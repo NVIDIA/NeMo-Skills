@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Default evaluation and generation settings for the minif2f dataset
-DATASET_GROUP = 'lean4'
+DATASET_GROUP = "lean4"
 METRICS_TYPE = "lean4-proof"
 EVAL_ARGS = "++eval_type=lean4-proof"
 GENERATION_ARGS = "++prompt_config=lean4/formal-proof"

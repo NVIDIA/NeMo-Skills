@@ -73,7 +73,7 @@ class ProcessTopAnswerConfig:
     def __post_init__(self):
         """Building data_file from dataset/split if not provided directly."""
         if isinstance(self.input_files, str):
-            if ',' in self.input_files:
+            if "," in self.input_files:
                 self.input_files = self.input_files.split(",")
             else:
                 self.input_files = self.input_files.split(" ")
@@ -156,7 +156,7 @@ class TopAnswerProcessor:
 
             # A single output file "output-agg.jsonl" is created where the top-scoring answer is
             # considered as predicted_answer for each problem
-            self.output_file_handles = [open(Path(cfg.output_dir) / f"output-agg.jsonl", "wt", encoding="utf-8")]
+            self.output_file_handles = [open(Path(cfg.output_dir) / "output-agg.jsonl", "wt", encoding="utf-8")]
 
         # Fill mode is used to indicate the mode of selecting the top-scoring answer
         self.fill_mode = "majority"
@@ -200,21 +200,21 @@ class TopAnswerProcessor:
             # Useful when extracting the top answer
             answer_to_metadata = {}
             for elem in data:
-                if 'predicted_answer' not in elem:
-                    elem['predicted_answer'] = extract_answer(elem['generation'])
-                if elem['predicted_answer'] is not None:
-                    answer_to_metadata[elem['predicted_answer']] = [
-                        elem.get('symbolic_correct', None),
-                        elem.get('judgement', None),
+                if "predicted_answer" not in elem:
+                    elem["predicted_answer"] = extract_answer(elem["generation"])
+                if elem["predicted_answer"] is not None:
+                    answer_to_metadata[elem["predicted_answer"]] = [
+                        elem.get("symbolic_correct", None),
+                        elem.get("judgement", None),
                     ]
 
             all_predictions.append(data)
 
             if cfg.use_majority_rm_score or cfg.use_highest_rm_score:
                 valid_answers_and_scores = [
-                    (elem['predicted_answer'], elem['reward_model_score'])
+                    (elem["predicted_answer"], elem["reward_model_score"])
                     for elem in data
-                    if elem['predicted_answer'] is not None
+                    if elem["predicted_answer"] is not None
                 ]
                 new_answers.append(("no_valid_answer_found", 0, None, None))
                 if len(valid_answers_and_scores) == 0:
@@ -237,7 +237,7 @@ class TopAnswerProcessor:
             else:
                 # Perform majority voting
                 # TODO: currently majority does not take into account equivalent answers written in a different way
-                valid_answers = [elem['predicted_answer'] for elem in data if elem['predicted_answer'] is not None]
+                valid_answers = [elem["predicted_answer"] for elem in data if elem["predicted_answer"] is not None]
                 new_answers.append(("no_valid_answer_found", (0, len(self.input_file_handles)), None, None))
                 if len(valid_answers) == 0:
                     continue
@@ -328,7 +328,7 @@ HELP_MESSAGE = get_help_message(ProcessTopAnswerConfig)
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

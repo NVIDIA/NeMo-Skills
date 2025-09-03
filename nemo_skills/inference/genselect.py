@@ -19,14 +19,10 @@ import re
 import sys
 from copy import deepcopy
 from dataclasses import field
-from enum import Enum
-from os import makedirs, path
+from os import path
 from pathlib import Path
-from typing import Any
 
 import hydra
-import typer
-from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
@@ -95,7 +91,7 @@ class GenSelectTask(GenerationTask):
             else:
                 judgment = None
 
-        except:
+        except Exception:
             judgment = None
 
         if judgment is not None and max_idx is not None:
@@ -114,33 +110,33 @@ class GenSelectTask(GenerationTask):
         output_file = Path(self.cfg.output_dir) / benchmark_dir / f"output-rs{self.cfg.inference.random_seed}.jsonl"
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(input_file, 'r') as f, open(output_file, 'w') as fout:
+        with open(input_file, "r") as f, open(output_file, "w") as fout:
             for single_answer_instance in single_answer_instances:
-                fout.write(json.dumps(single_answer_instance) + '\n')
+                fout.write(json.dumps(single_answer_instance) + "\n")
 
             for line in f:
                 instance = json.loads(line)
                 output_instance = deepcopy(instance)
 
-                judgment = self._extract_judgment(instance['genselect_comparison'], max_idx=instance["max_idx"])
+                judgment = self._extract_judgment(instance["genselect_comparison"], max_idx=instance["max_idx"])
                 if judgment is not None:
                     output_instance["judgment_idx"] = judgment
                 else:
                     output_instance["judgment_idx"] = None
                     judgment = random.randint(0, instance["max_idx"])
 
-                output_instance["predicted_answer"] = instance[f'predicted_answer_{judgment}']
+                output_instance["predicted_answer"] = instance[f"predicted_answer_{judgment}"]
 
                 if f"symbolic_correct_{judgment}" in instance:
-                    output_instance["symbolic_correct"] = instance[f'symbolic_correct_{judgment}']
+                    output_instance["symbolic_correct"] = instance[f"symbolic_correct_{judgment}"]
                 if f"judgement_{judgment}" in instance:
-                    output_instance["judgement"] = instance[f'judgement_{judgment}']
+                    output_instance["judgement"] = instance[f"judgement_{judgment}"]
 
-                fout.write(json.dumps(output_instance) + '\n')
+                fout.write(json.dumps(output_instance) + "\n")
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_genselect_config')
+@hydra.main(version_base=None, config_name="base_genselect_config")
 def generate(cfg: GenSelectConfig):
     cfg = GenSelectConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -156,7 +152,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

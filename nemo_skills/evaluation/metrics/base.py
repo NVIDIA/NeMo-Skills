@@ -14,22 +14,21 @@
 
 import abc
 import math
-import random
 from collections import Counter, defaultdict
 
 
 # Base class for metrics computation
 class BaseMetrics(abc.ABC):
-
-    def __init__(self):
+    def __init__(self, compute_no_answer: bool = True):
+        self.compute_no_answer = compute_no_answer
         self.reset()
 
     def update_common_metrics(self, agg_dict):
         agg_dict["num_entries"] = self.total
         if self.avg_tokens > 0:
-            agg_dict['avg_tokens'] = int(self.avg_tokens / self.total)
-        if self.max_end_time > float('-inf') and self.min_start_time < float('inf'):
-            agg_dict['gen_seconds'] = int(self.max_end_time - self.min_start_time)
+            agg_dict["avg_tokens"] = int(self.avg_tokens / self.total)
+        if self.max_end_time > float("-inf") and self.min_start_time < float("inf"):
+            agg_dict["gen_seconds"] = int(self.max_end_time - self.min_start_time)
 
     def get_metrics(self):
         metrics_dict = {}
@@ -75,16 +74,16 @@ class BaseMetrics(abc.ABC):
         if self.max_k == 0:
             self.max_k = len(predictions)
         self.avg_tokens += sum(
-            pred['num_generated_tokens'] for pred in predictions if 'num_generated_tokens' in pred
+            pred["num_generated_tokens"] for pred in predictions if "num_generated_tokens" in pred
         ) / len(predictions)
         try:
             self.min_start_time = min(
                 self.min_start_time,
-                min(pred['generation_start_time'] for pred in predictions if 'generation_start_time' in pred),
+                min(pred["generation_start_time"] for pred in predictions if "generation_start_time" in pred),
             )
             self.max_end_time = max(
                 self.max_end_time,
-                max(pred['generation_end_time'] for pred in predictions if 'generation_end_time' in pred),
+                max(pred["generation_end_time"] for pred in predictions if "generation_end_time" in pred),
             )
         except ValueError:  # min of empty sequence
             pass
@@ -93,18 +92,17 @@ class BaseMetrics(abc.ABC):
         self.total = 0
         self.max_k = 0
         self.avg_tokens = 0
-        self.min_start_time = float('inf')
-        self.max_end_time = float('-inf')
+        self.min_start_time = float("inf")
+        self.max_end_time = float("-inf")
         self.eval_dict = defaultdict(lambda: defaultdict(float))
 
-    @classmethod
-    def get_incorrect_sample(cls, predictions: list[dict]) -> list[dict]:
+    def get_incorrect_sample(self, predictions: list[dict]) -> list[dict]:
         """Needs to replace predictions with something that evaluates as incorrect.
 
         This is used in filtering based on length, where we want to automatically grade
         all solutions longer than a specified threshold as incorrect.
         """
-        raise NotImplementedError(f"Needs to be implemented in metrics class to support filtering on length.")
+        raise NotImplementedError("Needs to be implemented in metrics class to support filtering on length.")
 
     def _update_score_metrics_for_majority(
         self,
@@ -203,8 +201,9 @@ class BaseMetrics(abc.ABC):
                     predictions=predictions,
                     predicted_answers=predicted_answers,
                 )
+            if self.compute_no_answer:
+                eval_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
 
-            eval_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
             self._update_metrics_for_majority(
                 eval_dict=eval_dict,
                 k=k,
@@ -309,7 +308,7 @@ class BaseMetrics(abc.ABC):
                     predicted_answers=predicted_answers,
                 )
 
-                if predicted_answers is not None:
+                if predicted_answers is not None and self.compute_no_answer:
                     no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
                     eval_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
                     eval_dict[f"pass@1[avg-of-{k}]"]["no_answer"] += sum(no_answer_list) / k
@@ -330,7 +329,7 @@ class BaseMetrics(abc.ABC):
 
     def evaluations_to_print(self):
         """We will log all pass/pass@1[avg-of-k] up to k, but only report the kth one."""
-        return [f'pass@1[avg-of-{self.max_k}]', f'majority@{self.max_k}', f'pass@{self.max_k}']
+        return [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
 
 
 def as_percentage(metric_value):

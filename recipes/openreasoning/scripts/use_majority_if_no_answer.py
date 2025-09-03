@@ -17,7 +17,6 @@ import glob
 import json
 import os
 from collections import Counter
-from typing import Union
 
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
@@ -36,7 +35,7 @@ def process_files(input_folder: str, output_folder: str) -> None:
     # Load all files
     all_data = []
     for file_path in file_paths:
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             lines = f.readlines()
             data = [json.loads(line) for line in lines]
             all_data.append((file_path, data))
@@ -91,9 +90,9 @@ def process_files(input_folder: str, output_folder: str) -> None:
     # Save modified files
     for file_path, data in all_data:
         output_file = os.path.join(output_folder, os.path.basename(file_path))
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             for line_data in data:
-                f.write(json.dumps(line_data) + '\n')
+                f.write(json.dumps(line_data) + "\n")
 
     print(f"Processed {num_files} files with {num_lines} lines")
     print(f"Found {incorrect_judgements} lines without any correct judgement")
@@ -101,9 +100,9 @@ def process_files(input_folder: str, output_folder: str) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Process JSONL files and update predicted answers')
-    parser.add_argument('input_folder', help='Folder containing output-rsX.jsonl files')
-    parser.add_argument('output_folder', help='Folder to save modified files')
+    parser = argparse.ArgumentParser(description="Process JSONL files and update predicted answers")
+    parser.add_argument("input_folder", help="Folder containing output-rsX.jsonl files")
+    parser.add_argument("output_folder", help="Folder to save modified files")
     args = parser.parse_args()
 
     process_files(args.input_folder, args.output_folder)

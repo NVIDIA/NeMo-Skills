@@ -23,9 +23,9 @@ URL = "https://raw.githubusercontent.com/joyheyueya/declarative-math-word-proble
 
 if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
-    original_file = str(data_dir / f"original_test.csv")
+    original_file = str(data_dir / "original_test.csv")
     data_dir.mkdir(exist_ok=True)
-    output_file = str(data_dir / f"test.jsonl")
+    output_file = str(data_dir / "test.jsonl")
 
     if not os.path.exists(original_file):
         urllib.request.urlretrieve(URL, original_file)

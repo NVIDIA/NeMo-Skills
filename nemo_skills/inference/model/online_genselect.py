@@ -33,8 +33,9 @@ class OnlineGenSelectConfig:
     prompt_config: str = "generic/genselect"
     use_completions_api: bool = False
     tokenizer: str | None = None
+    chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
     temperature: float = 0.6
-    tokens_to_generate: int = 2048
+    tokens_to_generate: int | None = None
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     regex: str = r"Judg[e]?ment: (\d+)"
     remove_thinking: bool = True  # Remove thinking tokens from the comparison key
@@ -99,10 +100,10 @@ class OnlineGenSelectWrapper:
         solutions_text = self._format_solutions_for_genselect(solutions)
 
         genselect_input = {
-            'problem': prompt,
-            'solutions': solutions_text,
-            'num_solutions': num_solutions,
-            'max_idx': max_idx,
+            "problem": prompt,
+            "solutions": solutions_text,
+            "num_solutions": num_solutions,
+            "max_idx": max_idx,
         }
         genselect_prompt = self.genselect_prompt.fill(genselect_input)
 
@@ -115,7 +116,7 @@ class OnlineGenSelectWrapper:
         )
 
         # Step 3: Extract the judgment from the GenSelect result
-        judgment = self._extract_judgment(genselect_result['generation'], max_idx)
+        judgment = self._extract_judgment(genselect_result["generation"], max_idx)
         if judgment is None:
             LOG.warning("GenSelect failed to produce valid judgment, falling back to random selection")
             judgment = local_random.randint(0, max_idx)
@@ -139,7 +140,7 @@ class OnlineGenSelectWrapper:
             cur_random_seed = local_random.getrandbits(32)
             # Create a copy to avoid mutation issues
             current_kwargs = solution_kwargs.copy()
-            current_kwargs['random_seed'] = cur_random_seed
+            current_kwargs["random_seed"] = cur_random_seed
 
             task = self.model.generate_async(prompt=prompt, **current_kwargs)
             tasks.append(task)
@@ -177,7 +178,7 @@ class OnlineGenSelectWrapper:
 
         total_num_generated_tokens = 0
         for solution in solutions:
-            total_num_generated_tokens += solution["output_dict"].get('num_generated_tokens', 0)
+            total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)
         result["total_solution_generated_tokens"] = total_num_generated_tokens
 
         # Add the tokens for genselect
@@ -191,6 +192,6 @@ class OnlineGenSelectWrapper:
         result["num_generated_tokens"] = total_gen_tokens
 
         # Add the tokens for the best solution
-        result['num_best_solution_generated_tokens'] = best_solution["output_dict"].get("num_generated_tokens", 0)
+        result["num_best_solution_generated_tokens"] = best_solution["output_dict"].get("num_generated_tokens", 0)
 
         return result

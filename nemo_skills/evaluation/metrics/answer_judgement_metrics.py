@@ -33,15 +33,14 @@ class AnswerJudgementMetrics(BaseMetrics):
         self.individual_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
-        gt_judgement = is_correct_judgement_or_none(prediction['expected_judgement'])
-        pred_judgement = is_correct_judgement_or_none(prediction['judgement'])
+        gt_judgement = is_correct_judgement_or_none(prediction["expected_judgement"])
+        pred_judgement = is_correct_judgement_or_none(prediction["judgement"])
 
-        return {'correct_judgements': gt_judgement == pred_judgement}
+        return {"correct_judgements": gt_judgement == pred_judgement}
 
-    @classmethod
-    def get_incorrect_sample(cls, prediction: dict) -> dict:
+    def get_incorrect_sample(self, prediction: dict) -> dict:
         prediction = prediction.copy()
-        if is_correct_judgement_or_none(prediction['expected_judgement']):
+        if is_correct_judgement_or_none(prediction["expected_judgement"]):
             prediction["predicted_judgement"] = "Judgement: No"
         else:
             prediction["predicted_judgement"] = "Judgement: Yes"
@@ -58,18 +57,18 @@ class AnswerJudgementMetrics(BaseMetrics):
         # This is hacky, but the only way to access the datapoint_idx
         datapoint_idx = self.total - 1
         self.individual_metrics[agg_key][datapoint_idx][sample_idx] = {
-            'tp': float(is_tp),
-            'fp': float(is_fp),
-            'fn': float(is_fn),
-            'tn': float(is_tn),
+            "tp": float(is_tp),
+            "fp": float(is_fp),
+            "fn": float(is_fn),
+            "tn": float(is_tn),
         }
 
     def _update_fp_fn(self, metrics_dict, pred_judgement, gt_judgement, divide_by=1):
         is_fp = pred_judgement is True and gt_judgement is False
         is_fn = pred_judgement is False and gt_judgement is True
 
-        metrics_dict['false_positives'] += float(is_fp) / divide_by
-        metrics_dict['false_negatives'] += float(is_fn) / divide_by
+        metrics_dict["false_positives"] += float(is_fp) / divide_by
+        metrics_dict["false_negatives"] += float(is_fn) / divide_by
 
     def _update_score_metrics_for_majority(
         self,
@@ -82,9 +81,9 @@ class AnswerJudgementMetrics(BaseMetrics):
         predictions: list[dict],
         predicted_answers: list[str],
     ):
-        assert score_method == 'correct_judgements'
+        assert score_method == "correct_judgements"
         # expected answer is always the same for all predictions, so just take the first one
-        gt_judgement = is_correct_judgement_or_none(predictions[0]['expected_judgement'])
+        gt_judgement = is_correct_judgement_or_none(predictions[0]["expected_judgement"])
         self._update_fp_fn(eval_dict[f"majority@{k}"], majority_answer, gt_judgement)
         self._store_individual_metrics(f"majority@{k}", majority_answer, gt_judgement)
 
@@ -98,10 +97,10 @@ class AnswerJudgementMetrics(BaseMetrics):
         predictions: list[dict],
         predicted_answers: list[str] | None,
     ):
-        assert score_method == 'correct_judgements'
+        assert score_method == "correct_judgements"
         # expected answer is always the same for all predictions, so just take the first one
-        gt_judgement = is_correct_judgement_or_none(predictions[0]['expected_judgement'])
-        pred_judgements = [is_correct_judgement_or_none(pred['judgement']) for pred in predictions[:k]]
+        gt_judgement = is_correct_judgement_or_none(predictions[0]["expected_judgement"])
+        pred_judgements = [is_correct_judgement_or_none(pred["judgement"]) for pred in predictions[:k]]
         if gt_judgement in pred_judgements:
             pred_judgement = gt_judgement
         else:
@@ -114,8 +113,8 @@ class AnswerJudgementMetrics(BaseMetrics):
         self._store_individual_metrics(f"pass@{k}", pred_judgement, gt_judgement)
 
         for sample_idx, pred in enumerate(predictions[:k]):
-            gt_judgement = is_correct_judgement_or_none(pred['expected_judgement'])
-            pred_judgement = is_correct_judgement_or_none(pred['judgement'])
+            gt_judgement = is_correct_judgement_or_none(pred["expected_judgement"])
+            pred_judgement = is_correct_judgement_or_none(pred["judgement"])
             self._update_fp_fn(eval_dict[f"pass@1[avg-of-{k}]"], pred_judgement, gt_judgement, divide_by=k)
             self._store_individual_metrics(f"pass@1[avg-of-{k}]", pred_judgement, gt_judgement, sample_idx)
 
@@ -127,8 +126,8 @@ class AnswerJudgementMetrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         super().update(predictions)
-        self.total_positives += float(is_correct_judgement_or_none(predictions[0]['expected_judgement']) is True)
-        predicted_answers = [is_correct_judgement_or_none(pred['judgement']) for pred in predictions]
+        self.total_positives += float(is_correct_judgement_or_none(predictions[0]["expected_judgement"]) is True)
+        predicted_answers = [is_correct_judgement_or_none(pred["judgement"]) for pred in predictions]
         self._compute_pass_at_k(predictions=predictions, predicted_answers=predicted_answers)
         self._compute_majority_at_k(predictions=predictions, predicted_answers=predicted_answers)
 
@@ -148,9 +147,9 @@ class AnswerJudgementMetrics(BaseMetrics):
 
             for sample_metrics in datapoint_metrics.values():
                 metrics = sample_metrics[sample_idx]
-                total_tp += metrics['tp']
-                total_fp += metrics['fp']
-                total_fn += metrics['fn']
+                total_tp += metrics["tp"]
+                total_fp += metrics["fp"]
+                total_fn += metrics["fn"]
 
             # Compute precision for sample k
             if total_tp + total_fp > 0:
@@ -175,9 +174,9 @@ class AnswerJudgementMetrics(BaseMetrics):
 
         # Average across all K samples
         return {
-            'precision': 100 * sum(sample_precision_values) / max_k,
-            'recall': 100 * sum(sample_recall_values) / max_k,
-            'f1': 100 * sum(sample_f1_values) / max_k,
+            "precision": 100 * sum(sample_precision_values) / max_k,
+            "recall": 100 * sum(sample_recall_values) / max_k,
+            "f1": 100 * sum(sample_f1_values) / max_k,
         }
 
     def get_metrics(self):

@@ -33,8 +33,8 @@ def eval_ruler(cfg):
     def default_parse(prediction):
         prediction = prediction.strip()
         # Remove all non-printable characters
-        np_pattern = re.compile(r'[\x00-\x1f]')
-        pp_predict = np_pattern.sub('\n', prediction).strip()
+        np_pattern = re.compile(r"[\x00-\x1f]")
+        pp_predict = np_pattern.sub("\n", prediction).strip()
         return pp_predict
 
     def string_match_all_single(preds, refs):
@@ -57,21 +57,21 @@ def eval_ruler(cfg):
     eval_config = RulerEvaluatorConfig(**cfg.eval_config)
 
     parse_funcs = {
-        'default': default_parse,
+        "default": default_parse,
     }
     match_type_funcs = {
-        'all': string_match_all_single,
-        'part': string_match_part_single,
+        "all": string_match_all_single,
+        "part": string_match_part_single,
     }
 
     for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
+        with open(file, "rt", encoding="utf-8") as fin:
             data = [json.loads(line) for line in fin]
-        with open(file, 'wt', encoding='utf-8') as fout:
+        with open(file, "wt", encoding="utf-8") as fout:
             for sample in tqdm(data):
-                parse_result = parse_funcs[eval_config.parse_func](sample['generation'])
-                sample['is_correct'] = match_type_funcs[eval_config.match_type](
-                    sample['generation'], sample['expected_answer']
+                parse_result = parse_funcs[eval_config.parse_func](sample["generation"])
+                sample["is_correct"] = match_type_funcs[eval_config.match_type](
+                    sample["generation"], sample["expected_answer"]
                 )
-                sample['predicted_answer'] = parse_result
+                sample["predicted_answer"] = parse_result
                 fout.write(json.dumps(sample) + "\n")

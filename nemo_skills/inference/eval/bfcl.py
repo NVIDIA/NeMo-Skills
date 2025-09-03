@@ -15,13 +15,11 @@
 import json
 import logging
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, field
 from functools import partial
 
 import hydra
-import openai
-from omegaconf import OmegaConf
+import litellm
 
 from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
 from nemo_skills.inference.eval.bfcl_utils import (
@@ -157,16 +155,10 @@ class BFCLGenerationTask(GenerationTask):
         try:
             output = await self.llm.generate_async(**input_dict)
         # TODO: Currently we're assuming an openai interface which is not true for all servers
-        except openai.BadRequestError as e:
+        except litellm.exceptions.ContextWindowExceededError as e:
             error_str = str(e)
-            context_error = "is longer than the model's context length" in error_str
-            token_error = "Requested token count exceeds model's maximum context length" in error_str
-
-            if context_error or token_error:
-                LOG.warning(f"BFCL generation failed due to running out of context. {error_str}")
-                return {"message": None, "generation": ""}
-            else:
-                raise
+            LOG.warning(f"BFCL generation failed due to running out of context. {error_str}")
+            return {"message": None, "generation": ""}
 
         # Step 3: Parse the generated output. In case of server side parsing, merely getting the response message
         if self.cfg.use_client_parsing:
@@ -195,7 +187,7 @@ class BFCLGenerationTask(GenerationTask):
 
             return output
 
-    async def generate_single_data_point_single_turn(self, data_point):
+    async def _generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
         state_dict = {"messages": data_point["question"][0], "tools": data_point["tools"]}
 
@@ -211,13 +203,15 @@ class BFCLGenerationTask(GenerationTask):
                 "num_generated_tokens": model_response.get("num_generated_tokens", 0),
             }
 
-    async def generate_single_data_point_multi_turn(self, data_point):
+    async def _generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
 
         initial_config: dict = data_point["initial_config"]
         involved_classes: list = data_point["involved_classes"]
         test_entry_id: str = data_point["id"]
         test_category: str = data_point["id"].rsplit("_", 1)[0]
+
+        # This is a dictionary specifically for BFCLv3 test category "multi_turn_miss_func"
         holdout_function: dict[int, list] = data_point.get("missed_function", {})
 
         all_model_response: list[list] = []  # The model response that will be used for later evaluation
@@ -225,7 +219,7 @@ class BFCLGenerationTask(GenerationTask):
 
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
         state_dict = {"messages": [], "tools": data_point["tools"]}
-        output_dict = {"result": [], "num_generated_tokens": 0, "log_dict_list": []}
+        output_dict = {"num_generated_tokens": 0}
         out_of_context = False
 
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
@@ -258,16 +252,16 @@ class BFCLGenerationTask(GenerationTask):
                     break
 
                 output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
-                output_dict["log_dict_list"].append(model_response)
 
                 if self.cfg.remove_thinking:
                     if self.cfg.use_client_parsing:
                         if model_response["message"]["content"] is not None:
-                            trimmed_content = self._process_model_response_text(model_response["message"]["content"])
-                            model_response["message"]["content"] = trimmed_content
+                            model_response["message"]["content"] = self._remove_thinking_from_message_content(
+                                model_response["message"]["content"]
+                            )
                     else:
                         if model_response["message"].content is not None:
-                            model_response["message"].content = self._process_model_response_text(
+                            model_response["message"].content = self._remove_thinking_from_message_content(
                                 model_response["message"].content
                             )
 
@@ -286,7 +280,7 @@ class BFCLGenerationTask(GenerationTask):
                         LOG.info("Empty response from the model. Proceed to next turn.")
                         break
 
-                except Exception as e:
+                except Exception:
                     LOG.info("Failed to decode the model response. Proceed to next turn.")
                     break
 
@@ -329,13 +323,6 @@ class BFCLGenerationTask(GenerationTask):
 
         return output_dict
 
-    async def process_single_datapoint(self, data_point, all_data):
-        """Process a single data point and return the result."""
-        if data_point["single_turn"]:
-            return await self.generate_single_data_point_single_turn(data_point)
-        else:
-            return await self.generate_single_data_point_multi_turn(data_point)
-
     def _process_model_response(self, model_response):
         """Process the model response to get the result."""
         try:
@@ -351,8 +338,12 @@ class BFCLGenerationTask(GenerationTask):
                     for func_call in model_response["tool_calls"]
                 ]
                 tool_call_ids = [func_call.id for func_call in model_response["tool_calls"]]
-        except:
-            generation = model_response["generation"]
+
+        except Exception as e:
+            # This shouldn't matter much, because my guess is that the tool calls are what matter ultimately
+            # We just check to limit the generation to a string
+            LOG.error(f"Failed to parse function calls from the model response: {e}")
+            generation = model_response["generation"] if isinstance(model_response["generation"], str) else ""
             tool_call_ids = []
 
         return {
@@ -362,19 +353,27 @@ class BFCLGenerationTask(GenerationTask):
             "message": model_response["message"],
         }
 
-    def _process_model_response_text(self, model_response_text):
+    def _remove_thinking_from_message_content(self, model_response_text):
+        """If specified, remove the thinking part of the model response text."""
         if self.cfg.thinking_end in model_response_text:
-            return model_response_text.split(self.cfg.thinking_end)[-1].lstrip('\n')
+            return model_response_text.split(self.cfg.thinking_end)[-1].lstrip("\n")
         else:
             # If the thinking didn't finish, we can keep it empty
             return ""
+
+    async def process_single_datapoint(self, data_point, all_data):
+        """Process a single data point and return the result."""
+        if data_point["single_turn"]:
+            return await self._generate_single_data_point_single_turn(data_point)
+        else:
+            return await self._generate_single_data_point_multi_turn(data_point)
 
 
 GENERATION_TASK_CLASS = BFCLGenerationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_bfcl_generation_config')
+@hydra.main(version_base=None, config_name="base_bfcl_generation_config")
 def bfcl_generation(cfg: BFCLGenerationConfig):
     cfg = BFCLGenerationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -389,7 +388,7 @@ HELP_MESSAGE = get_help_message(
 )
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

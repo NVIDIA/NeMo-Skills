@@ -26,7 +26,7 @@ from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from tqdm import tqdm
 
-PACKING_ALGOS = ['first_fit_decreasing', 'first_fit_shuffle']
+PACKING_ALGOS = ["first_fit_decreasing", "first_fit_shuffle"]
 
 
 def find_first_bin_that_fits(bins: List[List[int]], s: int, bin_size: int) -> int:
@@ -127,7 +127,7 @@ def create_hist(dataset: np.array, truncate_seq_len: int):
         # Minus 1 here to account for the fact that transformer input and label have one less token than the full sequence
         # Input is missing the last token and label is missing the first token (this way the tokens are aligned for next token prediction).
         # We want pack size to be the length of the actual input and label, hence minus 1.
-        seq_len = len(item_dict['input_ids']) - 1
+        seq_len = len(item_dict["input_ids"]) - 1
         sequences[seq_len].append(item_dict)
         counts[seq_len] += 1
 
@@ -142,7 +142,7 @@ def create_hist(dataset: np.array, truncate_seq_len: int):
 
 
 def create_packing_strategy(
-    histogram: List[int], pack_size: int, packing_algorithm: str = 'first_fit'
+    histogram: List[int], pack_size: int, packing_algorithm: str = "first_fit"
 ) -> List[List[int]]:
     """
     Packs sequences into bins using the specified packing algorithm.
@@ -175,11 +175,11 @@ def create_packing_strategy(
 
     max_seqlen = max(all_seq_lens)
     max_samples_per_bin = max([len(b) for b in assignments])
-    packing_metadata = {'dataset_max_seqlen': max_seqlen, 'max_samples_per_bin': max_samples_per_bin}
+    packing_metadata = {"dataset_max_seqlen": max_seqlen, "max_samples_per_bin": max_samples_per_bin}
 
     logging.debug("Packed sequence lengths:")
     logging.debug(packed_seq_lens)
-    logging.info(f"Packing is {sum(packed_seq_lens)/len(packed_seq_lens)/pack_size*100:.2f}% efficient")
+    logging.info(f"Packing is {sum(packed_seq_lens) / len(packed_seq_lens) / pack_size * 100:.2f}% efficient")
     logging.info(
         f">>>>> For pack size {pack_size}, average number of sequences per pack is n = {packing_factor:.3f} <<<<<"
     )
@@ -214,15 +214,15 @@ def fill_packing_strategy(
         per_seq_data = sequences[seq_len]
         if len(per_seq_data) > 0:
             perm = np.random.permutation(len(per_seq_data))
-            input_ids = np.array([x['input_ids'] for x in per_seq_data])[perm].tolist()
+            input_ids = np.array([x["input_ids"] for x in per_seq_data])[perm].tolist()
             try:
                 loss_mask = np.array(
                     [
                         [
                             ## (x['answer_start_idx'] - 1) because we want to train on the output
                             ## after the last context token
-                            idx >= (x['answer_start_idx'] - 1) and x['input_ids'][idx] != pad_id
-                            for idx in range(len(x['input_ids']))
+                            idx >= (x["answer_start_idx"] - 1) and x["input_ids"][idx] != pad_id
+                            for idx in range(len(x["input_ids"]))
                         ]
                         for x in per_seq_data
                     ]
@@ -247,7 +247,7 @@ def fill_packing_strategy(
 
     output_data = []
     for i in range(len(input_ids)):
-        item_dict = {'input_ids': input_ids[i], 'loss_mask': loss_mask[i], 'seq_start_id': seq_start_id[i]}
+        item_dict = {"input_ids": input_ids[i], "loss_mask": loss_mask[i], "seq_start_id": seq_start_id[i]}
         output_data.append(item_dict)
 
     assert all(not seq[0] for seq in ifile_handles.values()), "Error: There are items left over from the assignment"
@@ -330,7 +330,7 @@ def parallel_convert_dataset(dataset, num_workers=100):
     return np.array([item for chunk in results for item in chunk])
 
 
-def tokenize_dataset(cfg: 'DictConfig'):
+def tokenize_dataset(cfg: "DictConfig"):
     """
     Tokenizes a dataset using the same configuration file as finetuninng with GPTSFTDataset.
 
@@ -367,24 +367,24 @@ def tokenize_dataset(cfg: 'DictConfig'):
         max_seq_length=data_cfg.max_seq_length,
         min_seq_length=data_cfg.min_seq_length,
         pad_seq_length_to_mult=pad_seq_length_to_mult,
-        add_bos=data_cfg.get('add_bos', False),
-        add_eos=data_cfg.get('add_eos', True),
-        add_sep=data_cfg.get('add_sep', False),
-        sep_id=cfg.get('sep_id', 49704),
+        add_bos=data_cfg.get("add_bos", False),
+        add_eos=data_cfg.get("add_eos", True),
+        add_sep=data_cfg.get("add_sep", False),
+        sep_id=cfg.get("sep_id", 49704),
         max_num_samples=None,
-        seed=data_cfg.get('seed', 1234),
-        label_key=data_cfg.get('label_key', 'answer'),
-        answer_only_loss=cfg.get('answer_only_loss', True),
-        truncation_field=data_cfg.get('truncation_field', 'text'),
-        pad_to_max_length=data_cfg.get('pad_to_max_length', False),
-        index_mapping_dir=data_cfg.get('index_mapping_dir', None),
-        prompt_template=data_cfg.get('prompt_template', None),
+        seed=data_cfg.get("seed", 1234),
+        label_key=data_cfg.get("label_key", "answer"),
+        answer_only_loss=cfg.get("answer_only_loss", True),
+        truncation_field=data_cfg.get("truncation_field", "text"),
+        pad_to_max_length=data_cfg.get("pad_to_max_length", False),
+        index_mapping_dir=data_cfg.get("index_mapping_dir", None),
+        prompt_template=data_cfg.get("prompt_template", None),
         virtual_tokens=0,
-        tokens_to_generate=data_cfg.get('tokens_to_generate', 0),
-        memmap_workers=data_cfg.get('memmap_workers', None),
-        hf_dataset=data_cfg.get('hf_dataset', False),
-        truncation_method=data_cfg.get('truncation_method', 'right'),
-        special_tokens=data_cfg.get('chat_prompt_tokens', None),
+        tokens_to_generate=data_cfg.get("tokens_to_generate", 0),
+        memmap_workers=data_cfg.get("memmap_workers", None),
+        hf_dataset=data_cfg.get("hf_dataset", False),
+        truncation_method=data_cfg.get("truncation_method", "right"),
+        special_tokens=data_cfg.get("chat_prompt_tokens", None),
         is_test=True,
     )
 
@@ -396,12 +396,12 @@ def tokenize_dataset(cfg: 'DictConfig'):
     if cp_size > 1:
 
         def pre_pad_dataset(data, max_seq_length, max_length_to_pad, pad_id):
-            '''
+            """
             pad each individual data point to the length of max_length
-            '''
+            """
             assert max_seq_length >= max_length_to_pad
             for key, val in data.items():
-                if key in {'input_ids', 'context_ids'}:
+                if key in {"input_ids", "context_ids"}:
                     if len(val) <= max_length_to_pad:
                         # because input_ids are truncated by 1 for inputs and labels,
                         # we add 1 extra padding here to make sure padded inputs and labels
@@ -418,9 +418,11 @@ def tokenize_dataset(cfg: 'DictConfig'):
                         data[key] = val[:max_seq_length]
             return
 
-        ceil_to_nearest = lambda n, m: (n + m - 1) // m * m
+        def ceil_to_nearest(n, m):
+            return (n + m - 1) // m * m
+
         for data in dataset:
-            max_length_to_pad = min(max_seq_length, ceil_to_nearest(len(data['input_ids']), pad_seq_length_to_mult))
+            max_length_to_pad = min(max_seq_length, ceil_to_nearest(len(data["input_ids"]), pad_seq_length_to_mult))
             pre_pad_dataset(data, max_seq_length, max_length_to_pad, pad_id)
     return dataset, tokenizer
 
@@ -432,8 +434,8 @@ class PackingArgs:
     packing_algorithm: str = "first_fit_shuffle"
     seed: int = 0
 
-    def from_config(self, cfg: 'DictConfig'):
-        for required_arg in ('output_dir', 'pack_sizes'):
+    def from_config(self, cfg: "DictConfig"):
+        for required_arg in ("output_dir", "pack_sizes"):
             assert cfg.get(required_arg, None), f"Please specify +{required_arg}=..."
         self.output_dir = cfg.output_dir
         self.pack_sizes = cfg.pack_sizes
@@ -481,7 +483,7 @@ def process_chunk_wrapper(args):
 
 
 @hydra_runner(config_path=".", config_name="pack_config")
-def main(cfg: 'DictConfig') -> None:
+def main(cfg: "DictConfig") -> None:
     args = PackingArgs().from_config(cfg)
     dataset, tokenizer = tokenize_dataset(cfg)
     split_packing_length = cfg.split_packing_length
@@ -522,8 +524,8 @@ def main(cfg: 'DictConfig') -> None:
         N = len(all_packed_data)
         P, M = 0, 0
         for sample in tqdm(all_packed_data, desc="Finding P, M"):
-            P = max(P, len(sample['input_ids']))
-            M = max(M, len(sample['seq_start_id']))
+            P = max(P, len(sample["input_ids"]))
+            M = max(M, len(sample["seq_start_id"]))
 
         logging.info("Pre-allocating arrays...")
         all_input_ids = -np.ones((N, P), dtype=np.int32)
@@ -532,21 +534,21 @@ def main(cfg: 'DictConfig') -> None:
 
         logging.info("Filling arrays to max len...")
         for i, sample in tqdm(enumerate(all_packed_data), desc="Filling arrays", total=len(all_packed_data)):
-            seq_len_ids = len(sample['input_ids'])
-            seq_len_mask = len(sample['loss_mask'])
-            seq_len_starts = len(sample['seq_start_id'])
+            seq_len_ids = len(sample["input_ids"])
+            seq_len_mask = len(sample["loss_mask"])
+            seq_len_starts = len(sample["seq_start_id"])
 
-            all_input_ids[i, :seq_len_ids] = sample['input_ids']
-            all_loss_mask[i, :seq_len_mask] = sample['loss_mask']
-            all_seq_start_id[i, :seq_len_starts] = sample['seq_start_id']
+            all_input_ids[i, :seq_len_ids] = sample["input_ids"]
+            all_loss_mask[i, :seq_len_mask] = sample["loss_mask"]
+            all_seq_start_id[i, :seq_len_starts] = sample["seq_start_id"]
 
         # Save arrays
         logging.info("Writing final npy files")
         os.makedirs(args.output_dir, exist_ok=True)
-        base_path = os.path.join(args.output_dir, f'packed_{pack_size}_seed{args.seed}')
-        np.save(f'{base_path}.input_ids.npy', all_input_ids)
-        np.save(f'{base_path}.loss_mask.npy', all_loss_mask)
-        np.save(f'{base_path}.seq_start_id.npy', all_seq_start_id)
+        base_path = os.path.join(args.output_dir, f"packed_{pack_size}_seed{args.seed}")
+        np.save(f"{base_path}.input_ids.npy", all_input_ids)
+        np.save(f"{base_path}.loss_mask.npy", all_loss_mask)
+        np.save(f"{base_path}.seq_start_id.npy", all_seq_start_id)
         logging.info(f"Done, output written to {base_path}.[input_ids|loss_mask|seq_start_id].npy")
 
     logging.info(
@@ -558,5 +560,5 @@ for more details: <https://docs.nvidia.com/nemo-framework/user-guide/latest/nemo
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

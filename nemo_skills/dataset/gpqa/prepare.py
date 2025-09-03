@@ -44,7 +44,7 @@ def format_entry(entry):
         preprocess(entry["Incorrect Answer 3"]),
         preprocess(entry["Correct Answer"]),
     ]
-    
+
     random.shuffle(choices)
     correct_answer_index = choices.index(preprocess(entry["Correct Answer"]))
     return {
@@ -52,7 +52,7 @@ def format_entry(entry):
         "explanation": preprocess(entry["Explanation"]),
         "subset_for_metrics": entry["Subdomain"],
         "difficulty": (
-            re.split(r'\s*\(', entry["Writer's Difficulty Estimate"])[0]
+            re.split(r"\s*\(", entry["Writer's Difficulty Estimate"])[0]
             if entry["Writer's Difficulty Estimate"] is not None
             else None
         ),
@@ -94,4 +94,3 @@ if __name__ == "__main__":
             save_data(split, args.random_seed)
     else:
         save_data(args.split, args.random_seed)
-        

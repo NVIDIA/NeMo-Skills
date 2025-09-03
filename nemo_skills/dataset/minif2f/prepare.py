@@ -33,9 +33,9 @@ def split_data(input_file):
     with open(input_file, "r", encoding="utf-8") as file:
         for line in file:
             entry = json.loads(line)
-            if entry['split'] == 'valid':
+            if entry["split"] == "valid":
                 valid_data.append(entry)
-            elif entry['split'] == 'test':
+            elif entry["split"] == "test":
                 test_data.append(entry)
 
     return valid_data, test_data

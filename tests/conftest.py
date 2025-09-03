@@ -21,13 +21,13 @@ import yaml
 
 def docker_run(command, image_name=None, volume_paths=None):
     test_config_path = Path(__file__).absolute().parent / "gpu-tests" / "test-local.yaml"
-    with test_config_path.open('r') as f:
+    with test_config_path.open("r") as f:
         config = yaml.safe_load(f.read())
 
     if image_name is None:
-        image_name = config['containers']['nemo-skills']
+        image_name = config["containers"]["nemo-skills"]
     if volume_paths is None:
-        volume_paths = config['mounts']
+        volume_paths = config["mounts"]
 
     client = docker.from_env()
 
@@ -35,8 +35,8 @@ def docker_run(command, image_name=None, volume_paths=None):
         # Process volume paths
         volumes = {}
         for path in volume_paths:
-            src, dst = path.split(':')
-            volumes[os.path.abspath(src)] = {'bind': dst, 'mode': 'rw'}
+            src, dst = path.split(":")
+            volumes[os.path.abspath(src)] = {"bind": dst, "mode": "rw"}
 
         # Run the container
         full_command = f"/bin/bash -c '{command}'"
@@ -47,7 +47,7 @@ def docker_run(command, image_name=None, volume_paths=None):
             remove=True,
             detach=False,
         )
-        logs = result.decode('utf-8')
+        logs = result.decode("utf-8")
         print("Operation completed.")
         print("Container logs:", logs)
     except docker.errors.ContainerError as e:

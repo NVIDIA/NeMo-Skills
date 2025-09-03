@@ -17,27 +17,27 @@ concurrency:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v5
     - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: "3.10"
+        cache: pip
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .
-        pip install -r requirements/common-tests.txt
+        pip install -e .[dev]
     - name: Run all tests
       env:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
         docker pull igitman/nemo-skills:0.7.0
-        docker run --rm --name=local-sandbox igitman/nemo-skills-sandbox:0.7.0 &
-        sleep 120
-        export NEMO_SKILLS_SANDBOX_HOST=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' local-sandbox`
+        docker pull igitman/nemo-skills-sandbox:0.7.1
+        docker run --rm --network=host igitman/nemo-skills-sandbox:0.7.1 &
+        sleep 10
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ns prepare_data gsm8k math-500
         python -m pytest tests/ -m "not gpu" --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=nemo_skills --cov=pipeline --durations=30 -rs -s -vvv

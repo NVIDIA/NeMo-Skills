@@ -17,7 +17,7 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 class RulerMetrics(BaseMetrics):
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
-        return {"accuracy": prediction['is_correct']}
+        return {"accuracy": prediction["is_correct"]}
 
     def update(self, predictions):
         super().update(predictions)
@@ -25,5 +25,5 @@ class RulerMetrics(BaseMetrics):
 
     def get_incorrect_sample(self, prediction: dict) -> dict:
         prediction = prediction.copy()
-        prediction['is_correct'] = False
+        prediction["is_correct"] = False
         return prediction

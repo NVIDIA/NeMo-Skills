@@ -25,7 +25,7 @@ def format_code_output(
     execution_dict,
     code_output_begin: str,
     code_output_end: str,
-    code_output_format: str = 'llama',
+    code_output_format: str = "llama",
     remaining_code_executions: int | None = None,
 ):
     """Formatting code output to be displayed as an llm expects it."""
@@ -41,23 +41,23 @@ def format_code_output(
             )
         else:
             remaining_ce_string = (
-                f"```system\n"
-                f"You have run out of code executions! You can no longer write or execute code. "
-                f"Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.\n"
-                f"```\n"
+                "```system\n"
+                "You have run out of code executions! You can no longer write or execute code. "
+                "Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.\n"
+                "```\n"
             )
-    if code_output_format == 'llama':
+    if code_output_format == "llama":
         output = execution_dict["process_status"]
-        if execution_dict['stdout']:
+        if execution_dict["stdout"]:
             output += f"\n[stdout]\n{execution_dict['stdout']}[/stdout]"
-        if execution_dict['stderr']:
+        if execution_dict["stderr"]:
             output += f"\n[stderr]\n{execution_dict['stderr']}[/stderr]"
         output = f"{code_output_begin}\n\n{output}{remaining_ce_string}{code_output_end}\n\n"
-    elif code_output_format == 'qwen':
+    elif code_output_format == "qwen":
         output = ""
-        if execution_dict['stdout']:
+        if execution_dict["stdout"]:
             output += f"{execution_dict['stdout']}"
-        if execution_dict['stderr']:
+        if execution_dict["stderr"]:
             output += f"{execution_dict['stderr']}"
         output = f"{code_output_begin}{output}{code_output_end}{remaining_ce_string}"
     else:
@@ -74,7 +74,7 @@ def _extract_between_separators(generation: str, separators: Tuple[str, str], ex
     """
     if extract_all:
         separators = [re.escape(sp) for sp in separators]
-        pattern = f'{separators[0]}(.*?){separators[1]}'
+        pattern = f"{separators[0]}(.*?){separators[1]}"
         return re.findall(pattern, generation, re.DOTALL)
     return generation.split(separators[0])[-1].split(separators[1])[0]
 

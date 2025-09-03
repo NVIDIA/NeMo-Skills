@@ -1,0 +1,531 @@
+import types
+
+import pytest
+from omegaconf import OmegaConf
+
+# Dummy client to exercise MCPClientMeta behavior without real I/O
+from nemo_skills.mcp.clients import (
+    MCPClient,
+    MCPClientManager,
+    MCPStdioClient,
+    MCPStreamableHttpClient,
+)
+
+
+class DummyClient(MCPClient):
+    def __init__(self):
+        # Pre-populate with a simple tool list; will also be returned by list_tools()
+        self.tools = [
+            {
+                "name": "execute",
+                "description": "Run code",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "code": {"type": "string"},
+                        "session_id": {"type": "string"},
+                        "timeout": {"type": "integer"},
+                    },
+                    "required": ["code", "session_id"],
+                },
+            },
+            {
+                "name": "echo",
+                "description": "Echo input",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                },
+            },
+        ]
+
+    async def list_tools(self):
+        return list(self.tools)
+
+    async def call_tool(self, tool: str, args: dict):
+        # Enforce allowed/disabled rules like real clients do
+        self._assert_tool_allowed(tool)
+        if tool == "execute":
+            return {"ran": True, "code": args.get("code")}
+        if tool == "echo":
+            return {"echo": args.get("text")}
+        return {"unknown": tool, "args": args}
+
+
+class MinimalClient(MCPClient):
+    # No __init__; tests default attribute injection via metaclass __call__
+    async def list_tools(self):
+        return []
+
+    async def call_tool(self, tool: str, args: dict):
+        return {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_metaclass_list_tools_hides_and_filters():
+    client = DummyClient(
+        hide_args={"execute": ["session_id", "timeout"]},
+        disabled_tools=["echo"],
+    )
+    tools = await client.list_tools()
+
+    # Only "execute" should remain due to disabled_tools
+    names = {t["name"] for t in tools}
+    assert names == {"execute"}
+
+    execute = tools[0]
+    schema = execute["input_schema"]
+    assert "session_id" not in schema["properties"]
+    assert "timeout" not in schema["properties"]
+    assert "code" in schema["properties"]
+    # required should be updated (removed hidden keys)
+    assert "session_id" not in schema.get("required", [])
+
+
+@pytest.mark.asyncio
+async def test_metaclass_enabled_tools_allowlist_and_missing_check():
+    # When enabled_tools is non-empty: only those are returned, and missing raises
+    client = DummyClient(enabled_tools=["execute"])  # allow only execute
+    tools = await client.list_tools()
+    assert [t["name"] for t in tools] == ["execute"]
+
+    client_missing = DummyClient(enabled_tools=["execute", "missing_tool"])  # missing
+    with pytest.raises(ValueError):
+        await client_missing.list_tools()
+
+
+@pytest.mark.asyncio
+async def test_metaclass_call_tool_output_formatter_and_init_hook():
+    hook_called = {"flag": False}
+
+    def init_hook(self):
+        hook_called["flag"] = True
+        setattr(self, "_ready", True)
+
+    def formatter(result):
+        # Convert results to a simple string signature
+        if isinstance(result, dict) and "ran" in result:
+            return f"ran:{result.get('code')}"
+        return str(result)
+
+    client = DummyClient(output_formatter=formatter, init_hook=init_hook)
+    assert hook_called["flag"] is True
+    assert getattr(client, "_ready", False) is True
+
+    out = await client.call_tool("execute", {"code": "print(1)"})
+    assert out == "ran:print(1)"
+
+
+def test_minimal_client_defaults_and_sanitize():
+    # Minimal client with no __init__ still gets default attributes
+    c = MinimalClient()
+    assert hasattr(c, "_hide_args") and c._hide_args == {}
+    assert hasattr(c, "_enabled_tools") and isinstance(c._enabled_tools, set)
+    assert hasattr(c, "_disabled_tools") and isinstance(c._disabled_tools, set)
+
+    # Sanitize removes hidden keys
+    c._hide_args = {"tool": ["secret", "token"]}
+    clean = c.sanitize("tool", {"x": 1, "secret": 2, "token": 3})
+    assert clean == {"x": 1}
+
+
+@pytest.mark.asyncio
+async def test_manager_register_and_tool_map_and_execute():
+    c1 = DummyClient()
+    c2 = DummyClient()
+
+    # Pre-populate tool listings so register builds initial tool_map entries
+    manager = MCPClientManager()
+    manager.register("c1", c1)
+    manager.register("c2", c2)
+
+    # Initial tool_map should include pre-populated tools
+    assert any(k.startswith("c1.") for k in manager.tool_map)
+    assert any(k.startswith("c2.") for k in manager.tool_map)
+
+    tools = await manager.list_all_tools(use_cache=False)
+    names = sorted(t["name"] for t in tools)
+    # Each client contributes two tools
+    assert names == ["c1.echo", "c1.execute", "c2.echo", "c2.execute"]
+
+    # Execute should route to underlying client with bare tool name
+    result = await manager.execute_tool("c1.execute", {"code": "x=1"})
+    assert result == {"ran": True, "code": "x=1"}
+
+
+@pytest.mark.asyncio
+async def test_manager_list_all_tools_uses_cache_and_duplicate_detection():
+    calls = {"c": 0}
+
+    class CountingClient(DummyClient):
+        async def list_tools(self):
+            calls["c"] += 1
+            return await super().list_tools()
+
+    manager = MCPClientManager()
+    c = CountingClient()
+    manager.register("c", c)
+
+    _ = await manager.list_all_tools(use_cache=True)
+    _ = await manager.list_all_tools(use_cache=True)
+    # Only first call should trigger underlying list_tools due to cache
+    assert calls["c"] == 1
+
+    # Duplicate detection: same client returns duplicate raw tool names
+    dup = DummyClient()
+    # Force duplicate name entries inside a single client's tool list
+    dup.tools = [dup.tools[0], dup.tools[0]]
+    manager2 = MCPClientManager()
+    manager2.register("d", dup)
+    with pytest.raises(ValueError):
+        await manager2.list_all_tools(use_cache=False)
+
+
+@pytest.mark.asyncio
+async def test_stdio_client_list_tools_hide_and_call_tool_with_output_formatter(monkeypatch):
+    # Build fakes
+    class ToolObj:
+        def __init__(self, name, description, input_schema=None, inputSchema=None):
+            self.name = name
+            self.description = description
+            if input_schema is not None:
+                self.input_schema = input_schema
+            if inputSchema is not None:
+                self.inputSchema = inputSchema
+
+    class ToolsResp:
+        def __init__(self, tools):
+            self.tools = tools
+
+    class ResultObj:
+        def __init__(self, structured):
+            self.structuredContent = structured
+
+    class FakeSession:
+        def __init__(self, *_):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def initialize(self):
+            return None
+
+        async def list_tools(self):
+            return ToolsResp(
+                [
+                    ToolObj(
+                        name="execute",
+                        description="Run",
+                        input_schema={
+                            "type": "object",
+                            "properties": {
+                                "code": {"type": "string"},
+                                "session_id": {"type": "string"},
+                                "timeout": {"type": "integer"},
+                            },
+                            "required": ["code", "session_id"],
+                        },
+                    ),
+                    ToolObj(
+                        name="echo",
+                        description="Echo",
+                        inputSchema={
+                            "type": "object",
+                            "properties": {"text": {"type": "string"}},
+                            "required": ["text"],
+                        },
+                    ),
+                ]
+            )
+
+        async def call_tool(self, tool, arguments):
+            return ResultObj({"tool": tool, "args": arguments})
+
+    class FakeStdioCtx:
+        async def __aenter__(self):
+            return ("r", "w")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    import nemo_skills.mcp.clients as clients_mod
+
+    monkeypatch.setattr(clients_mod, "ClientSession", FakeSession)
+    monkeypatch.setattr(clients_mod, "stdio_client", lambda *_: FakeStdioCtx())
+
+    formatted = []
+
+    def output_formatter(result):
+        formatted.append(result)
+        return {"formatted": True, "data": result}
+
+    client = MCPStdioClient(
+        command="python",
+        args=["-m", "nemo_skills.mcp.servers.python_tool"],
+        hide_args={"execute": ["session_id", "timeout"]},
+        enabled_tools=["execute", "echo"],
+        output_formatter=output_formatter,
+    )
+
+    tools = await client.list_tools()
+    # Ensure hide_args pruned and names preserved
+    names = sorted(t["name"] for t in tools)
+    assert names == ["echo", "execute"]
+    exec_tool = next(t for t in tools if t["name"] == "execute")
+    props = exec_tool["input_schema"]["properties"]
+    assert "session_id" not in props and "timeout" not in props and "code" in props
+
+    # call_tool should enforce allowlist and apply output formatter
+    out = await client.call_tool("execute", {"code": "print(1)"})
+    assert out == {"formatted": True, "data": {"tool": "execute", "args": {"code": "print(1)"}}}
+    # formatter received the pre-formatted structured content
+    assert formatted and formatted[-1] == {"tool": "execute", "args": {"code": "print(1)"}}
+
+
+@pytest.mark.asyncio
+async def test_stdio_client_enabled_tools_enforcement(monkeypatch):
+    class FakeSession:
+        def __init__(self, *_):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def initialize(self):
+            return None
+
+        async def list_tools(self):
+            # Minimal list
+            class T:
+                def __init__(self):
+                    self.name = "execute"
+                    self.description = "d"
+                    self.input_schema = {"type": "object"}
+
+            class R:
+                def __init__(self, tools):
+                    self.tools = tools
+
+            return R([T()])
+
+        async def call_tool(self, tool, arguments):
+            class Res:
+                def __init__(self, content):
+                    self.structuredContent = content
+
+            return Res({"ok": True})
+
+    class FakeStdioCtx:
+        async def __aenter__(self):
+            return ("r", "w")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    import nemo_skills.mcp.clients as clients_mod
+
+    monkeypatch.setattr(clients_mod, "ClientSession", FakeSession)
+    monkeypatch.setattr(clients_mod, "stdio_client", lambda *_: FakeStdioCtx())
+
+    client = MCPStdioClient(command="python", enabled_tools=["only_this_tool"])  # allowlist excludes "execute"
+    with pytest.raises(PermissionError):
+        await client.call_tool("execute", {})
+
+
+@pytest.mark.asyncio
+async def test_streamable_http_client_list_and_call_tool(monkeypatch):
+    class ToolObj:
+        def __init__(self, name, description, input_schema=None, inputSchema=None):
+            self.name = name
+            self.description = description
+            if input_schema is not None:
+                self.input_schema = input_schema
+            if inputSchema is not None:
+                self.inputSchema = inputSchema
+
+    class ToolsResp:
+        def __init__(self, tools):
+            self.tools = tools
+
+    class ResultObj:
+        def __init__(self, structured=None):
+            self.structuredContent = structured
+
+    class FakeSession:
+        def __init__(self, *_):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def initialize(self):
+            return None
+
+        async def list_tools(self):
+            return ToolsResp(
+                [
+                    ToolObj("t1", "desc", input_schema={"type": "object"}),
+                    ToolObj("t2", "desc", inputSchema={"type": "object"}),
+                ]
+            )
+
+        async def call_tool(self, tool, arguments):
+            if tool == "t1":
+                return ResultObj({"ok": True})
+            # No structured content -> client should return raw object
+            return types.SimpleNamespace(structuredContent=None, raw=True, tool=tool, arguments=arguments)
+
+    class FakeHttpCtx:
+        async def __aenter__(self):
+            return ("r", "w", None)
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    import nemo_skills.mcp.clients as clients_mod
+
+    monkeypatch.setattr(clients_mod, "ClientSession", FakeSession)
+    monkeypatch.setattr(clients_mod, "streamablehttp_client", lambda *_: FakeHttpCtx())
+
+    client = MCPStreamableHttpClient(base_url="https://example.com/mcp")
+    tools = await client.list_tools()
+    assert sorted(t["name"] for t in tools) == ["t1", "t2"]
+
+    # structured content present -> return structured
+    out1 = await client.call_tool("t1", {})
+    assert out1 == {"ok": True}
+
+    # structured content absent -> return raw
+    out2 = await client.call_tool("t2", {"x": 1})
+    assert getattr(out2, "raw", False) is True and getattr(out2, "tool", "") == "t2"
+
+
+@pytest.mark.asyncio
+async def test_streamable_http_client_enforcement(monkeypatch):
+    class FakeSession:
+        def __init__(self, *_):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def initialize(self):
+            return None
+
+        async def list_tools(self):
+            class T:
+                def __init__(self):
+                    self.name = "t1"
+                    self.description = "d"
+                    self.input_schema = {"type": "object"}
+
+            class R:
+                def __init__(self, tools):
+                    self.tools = tools
+
+            return R([T()])
+
+        async def call_tool(self, tool, arguments):
+            return types.SimpleNamespace(structuredContent=None)
+
+    class FakeHttpCtx:
+        async def __aenter__(self):
+            return ("r", "w", None)
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    import nemo_skills.mcp.clients as clients_mod
+
+    monkeypatch.setattr(clients_mod, "ClientSession", FakeSession)
+    monkeypatch.setattr(clients_mod, "streamablehttp_client", lambda *_: FakeHttpCtx())
+
+    client = MCPStreamableHttpClient(base_url="https://example.com/mcp", enabled_tools=["only_t2"])  # not including t1
+    with pytest.raises(PermissionError):
+        await client.call_tool("t1", {})
+
+
+@pytest.mark.asyncio
+async def test_build_manager_resolves_output_formatter_and_init_hook_locate_hydra(monkeypatch):
+    # Build config with $locate for init_hook and string locate for output_formatter
+    cfg = OmegaConf.create(
+        {
+            "tools": [
+                {
+                    "id": "py",
+                    "client": "nemo_skills.mcp.clients.MCPStdioClient",
+                    "params": {
+                        "command": "python",
+                        "args": ["-m", "nemo_skills.mcp.servers.python_tool"],
+                        "init_hook": {
+                            "$locate": "nemo_skills.mcp.utils.hydra_config_connector_factory",
+                            "kwargs": {"config_obj": "@@full_config"},
+                        },
+                        "output_formatter": "nemo_skills.mcp.utils.exa_output_formatter",
+                    },
+                }
+            ]
+        }
+    )
+
+    import nemo_skills.mcp.utils as utils_mod
+    from nemo_skills.mcp.config import build_client_manager
+
+    manager = build_client_manager(cfg)
+    client = manager.get_client("py")
+    assert isinstance(client, MCPStdioClient)
+
+    # init_hook should have executed and appended hydra args
+    args_list = list(client.server_params.args)
+    assert "--config-dir" in args_list and "--config-name" in args_list
+
+    # output formatter should be resolved callable
+    assert client.output_formatter is utils_mod.exa_output_formatter
+
+
+@pytest.mark.asyncio
+async def test_build_manager_locate_string_for_output_formatter_and_init_hook_string(monkeypatch):
+    # Ensure env var is present for exa_auth_connector side-effect
+    monkeypatch.setenv("EXA_API_KEY", "KEY123")
+
+    cfg = OmegaConf.create(
+        {
+            "tools": [
+                {
+                    "id": "http",
+                    "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient",
+                    "params": {
+                        "base_url": "https://host/mcp",
+                        "output_formatter": "nemo_skills.mcp.utils.exa_output_formatter",
+                        "init_hook": "nemo_skills.mcp.utils.exa_auth_connector",
+                    },
+                }
+            ]
+        }
+    )
+
+    import nemo_skills.mcp.utils as utils_mod
+    from nemo_skills.mcp.config import build_client_manager
+
+    manager = build_client_manager(cfg)
+    client = manager.get_client("http")
+    assert isinstance(client, MCPStreamableHttpClient)
+
+    # init_hook should have modified base_url to include API key
+    assert client.base_url.endswith("?exaApiKey=KEY123")
+    # output formatter should be resolved callable
+    assert client.output_formatter is utils_mod.exa_output_formatter

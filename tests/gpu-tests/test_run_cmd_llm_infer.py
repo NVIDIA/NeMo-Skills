@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import subprocess
-import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -29,15 +26,14 @@ def test_run_cmd_llm_infer():
     Uses (if available) VLLM servers, then sends the same prompt
     with with openai python api to check if generation works.
     """
-    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
+    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
 
     model_info = [
-        ("vllm", os.getenv('NEMO_SKILLS_TEST_HF_MODEL')),
+        ("vllm", os.getenv("NEMO_SKILLS_TEST_HF_MODEL")),
     ]
 
-    outputs_map = {}
     for server_type, model_path in model_info:
         if not model_path:
             continue
@@ -61,7 +57,7 @@ def test_run_cmd_llm_infer():
             f"--server_nodes 1 "
             f"--command '{command}'"
         )
-        job = subprocess.run(cmd, shell=True, check=True)
+        subprocess.run(cmd, shell=True, check=True)
 
         jsonl_file = Path(output_dir) / "output.txt"
 

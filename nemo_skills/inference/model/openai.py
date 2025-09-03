@@ -12,21 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import re
-import copy
-import logging
+
 from .base import BaseModel
 
 
 class OpenAIModel(BaseModel):
     def __init__(
         self,
-        host: str = '127.0.0.1',
-        port: str = '5000',
+        host: str = "127.0.0.1",
+        port: str = "5000",
         model: str | None = None,
         base_url: str | None = None,
-        api_key: str | None = None,
         max_retries: int = 3,
         **kwargs,
     ):
@@ -38,44 +37,48 @@ class OpenAIModel(BaseModel):
         if base_url is None:
             base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
-        if api_key is None:
-            if 'api.nvidia.com' in base_url:
-                api_key = os.getenv("NVIDIA_API_KEY")
-                if not api_key:
-                    raise ValueError("NVIDIA_API_KEY is required for NVIDIA models and could not be found.")
-            elif 'api.openai.com' in base_url:
-                api_key = os.getenv("OPENAI_API_KEY")
-                if not api_key:
-                    raise ValueError("OPENAI_API_KEY is required for OpenAI models and could not be found.")
-            else:
-                api_key = "EMPTY"
-                logging.warning("No API key provided, using a dummy string as API key.")
-
         super().__init__(
             model=model,
-            api_key=api_key,
             base_url=base_url,
             max_retries=max_retries,
             **kwargs,
         )
+
+    def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
+        api_key = super()._get_api_key(api_key, api_key_env_var, base_url)
+
+        if api_key is None:
+            if "api.nvidia.com" in base_url:
+                api_key = os.getenv("NVIDIA_API_KEY")
+                if not api_key:
+                    raise ValueError("NVIDIA_API_KEY is required for NVIDIA models and could not be found.")
+            elif "api.openai.com" in base_url:
+                api_key = os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY is required for OpenAI models and could not be found.")
+        return api_key
 
     def _is_reasoning_model(self, model_name: str) -> bool:
         return re.match(r"^o\d", model_name)
 
     def _build_completion_request_params(self, **kwargs) -> dict:
         kwargs = copy.deepcopy(kwargs)
-        assert kwargs.pop('tools', None) is None, "tools are not supported by completion requests."
-        assert kwargs.pop('reasoning_effort', None) is None, "reasoning_effort is not supported by completion requests."
-        assert kwargs.pop('top_k', -1) == -1, "`top_k` is not supported by OpenAI API, please set it to -1."
-        assert kwargs.pop('min_p', 0.0) == 0.0, "`min_p` is not supported by OpenAI API, please set it to 0.0."
-        assert kwargs.pop('repetition_penalty', 1.0) == 1.0, "`repetition_penalty` is not supported by OpenAI API, please set it to 1.0."
-        if 'tokens_to_generate' in kwargs:
-            tokens_to_generate = kwargs.pop('tokens_to_generate')
-            kwargs['max_tokens'] = tokens_to_generate
-        if 'random_seed' in kwargs:
-            kwargs['seed'] = kwargs.pop('random_seed')
-        if 'stop_phrases' in kwargs:
-            kwargs['stop'] = kwargs.pop('stop_phrases')
+        assert kwargs.pop("tools", None) is None, "tools are not supported by completion requests."
+        assert kwargs.pop("reasoning_effort", None) is None, (
+            "reasoning_effort is not supported by completion requests."
+        )
+        assert kwargs.pop("top_k", -1) == -1, "`top_k` is not supported by OpenAI API, please set it to -1."
+        assert kwargs.pop("min_p", 0.0) == 0.0, "`min_p` is not supported by OpenAI API, please set it to 0.0."
+        assert kwargs.pop("repetition_penalty", 1.0) == 1.0, (
+            "`repetition_penalty` is not supported by OpenAI API, please set it to 1.0."
+        )
+        if "tokens_to_generate" in kwargs:
+            tokens_to_generate = kwargs.pop("tokens_to_generate")
+            kwargs["max_tokens"] = tokens_to_generate
+        if "random_seed" in kwargs:
+            kwargs["seed"] = kwargs.pop("random_seed")
+        if "stop_phrases" in kwargs:
+            kwargs["stop"] = kwargs.pop("stop_phrases")
         return dict(kwargs)
 
     def _build_chat_request_params(

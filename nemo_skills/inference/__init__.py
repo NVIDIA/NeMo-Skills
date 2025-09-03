@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .factory import GenerationType, GENERATION_MODULE_MAP
+from .factory import GENERATION_MODULE_MAP, GenerationType
 
 __all__ = ["GenerationType", "GENERATION_MODULE_MAP"]

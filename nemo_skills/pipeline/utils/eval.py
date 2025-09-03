@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import nemo_skills.pipeline.utils as pipeline_utils
-from nemo_skills.dataset.utils import get_dataset_module
+from nemo_skills.dataset.utils import get_dataset_module, import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.utils import compute_chunk_ids, get_logger_name
@@ -51,6 +51,17 @@ class BenchmarkArgs:
         return bool(self.judge_args or self.judge_pipeline_args)
 
 
+def combine_cmds(cmds: list[str], single_node_mode: str) -> str:
+    """Combine multiple eval commands into a single eval cmd."""
+    if single_node_mode == "sequential":
+        return " && ".join(cmds)
+    elif single_node_mode == "parallel":
+        if len(cmds) == 1:
+            return cmds[0]
+        return " & ".join(f"( {cmd} )" for cmd in cmds) + " & wait "
+    raise ValueError(f"Unknown single_node_mode: {single_node_mode}")
+
+
 def get_arg_from_module_or_dict(module, arg_name, default_value=None, override_dict=None):
     """If argument is in a dict, take from there. If not, take from the module."""
     if override_dict and arg_name in override_dict:
@@ -69,6 +80,7 @@ def get_benchmark_args_from_module(
     cluster_config,
     data_path,
     is_on_cluster,
+    eval_requires_judge,
     benchmark_group=None,
     override_dict=None,
 ):
@@ -79,11 +91,11 @@ def get_benchmark_args_from_module(
         if pipeline_utils.is_mounted_filepath(cluster_config, data_path):
             input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
             unmounted_input_file = pipeline_utils.get_unmounted_path(cluster_config, input_file)
-            unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace('/nemo_run/code/', ''))
+            unmounted_path = str(Path(__file__).parents[3] / unmounted_input_file.replace("/nemo_run/code/", ""))
         else:
             # will be copied over in this case as it must come from extra datasets
             input_file = f"/nemo_run/code/{Path(data_path).name}/{benchmark.replace('.', '/')}/{split}.jsonl"
-            unmounted_path = Path(data_path) / benchmark.replace('.', '/') / f"{split}.jsonl"
+            unmounted_path = Path(data_path) / benchmark.replace(".", "/") / f"{split}.jsonl"
     else:
         # on cluster we will always use the mounted path
         input_file = f"{data_path}/{benchmark.replace('.', '/')}/{split}.jsonl"
@@ -96,14 +108,14 @@ def get_benchmark_args_from_module(
             raise ValueError(
                 f"Data file {unmounted_path} does not exist on cluster. "
                 "Please check the benchmark and split parameters. "
-                "Did you forget to run prepare data commands?"
+                "Did you forget to run prepare data commands or add data_dir argument?"
             )
     else:
         if not Path(unmounted_path).exists():
             raise ValueError(
                 f"Data file {unmounted_path} does not exist locally. "
                 "Please check the benchmark and split parameters. "
-                "Did you forget to run prepare data commands?"
+                "Did you forget to run prepare data commands or add data_dir argument?"
             )
 
     # this is deprecated, should remove in the future
@@ -127,7 +139,7 @@ def get_benchmark_args_from_module(
     if num_chunks == 0:
         num_chunks = None
 
-    if judge_args or judge_pipeline_args:
+    if judge_args or judge_pipeline_args or eval_requires_judge:
         # setting to a tmp folder for judge and then the judged outputs will be in main eval-results folder
         eval_subfolder = "tmp-eval-results/"
     else:
@@ -139,9 +151,11 @@ def get_benchmark_args_from_module(
 
     # when running locally swe-bench launches apptainer inside docker and this required elevated privileges
     # TODO: is there a better way to handle this?
-    if benchmark == "swe-bench" and cluster_config['executor'] == 'local':
+    if benchmark == "swe-bench" and cluster_config["executor"] == "local":
         LOG.info("Swe-bench requires extra docker privileges, setting NEMO_SKILLS_PRIVILEGED_DOCKER=1")
-        os.environ['NEMO_SKILLS_PRIVILEGED_DOCKER'] = '1'
+        os.environ["NEMO_SKILLS_PRIVILEGED_DOCKER"] = "1"
+
+    eval_args += f" ++split={split} "
 
     return BenchmarkArgs(
         name=benchmark,
@@ -159,7 +173,9 @@ def get_benchmark_args_from_module(
     )
 
 
-def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets):
+def add_default_args(
+    cluster_config, benchmark_or_group, split, data_dir, extra_datasets_type, extra_datasets, eval_requires_judge
+):
     benchmark_or_group_module, data_path, is_on_cluster = get_dataset_module(
         dataset=benchmark_or_group,
         data_dir=data_dir,
@@ -186,8 +202,12 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
                 cluster_config=cluster_config,
                 data_path=data_path,
                 is_on_cluster=is_on_cluster,
+                eval_requires_judge=eval_requires_judge,
                 override_dict=override_dict,
             )
+            if data_dir:
+                benchmark_args.eval_args += f" ++data_dir={data_dir} "
+
             # TODO: should it be optional?
             benchmark_args.score_module = benchmark_or_group_module.SCORE_MODULE
             benchmarks_args.append(benchmark_args)
@@ -195,16 +215,20 @@ def add_default_args(cluster_config, benchmark_or_group, split, data_dir, extra_
 
     # Single benchmark
     benchmark = benchmark_or_group
-    return [
-        get_benchmark_args_from_module(
-            benchmark_module=benchmark_or_group_module,
-            benchmark=benchmark,
-            split=split,
-            cluster_config=cluster_config,
-            data_path=data_path,
-            is_on_cluster=is_on_cluster,
-        )
-    ]
+    benchmark_args = get_benchmark_args_from_module(
+        benchmark_module=benchmark_or_group_module,
+        benchmark=benchmark,
+        split=split,
+        cluster_config=cluster_config,
+        data_path=data_path,
+        is_on_cluster=is_on_cluster,
+        eval_requires_judge=eval_requires_judge,
+    )
+
+    if data_dir:
+        benchmark_args.eval_args += f" ++data_dir={data_dir} "
+
+    return [benchmark_args]
 
 
 def prepare_eval_commands(
@@ -226,6 +250,7 @@ def prepare_eval_commands(
     with_sandbox,
     wandb_parameters,
     extra_eval_args,
+    eval_requires_judge,
     generation_type=None,
     generation_module=None,
 ):
@@ -246,7 +271,7 @@ def prepare_eval_commands(
     extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
 
     if num_jobs is None:
-        if cluster_config['executor'] == 'slurm':
+        if cluster_config["executor"] == "slurm":
             num_jobs = -1  # -1 means run all benchmarks in parallel
         else:
             # for local executor, it makes no sense to use other values
@@ -261,6 +286,7 @@ def prepare_eval_commands(
             data_dir,
             extra_datasets_type,
             extra_datasets,
+            eval_requires_judge=eval_requires_judge,
         )
         for benchmark_args in cur_benchmarks:
             benchmark = benchmark_args.name
@@ -323,7 +349,7 @@ def prepare_eval_commands(
 
     cur_job_idx = 0
     get_random_port = pipeline_utils.should_get_random_port(
-        server_parameters['server_gpus'], exclusive, server_parameters['server_type']
+        server_parameters["server_gpus"], exclusive, server_parameters["server_type"]
     )
     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         **server_parameters,
@@ -346,7 +372,7 @@ def prepare_eval_commands(
         for seed_idx, (seed, benchmark_chunk_ids) in enumerate(benchmark_args.remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
+                wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
                     benchmark_output_dir,
                     random_seed=seed,
                     chunk_id=None,
@@ -354,8 +380,12 @@ def prepare_eval_commands(
             for chunk_id in benchmark_chunk_ids:
                 job_benchmarks.add(benchmark)
 
-                generation_task = importlib.import_module(generation_module or benchmark_args.generation_module)
-                if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+                effective_generation_module = generation_module or benchmark_args.generation_module
+                if effective_generation_module and os.sep in effective_generation_module:
+                    generation_task = import_from_path(effective_generation_module)
+                else:
+                    generation_task = importlib.import_module(effective_generation_module)
+                if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
                     raise ValueError(
                         f"Module {generation_module or benchmark_args.generation_module} does not have a GENERATION_TASK_CLASS attribute. "
                         "Please provide a valid generation module."

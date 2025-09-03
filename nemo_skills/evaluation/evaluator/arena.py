@@ -28,8 +28,8 @@ from nemo_skills.utils import get_logger_name, nested_dataclass
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-JUDGE_MODEL = 'gpt-4-1106-preview'
-JUDGE_SERVER = 'openai'
+JUDGE_MODEL = "gpt-4-1106-preview"
+JUDGE_SERVER = "openai"
 
 
 def compute_mle_elo(df, SCALE=400, BASE=10, INIT_RATING=1000):
@@ -106,7 +106,7 @@ def get_battles_from_judgment(scores, WEIGHT=3):
 
     for score in scores:
         # game 1
-        output = {"model_a": "candidate", "model_b": 'baseline'}
+        output = {"model_a": "candidate", "model_b": "baseline"}
 
         assert len(score) == 2
         cur_score = score[0]
@@ -132,7 +132,7 @@ def get_battles_from_judgment(scores, WEIGHT=3):
             arena_hard_battles = pd.concat([arena_hard_battles, pd.DataFrame([output] * weight)])
 
         # game 2
-        output = {"model_a": "candidate", "model_b": 'baseline'}
+        output = {"model_a": "candidate", "model_b": "baseline"}
 
         cur_score = score[1]
 
@@ -168,7 +168,7 @@ def get_aggregate_score(scores, weight=3):
 
     stats = pd.DataFrame()
     stats["results"] = None
-    stats["results"] = stats['results'].astype('object')
+    stats["results"] = stats["results"].astype("object")
 
     for i, model in enumerate(bootstrap_online_elo.index):
         assert model in bootstrap_elo_lu.columns
@@ -184,15 +184,15 @@ def get_aggregate_score(scores, weight=3):
     stats["lower"] = get_win_rate_column(stats, "lower").tolist()
     stats["upper"] = get_win_rate_column(stats, "upper").tolist()
 
-    candidate_stats = stats[stats['model'] == 'candidate']
+    candidate_stats = stats[stats["model"] == "candidate"]
     interval = (
-        round((candidate_stats['lower'] - candidate_stats['score']).iloc[0], 2),
-        round((candidate_stats['upper'] - candidate_stats['score']).iloc[0], 2),
+        round((candidate_stats["lower"] - candidate_stats["score"]).iloc[0], 2),
+        round((candidate_stats["upper"] - candidate_stats["score"]).iloc[0], 2),
     )
     metrics = {
-        'score': candidate_stats['score'].iloc[0],
-        '95_CI': interval,
-        'invalid_scores': num_invalid,
+        "score": candidate_stats["score"].iloc[0],
+        "95_CI": interval,
+        "invalid_scores": num_invalid,
     }
     return metrics
 

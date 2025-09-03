@@ -22,27 +22,32 @@ ci:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
-      - id: check-yaml
-        exclude: ^mkdocs\.yml$
-      - id: check-case-conflict
-      - id: detect-private-key
       - id: check-added-large-files
         args: ['--maxkb=1000']
-      - id: requirements-txt-fixer
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        name: Format imports
+      - id: check-case-conflict
+      - id: check-yaml
+        exclude: ^mkdocs\.yml$
+      - id: detect-private-key
+      - id: end-of-file-fixer
         exclude: docs/
-        args: ["--profile", "black"]
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
 
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.9
     hooks:
-      - id: black
-        name: Format code
-        exclude: docs/source-app
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: check-signoff
+        name: Check Signed-off-by
+        entry: bash -c 'if ! grep -q "Signed-off-by:" "$1"; then echo "❌ Commit message must be signed off. Use git commit -s to add it automatically."; exit 1; fi' --
+        language: system
+        always_run: true
+        stages: [commit-msg]
+        types: [text]

@@ -55,18 +55,23 @@ exclude = ["tests", "tests.*"]
 [tool.setuptools.dynamic]
 version = { attr = "nemo_skills.version.__version__" }
 dependencies = {file = ["requirements/main.txt"]}
-optional-dependencies = {core = { file = ["requirements/main.txt"] }, all = { file = ["requirements/main.txt"] }}
-
-[tool.isort]
-profile = "black"  # black-compatible
-line_length = 119  # should match black parameters
-py_version = 310  # python 3.10 as a target version
-
-[tool.black]
-line_length = 119
-skip_string_normalization = true
+optional-dependencies = {dev = { file = ["requirements/common-tests.txt", "requirements/common-dev.txt"] } }
 
 [tool.pytest.ini_options]
 markers = [
     "gpu: tests that require a GPU to run",
 ]
+addopts = "--ignore=tests/slurm-tests"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 119
+
+[tool.ruff.lint]
+## See https://docs.astral.sh/ruff/formatter/#sorting-imports.
+extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"nemo_skills/utils.py" = ["F401"]
+"nemo_skills/pipeline/cli.py" = ["F401"]

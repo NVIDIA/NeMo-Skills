@@ -43,7 +43,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 def get_subset_name(benchmark: str, subset: str) -> str:
     """Construct a subset name based on the benchmark and subset."""
-    if subset == '_all_':
+    if subset == "_all_":
         return benchmark
     return f"{benchmark}-{subset}"
 
@@ -52,8 +52,8 @@ def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
     # Average results for benchmarks with dot notation (e.g., ruler.niah_single_1, ruler.niah_single_2)
     benchmark_groups = defaultdict(list)
     for benchmark in results.keys():
-        if '.' in benchmark:
-            prefix = benchmark.rsplit('.', 1)[0]
+        if "." in benchmark:
+            prefix = benchmark.rsplit(".", 1)[0]
             benchmark_groups[prefix].append(benchmark)
 
     # Create a new ordered dictionary to ensure prefix benchmarks appear first
@@ -189,7 +189,7 @@ def summarize_results(
     wandb_name: Optional[str] = typer.Option(None, help="Name of the wandb experiment to sync these results to"),
     wandb_group: str = typer.Option(None, help="Name of the wandb group to sync results to."),
     wandb_project: str = typer.Option(
-        'nemo-skills',
+        "nemo-skills",
         help="Name of the wandb project to sync results to.",
     ),
 ):
@@ -239,7 +239,7 @@ def summarize_results(
     if Path(results_dir).is_dir() and (len(glob.glob(f'{results_dir}/output*jsonl')) > 0 or len(glob.glob(f'{results_dir}/output_chunk_*.jsonl')) > 0):
         benchmarks_paths = [results_dir]
     else:
-        cand_results_dir = Path(results_dir) / 'eval-results'
+        cand_results_dir = Path(results_dir) / "eval-results"
         # Check for Option 1
         if cand_results_dir.exists() and cand_results_dir.is_dir():
             results_dir = cand_results_dir
@@ -253,8 +253,8 @@ def summarize_results(
 
         benchmarks_paths = [
             cand_path
-            for cand_path in glob.glob(f'{results_dir}/*')
-            if '-logs' not in os.path.basename(cand_path) and Path(cand_path).is_dir()
+            for cand_path in glob.glob(f"{results_dir}/*")
+            if "-logs" not in os.path.basename(cand_path) and Path(cand_path).is_dir()
         ]
 
     if benchmarks:
@@ -296,8 +296,8 @@ def summarize_results(
 
         metrics = {}
 
-        has_greedy = Path(f'{benchmark_path}/output.jsonl').exists()
-        input_files = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
+        has_greedy = Path(f"{benchmark_path}/output.jsonl").exists()
+        input_files = glob.glob(f"{benchmark_path}/output-rs*.jsonl")
         has_sampling = len(input_files) > 0
         
         # Check for chunked output files (e.g., output_chunk_*.jsonl)
@@ -335,7 +335,7 @@ def summarize_results(
             for subset, subset_metrics in metrics.items():
                 results[get_subset_name(benchmark, subset)].update(subset_metrics)
         else:
-            results[benchmark].update(metrics['_all_'])
+            results[benchmark].update(metrics["_all_"])
 
         if len(metrics) > 1:
             for subset, subset_metrics in metrics.items():
@@ -354,7 +354,7 @@ def summarize_results(
         if not benchmark_results:
             continue
         max_widths = {}
-        max_widths['evaluation_mode'] = len('evaluation_mode')
+        max_widths["evaluation_mode"] = len("evaluation_mode")
         for eval_mode in evaluations_to_print[benchmark]:
             if eval_mode not in benchmark_results:
                 continue
@@ -372,41 +372,41 @@ def summarize_results(
                     max_widths.get(metric_key, len(metric_key)),
                     len(str(format_fn(metric_value))),
                 )
-            max_widths['evaluation_mode'] = max(max_widths['evaluation_mode'], len(eval_mode))
+            max_widths["evaluation_mode"] = max(max_widths["evaluation_mode"], len(eval_mode))
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
         if max_seq_len is not None and not printed_max_seq_len:
-            print(f' Metrics for Max Sequence Length {max_seq_len} '.center(total_width, '-'))
+            print(f" Metrics for Max Sequence Length {max_seq_len} ".center(total_width, "-"))
         printed_max_seq_len = True
-        print(f' {benchmark} '.center(total_width, '-'))
-        headers = ['evaluation_mode'] + list(metrics_to_print[benchmark].keys())
-        print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
+        print(f" {benchmark} ".center(total_width, "-"))
+        headers = ["evaluation_mode"] + list(metrics_to_print[benchmark].keys())
+        print(" | ".join([f"{header:<{max_widths[header]}}" for header in headers]))
 
         for eval_mode in evaluations_to_print[benchmark]:
             if eval_mode not in benchmark_results:
                 continue
             metrics = benchmark_results[eval_mode]
-            values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
+            values = [f"{eval_mode:<{max_widths['evaluation_mode']}}"]
             for metric_key, format_fn in metrics_to_print[benchmark].items():
                 metric_value = metrics[metric_key]
-                values.append(f'{str(format_fn(metric_value)):<{max_widths[metric_key]}}')
-            print(' | '.join(values))
+                values.append(f"{str(format_fn(metric_value)):<{max_widths[metric_key]}}")
+            print(" | ".join(values))
 
-        print('\n')
+        print("\n")
 
     try:
-        save_metrics_path = save_metrics_path or str(Path(results_dir) / 'metrics.json')
+        save_metrics_path = save_metrics_path or str(Path(results_dir) / "metrics.json")
         Path(save_metrics_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(save_metrics_path, 'wt', encoding='utf-8') as fout:
+        with open(save_metrics_path, "wt", encoding="utf-8") as fout:
             json.dump(results, fout, indent=2)
         if upload_path is not None:
             cluster_upload(
                 cluster_config,
                 save_metrics_path,
-                Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json',
+                Path(get_unmounted_path(cluster_config, upload_path)) / "metrics.json",
                 verbose=verbose,
             )
-            print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json'))
+            print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / "metrics.json"))
         else:
             print("Metrics are saved to", save_metrics_path)
     except PermissionError:
@@ -435,10 +435,10 @@ def summarize_results(
 
             for eval_mode, metrics in benchmark_results.items():
                 # Check if this is a @k metric
-                k_match = re.search(r'@(\d+)$', eval_mode)
+                k_match = re.search(r"@(\d+)$", eval_mode)
                 if k_match:
                     k = int(k_match.group(1))
-                    base_name = eval_mode.rsplit('@', 1)[0]
+                    base_name = eval_mode.rsplit("@", 1)[0]
 
                 # Store k and corresponding values for each metric, but log everything
                 for metric_key, metric_value in metrics.items():
