@@ -43,86 +43,76 @@ class BaseMetrics(abc.ABC):
                     metrics_dict[agg_mode][metric_key] = 100.0 * metric_value / self.total
                 else:
                     metrics_dict[agg_mode][metric_key] = metric_value
-        self._add_benchmark_std_metrics(metrics_dict)
+        self._add_std_metrics(metrics_dict)
         return metrics_dict
 
-    def _add_benchmark_std_metrics(self, metrics_dict):
-        """Add standard deviation and standard error metrics as columns to existing evaluation modes.
+    def _add_std_metrics(self, metrics_dict):
+        """Add standard deviation and standard error metrics.
 
-        Only processes data for max_k when max_k > 1 and sample data is available.
-        Adds std and std err metrics as additional columns to evaluation modes:
-        - {score_method}_std_across_runs: Standard deviation of metric values across max_k benchmark runs
-        - {score_method}_avg_sample_std: Average of per-sample standard deviations
-        - {score_method}_std_err_across_runs: Standard error of metric values across max_k benchmark runs
-        - {score_method}_avg_sample_std_err: Standard error of per-sample standard deviations
+        Only processes data when self.max_k > 1 and sample data is available in self.all_scores.
 
-        Computes two complementary variance measures for max_k only:
+        Adds three statistical metrics:
+        - {score_method}_std_dev_across_runs: Standard deviation of average metric values across runs
+        - {score_method}_std_err_across_runs: Standard error of average metric values across runs
+        - {score_method}_avg_sample_std_dev: Average of per-sample standard deviations
 
-        1. std_across_runs: Standard deviation of metric values across max_k benchmark runs
+        Computes two complementary variance measures:
+
+        1. std_dev_across_runs: Standard deviation of average metric values across runs
            - Each "run" uses attempt i from each sample (transpose of data)
-           - Measures: "How much does the metric vary between different benchmark runs?"
-           - std_err_across_runs: std_across_runs / sqrt(k) where k is number of runs
+           - Measures: "How much does the average metric value vary between different runs?"
+           - std_err_across_runs: std_dev_across_runs / sqrt(k) where k is number of runs
 
-        2. avg_sample_std: Average of per-sample standard deviations
-           - For each sample, calculates std dev across its max_k attempts, then averages
+        2. avg_sample_std_dev: Average of per-sample standard deviations
+           - For each sample, calculates standard deviation across its k attempts, then averages
            - Measures: "What's the average within-sample variance?"
-           - avg_sample_std_err: avg_sample_std / sqrt(n) where n is number of samples
 
-        Only adds columns to: pass@1[avg-of-max_k], majority@max_k, and pass@max_k
-        evaluation modes when they exist in metrics_dict.
+        Only adds columns to pass@1[avg-of-{k}] that must exist in the passed metrics_dict.
 
         Example (max_k=4):
             3 samples × 4 attempts = [[1,0,1,0], [1,1,0,0], [0,1,1,1]]
 
-            Benchmark runs (transpose):
+            Standard deviation and error of average metric values across runs (transpose):
             - Run 1: [1,1,0] → avg 0.6667
             - Run 2: [0,1,1] → avg 0.6667
             - Run 3: [1,0,1] → avg 0.6667
             - Run 4: [0,0,1] → avg 0.3333
-            → std_across_runs = stdev([0.6667, 0.6667, 0.6667, 0.3333]) ≈ 0.1925
-            → std_err_across_runs = 0.1925 / sqrt(4) ≈ 0.0963
+            → std_dev_across_runs = stdev([0.6667, 0.6667, 0.6667, 0.3333]) ≈ 0.1925
+            → std_err_across_runs = 0.1925 / sqrt(4) ≈ 0.096
 
-            Sample std devs:
+            Average of per-sample standard deviations:
             - Sample 1: stdev([1,0,1,0]) ≈ 0.5773
             - Sample 2: stdev([1,1,0,0]) ≈ 0.5773
             - Sample 3: stdev([0,1,1,1]) ≈ 0.5000
-            → avg_sample_std = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
-            → avg_sample_std_err = 0.5515 / sqrt(3) ≈ 0.3184
+            → avg_sample_std_dev = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
         """
-        for score_method, sample_list in self.all_scores.items():
-            for sample_scores in sample_list:
-                assert len(sample_scores) == self.max_k, (
-                    f"Sample has {len(sample_scores)} scores but expected {self.max_k}"
-                )
+        for score_method, scores_list in self.all_scores.items():
+            for scores in scores_list:
+                assert len(scores) == self.max_k, f"Sample has {len(scores)} scores but expected {self.max_k}"
 
             for k in range(2, self.max_k + 1):
-                # Calculate benchmark run std dev
+                # Standard deviation and error of average metric values across runs
                 run_scores = [[] for _ in range(k)]
-                for sample_scores in sample_list:
-                    for run_idx, score in enumerate(sample_scores[:k]):
-                        run_scores[run_idx].append(score)
+                for scores in scores_list:
+                    for i, score in enumerate(scores[:k]):
+                        run_scores[i].append(score)
+                run_averages = [np.mean(scores) for scores in run_scores]
+                std_dev_across_runs = np.std(run_averages, ddof=1)
+                std_err_across_runs = std_dev_across_runs / math.sqrt(k)
 
-                run_averages = [sum(scores) / len(scores) for scores in run_scores]
-                benchmark_std = np.std(run_averages, ddof=1)
-                benchmark_std_err = benchmark_std / math.sqrt(k)
-
-                # Calculate average sample std dev
+                # Average of per-sample standard deviations
                 sample_std_devs = []
-                for sample_scores in sample_list:
-                    sample_std_devs.append(np.std(sample_scores[:k], ddof=1))
-                avg_sample_std = sum(sample_std_devs) / len(sample_std_devs)
-                avg_sample_std_err = avg_sample_std / math.sqrt(len(sample_list))
+                for scores in scores_list:
+                    sample_std_devs.append(np.std(scores[:k], ddof=1))
+                avg_sample_std_dev = sum(sample_std_devs) / len(sample_std_devs)
 
-                # Add std and std err metrics as columns to relevant evaluation modes
-                std_column_names = {
-                    f"{score_method}_std_across_runs": benchmark_std,
-                    f"{score_method}_avg_sample_std": avg_sample_std,
-                    f"{score_method}_std_err_across_runs": benchmark_std_err,
-                    f"{score_method}_avg_sample_std_err": avg_sample_std_err,
+                # Update metrics dictionary
+                std_metrics = {
+                    f"{score_method}_std_dev_across_runs": std_dev_across_runs,
+                    f"{score_method}_avg_sample_std_dev": avg_sample_std_dev,
+                    f"{score_method}_std_err_across_runs": std_err_across_runs,
                 }
-
-                # Update metrics dict with std metrics
-                metrics_dict[f"pass@1[avg-of-{k}]"].update(std_column_names)
+                metrics_dict[f"pass@1[avg-of-{k}]"].update(std_metrics)
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         """
