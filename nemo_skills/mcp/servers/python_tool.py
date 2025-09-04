@@ -105,13 +105,11 @@ class PythonTool(MCPClientTool):
         )
 
     async def execute(self, tool_name: str, arguments: Dict[str, Any], extra_args: Dict[str, Any] | None = None):
-        if tool_name != "execute":
-            raise ValueError(f"Unknown tool for PythonTool: {tool_name}")
         # Ensure timeout is sent via extra_args (post-sanitize), not in main arguments
         arguments = dict(arguments)
         merged_extra = dict(extra_args or {})
         merged_extra.setdefault("timeout", self._config.get("exec_timeout_s", 10))
-        return await self._client.call_tool(tool="execute", args=arguments, extra_args=merged_extra)
+        return await self._client.call_tool(tool=tool_name, args=arguments, extra_args=merged_extra)
 
     async def shutdown(self) -> None:
         return None

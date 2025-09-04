@@ -110,7 +110,3 @@ def resolve_adapters(cfg: DictConfig):
         response_formatter_obj() if isinstance(response_formatter_obj, type) else response_formatter_obj
     )
     return schema_adapter, call_interpreter, response_formatter
-
-
-def build_client_manager(cfg: DictConfig):
-    raise RuntimeError("MCPClientManager has been removed. Use ToolManager and module-based tools instead.")

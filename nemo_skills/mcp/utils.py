@@ -34,32 +34,18 @@ def locate(path):
     if not isinstance(path, str):
         return path
 
-    # Handle file path with ::attribute syntax
+    # Double-colon syntax for both modules and files: module::Class or path.py::Class
     if "::" in path:
-        file_path, attr_name = path.split("::", 1)
-        module_name = os.path.splitext(os.path.basename(file_path))[0]
-        spec = importlib.util.spec_from_file_location(module_name, file_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return getattr(module, attr_name)
-
-    # Support single-colon syntax for both modules and .py files:
-    #  - module:ClassName
-    #  - /abs/or/rel/path/file.py:ClassName
-    if ":" in path:
-        left, obj_name = path.split(":", 1)
-        # Heuristic: treat as file path if it looks like a .py file or an existing path
-        is_file_like = left.endswith(".py") or os.path.isabs(left) or os.sep in left
-        if is_file_like and (left.endswith(".py") or os.path.exists(left)):
+        left, attr_name = path.split("::", 1)
+        # If it's a file path (endswith .py or exists), load from file; otherwise import module
+        if left.endswith(".py") or os.path.exists(left):
             module_name = os.path.splitext(os.path.basename(left))[0]
             spec = importlib.util.spec_from_file_location(module_name, left)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-            return getattr(module, obj_name)
-        # Otherwise, treat as importable module path
-        module_path = left
-        module = importlib.import_module(module_path)
-        return getattr(module, obj_name)
+            return getattr(module, attr_name)
+        module = importlib.import_module(left)
+        return getattr(module, attr_name)
 
     # Handle standard dotted module path
     module_path, obj_name = path.rsplit(".", 1)
