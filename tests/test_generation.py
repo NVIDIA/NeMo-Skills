@@ -55,7 +55,7 @@ def test_eval_judge_api(tmp_path):
         f"    --server_type=openai "
         f"    --model=meta/llama-3.1-8b-instruct "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
-        f"    --benchmarks=math "
+        f"    --benchmarks=math-500 "
         f"    --output_dir={tmp_path} "
         f"    --judge_model=meta/llama-3.1-8b-instruct "
         f"    --judge_server_address=https://integrate.api.nvidia.com/v1 "
@@ -73,8 +73,8 @@ def test_eval_judge_api(tmp_path):
     )
 
     # running compute_metrics to check that results are expected
-    metrics = ComputeMetrics(benchmark="math").compute_metrics(
-        [f"{tmp_path}/eval-results/math/output.jsonl"],
+    metrics = ComputeMetrics(benchmark="math-500").compute_metrics(
+        [f"{tmp_path}/eval-results/math-500/output.jsonl"],
     )["_all_"]["pass@1"]
 
     assert metrics["symbolic_correct"] >= 40
