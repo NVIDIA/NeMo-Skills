@@ -50,21 +50,18 @@ To start, let's first evaluate the original model to see where it stands. We wil
 In this case let's use vllm as an inference library.
 
 ```shell
-# download the model
-ns run_cmd --expname=download-14b --log_dir=/workspace/Qwen2.5-14B-Instruct --cluster=local \
-    huggingface-cli download Qwen/Qwen2.5-14B-Instruct --local-dir /workspace/Qwen2.5-14B-Instruct
 # prepare benchmark data
 ns prepare_data aime24 aime25
 # launch evaluation
 ns eval \
     --cluster=local \
     --expname=baseline-eval \
-    --run_after=download-14b \
-    --model=/workspace/Qwen2.5-14B-Instruct \
+    --model=Qwen/Qwen2.5-14B-Instruct \
     --server_type=vllm \
     --server_gpus=8 \
     --benchmarks=aime24:8,aime25:8 \
     --output_dir=/workspace/evals/baseline
+
 # summarize results, after the evaluation job is done
 ns summarize_results --cluster=local /workspace/evals/baseline --wandb_name=baseline-evals
 ```
@@ -134,7 +131,7 @@ generate(
     postprocess_cmd=postprocess_cmd,
     expname="problem-extraction",
     run_after=["prepare-data", "download-14b"],
-    model="/workspace/Qwen2.5-14B-Instruct",
+    model="Qwen/Qwen2.5-14B-Instruct",
     server_type="vllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging
@@ -159,7 +156,7 @@ generate(
     output_dir="/workspace/sdg/solutions",
     expname="solution-generation",
     run_after="problem-extraction",
-    model="/workspace/QwQ-32B",
+    model="Qwen/QwQ-32B",
     server_type="trtllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging

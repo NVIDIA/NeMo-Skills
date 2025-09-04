@@ -56,7 +56,7 @@ The instructions below are for Llama3.1-8B, but the same commands should work fo
 
 ```bash
 pip install -U "huggingface_hub[cli]"
-huggingface-cli download meta-llama/Llama-3.1-8B --local-dir Llama-3.1-8B
+hf download meta-llama/Llama-3.1-8B --local-dir Llama-3.1-8B
 
 ns convert \
     --cluster=local \
