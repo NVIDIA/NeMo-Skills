@@ -50,9 +50,6 @@ To start, let's first evaluate the original model to see where it stands. We wil
 In this case let's use vllm as an inference library.
 
 ```shell
-# download the model
-ns run_cmd --expname=download-14b --log_dir=/workspace/Qwen2.5-14B-Instruct --cluster=local \
-    huggingface-cli download Qwen/Qwen2.5-14B-Instruct --local-dir /workspace/Qwen2.5-14B-Instruct
 # prepare benchmark data
 ns prepare_data aime24 aime25
 # launch evaluation
@@ -60,7 +57,7 @@ ns eval \
     --cluster=local \
     --expname=baseline-eval \
     --run_after=download-14b \
-    --model=/workspace/Qwen2.5-14B-Instruct \
+    --model=Qwen/Qwen2.5-14B-Instruct \
     --server_type=vllm \
     --server_gpus=8 \
     --benchmarks=aime24:8,aime25:8 \
@@ -135,7 +132,7 @@ generate(
     postprocess_cmd=postprocess_cmd,
     expname="problem-extraction",
     run_after=["prepare-data", "download-14b"],
-    model="/workspace/Qwen2.5-14B-Instruct",
+    model="Qwen/Qwen2.5-14B-Instruct",
     server_type="vllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging
@@ -145,19 +142,6 @@ generate(
 ```
 
 You can inspect sdg/extracted-problems.yaml to see the outputs. There should be a new field containing the extracted problems. Let's use the QwQ-32B model to generate solutions to these problems.
-
-First we download the model. We will also use a TensorRT-LLM converted engine for data generation which can be faster.
-```
-# Download the model
-ns run_cmd --expname=qwq32b --log_dir=/workspace/QwQ-32B --cluster=slurm \
-    huggingface-cli download Qwen/QwQ-32B --local-dir /workspace/QwQ-32B
-
-# Convert to a trtllm version
-ns convert --cluster=slurm --expname=convert-qwq-trtllm --run_after=download-qwq --input_model=/workspace/QwQ-32B \
-    --output_model=/workspace/qwq32b-trtllm --convert_from=hf --convert_to=trtllm \
-    --num_gpus=8 --model_type=qwen --hf_model_name=Qwen/QwQ-32B --max_seq_len 10000
-```
-
 
 Add the following code to the end of sdg.py script and rerun it. By default, it will skip the problem extraction step (if it’s complete) because NeMo-Skills can detect if the generation has already finished.
 
@@ -173,8 +157,8 @@ generate(
     output_dir="/workspace/sdg/solutions",
     expname="solution-generation",
     run_after="problem-extraction",
-    model="/workspace/qwq32b-trtllm",
-    server_type="trtllm",
+    model="Qwen/QwQ-32B",
+    server_type="vllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging
     log_samples=True,
@@ -216,7 +200,7 @@ ns convert \
     --cluster=local \
     --expname=convert-14b-nemo \
     --run_after=download-14b \
-    --input_model=/workspace/Qwen2.5-14B-Instruct \
+    --input_model=Qwen/Qwen2.5-14B-Instruct \
     --output_model=/workspace/qwen2.5-14b-instruct-nemo \
     --convert_from=hf \
     --convert_to=nemo \
@@ -255,7 +239,7 @@ ns nemo_rl sft \
     --run_after=download-14b \
     --run_after=prepare-sft-data \
     --output_dir=/workspace/training \
-    --hf_model=/workspace/Qwen2.5-14B-Instruct \
+    --hf_model=Qwen/Qwen2.5-14B-Instruct \
     --num_nodes=1 \
     --num_gpus=8 \
     --training_data=/workspace/sft-data.jsonl \
