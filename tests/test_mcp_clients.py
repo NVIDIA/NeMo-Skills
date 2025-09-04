@@ -192,6 +192,8 @@ async def test_tool_manager_cache_and_duplicate_detection():
     _ = await tm.list_all_tools(use_cache=True)
     _ = await tm.list_all_tools(use_cache=True)
     assert calls["n"] == 1
+    _ = await tm.list_all_tools(use_cache=False)
+    assert calls["n"] == 2
 
     class DupTool(DummyTool):
         async def list_tools(self):
@@ -479,5 +481,3 @@ async def test_streamable_http_client_enforcement(monkeypatch):
     client = MCPStreamableHttpClient(base_url="https://example.com/mcp", enabled_tools=["only_t2"])  # not including t1
     with pytest.raises(PermissionError):
         await client.call_tool("t1", {})
-
-
