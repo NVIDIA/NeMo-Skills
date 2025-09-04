@@ -101,7 +101,7 @@ class GenerateSolutionsConfig:
 
     # maximum number of concurrent requests to the server for the async loop
     # if sync loop is used, this is the batch size
-    max_concurrent_requests: int = 1024
+    max_concurrent_requests: int = 512
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -283,9 +283,8 @@ class GenerationTask:
             tokenizer=self.tokenizer,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
+            system_message=self.cfg.system_message,
         )
-        if self.cfg.system_message is not None:
-            prompt.config.system = self.cfg.system_message
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
