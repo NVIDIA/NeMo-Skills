@@ -294,11 +294,11 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
-        elif getattr(self.cfg, "tool_modules", None):
+        elif self.cfg.tool_modules is not None:
             llm = get_tool_calling_model(
                 **self.cfg.server,
-                tool_modules=getattr(self.cfg, "tool_modules", None),
-                tool_overrides=getattr(self.cfg, "tool_overrides", None),
+                tool_modules=self.cfg.tool_modules,
+                tool_overrides=self.cfg.tool_overrides,
                 tokenizer=self.tokenizer,
                 additional_config={"sandbox": self.cfg.sandbox},
             )
