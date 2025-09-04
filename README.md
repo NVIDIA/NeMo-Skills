@@ -17,6 +17,7 @@ Here are some of the features we support:
     - [**Instruction following**](https://nvidia.github.io/NeMo-Skills/evaluation/instruction-following): e.g. [ifbench](https://nvidia.github.io/NeMo-Skills/evaluation/instruction-following/#ifbench), [ifeval](https://nvidia.github.io/NeMo-Skills/evaluation/instruction-following/#ifeval)
     - [**Long-context**](https://nvidia.github.io/NeMo-Skills/evaluation/long-context): e.g. [ruler](https://nvidia.github.io/NeMo-Skills/evaluation/long-context/#ruler), [mrcr](https://nvidia.github.io/NeMo-Skills/evaluation/long-context/#mrcr)
     - [**Tool-calling**](https://nvidia.github.io/NeMo-Skills/evaluation/tool-calling): e.g. [bfcl_v3](https://nvidia.github.io/NeMo-Skills/evaluation/tool-calling/#bfcl_v3)
+    - [**Multilingual**](https://nvidia.github.io/NeMo-Skills/evaluation/multilingual): e.g. [mmlu-prox](https://nvidia.github.io/NeMo-Skills/evaluation/multilingual/#mmlu-prox)
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
