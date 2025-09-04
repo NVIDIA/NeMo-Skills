@@ -112,10 +112,7 @@ class BaseMetrics(abc.ABC):
                 # Calculate average sample std dev
                 sample_std_devs = []
                 for sample_scores in sample_list:
-                    if len(sample_scores) > 1:
-                        sample_std_devs.append(np.std(sample_scores, ddof=1))
-                    else:
-                        sample_std_devs.append(0.0)
+                    sample_std_devs.append(np.std(sample_scores, ddof=1))
                 avg_sample_std = sum(sample_std_devs) / len(sample_std_devs)
                 avg_sample_std_err = avg_sample_std / math.sqrt(len(sample_list))
 
@@ -128,8 +125,7 @@ class BaseMetrics(abc.ABC):
                 }
 
                 # Update metrics dict with std metrics
-                if update_dict := metrics_dict.get(f"pass@1[avg-of-{k}]"):
-                    update_dict.update(std_column_names)
+                metrics_dict[f"pass@1[avg-of-{k}]"].update(std_column_names)
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         """
