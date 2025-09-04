@@ -213,6 +213,7 @@ def eval_ioi(cfg):
         metadata = json.load(f)
 
     pool = multiprocessing.Pool(processes=batch_size, initializer=init_worker, initargs=(sandbox,))
+    print("processing with batch size", batch_size)
 
     for jsonl_file in unroll_files(cfg.input_files):
         samples = []
@@ -237,45 +238,72 @@ def eval_ioi(cfg):
             test_case_results = {}
             problem_name = entry['name']
             problem_metadata = metadata[problem_name]
+
+            # -------------------------------------------------------------
+            # Batch tests across *all* subtasks so that each pool invocation
+            # works on a larger chunk, making the `test_batch_size` flag
+            # meaningful and speeding up evaluation.
+            # -------------------------------------------------------------
+
+            # 1. Flatten all tests and create per-subtask bookkeeping.
+            all_tests = []  # (subtask_name, test_name, test_data)
+            subtask_state = {}
             for subtask, subtask_data in problem_metadata.items():
-                tests = subtask_data['tests']
-                subtask_score = subtask_data['score']
-                subtask_score_precision = subtask_data['score_precision']
-                subtask_passed = True
-                subtask_outputs = []
-                test_items = list(tests.items())
+                subtask_state[subtask] = {
+                    "score": subtask_data['score'],
+                    "precision": subtask_data['score_precision'],
+                    "outputs": [],
+                    "scores": [],
+                    "passed": True,
+                }
+                for test_name, test_data in subtask_data['tests'].items():
+                    all_tests.append((subtask, test_name, test_data))
 
-                scores = []
-                for i in range(0, len(test_items), batch_size):
-                    batch = test_items[i : i + batch_size]
-                    tasks = []
-                    for local_idx, (test_name, test_data) in enumerate(batch):
-                        task_args = {
-                            "generated_code": completion,
-                            "problem_id": entry['ioi_id'],
-                            "grader_files": entry['grader_files'],
-                            "run_code": entry['run'],
-                            "compile_code": entry['compile'],
-                            "test_input": test_data['input'],
-                            "test_output": test_data['output'],
-                        }
-                        tasks.append((task_args, local_idx))
-                    results = pool.starmap(run_test_case, tasks)
+            print("total number of test cases", len(all_tests))
 
-                    for (test_name, _), result in zip(batch, results):
-                        result_with_name = dict(result)
-                        result_with_name['test_name'] = test_name
-                        subtask_outputs.append(result_with_name)
-                        scores.append(float(result['score']))
-                        if float(result['score']) == 0.0:
-                            # break early as we failed this test case.
-                            subtask_passed = False
-                            break
-                    if not subtask_passed:
-                        break
+            # 2. Walk through the flattened list in chunks of `batch_size`.
+            for i in range(0, len(all_tests), batch_size):
+                # Filter out tests whose subtask already failed.
+                batch = [t for t in all_tests[i : i + batch_size] if subtask_state[t[0]]["passed"]]
+                if not batch:
+                    continue
 
-                effective_score = round(min([score for score in scores]) * subtask_score, subtask_score_precision)
-                test_case_results[subtask] = {"score": effective_score, "outputs": subtask_outputs}
+                tasks = []
+                for _, _, test_data in batch:
+                    task_args = {
+                        "generated_code": completion,
+                        "problem_id": entry['ioi_id'],
+                        "grader_files": entry['grader_files'],
+                        "run_code": entry['run'],
+                        "compile_code": entry['compile'],
+                        "test_input": test_data['input'],
+                        "test_output": test_data['output'],
+                    }
+                    # local_idx is irrelevant after flattening
+                    tasks.append((task_args, 0))
+
+                results = pool.starmap(run_test_case, tasks)
+
+                # 3. Scatter results back to the corresponding subtask.
+                for (subtask, test_name, _), result in zip(batch, results):
+                    st = subtask_state[subtask]
+                    result_with_name = dict(result)
+                    result_with_name['test_name'] = test_name
+                    st['outputs'].append(result_with_name)
+                    st['scores'].append(float(result['score']))
+                    if float(result['score']) == 0.0:
+                        st['passed'] = False
+
+            # 4. Compute per-subtask scores and build `test_case_results`.
+            for subtask, st in subtask_state.items():
+                if st['scores']:
+                    effective_score = round(min(st['scores']) * st['score'], st['precision'])
+                else:
+                    effective_score = 0.0
+                test_case_results[subtask] = {
+                    "score": effective_score,
+                    "outputs": st['outputs'],
+                }
 
             outputs.append(
                 {
