@@ -128,8 +128,6 @@ When using multiple samples (k > 1), the evaluation automatically computes stand
 
 - **`{metric_name}_std_err_across_runs`**: Standard error of metric values across max_k benchmark runs. Calculated as `std_across_runs / sqrt(k)` where k is the number of runs. Provides a measure of uncertainty in the benchmark run variance estimate.
 
-- **`{metric_name}_avg_sample_std_err`**: Standard error of per-sample standard deviations. Calculated as `avg_sample_std / sqrt(n)` where n is the number of samples. Provides a measure of uncertainty in the average sample variance estimate.
-
 These std dev and std err columns are added as additional columns to `pass@1[avg-of-k]`, providing comprehensive variance and uncertainty statistics alongside the main performance metrics.
 
 ## Customizing evaluations

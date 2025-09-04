@@ -54,7 +54,6 @@ class BaseMetrics(abc.ABC):
         - {score_method}_std_across_runs: Standard deviation of metric values across max_k benchmark runs
         - {score_method}_avg_sample_std: Average of per-sample standard deviations
         - {score_method}_std_err_across_runs: Standard error of metric values across max_k benchmark runs
-        - {score_method}_avg_sample_std_err: Standard error of per-sample standard deviations
 
         Computes two complementary variance measures for max_k only:
 
@@ -66,7 +65,6 @@ class BaseMetrics(abc.ABC):
         2. avg_sample_std: Average of per-sample standard deviations
            - For each sample, calculates std dev across its max_k attempts, then averages
            - Measures: "What's the average within-sample variance?"
-           - avg_sample_std_err: avg_sample_std / sqrt(n) where n is number of samples
 
         Only adds columns to: pass@1[avg-of-max_k], majority@max_k, and pass@max_k
         evaluation modes when they exist in metrics_dict.
@@ -87,7 +85,6 @@ class BaseMetrics(abc.ABC):
             - Sample 2: stdev([1,1,0,0]) ≈ 0.5773
             - Sample 3: stdev([0,1,1,1]) ≈ 0.5000
             → avg_sample_std = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
-            → avg_sample_std_err = 0.5515 / sqrt(3) ≈ 0.3184
         """
         for score_method, sample_list in self.all_scores.items():
             for sample_scores in sample_list:
@@ -111,14 +108,12 @@ class BaseMetrics(abc.ABC):
                 for sample_scores in sample_list:
                     sample_std_devs.append(np.std(sample_scores[:k], ddof=1))
                 avg_sample_std = sum(sample_std_devs) / len(sample_std_devs)
-                avg_sample_std_err = avg_sample_std / math.sqrt(len(sample_list))
 
                 # Add std and std err metrics as columns to relevant evaluation modes
                 std_column_names = {
                     f"{score_method}_std_across_runs": benchmark_std,
                     f"{score_method}_avg_sample_std": avg_sample_std,
                     f"{score_method}_std_err_across_runs": benchmark_std_err,
-                    f"{score_method}_avg_sample_std_err": avg_sample_std_err,
                 }
 
                 # Update metrics dict with std metrics

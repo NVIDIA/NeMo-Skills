@@ -30,16 +30,15 @@ class TestBenchmarkAndSampleStd:
     """Test std dev metrics integration as columns."""
 
     @pytest.mark.parametrize(
-        "k,sample_list,expected_benchmark_std,expected_sample_std,expected_benchmark_std_err,expected_sample_std_err,_description",
+        "k,sample_list,expected_benchmark_std,expected_sample_std,expected_benchmark_std_err,_description",
         [
-            (1, [[1.0]], 0.0, 0.0, 0.0, 0.0, "k=1 always returns 0 for both"),
+            (1, [[1.0]], 0.0, 0.0, 0.0, "k=1 always returns 0 for both"),
             (
                 2,
                 [[1.0, 0.0], [0.0, 1.0]],
                 0.0,
                 0.7071067811865476,
                 0.0,
-                0.5000,
                 "Identical run averages (50%, 50%), different sample stds",
             ),
             (
@@ -47,7 +46,6 @@ class TestBenchmarkAndSampleStd:
                 [[1.0, 0.0], [1.0, 0.0]],
                 0.7071067811865476,
                 0.7071067811865476,
-                0.5000,
                 0.5000,
                 "Different benchmark averages (50%, 100%)",
             ),
@@ -57,7 +55,6 @@ class TestBenchmarkAndSampleStd:
                 0.28867513459481287,
                 0.28867513459481287,
                 0.16666666666666666,
-                0.20412414523193154,
                 "Mixed variance: benchmark (66.67%, 0%), sample stds",
             ),
             (
@@ -66,7 +63,6 @@ class TestBenchmarkAndSampleStd:
                 0.0,
                 0.38490017945975047,
                 0.0,
-                0.22222222222222221,
                 "Same benchmark averages (66.67%), different sample stds",
             ),
             (
@@ -75,7 +71,6 @@ class TestBenchmarkAndSampleStd:
                 0.16666666666666666,
                 0.5515668461264172,
                 0.08333333333333333,
-                0.31844726708715987,
                 "Original case",
             ),
         ],
@@ -87,7 +82,6 @@ class TestBenchmarkAndSampleStd:
         expected_benchmark_std,
         expected_sample_std,
         expected_benchmark_std_err,
-        expected_sample_std_err,
         _description,
     ):
         """Test that std dev and std err metrics are added as columns to existing evaluation modes."""
@@ -113,7 +107,6 @@ class TestBenchmarkAndSampleStd:
                 assert "correct_std_across_runs" not in metrics_dict[eval_mode]
                 assert "correct_avg_sample_std" not in metrics_dict[eval_mode]
                 assert "correct_std_err_across_runs" not in metrics_dict[eval_mode]
-                assert "correct_avg_sample_std_err" not in metrics_dict[eval_mode]
         else:
             # k > 1 should add std and std err columns
             metrics._add_benchmark_std_metrics(metrics_dict)
@@ -123,12 +116,10 @@ class TestBenchmarkAndSampleStd:
                 assert "correct_std_across_runs" in metrics_dict[eval_mode]
                 assert "correct_avg_sample_std" in metrics_dict[eval_mode]
                 assert "correct_std_err_across_runs" in metrics_dict[eval_mode]
-                assert "correct_avg_sample_std_err" in metrics_dict[eval_mode]
 
                 actual_benchmark_std = metrics_dict[eval_mode]["correct_std_across_runs"]
                 actual_sample_std = metrics_dict[eval_mode]["correct_avg_sample_std"]
                 actual_benchmark_std_err = metrics_dict[eval_mode]["correct_std_err_across_runs"]
-                actual_sample_std_err = metrics_dict[eval_mode]["correct_avg_sample_std_err"]
 
                 assert abs(actual_benchmark_std - expected_benchmark_std) < 1e-10, (
                     f"{eval_mode} benchmark std: expected {expected_benchmark_std}, got {actual_benchmark_std}"
@@ -139,15 +130,11 @@ class TestBenchmarkAndSampleStd:
                 assert abs(actual_benchmark_std_err - expected_benchmark_std_err) < 1e-10, (
                     f"{eval_mode} benchmark std err: expected {expected_benchmark_std_err}, got {actual_benchmark_std_err}"
                 )
-                assert abs(actual_sample_std_err - expected_sample_std_err) < 1e-10, (
-                    f"{eval_mode} sample std err: expected {expected_sample_std_err}, got {actual_sample_std_err}"
-                )
 
             for eval_mode in [f"majority@{k}", f"pass@{k}"]:
                 assert "correct_std_across_runs" not in metrics_dict[eval_mode]
                 assert "correct_avg_sample_std" not in metrics_dict[eval_mode]
                 assert "correct_std_err_across_runs" not in metrics_dict[eval_mode]
-                assert "correct_avg_sample_std_err" not in metrics_dict[eval_mode]
 
 
 class TestStdMetricsOrchestration:
@@ -170,15 +157,12 @@ class TestStdMetricsOrchestration:
         assert "correct_std_across_runs" in metrics_dict["pass@1[avg-of-2]"]
         assert "correct_avg_sample_std" in metrics_dict["pass@1[avg-of-2]"]
         assert "correct_std_err_across_runs" in metrics_dict["pass@1[avg-of-2]"]
-        assert "correct_avg_sample_std_err" in metrics_dict["pass@1[avg-of-2]"]
         assert "correct_std_across_runs" in metrics_dict["pass@1[avg-of-3]"]
         assert "correct_avg_sample_std" in metrics_dict["pass@1[avg-of-3]"]
         assert "correct_std_err_across_runs" in metrics_dict["pass@1[avg-of-3]"]
-        assert "correct_avg_sample_std_err" in metrics_dict["pass@1[avg-of-3]"]
         assert "correct_std_across_runs" not in metrics_dict["pass@2"]
         assert "correct_avg_sample_std" not in metrics_dict["pass@2"]
         assert "correct_std_err_across_runs" not in metrics_dict["pass@2"]
-        assert "correct_avg_sample_std_err" not in metrics_dict["pass@2"]
 
     def test_handles_multiple_score_methods(self):
         """Test _add_benchmark_std_metrics handles multiple score methods."""
@@ -197,21 +181,17 @@ class TestStdMetricsOrchestration:
             assert "correct_std_across_runs" in metrics_dict[eval_mode]
             assert "correct_avg_sample_std" in metrics_dict[eval_mode]
             assert "correct_std_err_across_runs" in metrics_dict[eval_mode]
-            assert "correct_avg_sample_std_err" in metrics_dict[eval_mode]
             assert "partial_std_across_runs" in metrics_dict[eval_mode]
             assert "partial_avg_sample_std" in metrics_dict[eval_mode]
             assert "partial_std_err_across_runs" in metrics_dict[eval_mode]
-            assert "partial_avg_sample_std_err" in metrics_dict[eval_mode]
 
         for eval_mode in ["pass@2"]:
             assert "correct_std_across_runs" not in metrics_dict[eval_mode]
             assert "correct_avg_sample_std" not in metrics_dict[eval_mode]
             assert "correct_std_err_across_runs" not in metrics_dict[eval_mode]
-            assert "correct_avg_sample_std_err" not in metrics_dict[eval_mode]
             assert "partial_std_across_runs" not in metrics_dict[eval_mode]
             assert "partial_avg_sample_std" not in metrics_dict[eval_mode]
             assert "partial_std_err_across_runs" not in metrics_dict[eval_mode]
-            assert "partial_avg_sample_std_err" not in metrics_dict[eval_mode]
 
 
 class TestPassAtKIntegration:
@@ -281,7 +261,6 @@ class TestEdgeCasesAndBoundaryConditions:
         assert "correct_std_across_runs" not in metrics_dict["pass@1[avg-of-1]"]
         assert "correct_avg_sample_std" not in metrics_dict["pass@1[avg-of-1]"]
         assert "correct_std_err_across_runs" not in metrics_dict["pass@1[avg-of-1]"]
-        assert "correct_avg_sample_std_err" not in metrics_dict["pass@1[avg-of-1]"]
 
 
 class TestInheritanceCompatibility:
@@ -389,15 +368,12 @@ class TestScoreTypesCompatibility:
             assert f"{score_method}_std_across_runs" in result_metrics["pass@1[avg-of-3]"]
             assert f"{score_method}_avg_sample_std" in result_metrics["pass@1[avg-of-3]"]
             assert f"{score_method}_std_err_across_runs" in result_metrics["pass@1[avg-of-3]"]
-            assert f"{score_method}_avg_sample_std_err" in result_metrics["pass@1[avg-of-3]"]
             benchmark_std = result_metrics["pass@1[avg-of-3]"][f"{score_method}_std_across_runs"]
             sample_std = result_metrics["pass@1[avg-of-3]"][f"{score_method}_avg_sample_std"]
             benchmark_std_err = result_metrics["pass@1[avg-of-3]"][f"{score_method}_std_err_across_runs"]
-            sample_std_err = result_metrics["pass@1[avg-of-3]"][f"{score_method}_avg_sample_std_err"]
             assert isinstance(benchmark_std, (int, float)) and benchmark_std >= 0
             assert isinstance(sample_std, (int, float)) and sample_std >= 0
             assert isinstance(benchmark_std_err, (int, float)) and benchmark_std_err >= 0
-            assert isinstance(sample_std_err, (int, float)) and sample_std_err >= 0
 
 
 class TestEndToEndIntegration:
@@ -424,17 +400,14 @@ class TestEndToEndIntegration:
         assert "correct_std_across_runs" in result_metrics["pass@1[avg-of-3]"]
         assert "correct_avg_sample_std" in result_metrics["pass@1[avg-of-3]"]
         assert "correct_std_err_across_runs" in result_metrics["pass@1[avg-of-3]"]
-        assert "correct_avg_sample_std_err" in result_metrics["pass@1[avg-of-3]"]
 
         benchmark_std = result_metrics["pass@1[avg-of-3]"]["correct_std_across_runs"]
         sample_std = result_metrics["pass@1[avg-of-3]"]["correct_avg_sample_std"]
         benchmark_std_err = result_metrics["pass@1[avg-of-3]"]["correct_std_err_across_runs"]
-        sample_std_err = result_metrics["pass@1[avg-of-3]"]["correct_avg_sample_std_err"]
 
         assert isinstance(benchmark_std, float) and benchmark_std >= 0.0
         assert isinstance(sample_std, float) and sample_std >= 0.0
         assert isinstance(benchmark_std_err, float) and benchmark_std_err >= 0.0
-        assert isinstance(sample_std_err, float) and sample_std_err >= 0.0
 
         # Test specific values
         # Expected benchmark runs: [1,0,1], [0,1,1], [1,0,1] → all 66.67% → std = 0
@@ -454,8 +427,6 @@ class TestEndToEndIntegration:
                 assert result_metrics[eval_mode]["correct_avg_sample_std"] >= 0.0
                 assert isinstance(result_metrics[eval_mode]["correct_std_err_across_runs"], float)
                 assert result_metrics[eval_mode]["correct_std_err_across_runs"] >= 0.0
-                assert isinstance(result_metrics[eval_mode]["correct_avg_sample_std_err"], float)
-                assert result_metrics[eval_mode]["correct_avg_sample_std_err"] >= 0.0
 
     @pytest.mark.parametrize(
         "real_metrics_class,test_data",
@@ -530,7 +501,6 @@ class TestEndToEndIntegration:
                         assert f"{expected_key}_std_across_runs" in result[eval_mode]
                         assert f"{expected_key}_avg_sample_std" in result[eval_mode]
                         assert f"{expected_key}_std_err_across_runs" in result[eval_mode]
-                        assert f"{expected_key}_avg_sample_std_err" in result[eval_mode]
 
         eval_modes_to_check = [f"majority@{k}", f"pass@{k}"]
         for eval_mode in eval_modes_to_check:
@@ -540,4 +510,3 @@ class TestEndToEndIntegration:
                         assert f"{expected_key}_std_across_runs" not in result[eval_mode]
                         assert f"{expected_key}_avg_sample_std" not in result[eval_mode]
                         assert f"{expected_key}_std_err_across_runs" not in result[eval_mode]
-                        assert f"{expected_key}_avg_sample_std_err" not in result[eval_mode]
