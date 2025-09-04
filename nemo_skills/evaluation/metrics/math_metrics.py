@@ -139,9 +139,4 @@ class MathMetrics(BaseMetrics):
         }
         if self.compute_no_answer:
             metrics_to_print["no_answer"] = as_percentage
-        if self.max_k > 1:
-            metrics_to_print["judge_correct_std_across_runs"] = as_percentage
-            metrics_to_print["judge_correct_avg_sample_std"] = as_percentage
-            metrics_to_print["symbolic_correct_std_across_runs"] = as_percentage
-            metrics_to_print["symbolic_correct_avg_sample_std"] = as_percentage
         return metrics_to_print
