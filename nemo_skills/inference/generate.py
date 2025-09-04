@@ -137,8 +137,25 @@ class GenerateSolutionsConfig:
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
     # Module-based tool configuration
-    tool_modules: list[str] | None = None  # List of tool module specs (e.g., module.path:ClassName)
-    tool_overrides: dict | None = field(default_factory=dict)  # provider_id -> overrides dict
+    #   List of tool provider locators using double-colon syntax for the tool class.
+    #   Each item should be of the form:
+    #     - Module class:  module.path.to.provider::ClassName
+    #     - File class:    /abs/or/rel/path/to/provider.py::ClassName
+    #
+    #   Examples:
+    #     - ++tool_modules=["nemo_skills.mcp.servers.python_tool::PythonTool"]
+    #     - ++tool_modules=["/nemo_run/code/mcp/example_tool.py::ExampleTool","nemo_skills.mcp.servers.exa_tool::ExaTool"]
+    tool_modules: list[str] | None = None
+    #
+    #   Per-tool overrides keyed by the Tool class name (the same ClassName used above).
+    #   Use dotted keys to set nested values (e.g., client_params.base_url).
+    #
+    #   Common patterns:
+    #     - Set PythonTool timeout knob:
+    #         ++tool_overrides.PythonTool.exec_timeout_s=30
+    #     - Set an ExampleTool server-only arg:
+    #         ++tool_overrides.ExampleTool.foo_argument='[TEST] '
+    tool_overrides: dict | None = field(default_factory=dict)
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
