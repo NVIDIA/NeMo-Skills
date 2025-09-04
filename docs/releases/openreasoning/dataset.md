@@ -41,7 +41,7 @@ modifications to commands.
 To download the model you can run the following from `/workspace` folder on Slurm.
 
 ```bash
-huggingface-cli download deepseek-ai/DeepSeek-R1-0528 --local-dir DeepSeek-R1-0528
+hf download deepseek-ai/DeepSeek-R1-0528 --local-dir DeepSeek-R1-0528
 ```
 
 The next step is optional, but we recommend sharding the checkpoint to avoid very long loading time.
