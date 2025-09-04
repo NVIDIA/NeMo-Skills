@@ -24,8 +24,8 @@ def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
 
     # download the models and prepare the data
     cmd = (
-        f"huggingface-cli download Qwen/Qwen2.5-14B-Instruct --local-dir {workspace}/Qwen2.5-14B-Instruct && "
-        f"huggingface-cli download Qwen/QwQ-32B --local-dir {workspace}/QwQ-32B && "
+        f"hf download Qwen/Qwen2.5-14B-Instruct --local-dir {workspace}/Qwen2.5-14B-Instruct && "
+        f"hf download Qwen/QwQ-32B --local-dir {workspace}/QwQ-32B && "
         f"cd {workspace} && "
         f"export DOWNLOAD_PREFIX=https://raw.githubusercontent.com/NVIDIA/NeMo-Skills/refs/heads/main/recipes/openmathreasoning && "
         f"wget $DOWNLOAD_PREFIX/scripts/prepare_raw_data.py && "

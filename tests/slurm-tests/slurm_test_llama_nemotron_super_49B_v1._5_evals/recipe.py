@@ -33,8 +33,8 @@ from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 def setup(workspace, cluster, expname_prefix):
     # download models
     cmd = (
-        f"huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
-        f"huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir {workspace}/Qwen2.5-32B-Instruct"
+        f"hf download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir {workspace}/Llama-3_3-Nemotron-Super-49B-v1_5 && "
+        f"hf download Qwen/Qwen2.5-32B-Instruct --local-dir {workspace}/Qwen2.5-32B-Instruct"
     )
     run_cmd(
         ctx=wrap_arguments(cmd),
