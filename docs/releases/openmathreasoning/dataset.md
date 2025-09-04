@@ -48,8 +48,6 @@ Here are the steps to download/convert all models that we used to create this da
 Download the models by running this on cluster from the path that is mounted as `/hf_models` in your cluster config.
 ```
 pip install -U "huggingface_hub[cli]"
-hf download Qwen/Qwen2.5-32B-Instruct --local-dir Qwen2.5-32B-Instruct
-hf download Qwen/QwQ-32B --local-dir QwQ-32B
 hf download deepseek-ai/DeepSeek-R1 --local-dir DeepSeek-R1
 ```
 
