@@ -3,7 +3,7 @@ import logging
 import os
 import re
 import sys
-import textwrap
+import traceback
 from dataclasses import asdict, field
 from functools import partial
 from typing import Optional
@@ -18,7 +18,19 @@ from nemo_skills.inference.generate import (
     InferenceConfig,
 )
 from nemo_skills.inference.model import server_params
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.utils import (
+    get_help_message,
+    get_logger_name,
+    nested_dataclass,
+    setup_logging,
+)
+from nemo_skills.inference.wikipedia import (
+    search_resources,
+    pretty_outline_from_latex,
+    html_to_latex,
+    get_page_text,
+    truncate_latex_to_id,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -66,25 +78,69 @@ class ToolGenerationTask(GenerationTask):
                 {
                     "type": "function",
                     "function": {
-                        "name": "exa_websearch",
-                        "description": "Search the web using Exa. Provide relevant links in your answer.",
+                        "name": "wikipedia_search",
+                        "description": "A tool to get a list of Wikipedia page names, IDs, and descriptions for a given query.",
                         "parameters": {
                             "type": "object",
                             "properties": {
                                 "query": {
                                     "type": "string",
-                                    "description": "Search query for Exa.",
+                                    "description": "Query to get the list of relevant page names.",
                                 }
                             },
                             "required": ["query"],
                         },
                     },
-                }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "wikipedia_content",
+                        "description": "A tool to get the whole content of the specific Wikipedia page.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "page_id": {
+                                    "type": "string",
+                                    "description": "Id of the page.",
+                                },
+                                "section_id": {
+                                    "type": "string",
+                                    "description": "The index of the section to return. If not specified, will return 5000 characters of the page with no regard to sections.",
+                                },
+                                "offset": {
+                                    "type": "string",
+                                    "description": "The index of the character to start with. The tool returns only 5000 characters of the page/section.",
+                                },
+                            },
+                            "required": ["page_id"],
+                        },
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "wikipedia_outline",
+                        "description": "A tool to get the outline of the specific Wikipedia page.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "page_id": {
+                                    "type": "string",
+                                    "description": "Id of the page.",
+                                }
+                            },
+                            "required": ["page_id"],
+                        },
+                    },
+                },
             ],
         )
 
     def setup_llm(self):
-        self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
+        self.sandbox = (
+            get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
+        )
         return super().setup_llm()
 
     def log_example_prompt(self, _):
@@ -104,12 +160,16 @@ class ToolGenerationTask(GenerationTask):
                 tool_args = json.loads(tool_args)
             except json.decoder.JSONDecodeError as e:
                 if self.cfg.tool_errors_in_context:
-                    LOG.error(f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}")
+                    LOG.error(
+                        f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}"
+                    )
                     LOG.error(e)
 
                     return "error", {"error": "Unable to parse JSON arguments"}
                 else:
-                    raise ValueError(f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}") from e
+                    raise ValueError(
+                        f"Unable to parse JSON arguments from generation: {tool_name}/{tool_args}"
+                    ) from e
 
             return tool_name, tool_args
 
@@ -124,46 +184,74 @@ class ToolGenerationTask(GenerationTask):
     async def execute_tool_call(self, tool_name, tool_args):
         if tool_name == "error":
             return tool_args
-        elif tool_name == "exa_websearch":
-            if not os.getenv("EXA_API_KEY"):
-                LOG.error(f"Missing EXA_API_KEY: {tool_name}/{tool_args}")
-
-                return {"error": "Tool not available or unsupported"}
-
+        elif tool_name == "wikipedia_search":
             if "query" not in tool_args:
-                LOG.error(f"Missing query: {tool_name}/{tool_args}")
+                LOG.error(
+                    f"Error executing tool {tool_name}/{tool_args}: query not defined"
+                )
+                raise {"error": "query not defined"}
+            tool_result = search_resources(tool_args["query"])
+        elif tool_name == "wikipedia_outline":
+            if "page_id" not in tool_args:
+                LOG.error(
+                    f"Error executing tool {tool_name}/{tool_args}: page_id not defined"
+                )
+                raise {"error": "page_id not defined"}
 
-                return {"error": "Tool not available or unsupported"}
+            try:
+                offset = tool_args.get("offset", 0)
+                offset = int(offset) if offset else 0
+            except:
+                LOG.error(
+                    f"Error executing tool {tool_name}/{tool_args}: offset can't be converted to integer"
+                )
+                raise {"error": "offset can't be converted to integer"}
 
-            tool_code = textwrap.dedent(
-                f"""
-                from exa_py import Exa
-                import os
+            tool_result = pretty_outline_from_latex(
+                html_to_latex(get_page_text(tool_args["page_id"])["html"])
+            )[offset : offset + 5000]
+        elif tool_name == "wikipedia_content":
+            if "page_id" not in tool_args:
+                LOG.error(
+                    f"Error executing tool {tool_name}/{tool_args}: page_id not defined"
+                )
+                raise {"error": "page_id not defined"}
+            try:
+                offset = tool_args.get("offset", 0)
+                offset = int(offset) if offset else 0
+            except:
+                LOG.error(
+                    f"Error executing tool {tool_name}/{tool_args}: offset can't be converted to integer"
+                )
+                raise {"error": "offset can't be converted to integer"}
+            if "section_id" not in tool_args or not tool_args["section_id"]:
+                tool_result = html_to_latex(get_page_text(tool_args["page_id"])["html"])[
+                    offset : offset + 5000
+                ]
+            else:
+                try:
+                    section_id = int(tool_args["section_id"])
+                except:
+                    LOG.error(
+                        f"Error executing tool {tool_name}/{tool_args}: section_id can't be converted to integer"
+                    )
+                    raise {"error": "section_id can't be converted to integer"}
 
-                exa = Exa(os.getenv("EXA_API_KEY"))
-                result = exa.answer({repr(tool_args["query"])})
-                print(result.answer)
-            """
-            )
+                tool_result = truncate_latex_to_id(
+                    html_to_latex(get_page_text(tool_args["page_id"])["html"]),
+                    section_id,
+                )[offset : offset + 5000]
         else:
             if self.cfg.tool_errors_in_context:
                 LOG.error(f"Tool not available or unsupported: {tool_name}/{tool_args}")
 
                 return {"error": "Tool not available or unsupported"}
             else:
-                raise NotImplementedError(f"Tool not available or unsupported: {tool_name}/{tool_args}")
+                raise NotImplementedError(
+                    f"Tool not available or unsupported: {tool_name}/{tool_args}"
+                )
 
-        tool_output, _ = await self.sandbox.execute_code(generated_code=tool_code, language="python")
-
-        if tool_output["stderr"] and not tool_output["stdout"].strip():
-            if self.cfg.tool_errors_in_context:
-                LOG.error(f"Error executing tool {tool_name}/{tool_args}: {tool_output['stderr']}")
-
-                return {"error": tool_output["stderr"]}
-            else:
-                raise ValueError(f"Error executing tool {tool_name}/{tool_args}:\n{tool_output['stderr']}")
-
-        return {"result": tool_output["stdout"]}
+        return {"result": tool_result}
 
     async def process_tool_output(self, tool_name, tool_args, tool_out):
         _tool_conv = [
@@ -181,7 +269,9 @@ class ToolGenerationTask(GenerationTask):
         tool_output_generation = self.prompt_formatter(_tool_conv)
 
         ## FIXME: hack to get the correct tool output format.
-        _start_idx = [m.start() for m in re.finditer("\<\|start\|\>", tool_output_generation)][-2]
+        _start_idx = [
+            m.start() for m in re.finditer("\<\|start\|\>", tool_output_generation)
+        ][-2]
         tool_output_generation = tool_output_generation[_start_idx:]
 
         return tool_output_generation
@@ -207,14 +297,22 @@ class ToolGenerationTask(GenerationTask):
         generation_steps.append(generation["generation"])
 
         ## FIXME: make configurable.
-        while stop_reason in ["<|call|>", 200012] and num_tool_calls < self.cfg.total_code_executions_in_prompt:
+        while (
+            stop_reason in ["<|call|>", 200012]
+            and num_tool_calls < self.cfg.total_code_executions_in_prompt
+        ):
             ## FIXME: this is a hacky fix. Unsure why the invariant is not satisfied.
             if not generation_steps[-1].endswith("<|call|>"):
                 generation_steps[-1] += "<|call|>"
 
             tool_name, tool_args = await self.parse_tool_call(generation_steps[-1])
-            tool_out = await self.execute_tool_call(tool_name, tool_args)
-            tool_output_generation = await self.process_tool_output(tool_name, tool_args, tool_out)
+            try:
+                tool_out = await self.execute_tool_call(tool_name, tool_args)
+            except Exception as e:
+                tool_out = {"error": traceback.format_exc()}
+            tool_output_generation = await self.process_tool_output(
+                tool_name, tool_args, tool_out
+            )
             generation_steps.append(tool_output_generation)
 
             num_tool_calls += 1
