@@ -130,7 +130,7 @@ generate(
     output_dir="/workspace/sdg/problems",
     postprocess_cmd=postprocess_cmd,
     expname="problem-extraction",
-    run_after=["prepare-data", "download-14b"],
+    run_after=["prepare-data"],
     model="Qwen/Qwen2.5-14B-Instruct",
     server_type="vllm",
     server_gpus=num_gpus,
@@ -198,8 +198,7 @@ Next, [convert the model](https://nvidia.github.io/NeMo-Skills/pipelines/checkpo
 ns convert \
     --cluster=local \
     --expname=convert-14b-nemo \
-    --run_after=download-14b \
-    --input_model=/workspace/Qwen2.5-14B-Instruct \
+    --input_model=Qwen/Qwen2.5-14B-Instruct \
     --output_model=/workspace/qwen2.5-14b-instruct-nemo \
     --convert_from=hf \
     --convert_to=nemo \
@@ -235,7 +234,6 @@ For the NeMo-RL backend, use the following training command. Add `--disable_wand
 ns nemo_rl sft \
     --cluster=local \
     --expname=training \
-    --run_after=download-14b \
     --run_after=prepare-sft-data \
     --output_dir=/workspace/training \
     --hf_model=/workspace/Qwen2.5-14B-Instruct \
