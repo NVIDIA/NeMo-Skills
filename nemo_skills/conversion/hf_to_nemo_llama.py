@@ -143,8 +143,6 @@ def load_state_dict_helper(cls, cfg, trainer: Trainer, state_dict):
 
 
 def convert(args):
-    args.in_path = os.path.abspath(args.in_path)
-    args.out_path = os.path.abspath(args.out_path)
     logging.info(f"loading checkpoint {args.in_path}")
 
     model = LlamaForCausalLM.from_pretrained(args.in_path)
