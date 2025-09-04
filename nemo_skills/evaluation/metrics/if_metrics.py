@@ -64,7 +64,7 @@ class IFMetrics(BaseMetrics):
                 "instruction_loose_accuracy": inst_loose,
             }
             self.update_common_metrics(metrics_dict[agg_mode])
-        self._add_benchmark_std_metrics(metrics_dict)
+        self._add_std_metrics(metrics_dict)
         return metrics_dict
 
     def reset(self):

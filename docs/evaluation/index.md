@@ -120,15 +120,15 @@ pass@4           | 164         | 215        | 219         | 79.27%             |
 
 ### Standard deviation and standard error metrics for variance analysis
 
-When using multiple samples (k > 1), the evaluation automatically computes standard deviation and standard error metrics as additional columns for each metric in the main evaluation modes:
+When using multiple samples (`:<num repeats>` after the benchmark name), the evaluation automatically computes standard deviation and standard error metrics:
 
-- **`{metric_name}_std_across_runs`**: Standard deviation of metric values across max_k benchmark runs. Measures how much the metric varies between different benchmark runs (each run uses attempt i from each sample).
+- **`{metric_name}_std_dev_across_runs`**: Standard deviation of average metric values across runs. Measures how much the average metric value varies between different runs (each run uses attempt i from each sample).
 
-- **`{metric_name}_avg_sample_std`**: Average of per-sample standard deviations. Measures the average within-sample variance across all samples (for each sample, calculates std dev across its max_k attempts, then averages).
+- **`{metric_name}_std_err_across_runs`**: Standard error of average metric values across runs. Calculated as `std_dev_across_runs / sqrt(k)` where k is the number of runs. Provides a measure of uncertainty in the run variance estimate.
 
-- **`{metric_name}_std_err_across_runs`**: Standard error of metric values across max_k benchmark runs. Calculated as `std_across_runs / sqrt(k)` where k is the number of runs. Provides a measure of uncertainty in the benchmark run variance estimate.
+- **`{metric_name}_avg_sample_std_dev`**: Average of per-sample standard deviations. Measures the average within-sample variance across all samples (for each sample, calculates standard deviation across its k attempts, then averages).
 
-These std dev and std err columns are added as additional columns to `pass@1[avg-of-k]`, providing comprehensive variance and uncertainty statistics alongside the main performance metrics.
+These statistical metrics are added as additional columns to `pass@1[avg-of-k]` evaluation modes, providing comprehensive variance and uncertainty statistics alongside the main performance metrics.
 
 ## Customizing evaluations
 
