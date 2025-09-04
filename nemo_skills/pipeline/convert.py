@@ -299,7 +299,7 @@ def convert(
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
     if convert_from == "hf" and not input_model.startswith("/"):
-        # For HF, we don't need to check if the huggingface model name is used
+        # For HF, we don't need to check the input_model path if the huggingface model name is used
         output_model, log_dir = check_mounts(
             cluster_config,
             log_dir=log_dir,
