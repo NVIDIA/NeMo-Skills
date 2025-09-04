@@ -28,19 +28,26 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class OnlineGenSelectConfig:
-    max_concurrent_requests: int = 8
-    max_num_solutions: int = 8
-    prompt_config: str = "generic/genselect"
     use_completions_api: bool = False
     tokenizer: str | None = None
     chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
     temperature: float = 0.6
     tokens_to_generate: int | None = None
-    comparison_key: str = "generation"  # Key used for comparing the different solutions
-    regex: str = r"Judg[e]?ment: (\d+)"
     remove_thinking: bool = True  # Remove thinking tokens from the comparison key
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
+
+    # GenSelect Simple
+    window_size: int = 8  # Number of solutions compared in a single request
+    regex: str = r"Judg[e]?ment: (\d+)"
+    comparison_key: str = "generation"  # Key used for comparing the different solutions
+    prompt_config: str = "generic/genselect"
+
+    # GenSelect Competition
+    num_rounds: int | None = None  # Number of rounds of GenSelect to run
+    comparison_size: List[int] | None = (
+        None  # Number of solutions compared in each round. This supersedes window_size. Otherwise, it will be set to window_size.
+    )
 
 
 class OnlineGenSelectWrapper:
@@ -60,6 +67,7 @@ class OnlineGenSelectWrapper:
             tokenizer = None
         self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
 
+        self.cfg.max_concurrent_requests = self.cfg.window_size
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
@@ -135,7 +143,7 @@ class OnlineGenSelectWrapper:
         # Step 1: Generate multiple solutions
         local_random = random.Random(random_seed)
         tasks = []
-        for _ in range(self.cfg.max_num_solutions):
+        for _ in range(self.cfg.window_size):
             # Generate solutions with different seeds for diversity
             cur_random_seed = local_random.getrandbits(32)
             # Create a copy to avoid mutation issues

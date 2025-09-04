@@ -65,11 +65,20 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(model, tokenizer=None, online_genselect_config=None, **kwargs):
+def get_online_genselect_model(model, tokenizer=None, main_config=None, inference_override_config=None, **kwargs):
     """A helper function to create OnlineGenSelect model."""
     if isinstance(model, str):
         model = get_model(model=model, tokenizer=tokenizer, **kwargs)
-    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config or OnlineGenSelectConfig())
+
+    # Merging priority: Default OnlineGenSelectConfig, main inference config, Any overrides from inference_override_config
+    merge_config = {
+        **OnlineGenSelectConfig(),
+        **main_config,
+        **(inference_override_config if inference_override_config is not None else {}),
+    }
+    online_genselect_config = OnlineGenSelectConfig(**merge_config)
+
+    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
 
 
 def get_tool_calling_model(model, tool_config, tokenizer=None, additional_config=None, **kwargs):

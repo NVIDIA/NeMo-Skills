@@ -304,15 +304,17 @@ class GenerationTask:
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
         if self.cfg.online_genselect:
-            # Use the same prompt parameters for genselect as the one used for generation
-            self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
-            self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
-            self.cfg.online_genselect_config.chat_template_kwargs = self.cfg.chat_template_kwargs
-            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
-            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
+            # Allow for overriding the temperature and tokens_to_generate for genselect
+            inference_override_config = {}
+            if self.cfg.online_genselect_config.temperature is not None:
+                inference_override_config["temperature"] = self.cfg.online_genselect_config.temperature
+            if self.cfg.online_genselect_config.tokens_to_generate is not None:
+                inference_override_config["tokens_to_generate"] = self.cfg.online_genselect_config.tokens_to_generate
+
             llm = get_online_genselect_model(
                 **{**self.cfg.server, "model": llm, "tokenizer": self.tokenizer},
-                online_genselect_config=self.cfg.online_genselect_config,
+                main_config=self.cfg,
+                inference_override_config=inference_override_config,
             )
 
         return llm
