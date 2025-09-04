@@ -28,7 +28,6 @@ agent:
       5. Think about edgecases and make sure your fix handles them as well
       Your thinking should be thorough and so it's fine if it's very long.
       Please make sure your output includes exactly _ONE_ function call!  
-      You must invoke the function directly using the function call format. You cannot invoke commands with ```, you have to use the function call format.                                                        
       If you think you have already resolved the issue, please submit your changes by running the `submit` command. 
     next_step_template: |-
       OBSERVATION:
