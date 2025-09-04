@@ -14,8 +14,9 @@
 
 import abc
 import math
-import statistics
 from collections import Counter, defaultdict
+
+import numpy as np
 
 
 # Base class for metrics computation
@@ -94,16 +95,16 @@ class BaseMetrics(abc.ABC):
                         run_scores[run_idx].append(score)
 
                 run_averages = [sum(scores) / len(scores) for scores in run_scores]
-                benchmark_std = statistics.stdev(run_averages) if len(run_averages) > 1 else 0.0
+                benchmark_std = np.std(run_averages, ddof=1)
 
                 # Calculate average sample std dev
                 sample_std_devs = []
                 for sample_scores in sample_list:
                     if len(sample_scores) > 1:
-                        sample_std_devs.append(statistics.stdev(sample_scores))
+                        sample_std_devs.append(np.std(sample_scores, ddof=1))
                     else:
                         sample_std_devs.append(0.0)
-                avg_sample_std = sum(sample_std_devs) / len(sample_std_devs) if sample_std_devs else 0.0
+                avg_sample_std = sum(sample_std_devs) / len(sample_std_devs)
 
                 # Add std metrics as columns to relevant evaluation modes
                 std_column_names = {
