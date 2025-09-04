@@ -315,10 +315,6 @@ def convert(
             check_mounted_paths=check_mounted_paths,
         )
 
-    print(f"input_model: {input_model}")
-    print(f"output_model: {output_model}")
-    print(f"log_dir: {log_dir}")
-
     if log_dir is None:
         log_dir = str(Path(output_model) / "conversion-logs")
 
