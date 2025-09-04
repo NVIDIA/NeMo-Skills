@@ -93,14 +93,18 @@ class TestBenchmarkAndSampleStd:
         """Test that std dev and std err metrics are added as columns to existing evaluation modes."""
         metrics = BenchmarkStdMetrics()
         metrics.max_k = k
-        metrics.all_scores = {"correct": {k: sample_list}}
+        metrics.all_scores = {"correct": sample_list}
 
         # Create evaluation modes that would normally be created by _compute_pass_at_k
-        metrics_dict = {
-            f"pass@1[avg-of-{k}]": {"num_entries": len(sample_list), "correct": 50.0},
-            f"majority@{k}": {"num_entries": len(sample_list), "correct": 60.0},
-            f"pass@{k}": {"num_entries": len(sample_list), "correct": 80.0},
-        }
+        metrics_dict = {}
+        for k1 in range(1, k + 1):
+            metrics_dict.update(
+                {
+                    f"pass@1[avg-of-{k1}]": {"num_entries": len(sample_list), "correct": 50.0},
+                    f"majority@{k1}": {"num_entries": len(sample_list), "correct": 60.0},
+                    f"pass@{k1}": {"num_entries": len(sample_list), "correct": 80.0},
+                }
+            )
 
         if k == 1:
             # k=1 should not add std or std err columns
@@ -152,7 +156,8 @@ class TestStdMetricsOrchestration:
     def test_processes_all_k_values(self):
         """Test _add_benchmark_std_metrics processes all k values with correct sample counts."""
         metrics = BenchmarkStdMetrics()
-        metrics.all_scores = {"correct": {2: [[1.0, 0.0], [0.0, 1.0]], 3: [[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]}}
+        metrics.max_k = 3
+        metrics.all_scores = {"correct": [[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]}
 
         metrics_dict = {
             "pass@1[avg-of-2]": {"correct": 50.0},
@@ -178,7 +183,8 @@ class TestStdMetricsOrchestration:
     def test_handles_multiple_score_methods(self):
         """Test _add_benchmark_std_metrics handles multiple score methods."""
         metrics = BenchmarkStdMetrics()
-        metrics.all_scores = {"correct": {2: [[1.0, 0.0], [0.0, 1.0]]}, "partial": {2: [[0.5, 0.0], [0.0, 0.5]]}}
+        metrics.max_k = 2
+        metrics.all_scores = {"correct": [[1.0, 0.0], [0.0, 1.0]], "partial": [[0.5, 0.0], [0.0, 0.5]]}
 
         metrics_dict = {
             "pass@1[avg-of-2]": {"correct": 50.0, "partial": 25.0},
@@ -216,18 +222,14 @@ class TestPassAtKIntegration:
         metrics = BenchmarkStdMetrics()
         predictions = [{"is_correct": True}, {"is_correct": False}, {"is_correct": True}]
         metrics._compute_pass_at_k(predictions)
-        assert "correct" in metrics.all_scores
-        assert metrics.all_scores["correct"][1] == [[1.0]]
-        assert metrics.all_scores["correct"][2] == [[1.0, 0.0]]
-        assert metrics.all_scores["correct"][3] == [[1.0, 0.0, 1.0]]
+        assert metrics.all_scores["correct"] == [[1.0, 0.0, 1.0]]
 
     def test_score_accumulation(self):
         """Test _compute_pass_at_k accumulates scores across calls."""
         metrics = BenchmarkStdMetrics()
         metrics._compute_pass_at_k([{"is_correct": True}, {"is_correct": False}])
         metrics._compute_pass_at_k([{"is_correct": False}, {"is_correct": True}])
-        assert len(metrics.all_scores["correct"][2]) == 2
-        assert metrics.all_scores["correct"][2] == [[1.0, 0.0], [0.0, 1.0]]
+        assert metrics.all_scores["correct"] == [[1.0, 0.0], [0.0, 1.0]]
 
     def test_multiple_score_methods(self):
         """Test _compute_pass_at_k handles multiple score methods."""
@@ -239,10 +241,8 @@ class TestPassAtKIntegration:
         metrics = MultiScoreMetrics()
         predictions = [{"dummy": "data"}]
         metrics._compute_pass_at_k(predictions)
-        assert "correct" in metrics.all_scores
-        assert "partial" in metrics.all_scores
-        assert metrics.all_scores["correct"][1] == [[1.0]]
-        assert metrics.all_scores["partial"][1] == [[0.5]]
+        assert metrics.all_scores["correct"] == [[1.0]]
+        assert metrics.all_scores["partial"] == [[0.5]]
 
 
 class TestEvaluationsToPrint:
@@ -271,7 +271,7 @@ class TestEdgeCasesAndBoundaryConditions:
         """Test that k=1 doesn't add std columns."""
         metrics = BenchmarkStdMetrics()
         metrics.max_k = 1
-        metrics.all_scores = {"correct": {1: [[1.0]]}}
+        metrics.all_scores = {"correct": [[1.0]]}
 
         metrics_dict = {"pass@1[avg-of-1]": {"correct": 100.0}}
 

@@ -89,20 +89,17 @@ class BaseMetrics(abc.ABC):
             → avg_sample_std = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
             → avg_sample_std_err = 0.5515 / sqrt(3) ≈ 0.3184
         """
-        for score_method, k_dict in self.all_scores.items():
-            for k, sample_list in k_dict.items():
-                if k < 2:
-                    continue
+        for score_method, sample_list in self.all_scores.items():
+            for sample_scores in sample_list:
+                assert len(sample_scores) == self.max_k, (
+                    f"Sample has {len(sample_scores)} scores but expected {self.max_k}"
+                )
 
-                for sample_scores in sample_list:
-                    assert len(sample_scores) == k, (
-                        f"Sample has {len(sample_scores)} scores but expected {k} for score_method '{score_method}'"
-                    )
-
+            for k in range(2, self.max_k + 1):
                 # Calculate benchmark run std dev
                 run_scores = [[] for _ in range(k)]
                 for sample_scores in sample_list:
-                    for run_idx, score in enumerate(sample_scores):
+                    for run_idx, score in enumerate(sample_scores[:k]):
                         run_scores[run_idx].append(score)
 
                 run_averages = [sum(scores) / len(scores) for scores in run_scores]
@@ -112,7 +109,7 @@ class BaseMetrics(abc.ABC):
                 # Calculate average sample std dev
                 sample_std_devs = []
                 for sample_scores in sample_list:
-                    sample_std_devs.append(np.std(sample_scores, ddof=1))
+                    sample_std_devs.append(np.std(sample_scores[:k], ddof=1))
                 avg_sample_std = sum(sample_std_devs) / len(sample_std_devs)
                 avg_sample_std_err = avg_sample_std / math.sqrt(len(sample_list))
 
@@ -179,7 +176,7 @@ class BaseMetrics(abc.ABC):
         self.min_start_time = float("inf")
         self.max_end_time = float("-inf")
         self.eval_dict = defaultdict(lambda: defaultdict(float))
-        self.all_scores = defaultdict(lambda: defaultdict(list))
+        self.all_scores: dict[str, list[list[bool | int | float]]] = defaultdict(list)
 
     def get_incorrect_sample(self, predictions: list[dict]) -> list[dict]:
         """Needs to replace predictions with something that evaluates as incorrect.
@@ -352,6 +349,7 @@ class BaseMetrics(abc.ABC):
 
         for score_method in score_dicts[0].keys():
             scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
+            self.all_scores[score_method].append(scores_list)
 
             # Check if the task/instance has binary scores
             # For tasks like IF, the probabilistic logic for pass@k is not applicable
@@ -382,9 +380,6 @@ class BaseMetrics(abc.ABC):
 
                 # pass@1[avg-of-k] - mean of pass@1 across all generations
                 eval_dict[f"pass@1[avg-of-{k}]"][score_method] += sum(scores_list[:k]) / k
-
-                # Collect scores for this sample to enable standard deviation calculations
-                self.all_scores[score_method][k].append(scores_list[:k])
 
                 self._update_score_metrics_for_pass(
                     eval_dict=eval_dict,
