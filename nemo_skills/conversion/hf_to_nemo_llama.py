@@ -58,6 +58,14 @@ def get_args():
     parser.add_argument("--override", action="store_true", help="Override existing output directory if it exists.")
     parser.add_argument("--nemo-format", choices=["zarr", "torch_dist"], default="zarr", help="NeMo checkpoint format")
     args = parser.parse_args()
+
+    print(f"args: {args}")
+    print(f"args.in_path: {args.in_path}")
+    print(f"args.out_path: {args.out_path}")
+    print(f"args.precision: {args.precision}")
+    print(f"args.hf_model_name: {args.hf_model_name}")
+    print(f"args.override: {args.override}")
+    print(f"args.nemo_format: {args.nemo_format}")
     return args
 
 
