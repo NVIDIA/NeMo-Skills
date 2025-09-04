@@ -42,9 +42,9 @@ class TestBenchmarkAndSampleStd:
             ),
             (
                 2,
-                [[1.0, 0.0], [1.0]],
+                [[1.0, 0.0], [1.0, 0.0]],
                 0.7071067811865476,
-                0.35355339059327373,
+                0.7071067811865476,
                 "Different benchmark averages (50%, 100%)",
             ),
             (
@@ -95,8 +95,8 @@ class TestBenchmarkAndSampleStd:
             # k > 1 should add std columns
             metrics._add_benchmark_std_metrics(metrics_dict)
 
-            # Check that all evaluation modes now have std columns
-            for eval_mode in [f"pass@1[avg-of-{k}]", f"majority@{k}", f"pass@{k}"]:
+            # Check that only pass@1[avg-of-k] has std columns
+            for eval_mode in [f"pass@1[avg-of-{k}]"]:
                 assert "correct_std_across_runs" in metrics_dict[eval_mode]
                 assert "correct_avg_sample_std" in metrics_dict[eval_mode]
 
@@ -110,29 +110,38 @@ class TestBenchmarkAndSampleStd:
                     f"{eval_mode} sample std: expected {expected_sample_std}, got {actual_sample_std}"
                 )
 
+            for eval_mode in [f"majority@{k}", f"pass@{k}"]:
+                assert "correct_std_across_runs" not in metrics_dict[eval_mode]
+                assert "correct_avg_sample_std" not in metrics_dict[eval_mode]
+
 
 class TestStdMetricsOrchestration:
     """Test _add_benchmark_std_metrics orchestration."""
 
-    def test_skips_empty_lists(self):
-        """Test _add_benchmark_std_metrics skips empty sample lists."""
+    def test_processes_all_k_values(self):
+        """Test _add_benchmark_std_metrics processes all k values with correct sample counts."""
         metrics = BenchmarkStdMetrics()
-        metrics.max_k = 2
-        metrics.all_scores = {"correct": {2: [[1.0, 0.0]], 3: []}}
+        metrics.all_scores = {"correct": {2: [[1.0, 0.0], [0.0, 1.0]], 3: [[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]}}
 
-        metrics_dict = {"pass@1[avg-of-2]": {"correct": 50.0}, "pass@2": {"correct": 75.0}}
+        metrics_dict = {
+            "pass@1[avg-of-2]": {"correct": 50.0},
+            "pass@2": {"correct": 75.0},
+            "pass@1[avg-of-3]": {"correct": 67.0},
+        }
 
         metrics._add_benchmark_std_metrics(metrics_dict)
 
-        # Should have std columns for k=2 but not k=3 (empty list)
         assert "correct_std_across_runs" in metrics_dict["pass@1[avg-of-2]"]
         assert "correct_avg_sample_std" in metrics_dict["pass@1[avg-of-2]"]
+        assert "correct_std_across_runs" in metrics_dict["pass@1[avg-of-3]"]
+        assert "correct_avg_sample_std" in metrics_dict["pass@1[avg-of-3]"]
+        assert "correct_std_across_runs" not in metrics_dict["pass@2"]
+        assert "correct_avg_sample_std" not in metrics_dict["pass@2"]
 
     def test_handles_multiple_score_methods(self):
         """Test _add_benchmark_std_metrics handles multiple score methods."""
         metrics = BenchmarkStdMetrics()
-        metrics.max_k = 2
-        metrics.all_scores = {"correct": {2: [[1.0, 0.0]]}, "partial": {2: [[0.5, 0.0]]}}
+        metrics.all_scores = {"correct": {2: [[1.0, 0.0], [0.0, 1.0]]}, "partial": {2: [[0.5, 0.0], [0.0, 0.5]]}}
 
         metrics_dict = {
             "pass@1[avg-of-2]": {"correct": 50.0, "partial": 25.0},
@@ -141,12 +150,17 @@ class TestStdMetricsOrchestration:
 
         metrics._add_benchmark_std_metrics(metrics_dict)
 
-        # Should have std columns for both score methods
-        for eval_mode in ["pass@1[avg-of-2]", "pass@2"]:
+        for eval_mode in ["pass@1[avg-of-2]"]:
             assert "correct_std_across_runs" in metrics_dict[eval_mode]
             assert "correct_avg_sample_std" in metrics_dict[eval_mode]
             assert "partial_std_across_runs" in metrics_dict[eval_mode]
             assert "partial_avg_sample_std" in metrics_dict[eval_mode]
+
+        for eval_mode in ["pass@2"]:
+            assert "correct_std_across_runs" not in metrics_dict[eval_mode]
+            assert "correct_avg_sample_std" not in metrics_dict[eval_mode]
+            assert "partial_std_across_runs" not in metrics_dict[eval_mode]
+            assert "partial_avg_sample_std" not in metrics_dict[eval_mode]
 
 
 class TestPassAtKIntegration:
@@ -221,20 +235,6 @@ class TestEdgeCasesAndBoundaryConditions:
         # Should not have std columns for k=1
         assert "correct_std_across_runs" not in metrics_dict["pass@1[avg-of-1]"]
         assert "correct_avg_sample_std" not in metrics_dict["pass@1[avg-of-1]"]
-
-    def test_empty_sample_list_handling(self):
-        """Test that empty sample lists are handled gracefully."""
-        metrics = BenchmarkStdMetrics()
-        metrics.max_k = 2
-        metrics.all_scores = {"correct": {2: []}}
-
-        metrics_dict = {"pass@1[avg-of-2]": {"correct": 0.0}}
-
-        # Should not crash with empty sample list
-        metrics._add_benchmark_std_metrics(metrics_dict)
-
-        # Should not have added std columns due to empty list
-        assert "correct_std_across_runs" not in metrics_dict["pass@1[avg-of-2]"]
 
 
 class TestInheritanceCompatibility:
@@ -457,7 +457,7 @@ class TestEndToEndIntegration:
 
         # Check that std columns are added to evaluation modes
         k = len(test_data[0])
-        eval_modes_to_check = [f"pass@1[avg-of-{k}]", f"majority@{k}", f"pass@{k}"]
+        eval_modes_to_check = [f"pass@1[avg-of-{k}]"]
 
         for eval_mode in eval_modes_to_check:
             if eval_mode in result and k > 1:
@@ -466,3 +466,11 @@ class TestEndToEndIntegration:
                     if expected_key in result[eval_mode]:  # Only check if base metric exists
                         assert f"{expected_key}_std_across_runs" in result[eval_mode]
                         assert f"{expected_key}_avg_sample_std" in result[eval_mode]
+
+        eval_modes_to_check = [f"majority@{k}", f"pass@{k}"]
+        for eval_mode in eval_modes_to_check:
+            if eval_mode in result:
+                for expected_key in expected_keys:
+                    if expected_key in result[eval_mode]:
+                        assert f"{expected_key}_std_across_runs" not in result[eval_mode]
+                        assert f"{expected_key}_avg_sample_std" not in result[eval_mode]

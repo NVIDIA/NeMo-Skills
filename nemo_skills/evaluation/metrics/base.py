@@ -83,13 +83,18 @@ class BaseMetrics(abc.ABC):
             - Sample 3: stdev([0,1,1,1]) ≈ 0.5000
             → avg_sample_std = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
         """
-        if self.max_k <= 1:
-            return
-
         for score_method, k_dict in self.all_scores.items():
-            if sample_list := k_dict.get(self.max_k):
+            for k, sample_list in k_dict.items():
+                if k < 2:
+                    continue
+
+                for sample_scores in sample_list:
+                    assert len(sample_scores) == k, (
+                        f"Sample has {len(sample_scores)} scores but expected {k} for score_method '{score_method}'"
+                    )
+
                 # Calculate benchmark run std dev
-                run_scores = [[] for _ in range(self.max_k)]
+                run_scores = [[] for _ in range(k)]
                 for sample_scores in sample_list:
                     for run_idx, score in enumerate(sample_scores):
                         run_scores[run_idx].append(score)
@@ -113,9 +118,8 @@ class BaseMetrics(abc.ABC):
                 }
 
                 # Update metrics dict with std metrics
-                for eval_mode in self.evaluations_to_print():
-                    if eval_mode in metrics_dict:
-                        metrics_dict[eval_mode].update(std_column_names)
+                if update_dict := metrics_dict.get(f"pass@1[avg-of-{k}]"):
+                    update_dict.update(std_column_names)
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         """
