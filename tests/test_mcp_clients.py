@@ -481,4 +481,3 @@ async def test_streamable_http_client_enforcement(monkeypatch):
         await client.call_tool("t1", {})
 
 
-# Removed tests relying on build_client_manager; tool-centric flow supersedes client-centric config
