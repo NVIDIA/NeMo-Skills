@@ -88,7 +88,7 @@ class PythonTool(MCPClientTool):
     def __init__(self) -> None:
         super().__init__()
         # Defaults for stdio Python MCP using explicit client class
-        self._config.update(
+        self.apply_config_updates(
             {
                 "client": "nemo_skills.mcp.clients.MCPStdioClient",
                 "client_params": {

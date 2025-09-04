@@ -35,6 +35,14 @@ class MCPClientTool(Tool):
         }
         self._client = None
 
+    # Centralized helper to update internal config with a single entry point.
+    # Subclasses should use this instead of mutating _config directly.
+    def apply_config_updates(self, updates: Dict[str, Any] | None) -> None:
+        if not updates:
+            return
+        self._config.update(updates)
+        # In the future, side-effects or validations for specific keys can be handled here
+
     def default_config(self) -> Dict[str, Any]:
         return dict(self._config)
 

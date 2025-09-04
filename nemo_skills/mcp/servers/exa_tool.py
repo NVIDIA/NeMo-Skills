@@ -87,7 +87,7 @@ class ExaTool(MCPClientTool):
     def __init__(self) -> None:
         super().__init__()
         # Defaults for stdio Exa server launch using explicit client class
-        self._config.update(
+        self.apply_config_updates(
             {
                 "client": "nemo_skills.mcp.clients.MCPStdioClient",
                 "client_params": {
@@ -104,7 +104,7 @@ class ExaMCPTool(MCPClientTool):
     def __init__(self) -> None:
         super().__init__()
         # Defaults for Exa hosted MCP over HTTP using explicit client class
-        self._config.update(
+        self.apply_config_updates(
             {
                 "client": "nemo_skills.mcp.clients.MCPStreamableHttpClient",
                 "client_params": {
