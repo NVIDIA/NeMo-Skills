@@ -19,6 +19,7 @@ import logging
 import os
 import random
 import re
+from collections import defaultdict
 from typing import Dict, List, Optional, Union
 
 from nemo_skills.prompt.utils import get_prompt
@@ -68,6 +69,10 @@ class OnlineGenSelectWrapper:
         # TODO: Not sure how this will work for GenSelect Competition
         self.cfg.max_concurrent_requests = self.cfg.window_size
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+
+        # Initialize the solutions if input_dir is provided
+        if self.cfg.input_dir is not None:
+            self.prompt_to_solutions_dict = self._load_solutions(self.cfg.input_dir)
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
@@ -172,15 +177,24 @@ class OnlineGenSelectWrapper:
         local_random.shuffle(solutions)
         return solutions
 
-    def _load_solutions(self, input_dir: str, local_random: random.Random) -> List[Dict]:
+    def _load_solutions(self, input_dir: str) -> Dict[str, List[Dict]]:
         """Load the solutions from the input directory."""
-        solutions = []
+        prompt_to_solutions_dict = defaultdict(list)
         for input_file in glob.glob(os.path.join(input_dir, "output-rs*.jsonl")):
             with open(input_file, "r") as f:
                 for line in f:
-                    solution = json.load(line)
-                    solutions.append(solution)
-        return solutions
+                    data_point = json.loads(line)
+                    # TODO: Making an assumptiont that the prompt doesn't require all the data for few-shot prompting
+                    # Convert the prompt to a tuple to use as a key in case it's a list
+                    prompt = tuple(self.fill_prompt(data_point, all_data=None))
+                    prompt_to_solutions_dict[prompt].append(
+                        {
+                            self.cfg.comparison_key: data_point[self.cfg.comparison_key],
+                            "output_dict": data_point["output_dict"],
+                        }
+                    )
+
+        return prompt_to_solutions_dict
 
     async def generate_async(self, prompt: Union[str, List], **kwargs):
         """Generate a single solution using GenSelect."""
@@ -190,7 +204,8 @@ class OnlineGenSelectWrapper:
         # Step 1: Load/Generate the solutions
         if self.cfg.input_dir is not None:
             # Already have the solutions in the input directory
-            solutions = self._load_solutions(self.cfg.input_dir, local_random)
+            # Convert the prompt to a tuple to use as a key in case it's a list
+            solutions = local_random.shuffle(self.prompt_to_solutions_dict[tuple(prompt)])
         else:
             # Generate the solutions first
             solutions = await self.generate_solutions(prompt, local_random, **kwargs)
