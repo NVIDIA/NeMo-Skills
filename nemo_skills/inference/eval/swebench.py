@@ -265,8 +265,10 @@ class SweBenchGenerationTask(GenerationTask):
             f"git clone {self.cfg.agent_framework_repo} . && "
             f"git checkout {self.cfg.agent_framework_commit} && "
             "uv venv --python 3.12 venv && "
-            "source venv/bin/activate && "
-            "uv pip install -e . && "
+            # do not activate venv, use uv pip with -p flag instead
+            # "source venv/bin/activate && "
+            # "uv pip install -e . && "
+            "uv pip install -p /root/SWE-agent/venv/bin/python -e . && "
             # then running the agent
             f"/root/SWE-agent/venv/bin/python -m sweagent run "
             f"    --config {get_config_path(self.cfg.agent_config)} "
@@ -455,10 +457,10 @@ class SweBenchGenerationTask(GenerationTask):
                 "git clone https://github.com/Kipok/SWE-bench.git && "
                 "cd SWE-bench && "
                 "uv venv --python 3.12 venv && "
-                "source venv/bin/activate && "
-                "uv pip install -e . && "
-                # then running the evaluation with streaming output
-                f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
+                # DO NOT activate venv, use uv pip with -p flag instead
+                "uv pip install -p /root/SWE-bench/venv/bin/python -e . && "
+                # Run with clean environment to avoid venv contamination
+                f"env -u VIRTUAL_ENV /root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
                 f"    --predictions_path {pred_mounted_path} "
                 f"    --instance_ids {data_point['instance_id']} "
                 f"    --run_id eval-outputs "
