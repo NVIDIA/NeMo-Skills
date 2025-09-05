@@ -329,11 +329,12 @@ class GenerationTask:
             # Allow for overriding the temperature and tokens_to_generate for genselect
             online_genselect_config = self.cfg.online_genselect_config
 
-            inference_override_config = {}
-            if self.cfg.online_genselect_config.temperature is not None:
-                inference_override_config["temperature"] = self.cfg.online_genselect_config.temperature
-            if self.cfg.online_genselect_config.tokens_to_generate is not None:
-                inference_override_config["tokens_to_generate"] = self.cfg.online_genselect_config.tokens_to_generate
+            # We don't want to override these key variables which overlap with self.cfg
+            inference_override_config = {
+                "prompt_config": self.cfg.online_genselect_config.prompt_config,
+                "temperature": self.cfg.online_genselect_config.temperature,
+                "tokens_to_generate": self.cfg.online_genselect_config.tokens_to_generate,
+            }
 
             llm = get_online_genselect_model(
                 **{**self.cfg.server, "model": llm},
