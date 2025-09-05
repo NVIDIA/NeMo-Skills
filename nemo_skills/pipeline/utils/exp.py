@@ -470,7 +470,7 @@ def add_task(
                         heterogeneous=heterogeneous,
                         het_group=het_group,
                         total_het_groups=total_het_groups,
-                        overlap=server_config is not None,
+                        overlap=True,
                         with_ray=with_ray,
                     )
                 )
@@ -512,7 +512,7 @@ def add_task(
                 heterogeneous=heterogeneous,
                 het_group=het_group,
                 total_het_groups=total_het_groups,
-                overlap=server_config is not None,
+                overlap=server_config is not None or with_sandbox,
                 with_ray=with_ray,
             )
             executors.append(sandbox_executor)
