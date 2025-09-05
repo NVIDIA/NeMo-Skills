@@ -122,11 +122,6 @@ class OnlineGenSelectWrapper:
             "max_idx": max_idx,
         }
 
-        print(genselect_input)
-        print(self.genselect_prompt)
-        print("--------------------------------")
-        print(self.genselect_prompt.fill(genselect_input))
-        print("--------------------------------")
         genselect_prompt = self.genselect_prompt.fill(genselect_input)
 
         # Step 2: Run Self-GenSelect
