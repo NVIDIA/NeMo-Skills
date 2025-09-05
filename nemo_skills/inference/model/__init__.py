@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
+
 from nemo_skills.utils import python_doc_to_cmd_help
 
 from .azure import AzureOpenAIModel
@@ -71,12 +73,19 @@ def get_online_genselect_model(model, tokenizer=None, main_config=None, inferenc
         model = get_model(model=model, tokenizer=tokenizer, **kwargs)
 
     # Merging priority: Default OnlineGenSelectConfig, main inference config, Any overrides from inference_override_config
+    valid_params = set(inspect.signature(OnlineGenSelectConfig.__init__).parameters.keys())
+    valid_params.discard("self")  # Remove 'self' parameter
+
+    # Merging priority: Default OnlineGenSelectConfig, main inference config, Any overrides
     merge_config = {
         **OnlineGenSelectConfig().__dict__,
         **main_config.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
-    online_genselect_config = OnlineGenSelectConfig(**merge_config)
+
+    # Filter to only include valid parameters
+    filtered_config = {k: v for k, v in merge_config.items() if k in valid_params}
+    online_genselect_config = OnlineGenSelectConfig(**filtered_config)
 
     return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
 
