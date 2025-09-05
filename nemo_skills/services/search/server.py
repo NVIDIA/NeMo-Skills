@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import socket
 import threading
 import warnings
 from typing import List, Optional
@@ -408,42 +407,21 @@ async def access_endpoint(request: AccessRequest):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Launch the local faiss retriever.")
-    parser.add_argument(
-        "--index_path",
-        type=str,
-        default="/home/peterjin/mnt/index/wiki-18/e5_Flat.index",
-        help="Corpus indexing file.",
-    )
-    parser.add_argument(
-        "--corpus_path",
-        type=str,
-        default="/home/peterjin/mnt/data/retrieval-corpus/wiki-18.jsonl",
-        help="Local corpus file.",
-    )
+    parser.add_argument("--index_path", type=str, help="Corpus indexing file.", default=os.environ.get("INDEX_PATH"))
+    parser.add_argument("--corpus_path", type=str, help="Local corpus file.", default=os.environ.get("CORPUS_PATH"))
     parser.add_argument("--pages_path", type=str, default="", help="Local page file.")
-    parser.add_argument("--topk", type=int, default=3, help="Number of retrieved passages for one query.")
+    parser.add_argument("--topk", type=int, default=10, help="Number of retrieved passages for one query.")
     parser.add_argument("--retriever_name", type=str, default="e5", help="Name of the retriever model.")
     parser.add_argument(
         "--retriever_model", type=str, default="intfloat/e5-base-v2", help="Path of the retriever model."
     )
     parser.add_argument("--faiss_gpu", action="store_true", help="Use GPU for computation")
-    parser.add_argument("--port", type=int, default=5005)
-    parser.add_argument("--save-address-to", type=str, help="path to save server address")
+    parser.add_argument("--host", type=str, default=os.environ.get("SERVER_HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=os.environ.get("SERVER_PORT", 5005))
 
     args = parser.parse_args()
 
-    host_name = socket.gethostname()
-    host_ip = socket.gethostbyname(socket.gethostname())
-    port = args.port
-
-    host_addr = f"{host_ip}:{port}"
-
-    print(f"Server address: {host_addr}")
-
-    if args.save_address_to:
-        os.makedirs(args.save_address_to, exist_ok=True)
-        with open(os.path.join(args.save_address_to, "Host" + host_ip + "_" + "IP" + str(port) + ".txt"), "w") as f:
-            f.write(host_addr)
+    print(f"Server address: {args.host}:{args.port}")
 
     # 1) Build a config (could also parse from arguments).
     #    In real usage, you'd parse your CLI arguments or environment variables.
@@ -474,8 +452,8 @@ if __name__ == "__main__":
     # 4) Launch the server.
     config = uvicorn.Config(
         app,
-        host=host_addr.split(":")[0],
-        port=int(host_addr.split(":")[1]),
+        host=args.host,
+        port=args.port,
         log_level="warning",
     )
     http_server = uvicorn.Server(config)

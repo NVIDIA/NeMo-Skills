@@ -16,7 +16,7 @@ RUN uv venv --python ${PY_VERSION} /usr/local/venv
 ENV VIRTUAL_ENV=/usr/local/venv PATH="/usr/local/venv/bin:$PATH"
 
 ARG FAISS_VERSION
-RUN uv pip install torch --index-url https://download.pytorch.org/whl/cu121 \
+RUN uv pip install torch --index-url https://download.pytorch.org/whl/cu129 \
     && uv pip install faiss-gpu-cu12==${FAISS_VERSION}
 
 RUN uv pip install \
