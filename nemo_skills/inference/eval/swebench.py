@@ -164,9 +164,21 @@ class SweBenchGenerationTask(GenerationTask):
         self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
     ):
         """Execute a command in an Apptainer container with retry logic."""
+        # Try with _1776_ replacement first
         container_name = data_point["container_formatter"].format(
             instance_id=data_point["instance_id"].replace("__", "_1776_")
         )
+        
+        # Check if container exists, if not try _s_ replacement
+        if not os.path.exists(container_name):
+            container_name_alt = data_point["container_formatter"].format(
+                instance_id=data_point["instance_id"].replace("__", "_s_")
+            )
+            if os.path.exists(container_name_alt):
+                LOG.info(f"Container with _1776_ not found, using _s_ replacement: {container_name_alt}")
+                container_name = container_name_alt
+            else:
+                LOG.warning(f"Neither _1776_ nor _s_ container variants found. Using: {container_name}")
 
         # Create logs directory if it doesn't exist
         logs_dir = self.output_dir / "apptainer_logs"
