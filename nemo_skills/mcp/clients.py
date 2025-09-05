@@ -385,7 +385,7 @@ class MCPStdioClient(MCPClient):
     def __init__(self, command: str, args: list[str] | None = None):
         if args is None:
             args = []
-        # Inherit parent environment by default so servers can see test-set env vars
+        # Default: inherit the caller's environment for all stdio-launched servers
         self.server_params = StdioServerParameters(command=command, args=args, env=os.environ.copy())
         self.tools: List[Dict[str, Any]] = []
 
