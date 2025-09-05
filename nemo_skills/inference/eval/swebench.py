@@ -178,7 +178,23 @@ class SweBenchGenerationTask(GenerationTask):
                 LOG.info(f"Container with _1776_ not found, using _s_ replacement: {container_name_alt}")
                 container_name = container_name_alt
             else:
-                LOG.warning(f"Neither _1776_ nor _s_ container variants found. Using: {container_name}")
+                # If neither exists, try fuzzy search in the container directory
+                container_dir = os.path.dirname(container_name)
+                instance_id = data_point["instance_id"]
+                
+                if os.path.exists(container_dir):
+                    # Search for any .sif file containing the instance_id
+                    pattern = os.path.join(container_dir, f"*{instance_id}*.sif")
+                    matching_files = glob.glob(pattern)
+                    
+                    if matching_files:
+                        # Use the first matching file found
+                        container_name = matching_files[0]
+                        LOG.info(f"Using fuzzy match for container: {container_name}")
+                    else:
+                        LOG.warning(f"No container found with instance_id '{instance_id}' in {container_dir}. Using original: {container_name}")
+                else:
+                    LOG.warning(f"Container directory {container_dir} does not exist. Using: {container_name}")
 
         # Create logs directory if it doesn't exist
         logs_dir = self.output_dir / "apptainer_logs"
