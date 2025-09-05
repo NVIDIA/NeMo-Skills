@@ -232,6 +232,10 @@ class OnlineGenSelectWrapper:
             "genselect_comparison": genselect_result["generation"],
         }
 
+        if self.cfg.comparison_key != "generation":
+            # Add the generation key to the result since it's required by inference/generate.py
+            result["generation"] = best_solution["output_dict"]["generation"]
+
         total_num_generated_tokens = 0
         for solution in solutions:
             total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)
