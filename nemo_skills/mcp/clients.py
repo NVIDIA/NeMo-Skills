@@ -14,7 +14,6 @@
 import copy
 import functools
 import json
-import os
 from abc import abstractmethod
 from typing import Any, Callable, Dict, List
 
@@ -24,24 +23,21 @@ from mcp.client.streamable_http import streamablehttp_client
 
 
 def _process_hide_args(result, hide_args):
-    if not hide_args:
-        return result
-    # Be defensive: only attempt to process when result is a list
-    if not isinstance(result, list):
-        return result
-    output = []
-    for entry in result:
-        method_name = entry.get("name")
-        schema = copy.deepcopy(entry.get("input_schema", {}))
-        if method_name in hide_args and "properties" in schema:
-            for arg in hide_args[method_name]:
-                schema["properties"].pop(arg, None)
-                if "required" in schema and arg in schema["required"]:
-                    schema["required"].remove(arg)
-        new_entry = dict(entry)
-        new_entry["input_schema"] = schema
-        output.append(new_entry)
-    return output
+    if hide_args:
+        output = []
+        for entry in result:
+            method_name = entry.get("name")
+            schema = copy.deepcopy(entry.get("input_schema", {}))
+            if method_name in hide_args and "properties" in schema:
+                for arg in hide_args[method_name]:
+                    schema["properties"].pop(arg, None)
+                    if "required" in schema and arg in schema["required"]:
+                        schema["required"].remove(arg)
+            new_entry = dict(entry)
+            new_entry["input_schema"] = schema
+            output.append(new_entry)
+        return output
+    return result
 
 
 def _filter_tools(result, disabled_tools, enabled_tools):
@@ -388,8 +384,7 @@ class MCPStdioClient(MCPClient):
     def __init__(self, command: str, args: list[str] | None = None):
         if args is None:
             args = []
-        # Default: inherit the caller's environment for all stdio-launched servers
-        self.server_params = StdioServerParameters(command=command, args=args, env=os.environ.copy())
+        self.server_params = StdioServerParameters(command=command, args=args)
         self.tools: List[Dict[str, Any]] = []
 
     async def list_tools(self):
