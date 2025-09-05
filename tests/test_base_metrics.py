@@ -31,10 +31,12 @@ class MockMetrics(BaseMetrics):
             [[1.0, 0.0], [0.0, 1.0]],
             {
                 "pass@1[avg-of-2]": {
-                    "correct_avg": 0.5,
-                    "correct_std_dev_across_runs": 0.0,
-                    "correct_avg_sample_std_dev": 0.7071067811865476,
-                    "correct_std_err_across_runs": 0.0,
+                    "correct_statistics": {
+                        "avg": 0.5,
+                        "std_dev_across_runs": 0.0,
+                        "avg_sample_std_dev": 0.7071067811865476,
+                        "std_err_across_runs": 0.0,
+                    }
                 }
             },
         ),
@@ -43,16 +45,20 @@ class MockMetrics(BaseMetrics):
             [[1.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 1.0, 1.0]],
             {
                 "pass@1[avg-of-2]": {
-                    "correct_avg": 0.6666666666666666,
-                    "correct_std_dev_across_runs": 0.0,
-                    "correct_avg_sample_std_dev": 0.47140452079103173,
-                    "correct_std_err_across_runs": 0.0,
+                    "correct_statistics": {
+                        "avg": 0.6666666666666666,
+                        "std_dev_across_runs": 0.0,
+                        "avg_sample_std_dev": 0.47140452079103173,
+                        "std_err_across_runs": 0.0,
+                    }
                 },
                 "pass@1[avg-of-3]": {
-                    "correct_avg": 0.6666666666666666,
-                    "correct_std_dev_across_runs": 0.0,
-                    "correct_avg_sample_std_dev": 0.3849001794597506,
-                    "correct_std_err_across_runs": 0.0,
+                    "correct_statistics": {
+                        "avg": 0.6666666666666666,
+                        "std_dev_across_runs": 0.0,
+                        "avg_sample_std_dev": 0.3849001794597506,
+                        "std_err_across_runs": 0.0,
+                    }
                 },
             },
         ),
@@ -61,22 +67,28 @@ class MockMetrics(BaseMetrics):
             [[1.0, 0.0, 1.0, 0.0], [1.0, 1.0, 0.0, 0.0], [0.0, 1.0, 1.0, 1.0]],
             {
                 "pass@1[avg-of-2]": {
-                    "correct_avg": 0.6666666666666666,
-                    "correct_std_dev_across_runs": 0.0,
-                    "correct_avg_sample_std_dev": 0.47140452079103173,
-                    "correct_std_err_across_runs": 0.0,
+                    "correct_statistics": {
+                        "avg": 0.6666666666666666,
+                        "std_dev_across_runs": 0.0,
+                        "avg_sample_std_dev": 0.47140452079103173,
+                        "std_err_across_runs": 0.0,
+                    }
                 },
                 "pass@1[avg-of-3]": {
-                    "correct_avg": 0.6666666666666666,
-                    "correct_std_dev_across_runs": 0.0,
-                    "correct_avg_sample_std_dev": 0.5773502691896258,
-                    "correct_std_err_across_runs": 0.0,
+                    "correct_statistics": {
+                        "avg": 0.6666666666666666,
+                        "std_dev_across_runs": 0.0,
+                        "avg_sample_std_dev": 0.5773502691896258,
+                        "std_err_across_runs": 0.0,
+                    }
                 },
                 "pass@1[avg-of-4]": {
-                    "correct_avg": 0.5833333333333334,
-                    "correct_std_dev_across_runs": 0.16666666666666666,
-                    "correct_avg_sample_std_dev": 0.5515668461264172,
-                    "correct_std_err_across_runs": 0.08333333333333333,
+                    "correct_statistics": {
+                        "avg": 0.5833333333333334,
+                        "std_dev_across_runs": 0.16666666666666666,
+                        "avg_sample_std_dev": 0.5515668461264172,
+                        "std_err_across_runs": 0.08333333333333333,
+                    }
                 },
             },
         ),
@@ -90,28 +102,36 @@ class MockMetrics(BaseMetrics):
             ],
             {
                 "pass@1[avg-of-2]": {
-                    "correct_avg": 0.5,
-                    "correct_std_dev_across_runs": 0.0,
-                    "correct_avg_sample_std_dev": 0.3535533905932738,
-                    "correct_std_err_across_runs": 0.0,
+                    "correct_statistics": {
+                        "avg": 0.5,
+                        "std_dev_across_runs": 0.0,
+                        "avg_sample_std_dev": 0.3535533905932738,
+                        "std_err_across_runs": 0.0,
+                    }
                 },
                 "pass@1[avg-of-3]": {
-                    "correct_avg": 0.5833333333333334,
-                    "correct_std_dev_across_runs": 0.14433756729740646,
-                    "correct_avg_sample_std_dev": 0.4330127018922194,
-                    "correct_std_err_across_runs": 0.08333333333333334,
+                    "correct_statistics": {
+                        "avg": 0.5833333333333334,
+                        "std_dev_across_runs": 0.14433756729740646,
+                        "avg_sample_std_dev": 0.4330127018922194,
+                        "std_err_across_runs": 0.08333333333333334,
+                    }
                 },
                 "pass@1[avg-of-4]": {
-                    "correct_avg": 0.625,
-                    "correct_std_dev_across_runs": 0.14433756729740643,
-                    "correct_avg_sample_std_dev": 0.5386751345948129,
-                    "correct_std_err_across_runs": 0.07216878364870322,
+                    "correct_statistics": {
+                        "avg": 0.625,
+                        "std_dev_across_runs": 0.14433756729740643,
+                        "avg_sample_std_dev": 0.5386751345948129,
+                        "std_err_across_runs": 0.07216878364870322,
+                    }
                 },
                 "pass@1[avg-of-5]": {
-                    "correct_avg": 0.6,
-                    "correct_std_dev_across_runs": 0.13693063937629152,
-                    "correct_avg_sample_std_dev": 0.5477225575051662,
-                    "correct_std_err_across_runs": 0.06123724356957944,
+                    "correct_statistics": {
+                        "avg": 0.6,
+                        "std_dev_across_runs": 0.13693063937629152,
+                        "avg_sample_std_dev": 0.5477225575051662,
+                        "std_err_across_runs": 0.06123724356957944,
+                    }
                 },
             },
         ),
@@ -120,10 +140,12 @@ class MockMetrics(BaseMetrics):
             [[1.0, 1.0], [1.0, 1.0], [0.0, 0.0]],
             {
                 "pass@1[avg-of-2]": {
-                    "correct_avg": 0.6666666666666666,
-                    "correct_std_dev_across_runs": 0.0,
-                    "correct_avg_sample_std_dev": 0.0,
-                    "correct_std_err_across_runs": 0.0,
+                    "correct_statistics": {
+                        "avg": 0.6666666666666666,
+                        "std_dev_across_runs": 0.0,
+                        "avg_sample_std_dev": 0.0,
+                        "std_err_across_runs": 0.0,
+                    }
                 }
             },
         ),
