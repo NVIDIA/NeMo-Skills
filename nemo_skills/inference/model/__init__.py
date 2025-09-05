@@ -72,8 +72,8 @@ def get_online_genselect_model(model, tokenizer=None, main_config=None, inferenc
 
     # Merging priority: Default OnlineGenSelectConfig, main inference config, Any overrides from inference_override_config
     merge_config = {
-        **OnlineGenSelectConfig(),
-        **main_config,
+        **OnlineGenSelectConfig().__dict__,
+        **main_config.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
     online_genselect_config = OnlineGenSelectConfig(**merge_config)

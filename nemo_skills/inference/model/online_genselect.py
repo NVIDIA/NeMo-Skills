@@ -46,7 +46,7 @@ class OnlineGenSelectConfig:
     regex: str = r"Judg[e]?ment: (\d+)"
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     prompt_config: str = "generic/genselect"
-    input_dir: str | None = None  # Assumes output-rs{random_seed}.jsonl files in this directory
+    input_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
 
 
 class OnlineGenSelectWrapper:
