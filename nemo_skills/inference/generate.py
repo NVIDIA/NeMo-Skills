@@ -266,7 +266,7 @@ class GenerationTask:
         if self.cfg.online_genselect:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
             self.semaphore = asyncio.Semaphore(
-                self.cfg.max_concurrent_requests // self.cfg.online_genselect_config.max_concurrent_requests
+                self.cfg.max_concurrent_requests // self.llm.cfg.max_concurrent_requests
             )
         else:
             self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)

@@ -13,7 +13,10 @@
 # limitations under the License.
 
 import asyncio
+import glob
+import json
 import logging
+import os
 import random
 import re
 from typing import Dict, List, Optional, Union
@@ -42,12 +45,7 @@ class OnlineGenSelectConfig:
     regex: str = r"Judg[e]?ment: (\d+)"
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     prompt_config: str = "generic/genselect"
-
-    # GenSelect Competition
-    num_rounds: int | None = None  # Number of rounds of GenSelect to run
-    comparison_size: List[int] | None = (
-        None  # Number of solutions compared in each round. This supersedes window_size. Otherwise, it will be set to window_size.
-    )
+    input_dir: str | None = None  # Assumes output-rs{random_seed}.jsonl files in this directory
 
 
 class OnlineGenSelectWrapper:
@@ -67,6 +65,7 @@ class OnlineGenSelectWrapper:
             tokenizer = None
         self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
 
+        # TODO: Not sure how this will work for GenSelect Competition
         self.cfg.max_concurrent_requests = self.cfg.window_size
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
@@ -131,17 +130,16 @@ class OnlineGenSelectWrapper:
 
         return judgment, genselect_result
 
-    async def generate_async(
+    async def generate_solutions(
         self,
         prompt: Union[str, List],
-        random_seed: int = 0,
+        local_random: random.Random,
         **solution_kwargs,
     ) -> Dict:
         """
         Generate multiple solutions and use Self-GenSelect to choose the best one.
         """
         # Step 1: Generate multiple solutions
-        local_random = random.Random(random_seed)
         tasks = []
         for _ in range(self.cfg.window_size):
             # Generate solutions with different seeds for diversity
@@ -172,6 +170,30 @@ class OnlineGenSelectWrapper:
             )
 
         local_random.shuffle(solutions)
+        return solutions
+
+    def _load_solutions(self, input_dir: str, local_random: random.Random) -> List[Dict]:
+        """Load the solutions from the input directory."""
+        solutions = []
+        for input_file in glob.glob(os.path.join(input_dir, "output-rs*.jsonl")):
+            with open(input_file, "r") as f:
+                for line in f:
+                    solution = json.load(line)
+                    solutions.append(solution)
+        return solutions
+
+    async def generate_async(self, prompt: Union[str, List], **kwargs):
+        """Generate a single solution using GenSelect."""
+
+        local_random = random.Random(kwargs.get("random_seed", 0))
+
+        # Step 1: Load/Generate the solutions
+        if self.cfg.input_dir is not None:
+            # Already have the solutions in the input directory
+            solutions = self._load_solutions(self.cfg.input_dir, local_random)
+        else:
+            # Generate the solutions first
+            solutions = await self.generate_solutions(prompt, local_random, **kwargs)
 
         # Step 2: Run GenSelect to choose the best solution
         best_index, genselect_result = await self._run_genselect(prompt, solutions, local_random)
