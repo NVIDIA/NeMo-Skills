@@ -15,7 +15,7 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "math"
 METRICS_TYPE = "simpleqa"
-EVAL_ARGS = "++eval_type=math "  # ++generation_key=generation
+EVAL_ARGS = "++eval_type=math ++generation_key=predicted_answer "
 GENERATION_ARGS = "++prompt_config=generic/default"
 EVAL_SPLIT = "test"
 

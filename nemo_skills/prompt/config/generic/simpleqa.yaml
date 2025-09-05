@@ -2,6 +2,6 @@
 
 system: |-
   Your response should be in the following format:
-  Answer: {{your succinct, final answer}}
+  {{your succinct, final answer}}
 
 user: "{problem}"

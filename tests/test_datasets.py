@@ -27,6 +27,7 @@ DATASETS = [
     ("gsm-plus", ["test", "test_rounded"]),
     ("gsm8k", ["train", "test"]),
     ("hle", ["math", "text"]),
+    ("simpleqa", ["test"]),
     ("human-eval", ["test"]),
     (
         "livecodebench",
