@@ -350,7 +350,7 @@ class BaseMetrics(abc.ABC):
 
             # Check if the task/instance has binary scores
             # For tasks like IF, the probabilistic logic for pass@k is not applicable
-            is_binary_score = (max(scores_list) == 1) and (min(scores_list) == 0)
+            is_binary_score = all([score in (0, 1, True, False) for score in scores_list])
 
             if is_binary_score:
                 total_correct = int(sum(scores_list))
