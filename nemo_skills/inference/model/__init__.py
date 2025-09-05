@@ -85,6 +85,8 @@ def get_online_genselect_model(
         **(inference_override_config if inference_override_config is not None else {}),
     }
 
+    print(merge_config)
+
     # Filter to only include valid parameters
     filtered_config = {k: v for k, v in merge_config.items() if k in valid_params}
     print(filtered_config)
