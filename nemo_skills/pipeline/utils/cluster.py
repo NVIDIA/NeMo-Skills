@@ -157,6 +157,7 @@ def get_env_variables(cluster_config):
         "AZURE_OPENAI_API_KEY",
         "OPENAI_API_KEY",
         "HF_TOKEN",
+        "NGC_API_KEY",
     }
     default_factories = {
         "HF_TOKEN": lambda: str(token) if (token := get_token()) else "",
@@ -197,6 +198,15 @@ def get_env_variables(cluster_config):
             if env_var_name not in _logged_optional_env_vars:
                 LOG.info(f"Optional environment variable {env_var_name} not found in user environment; skipping.")
                 _logged_optional_env_vars.add(env_var_name)
+
+    # Unless NGC_API_KEY is explicitly set we will populate it to be equal to NVIDIA_API_KEY
+    if "NGC_API_KEY" not in env_vars:
+        if "NVIDIA_API_KEY" in env_vars:
+            env_vars["NGC_API_KEY"] = env_vars["NVIDIA_API_KEY"]
+            LOG.info("Populating NGC_API_KEY to be equal to NVIDIA_API_KEY")
+        else:
+            LOG.warning("NGC_API_KEY is not set, but NVIDIA_API_KEY is not set either. "
+                        "You might need to set NGC_API_KEY in your cluster config.")
     return env_vars
 
 

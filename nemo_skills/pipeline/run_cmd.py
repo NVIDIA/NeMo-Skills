@@ -115,6 +115,7 @@ def run_cmd(
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
     ),
+    _slurm_kwargs_nodelist: str = typer.Option(None, help="Internal option to specify nodelist.", hidden=True),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -177,6 +178,13 @@ def run_cmd(
 
         prev_tasks = _task_dependencies
         for _ in range(dependent_jobs + 1):
+            # Build slurm_kwargs from nodelist and exclusive flag
+            final_slurm_kwargs = {}
+            if _slurm_kwargs_nodelist:
+                final_slurm_kwargs["nodelist"] = _slurm_kwargs_nodelist
+            if exclusive is not None:
+                final_slurm_kwargs["exclusive"] = exclusive
+            
             new_task = add_task(
                 exp,
                 cmd=commands,
@@ -197,7 +205,7 @@ def run_cmd(
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
                 num_tasks=[1] * len(commands),
-                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                slurm_kwargs=final_slurm_kwargs if final_slurm_kwargs else None,
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )

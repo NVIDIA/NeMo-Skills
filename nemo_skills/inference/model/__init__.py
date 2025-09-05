@@ -35,6 +35,10 @@ from .tool_call import ToolCallingWrapper
 # Utilities
 from .vllm import VLLMModel
 
+# NIM models (speech)
+from .asr_nim import ASRNIMModel
+from .tts_nim import TTSNIMModel
+
 # Model implementations
 
 
@@ -47,6 +51,8 @@ models = {
     "gemini": GeminiModel,
     "vllm": VLLMModel,
     "sglang": VLLMModel,
+    "tts_nim": TTSNIMModel,
+    "asr_nim": ASRNIMModel,
 }
 
 

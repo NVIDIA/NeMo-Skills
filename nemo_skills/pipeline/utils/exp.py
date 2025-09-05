@@ -235,6 +235,11 @@ def get_executor(
         additional_parameters["mail_type"] = cluster_config["mail_type"]
     if cluster_config.get("mail_user") is not None:
         additional_parameters["mail_user"] = cluster_config["mail_user"]
+    
+    # Merge slurm_kwargs into additional_parameters
+    if slurm_kwargs:
+        additional_parameters.update(slurm_kwargs)
+    
     srun_args = [
         "--no-container-mount-home",
         "--mpi=pmix",
@@ -278,7 +283,6 @@ def get_executor(
         dependency_type=dependency_type,
         heterogeneous=heterogeneous,
         env_vars=env_vars,
-        **(slurm_kwargs or {}),
     )
 
 
@@ -433,9 +437,11 @@ def add_task(
     # assuming server always has the largest resources request, so it needs to go first
     if server_config is not None and int(server_config["num_gpus"]) > 0:
         # do not pass container into the command builder
-        server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
+        # NOTE: avoid evaluating default (which would index cluster_config) unless needed
+        server_container = server_config.pop('container', None)
+        if server_container is None:
+            server_container = cluster_config["containers"][server_config["server_type"]]
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
-
         server_executor = get_executor(
             cluster_config=cluster_config,
             container=server_container,
