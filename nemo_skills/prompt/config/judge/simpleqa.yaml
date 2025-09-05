@@ -71,7 +71,7 @@ user: |-
     ```
     Question: {problem}
     Gold target: {expected_answer}
-    Predicted answer: {predicted_answer}
+    Predicted answer: {generation}
     ```
 
     Grade the predicted answer of this new question as one of:

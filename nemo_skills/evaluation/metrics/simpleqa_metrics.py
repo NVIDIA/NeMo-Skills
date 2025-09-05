@@ -36,7 +36,7 @@ def is_correct_judgement_label_matching(judgement: str, correct_label: str) -> b
 class SimpleQAMetrics(BaseMetrics):
     """Metrics for SimpleQA dataset which evaluates factual accuracy through judgement."""
 
-    def __init__(self, compute_no_answer: bool = True, answer_key: str = "generation"):
+    def __init__(self, compute_no_answer: bool = True, answer_key: str = "predicted_answer"):
         super().__init__(compute_no_answer=compute_no_answer)
         self.answer_key = answer_key
 

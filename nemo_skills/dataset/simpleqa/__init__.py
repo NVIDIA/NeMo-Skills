@@ -15,15 +15,15 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "math"
 METRICS_TYPE = "simpleqa"
-EVAL_ARGS = "++eval_type=math ++generation_key=predicted_answer "
-GENERATION_ARGS = "++prompt_config=generic/default"
+EVAL_ARGS = "++eval_type=math "
+GENERATION_ARGS = "++prompt_config=generic/simpleqa "
 EVAL_SPLIT = "test"
 
 # SimpleQA requires judge model for evaluating factual accuracy
 # Setting openai judge by default, but can be overridden from command line for a locally hosted model
 # Using GPT-4 as recommended for factual evaluation tasks
 JUDGE_PIPELINE_ARGS = {
-    "model": "/hf-cache/Qwen2.5-32B-Instruct",
+    "model": "/hf_models/Qwen2.5-32B-Instruct",
     "server_type": "sglang",
     "server_gpus": 8,
     "server_nodes": 1,
