@@ -25,10 +25,10 @@ from .base import BaseModel
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .context_retry import ContextLimitRetryConfig
 from .gemini import GeminiModel
-from .megatron import MegatronModel
 
-# Online GenSelect
-from .online_genselect import OnlineGenSelectConfig, OnlineGenSelectWrapper
+# GenSelect
+from .genselect import GenSelectConfig, GenSelectWrapper
+from .megatron import MegatronModel
 from .openai import OpenAIModel
 
 # Tool Calling
@@ -67,10 +67,10 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(
+def get_genselect_model(
     model,
     generation_task=None,
-    online_genselect_config=None,
+    genselect_config=None,
     main_config=None,
     inference_override_config=None,
     **kwargs,
@@ -78,18 +78,18 @@ def get_online_genselect_model(
     """A helper function to create OnlineGenSelect model."""
     # Merging priority: OnlineGenSelectConfig, main inference config, Any overrides from inference_override_config
     merge_config = {
-        **online_genselect_config.__dict__,
+        **genselect_config.__dict__,
         **main_config.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
 
     # Filter to only include valid parameters
-    valid_params = {field.name for field in dataclasses.fields(OnlineGenSelectConfig)}
+    valid_params = {field.name for field in dataclasses.fields(GenSelectConfig)}
     filtered_config = {key: value for key, value in merge_config.items() if key in valid_params}
 
-    online_genselect_config = OnlineGenSelectConfig(**filtered_config)
+    genselect_config = GenSelectConfig(**filtered_config)
 
-    return OnlineGenSelectWrapper(model=model, generation_task=generation_task, cfg=online_genselect_config)
+    return GenSelectWrapper(model=model, generation_task=generation_task, cfg=genselect_config)
 
 
 def get_tool_calling_model(
