@@ -68,15 +68,18 @@ class OnlineGenSelectWrapper:
             tokenizer = None
         self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
 
-        # TODO: Not sure how this will work for GenSelect Competition
-        self.cfg.max_concurrent_requests = self.cfg.window_size
-        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
-
         # Initialize the solutions if input_dir is provided
         if self.cfg.generation_dir is not None:
             LOG.info("Loading solutions from %s", self.cfg.generation_dir)
             self.prompt_to_solutions_dict = self._load_solutions(self.cfg.generation_dir)
             LOG.info("Loaded solutions for %d prompts", len(self.prompt_to_solutions_dict))
+
+        # TODO: These calculations will change for GenSelect Competition
+        if self.cfg.generation_dir is not None:
+            self.cfg.max_concurrent_requests = 1
+        else:
+            # We will be generating the solutions in parallel
+            self.cfg.max_concurrent_requests = self.cfg.window_size
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
@@ -149,7 +152,7 @@ class OnlineGenSelectWrapper:
         """
         Generate multiple solutions and use Self-GenSelect to choose the best one.
         """
-        # Step 1: Generate multiple solutions
+        # Generate multiple solutions
         tasks = []
         for _ in range(self.cfg.window_size):
             # Generate solutions with different seeds for diversity
