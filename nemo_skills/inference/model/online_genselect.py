@@ -46,7 +46,7 @@ class OnlineGenSelectConfig:
     regex: str = r"Judg[e]?ment: (\d+)"
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     prompt_config: str = "generic/genselect"
-    input_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
+    generation_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
 
 
 class OnlineGenSelectWrapper:
@@ -71,9 +71,9 @@ class OnlineGenSelectWrapper:
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
         # Initialize the solutions if input_dir is provided
-        if self.cfg.input_dir is not None:
-            LOG.info("Loading solutions from %s", self.cfg.input_dir)
-            self.prompt_to_solutions_dict = self._load_solutions(self.cfg.input_dir)
+        if self.cfg.generation_dir is not None:
+            LOG.info("Loading solutions from %s", self.cfg.generation_dir)
+            self.prompt_to_solutions_dict = self._load_solutions(self.cfg.generation_dir)
             LOG.info("Loaded solutions for %d prompts", len(self.prompt_to_solutions_dict))
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
@@ -204,7 +204,7 @@ class OnlineGenSelectWrapper:
         local_random = random.Random(kwargs.get("random_seed", 0))
 
         # Step 1: Load/Generate the solutions
-        if self.cfg.input_dir is not None:
+        if self.cfg.generation_dir is not None:
             # Already have the solutions in the input directory
             # Convert the prompt to a tuple to use as a key in case it's a list
             solutions = local_random.shuffle(self.prompt_to_solutions_dict[tuple(prompt)])
