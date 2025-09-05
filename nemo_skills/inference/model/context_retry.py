@@ -192,8 +192,10 @@ async def handle_context_retries_async(
         result = await func(self, *args, **kwargs)
         return result
     except (litellm.exceptions.ContextWindowExceededError, litellm.BadRequestError) as error:
-        if isinstance(error, litellm.exceptions.ContextWindowExceededError) or "Requested token count exceeds" in str(
-            error
+        if (
+            isinstance(error, litellm.exceptions.ContextWindowExceededError)
+            or "Requested token count exceeds" in str(error)
+            or "exceeds maximum input length" in str(error)
         ):
             if not config.enable_soft_fail:
                 raise error
