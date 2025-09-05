@@ -413,19 +413,19 @@ class BaseMetrics(abc.ABC):
 
 
 def as_percentage(metric_key: str, metric_value: float, all_metrics: dict):
-    if metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs"):
+    if (metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs")) is not None:
         return f"{metric_value:.2f}% ± {(100.0 * metric_std):.2f}%"
     return f"{metric_value:.2f}%"
 
 
 def as_int(metric_key: str, metric_value: float, all_metrics: dict):
-    if metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs"):
+    if (metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs")) is not None:
         return f"{int(metric_value)} ± {metric_std:.2f}"
     return f"{int(metric_value)}"
 
 
 def as_float(metric_key: str, metric_value: float, all_metrics: dict):
-    if metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs"):
+    if (metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs")) is not None:
         return f"{float(metric_value):.2f} ± {metric_std:.2f}"
     return f"{float(metric_value):.2f}"
 
