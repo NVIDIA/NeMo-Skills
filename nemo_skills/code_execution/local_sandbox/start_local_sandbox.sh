@@ -17,7 +17,12 @@
 # NOTE: needs to run from the root of the repo!
 
 SANDBOX_NAME=${1:-'local-sandbox'}
+docker build --tag=${SANDBOX_NAME} --build-arg="NUM_WORKERS=$((`nproc --all`))" -f dockerfiles/Dockerfile.sandbox .
 
-docker build --tag=${SANDBOX_NAME} -f dockerfiles/Dockerfile.sandbox .
-
-docker run --network=host --rm --memory=${NEMO_SKILLS_SANDBOX_MEM_LIMIT:-"16g"} --name=local-sandbox ${SANDBOX_NAME}
+echo "Multi-worker mode: Starting $((`nproc --all`)) workers with session affinity"
+docker run --network=host \
+    --memory=${NEMO_SKILLS_SANDBOX_MEM_LIMIT:-"8g"} \
+    ${NEMO_SKILLS_SANDBOX_CPU_AFFINITY:+-e UWSGI_CPU_AFFINITY=${NEMO_SKILLS_SANDBOX_CPU_AFFINITY}} \
+    ${NEMO_SKILLS_SANDBOX_PROCESSES:+-e UWSGI_PROCESSES=${NEMO_SKILLS_SANDBOX_PROCESSES}} \
+    --restart unless-stopped \
+    --name=local-sandbox ${SANDBOX_NAME}
