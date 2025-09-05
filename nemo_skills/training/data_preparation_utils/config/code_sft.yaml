@@ -53,9 +53,9 @@ processors:
     should_run: ${filters.drop_incorrect_code_blocks}
     output_key: ${output_key}
     test_cases:
-      - { input: { output: "Solution ```python\ndef hello()``` Second code ```python\n" }, output: null }
-      - { input: { output: "Solution ```python\ndef hello()```" }, output: { output: "Solution ```python\ndef hello()```" } }
-      - { input: { output: "She had python\ndef hello()```" }, output: null }
+      - {input: {output: "Solution ```python\ndef hello()``` Second code ```python\n"}, output: null}
+      - {input: {output: "Solution ```python\ndef hello()```"}, output: {output: "Solution ```python\ndef hello()```"}}
+      - {input: {output: "She had python\ndef hello()```"}, output: null}
 
   - _target_: sdp.processors.RenameFields
     rename_fields:
