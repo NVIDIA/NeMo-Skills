@@ -24,11 +24,22 @@ assistant_end: null  # can be used to not use jinja and just add this suffix
 
 code_tags: null
 
+# input params
+min_input_length: 0
+max_input_length: 1024
+
+# output params
+min_output_length: 0
+max_output_length: 2048
+use_chars_for_min_length: false
+
 input_key: input  # key to group samples by before code_text_filter
 output_key: output  # key to filter solutions by
 
 filters:
   drop_incorrect_code_blocks: false
+  remove_len_outlier_inputs: false
+  remove_len_outlier_outputs: false
 
 processors:
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ReadData
@@ -42,13 +53,34 @@ processors:
     should_run: ${filters.drop_incorrect_code_blocks}
     output_key: ${output_key}
     test_cases:
-      - {input: {output: "Solution ```python\ndef hello()``` Second code ```python\n"}, output: null}
-      - {input: {output: "Solution ```python\ndef hello()```"}, output: {output: "Solution ```python\ndef hello()```"}}
-      - {input: {output: "She had python\ndef hello()```"}, output: null}
+      - { input: { output: "Solution ```python\ndef hello()``` Second code ```python\n" }, output: null }
+      - { input: { output: "Solution ```python\ndef hello()```" }, output: { output: "Solution ```python\ndef hello()```" } }
+      - { input: { output: "She had python\ndef hello()```" }, output: null }
 
   - _target_: sdp.processors.RenameFields
     rename_fields:
       input: question  # we need to match llama3/codegen_sft format which uses 'question' as input key
+
+  - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutliers
+    should_run: ${filters.remove_len_outlier_inputs}
+    property_key: ${input_key}
+    min_length: ${min_input_length}
+    max_length: ${max_input_length}
+    tokenizer: ${tokenizer}
+
+  - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutliers
+    should_run: ${filters.remove_len_outlier_outputs}
+    property_key: ${output_key}
+    min_length: ${min_output_length}
+    max_length: ${max_output_length}
+    tokenizer: ${tokenizer}
+    use_chars_for_min_length: ${use_chars_for_min_length}
+
+  - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
+    num_samples: ${num_output_samples}
+    sampling_method: ${downsampling_method}
+    random_seed: ${random_seed}
+    do_shuffle: ${do_shuffle}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalSftManifest
     output_manifest_file: ${output_path}
