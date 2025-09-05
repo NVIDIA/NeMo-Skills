@@ -72,7 +72,9 @@ class OnlineGenSelectWrapper:
 
         # Initialize the solutions if input_dir is provided
         if self.cfg.input_dir is not None:
+            LOG.info("Loading solutions from %s", self.cfg.input_dir)
             self.prompt_to_solutions_dict = self._load_solutions(self.cfg.input_dir)
+            LOG.info("Loaded solutions for %d prompts", len(self.prompt_to_solutions_dict))
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
