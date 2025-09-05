@@ -23,21 +23,24 @@ from mcp.client.streamable_http import streamablehttp_client
 
 
 def _process_hide_args(result, hide_args):
-    if hide_args:
-        output = []
-        for entry in result:
-            method_name = entry.get("name")
-            schema = copy.deepcopy(entry.get("input_schema", {}))
-            if method_name in hide_args and "properties" in schema:
-                for arg in hide_args[method_name]:
-                    schema["properties"].pop(arg, None)
-                    if "required" in schema and arg in schema["required"]:
-                        schema["required"].remove(arg)
-            new_entry = dict(entry)
-            new_entry["input_schema"] = schema
-            output.append(new_entry)
-        return output
-    return result
+    if not hide_args:
+        return result
+    # Be defensive: only attempt to process when result is a list
+    if not isinstance(result, list):
+        return result
+    output = []
+    for entry in result:
+        method_name = entry.get("name")
+        schema = copy.deepcopy(entry.get("input_schema", {}))
+        if method_name in hide_args and "properties" in schema:
+            for arg in hide_args[method_name]:
+                schema["properties"].pop(arg, None)
+                if "required" in schema and arg in schema["required"]:
+                    schema["required"].remove(arg)
+        new_entry = dict(entry)
+        new_entry["input_schema"] = schema
+        output.append(new_entry)
+    return output
 
 
 def _filter_tools(result, disabled_tools, enabled_tools):
@@ -51,6 +54,9 @@ def _filter_tools(result, disabled_tools, enabled_tools):
     for entry in result:
         name = entry.get("name")
         if name is None:
+            continue
+        # Deduplicate by name within a single client result
+        if name in names_seen:
             continue
         names_seen.add(name)
         if name in disabled_set:

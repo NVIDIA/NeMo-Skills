@@ -102,10 +102,13 @@ class ToolManager:
         async def load_provider(provider_id: str, tool: Tool) -> List[Dict[str, Any]]:
             entries = await tool.list_tools()
             out: List[Dict[str, Any]] = []
-            for entry in entries:
+            # Be defensive: handle None and deduplicate within the same provider by raw tool name
+            local_seen: set[str] = set()
+            for entry in entries or []:
                 raw_name = entry.get("name")
-                if not raw_name:
+                if not raw_name or raw_name in local_seen:
                     continue
+                local_seen.add(raw_name)
                 qualified_name = f"{provider_id}.{raw_name}"
                 if qualified_name in self._qualified_tool_map:
                     raise ValueError(f"Duplicate tool name detected: '{qualified_name}'")
