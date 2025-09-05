@@ -79,6 +79,10 @@ def get_online_genselect_model(
     valid_params.discard("self")  # Remove 'self' parameter
 
     # Merging priority: Default OnlineGenSelectConfig, main inference config, Any overrides
+    print(online_genselect_config.__dict__)
+    print(main_config.__dict__)
+    print(inference_override_config if inference_override_config is not None else {})
+    print("--------------------------------")
     merge_config = {
         **online_genselect_config.__dict__,
         **main_config.__dict__,
