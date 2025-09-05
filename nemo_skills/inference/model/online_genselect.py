@@ -214,7 +214,8 @@ class OnlineGenSelectWrapper:
         if self.cfg.generation_dir is not None:
             # Already have the solutions in the input directory
             # Hashing the prompt to get the key for the solutions
-            solutions = local_random.shuffle(self.prompt_to_solutions_dict[self.hash_prompt(prompt)])
+            solutions = self.prompt_to_solutions_dict[self.hash_prompt(prompt)]
+            local_random.shuffle(solutions)
         else:
             # Generate the solutions first
             solutions = await self.generate_solutions(prompt, local_random, **kwargs)
