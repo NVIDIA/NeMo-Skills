@@ -69,17 +69,13 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
 
 def get_online_genselect_model(
     model,
-    prompt,
-    tokenizer=None,
+    generation_task=None,
     online_genselect_config=None,
     main_config=None,
     inference_override_config=None,
     **kwargs,
 ):
     """A helper function to create OnlineGenSelect model."""
-    if isinstance(model, str):
-        model = get_model(model=model, tokenizer=tokenizer, **kwargs)
-
     # Merging priority: OnlineGenSelectConfig, main inference config, Any overrides from inference_override_config
     merge_config = {
         **online_genselect_config.__dict__,
@@ -93,7 +89,7 @@ def get_online_genselect_model(
 
     online_genselect_config = OnlineGenSelectConfig(**filtered_config)
 
-    return OnlineGenSelectWrapper(model=model, prompt=prompt, cfg=online_genselect_config)
+    return OnlineGenSelectWrapper(model=model, generation_task=generation_task, cfg=online_genselect_config)
 
 
 def get_tool_calling_model(

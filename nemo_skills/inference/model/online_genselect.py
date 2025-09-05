@@ -22,7 +22,7 @@ import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Union
 
-from nemo_skills.prompt.utils import Prompt, get_prompt
+from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, remove_thinking
 
 from .base import BaseModel
@@ -55,8 +55,11 @@ class OnlineGenSelectWrapper:
     to choose the best one.
     """
 
-    def __init__(self, model: BaseModel, orig_prompt: Prompt, cfg: OnlineGenSelectConfig):
+    from nemo_skills.inference.generate import GenerationTask
+
+    def __init__(self, model: BaseModel, generation_task: GenerationTask, cfg: OnlineGenSelectConfig):
         self.model = model
+        self.generation_task = generation_task
         self.cfg = cfg
 
         # Load GenSelect prompt
@@ -188,7 +191,7 @@ class OnlineGenSelectWrapper:
                     data_point = json.loads(line)
                     # TODO: Making an assumptiont that the prompt doesn't require all the data for few-shot prompting
                     # Convert the prompt to a tuple to use as a key in case it's a list
-                    prompt = tuple(self.fill_prompt(data_point, all_data=None))
+                    prompt = tuple(self.generation_task.fill_prompt(data_point, all_data=None))
                     prompt_to_solutions_dict[prompt].append(
                         {
                             self.cfg.comparison_key: data_point[self.cfg.comparison_key],
