@@ -516,7 +516,7 @@ class SweBenchGenerationTask(GenerationTask):
                 "curl -LsSf https://astral.sh/uv/install.sh | sh && "
                 "source /root/.local/bin/env && "
                 "cd /root && "
-                "git clone https://github.com/Kipok/SWE-bench.git && "
+                "git clone https://github.com/HeyyyyyyG/SWE-bench.git && "
                 "cd SWE-bench && "
                 "uv venv --python 3.12 venv && "
                 # DO NOT activate venv, use uv pip with -p flag instead
