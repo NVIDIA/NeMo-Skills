@@ -327,6 +327,8 @@ class GenerationTask:
 
         if self.cfg.online_genselect:
             # Allow for overriding the temperature and tokens_to_generate for genselect
+            online_genselect_config = self.cfg.online_genselect_config
+
             inference_override_config = {}
             if self.cfg.online_genselect_config.temperature is not None:
                 inference_override_config["temperature"] = self.cfg.online_genselect_config.temperature
@@ -335,6 +337,7 @@ class GenerationTask:
 
             llm = get_online_genselect_model(
                 **{**self.cfg.server, "model": llm, "tokenizer": self.tokenizer},
+                online_genselect_config=online_genselect_config,
                 main_config=self.cfg,
                 inference_override_config=inference_override_config,
             )
