@@ -328,7 +328,6 @@ def summarize_results(
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers
     add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
-
     printed_max_seq_len = False
     for benchmark, benchmark_results in results.items():
         if not benchmark_results:
