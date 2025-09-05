@@ -199,7 +199,7 @@ class OnlineGenSelectWrapper:
                     prompt_to_solutions_dict[prompt].append(
                         {
                             self.cfg.comparison_key: data_point[self.cfg.comparison_key],
-                            "output_dict": data_point["output_dict"],
+                            "output_dict": data_point,
                         }
                     )
 
