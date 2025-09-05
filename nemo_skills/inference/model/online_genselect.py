@@ -189,7 +189,7 @@ class OnlineGenSelectWrapper:
                     data_point = json.loads(line)
                     # TODO: Making an assumptiont that the prompt doesn't require all the data for few-shot prompting
                     # Convert the prompt to a tuple to use as a key in case it's a list
-                    prompt = tuple(self.generation_task.fill_prompt(data_point))
+                    prompt = tuple(self.generation_task.fill_prompt(data_point, data=None))
                     prompt_to_solutions_dict[prompt].append(
                         {
                             self.cfg.comparison_key: data_point[self.cfg.comparison_key],
