@@ -55,9 +55,7 @@ class OnlineGenSelectWrapper:
     to choose the best one.
     """
 
-    from nemo_skills.inference.generate import GenerationTask
-
-    def __init__(self, model: BaseModel, generation_task: GenerationTask, cfg: OnlineGenSelectConfig):
+    def __init__(self, model: BaseModel, generation_task, cfg: OnlineGenSelectConfig):
         self.model = model
         self.generation_task = generation_task
         self.cfg = cfg
