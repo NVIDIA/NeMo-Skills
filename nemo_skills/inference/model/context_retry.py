@@ -196,6 +196,7 @@ async def handle_context_retries_async(
             isinstance(error, litellm.exceptions.ContextWindowExceededError)
             or "Requested token count exceeds" in str(error)
             or "exceeds maximum input length" in str(error)
+            or "should not exceed max_seq_len" in str(error)
         ):
             if not config.enable_soft_fail:
                 raise error
