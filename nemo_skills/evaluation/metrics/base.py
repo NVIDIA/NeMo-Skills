@@ -47,11 +47,12 @@ class BaseMetrics(abc.ABC):
         return metrics_dict
 
     def _add_std_metrics(self, metrics_dict):
-        """Add standard deviation and standard error metrics.
+        """Add average, standard deviation and standard error metrics.
 
         Only processes data when self.max_k > 1 and sample data is available in self.all_scores.
 
-        Adds three statistical metrics:
+        Adds four statistical metrics:
+        - {score_method}_avg: Average of metric values
         - {score_method}_std_dev_across_runs: Standard deviation of average metric values across runs
         - {score_method}_std_err_across_runs: Standard error of average metric values across runs
         - {score_method}_avg_sample_std_dev: Average of per-sample standard deviations
@@ -91,6 +92,9 @@ class BaseMetrics(abc.ABC):
                 assert len(scores) == self.max_k, f"Sample has {len(scores)} scores but expected {self.max_k}"
 
             for k in range(2, self.max_k + 1):
+                # Average of metric values across runs
+                avg = np.mean([np.mean(scores[:k]) for scores in scores_list])
+
                 # Standard deviation and error of average metric values across runs
                 run_scores = [[] for _ in range(k)]
                 for scores in scores_list:
@@ -108,6 +112,7 @@ class BaseMetrics(abc.ABC):
 
                 # Update metrics dictionary
                 std_metrics = {
+                    f"{score_method}_avg": avg,
                     f"{score_method}_std_dev_across_runs": std_dev_across_runs,
                     f"{score_method}_avg_sample_std_dev": avg_sample_std_dev,
                     f"{score_method}_std_err_across_runs": std_err_across_runs,
