@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
+import dataclasses
 
 from nemo_skills.utils import python_doc_to_cmd_help
 
@@ -74,26 +74,17 @@ def get_online_genselect_model(
     if isinstance(model, str):
         model = get_model(model=model, tokenizer=tokenizer, **kwargs)
 
-    # Merging priority: Default OnlineGenSelectConfig, main inference config, Any overrides from inference_override_config
-    valid_params = set(inspect.signature(OnlineGenSelectConfig.__init__).parameters.keys())
-    valid_params.discard("self")  # Remove 'self' parameter
-
-    # Merging priority: Default OnlineGenSelectConfig, main inference config, Any overrides
-    print(online_genselect_config.__dict__)
-    print(main_config.__dict__)
-    print(inference_override_config if inference_override_config is not None else {})
-    print("--------------------------------")
+    # Merging priority: OnlineGenSelectConfig, main inference config, Any overrides from inference_override_config
     merge_config = {
         **online_genselect_config.__dict__,
         **main_config.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
 
-    print(merge_config)
-
     # Filter to only include valid parameters
-    filtered_config = {k: v for k, v in merge_config.items() if k in valid_params}
-    print(filtered_config)
+    valid_params = {field.name for field in dataclasses.fields(OnlineGenSelectConfig)}
+    filtered_config = {key: value for key, value in merge_config.items() if key in valid_params}
+
     online_genselect_config = OnlineGenSelectConfig(**filtered_config)
 
     return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
