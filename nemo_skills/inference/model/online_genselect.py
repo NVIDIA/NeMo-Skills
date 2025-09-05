@@ -22,7 +22,7 @@ import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Union
 
-from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.prompt.utils import Prompt, get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, remove_thinking
 
 from .base import BaseModel
@@ -55,7 +55,7 @@ class OnlineGenSelectWrapper:
     to choose the best one.
     """
 
-    def __init__(self, model: BaseModel, cfg: OnlineGenSelectConfig):
+    def __init__(self, model: BaseModel, orig_prompt: Prompt, cfg: OnlineGenSelectConfig):
         self.model = model
         self.cfg = cfg
 

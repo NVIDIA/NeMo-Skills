@@ -336,7 +336,7 @@ class GenerationTask:
                 inference_override_config["tokens_to_generate"] = self.cfg.online_genselect_config.tokens_to_generate
 
             llm = get_online_genselect_model(
-                **{**self.cfg.server, "model": llm, "tokenizer": self.tokenizer},
+                **{**self.cfg.server, "model": llm, "prompt": self.prompt, "tokenizer": self.tokenizer},
                 online_genselect_config=online_genselect_config,
                 main_config=self.cfg,
                 inference_override_config=inference_override_config,

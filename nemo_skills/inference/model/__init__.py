@@ -68,7 +68,13 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
 
 
 def get_online_genselect_model(
-    model, tokenizer=None, online_genselect_config=None, main_config=None, inference_override_config=None, **kwargs
+    model,
+    prompt,
+    tokenizer=None,
+    online_genselect_config=None,
+    main_config=None,
+    inference_override_config=None,
+    **kwargs,
 ):
     """A helper function to create OnlineGenSelect model."""
     if isinstance(model, str):
@@ -87,7 +93,7 @@ def get_online_genselect_model(
 
     online_genselect_config = OnlineGenSelectConfig(**filtered_config)
 
-    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config)
+    return OnlineGenSelectWrapper(model=model, prompt=prompt, cfg=online_genselect_config)
 
 
 def get_tool_calling_model(
