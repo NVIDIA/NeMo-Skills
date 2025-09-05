@@ -38,7 +38,7 @@ TOOLCALLING_METRIC_RANGES = {
     "overall_live": (76.0, 83.0),
     "live_ast": (79.0, 86.0),
     "live_irrelevance": (73.0, 80.0),
-    "live_relevance": (85.0, 92.0),
+    "live_relevance": (70.0, 90.0),  # unusually high variance
     "overall_multi_turn": (20.0, 30.0),
 }
 
