@@ -14,6 +14,7 @@
 import copy
 import functools
 import json
+import os
 from abc import abstractmethod
 from typing import Any, Callable, Dict, List
 
@@ -384,7 +385,8 @@ class MCPStdioClient(MCPClient):
     def __init__(self, command: str, args: list[str] | None = None):
         if args is None:
             args = []
-        self.server_params = StdioServerParameters(command=command, args=args)
+        # Inherit parent environment by default so servers can see test-set env vars
+        self.server_params = StdioServerParameters(command=command, args=args, env=os.environ.copy())
         self.tools: List[Dict[str, Any]] = []
 
     async def list_tools(self):
