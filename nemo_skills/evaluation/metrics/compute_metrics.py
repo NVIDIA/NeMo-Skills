@@ -95,14 +95,7 @@ class ComputeMetrics:
         return metrics
 
     def metrics_to_print(self):
-        to_print = self.calculators["_all_"].metrics_to_print()
-        # TODO: we should have some proper way for this
-        # excluding std metrics as they are taking too much space in a printout
-        to_exclude = ["_std_err_across_runs", "_std_dev_across_runs", "_avg_sample_std_dev"]
-        for key in list(to_print.keys()):
-            if key.endswith(tuple(to_exclude)):
-                to_print.pop(key)
-        return to_print
+        return self.calculators["_all_"].metrics_to_print()
 
     def evaluations_to_print(self):
         return self.calculators["_all_"].evaluations_to_print()

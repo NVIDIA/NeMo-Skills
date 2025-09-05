@@ -15,7 +15,6 @@
 import abc
 import math
 from collections import Counter, defaultdict
-from typing import Union
 
 import numpy as np
 
@@ -113,10 +112,12 @@ class BaseMetrics(abc.ABC):
 
                 # Update metrics dictionary
                 std_metrics = {
-                    f"{score_method}_avg": avg,
-                    f"{score_method}_std_dev_across_runs": std_dev_across_runs,
-                    f"{score_method}_avg_sample_std_dev": avg_sample_std_dev,
-                    f"{score_method}_std_err_across_runs": std_err_across_runs,
+                    f"{score_method}_error_analysis": {
+                        "avg": avg,
+                        "std_dev_across_runs": std_dev_across_runs,
+                        "avg_sample_std_dev": avg_sample_std_dev,
+                        "std_err_across_runs": std_err_across_runs,
+                    },
                 }
                 metrics_dict[f"pass@1[avg-of-{k}]"].update(std_metrics)
 
@@ -411,27 +412,28 @@ class BaseMetrics(abc.ABC):
         return [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
 
 
-def as_percentage(metric_value: Union[float, dict]):
-    if isinstance(metric_value, dict):
-        return f"{float(metric_value['avg']):.2f} ± {float(metric_value['std']):.2f}%"
+def as_percentage(metric_key: str, metric_value: float, all_metrics: dict):
+    if metric_std := all_metrics.get(f"{metric_key}_error_analysis", {}).get("std_dev_across_runs"):
+        return f"{metric_value:.2f}% ± {(100.0 * metric_std):.2f}%"
     return f"{metric_value:.2f}%"
 
 
-def as_int(metric_value: Union[float, dict]):
-    if isinstance(metric_value, dict):
-        return f"{int(metric_value['avg'])} ± {metric_value['std']:.2f}"
+def as_int(metric_key: str, metric_value: float, all_metrics: dict):
+    if metric_std := all_metrics.get(f"{metric_key}_error_analysis", {}).get("std_dev_across_runs"):
+        return f"{int(metric_value)} ± {metric_std:.2f}"
     return f"{int(metric_value)}"
 
 
-def as_float(metric_value: Union[float, dict]):
-    if isinstance(metric_value, dict):
-        return f"{float(metric_value['avg']):.2f} ± {float(metric_value['std']):.2f}"
+def as_float(metric_key: str, metric_value: float, all_metrics: dict):
+    if metric_std := all_metrics.get(f"{metric_key}_error_analysis", {}).get("std_dev_across_runs"):
+        return f"{float(metric_value):.2f} ± {metric_std:.2f}"
     return f"{float(metric_value):.2f}"
 
 
-def default_formatting(metric_value: Union[float, dict]):
-    """Assumes floats are percentage and rest without changes."""
+def default_formatting(metric_key: str, metric_value, all_metrics: dict) -> str | None:
+    """Assumes floats are percentage, dicts shouldn't be printed and rest without changes."""
     if isinstance(metric_value, float):
-        return as_percentage(metric_value)
-    elif isinstance(metric_value, dict):
-        return as_float(metric_value)
+        return as_percentage(metric_key, metric_value, all_metrics)
+    if isinstance(metric_value, dict):
+        return None
+    return str(metric_value)
