@@ -79,6 +79,7 @@ nav:
     - evaluation/instruction-following.md
     - evaluation/long-context.md
     - evaluation/tool-calling.md
+    - evaluation/multilingual.md
     - evaluation/other-benchmarks.md
   - Tutorials:
     - tutorials/index.md

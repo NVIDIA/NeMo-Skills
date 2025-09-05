@@ -79,6 +79,8 @@ If you're running one of the pipeline scripts, you can control the prompt by usi
 ++examples_type=...
 ```
 
+#### Example 1 - Prompt formatted as a message list
+
 If you're implementing a new script, you can use the following code to create a prompt and then use it:
 
 ```python
@@ -99,11 +101,12 @@ which outputs
 ]
 ```
 
-You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tree/main/tests/test_prompts.py) to see more examples of using our prompt API.
+!!!note
+    If your data is already formatted as a list of openai messages, you can directly use it as an input to the pipeline scripts
+    if you set `++prompt_format=openai`.
 
 
-If your data is already formatted as a list of openai messages, you can directly use it as an input to the pipeline scripts
-if you set `++prompt_format=openai`.
+#### Example 2 - Prompt formatted as a string
 
 If you want to use completions API, you can set `++use_completions_api=True`. This will use model's tokenizer to format
 messages as a string (you can specify a custom tokenizer with `++tokenizer=...` argument).
@@ -129,3 +132,91 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 What's 2 + 2?<|im_end|>
 <|im_start|>assistant
 ```
+
+
+
+#### Example 3 - Overriding the System Message
+
+In the above example, the system message comes from the tokenizer. We can override this system message by setting `++system_message=...`. Here is an example of overriding the system message while creating a prompt
+
+```python
+from nemo_skills.prompt.utils import get_prompt
+
+prompt = get_prompt(
+  "generic/math",
+  tokenizer="Qwen/Qwen2.5-32B-Instruct",
+  system_message="You are a helpful chatbot"
+)
+print(prompt.fill({'problem': "What's 2 + 2?"}))
+```
+
+which outputs
+
+```python-console
+<|im_start|>system
+You are a helpful chatbot<|im_end|>
+<|im_start|>user
+Solve the following math problem. Make sure to put the answer (and only answer) inside \boxed{}.
+
+What's 2 + 2?<|im_end|>
+<|im_start|>assistant
+```
+
+#### Example 4 - Formatting the Assistant Response (Non-Reasoning)
+
+For SFT, we need to format the output as well. Here we show an example of how the prompt API formats the response for a non-reasoning model.
+
+```python
+from nemo_skills.prompt.utils import get_prompt
+
+prompt = get_prompt(
+  "generic/math",
+  tokenizer="Qwen/Qwen2.5-32B-Instruct",
+)
+
+print(prompt.format_assistant_response(content="The answer is 4"))
+```
+
+which outputs
+
+```python-console
+The answer is 4<|im_end|>
+```
+
+This example illustrates how the prompt API is used under the hood in [the SFT data preparation script](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/prepare_data.py).
+
+
+#### Example 5 - Formatting the Assistant Response (Reasoning)
+
+For a reasoning model, the assistant response has the additional `thinking` field.
+Below we illustrate how to pass in this extra field
+
+```python
+from nemo_skills.prompt.utils import get_prompt
+
+prompt = get_prompt(
+  "generic/math",
+  tokenizer="openai/gpt-oss-120b",
+  system_message="You are a helpful chatbot"
+)
+
+print(
+  prompt.format_assistant_response(
+    content="The answer is 4",
+    thinking="Let me think step by step.... The answer is 4"
+  )
+)
+```
+
+which outputs
+
+```python-console
+<|channel|>analysis<|message|>Let me think step by step.... The answer is 4<|end|><|start|>assistant<|channel|>final<|message|>The answer is 4<|return|>
+```
+
+!!!note
+    The `thinking` part is <span style="color: red;">**NOT**</span> automatically added to the assistant response by certain tokenizers like `Qwen/Qwen3-4B`.
+    We suggest adding the thinking part to the `content` field as part of preprocessing in such cases.
+
+
+You can also have a look at the [tests](https://github.com/NVIDIA/NeMo-Skills/tree/main/tests/test_prompts.py) to see more examples of using our prompt API.
