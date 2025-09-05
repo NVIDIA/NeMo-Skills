@@ -337,7 +337,7 @@ class GenerationTask:
             }
 
             llm = get_genselect_model(
-                **{**self.cfg.server, "model": llm},
+                model=llm,
                 generation_task=self,  # Needed for prompt fillling
                 genselect_config=genselect_config,
                 main_config=self.cfg,

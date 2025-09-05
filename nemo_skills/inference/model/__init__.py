@@ -73,7 +73,6 @@ def get_genselect_model(
     genselect_config=None,
     main_config=None,
     inference_override_config=None,
-    **kwargs,
 ):
     """A helper function to create GenSelect model."""
     # Merging priority: GenSelectConfig, main inference config, Any overrides from inference_override_config
