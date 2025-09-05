@@ -1,0 +1,31 @@
+ARG UV_VERSION=0.8.15
+ARG CUDA_VERSION=12.9.1
+ARG PY_VERSION=3.10
+ARG FAISS_VERSION=1.8.0.2
+
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
+ARG CUDA_VERSION
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04
+
+COPY --from=uv /uv /uvx /bin/
+
+ARG PY_VERSION
+RUN uv venv --python ${PY_VERSION} /usr/local/venv
+
+ENV VIRTUAL_ENV=/usr/local/venv PATH="/usr/local/venv/bin:$PATH"
+
+ARG FAISS_VERSION
+RUN uv pip install torch --index-url https://download.pytorch.org/whl/cu121 \
+    && uv pip install faiss-gpu-cu12==${FAISS_VERSION}
+
+RUN uv pip install \
+        datasets \
+        fastapi[standard] \
+        uvicorn \
+        transformers \
+        tqdm
+
+COPY nemo_skills/services/search/server.py /app/server.py
+
+ENTRYPOINT [ "python", "/app/server.py" ]
