@@ -160,41 +160,75 @@ class SweBenchGenerationTask(GenerationTask):
     def setup_llm(self):
         return
 
+    def _find_container(self, data_point):
+        """Find the container file using multiple strategies.
+        
+        Tries in order:
+        1. Exact match with "__" replaced by "_1776_"
+        2. Exact match with "__" replaced by "_s_"
+        3. Fuzzy search in container directory for files with either replacement
+        
+        Returns:
+            str: Path to the container file (may not exist if all strategies fail)
+        """
+        instance_id = data_point["instance_id"]
+        container_formatter = data_point["container_formatter"]
+        
+        # Strategy 1: Try _1776_ replacement
+        container_name = container_formatter.format(
+            instance_id=instance_id.replace("__", "_1776_")
+        )
+        if os.path.exists(container_name):
+            return container_name
+        
+        # Strategy 2: Try _s_ replacement
+        container_name_s = container_formatter.format(
+            instance_id=instance_id.replace("__", "_s_")
+        )
+        if os.path.exists(container_name_s):
+            LOG.info(f"Using _s_ replacement: {container_name_s}")
+            return container_name_s
+        
+        # Strategy 3: Fuzzy search in container directory
+        container_dir = os.path.dirname(container_name)
+        if os.path.exists(container_dir):
+            # Build search patterns for both replacements
+            replaced_id_1776 = instance_id.replace("__", "_1776_")
+            replaced_id_s = instance_id.replace("__", "_s_")
+            
+            # Search for .sif files with either replacement pattern
+            patterns = [
+                os.path.join(container_dir, f"*{replaced_id_1776}*.sif"),
+                os.path.join(container_dir, f"*{replaced_id_s}*.sif")
+            ]
+            
+            matching_files = []
+            for pattern in patterns:
+                matching_files.extend(glob.glob(pattern))
+            
+            if matching_files:
+                # Use the first matching file found
+                container_path = matching_files[0]
+                LOG.info(f"Using fuzzy match: {container_path}")
+                return container_path
+            else:
+                LOG.warning(
+                    f"No container found with instance_id replacements "
+                    f"'{replaced_id_1776}' or '{replaced_id_s}' in {container_dir}"
+                )
+        else:
+            LOG.warning(f"Container directory {container_dir} does not exist")
+        
+        # Return the original name as fallback (even though it doesn't exist)
+        LOG.warning(f"Using non-existent container path: {container_name}")
+        return container_name
+
     async def _execute_container_command(
         self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
     ):
         """Execute a command in an Apptainer container with retry logic."""
-        # Try with _1776_ replacement first
-        container_name = data_point["container_formatter"].format(
-            instance_id=data_point["instance_id"].replace("__", "_1776_")
-        )
-        
-        # Check if container exists, if not try _s_ replacement
-        if not os.path.exists(container_name):
-            container_name_alt = data_point["container_formatter"].format(
-                instance_id=data_point["instance_id"].replace("__", "_s_")
-            )
-            if os.path.exists(container_name_alt):
-                LOG.info(f"Container with _1776_ not found, using _s_ replacement: {container_name_alt}")
-                container_name = container_name_alt
-            else:
-                # If neither exists, try fuzzy search in the container directory
-                container_dir = os.path.dirname(container_name)
-                instance_id = data_point["instance_id"]
-                
-                if os.path.exists(container_dir):
-                    # Search for any .sif file containing the instance_id
-                    pattern = os.path.join(container_dir, f"*{instance_id}*.sif")
-                    matching_files = glob.glob(pattern)
-                    
-                    if matching_files:
-                        # Use the first matching file found
-                        container_name = matching_files[0]
-                        LOG.info(f"Using fuzzy match for container: {container_name}")
-                    else:
-                        LOG.warning(f"No container found with instance_id '{instance_id}' in {container_dir}. Using original: {container_name}")
-                else:
-                    LOG.warning(f"Container directory {container_dir} does not exist. Using: {container_name}")
+        # Find the container using multiple strategies
+        container_name = self._find_container(data_point)
 
         # Create logs directory if it doesn't exist
         logs_dir = self.output_dir / "apptainer_logs"
