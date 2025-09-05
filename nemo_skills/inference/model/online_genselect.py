@@ -14,6 +14,7 @@
 
 import asyncio
 import glob
+import hashlib
 import json
 import logging
 import os
@@ -180,6 +181,11 @@ class OnlineGenSelectWrapper:
         local_random.shuffle(solutions)
         return solutions
 
+    @classmethod
+    def hash_prompt(cls, prompt: Union[str, List[dict]]) -> str:
+        """Hash any data structure - handles strings, lists, dicts, etc."""
+        return hashlib.md5(json.dumps(prompt, sort_keys=True, default=str).encode()).hexdigest()
+
     def _load_solutions(self, input_dir: str) -> Dict[str, List[Dict]]:
         """Load the solutions from the input directory."""
         prompt_to_solutions_dict = defaultdict(list)
@@ -188,8 +194,8 @@ class OnlineGenSelectWrapper:
                 for line in f:
                     data_point = json.loads(line)
                     # TODO: Making an assumptiont that the prompt doesn't require all the data for few-shot prompting
-                    # Convert the prompt to a tuple to use as a key in case it's a list
-                    prompt = tuple(self.generation_task.fill_prompt(data_point, data=None))
+                    # Hashing the prompt to get the key for the solutions
+                    prompt = self.hash_prompt(self.generation_task.fill_prompt(data_point, data=None))
                     prompt_to_solutions_dict[prompt].append(
                         {
                             self.cfg.comparison_key: data_point[self.cfg.comparison_key],
@@ -207,8 +213,8 @@ class OnlineGenSelectWrapper:
         # Step 1: Load/Generate the solutions
         if self.cfg.generation_dir is not None:
             # Already have the solutions in the input directory
-            # Convert the prompt to a tuple to use as a key in case it's a list
-            solutions = local_random.shuffle(self.prompt_to_solutions_dict[tuple(prompt)])
+            # Hashing the prompt to get the key for the solutions
+            solutions = local_random.shuffle(self.prompt_to_solutions_dict[self.hash_prompt(prompt)])
         else:
             # Generate the solutions first
             solutions = await self.generate_solutions(prompt, local_random, **kwargs)
