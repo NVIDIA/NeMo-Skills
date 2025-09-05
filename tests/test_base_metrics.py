@@ -140,7 +140,3 @@ def test_add_std_metrics(
         metrics_dict[f"pass@1[avg-of-{i}]"] = {}
     metrics._add_std_metrics(metrics_dict)
     assert metrics_dict == expected_result
-    # for eval_mode, expected_values in expected_result.items():
-    #     for metric_name, expected_value in expected_values.items():
-    #         actual_value = metrics_dict[eval_mode][metric_name]
-    #         assert abs(actual_value - expected_value) < 1e-10
