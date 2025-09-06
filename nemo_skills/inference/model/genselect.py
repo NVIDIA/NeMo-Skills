@@ -13,9 +13,14 @@
 # limitations under the License.
 
 import asyncio
+import glob
+import hashlib
+import json
 import logging
+import os
 import random
 import re
+from collections import defaultdict
 from typing import Dict, List, Optional, Union
 
 from nemo_skills.prompt.utils import get_prompt
@@ -27,30 +32,33 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
-class OnlineGenSelectConfig:
-    max_concurrent_requests: int = 8
-    max_num_solutions: int = 8
-    prompt_config: str = "generic/genselect"
+class GenSelectConfig:
     use_completions_api: bool = False
     tokenizer: str | None = None
     chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
     temperature: float = 0.6
     tokens_to_generate: int | None = None
-    comparison_key: str = "generation"  # Key used for comparing the different solutions
-    regex: str = r"Judg[e]?ment: (\d+)"
     remove_thinking: bool = True  # Remove thinking tokens from the comparison key
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
 
+    # GenSelect Simple
+    window_size: int = 8  # Number of solutions compared in a single request
+    regex: str = r"Judg[e]?ment: (\d+)"
+    comparison_key: str = "generation"  # Key used for comparing the different solutions
+    prompt_config: str = "generic/genselect"
+    generation_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
 
-class OnlineGenSelectWrapper:
+
+class GenSelectWrapper:
     """
     Wrapper that generates multiple completions for a datapoint and uses GenSelect
     to choose the best one.
     """
 
-    def __init__(self, model: BaseModel, cfg: OnlineGenSelectConfig):
+    def __init__(self, model: BaseModel, generation_task, cfg: GenSelectConfig):
         self.model = model
+        self.generation_task = generation_task
         self.cfg = cfg
 
         # Load GenSelect prompt
@@ -60,7 +68,18 @@ class OnlineGenSelectWrapper:
             tokenizer = None
         self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
 
-        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
+        # Initialize the solutions if input_dir is provided
+        if self.cfg.generation_dir is not None:
+            LOG.info("Loading solutions from %s", self.cfg.generation_dir)
+            self.prompt_to_solutions_dict = self._load_solutions(self.cfg.generation_dir)
+            LOG.info("Loaded solutions for %d prompts", len(self.prompt_to_solutions_dict))
+
+        # TODO: These calculations will change for GenSelect Competition
+        if self.cfg.generation_dir is not None:
+            self.cfg.max_concurrent_requests = 1
+        else:
+            # We will be generating the solutions in parallel
+            self.cfg.max_concurrent_requests = self.cfg.window_size
 
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
@@ -105,6 +124,7 @@ class OnlineGenSelectWrapper:
             "num_solutions": num_solutions,
             "max_idx": max_idx,
         }
+
         genselect_prompt = self.genselect_prompt.fill(genselect_input)
 
         # Step 2: Run Self-GenSelect
@@ -123,19 +143,18 @@ class OnlineGenSelectWrapper:
 
         return judgment, genselect_result
 
-    async def generate_async(
+    async def generate_solutions(
         self,
         prompt: Union[str, List],
-        random_seed: int = 0,
+        local_random: random.Random,
         **solution_kwargs,
     ) -> Dict:
         """
         Generate multiple solutions and use Self-GenSelect to choose the best one.
         """
-        # Step 1: Generate multiple solutions
-        local_random = random.Random(random_seed)
+        # Generate multiple solutions
         tasks = []
-        for _ in range(self.cfg.max_num_solutions):
+        for _ in range(self.cfg.window_size):
             # Generate solutions with different seeds for diversity
             cur_random_seed = local_random.getrandbits(32)
             # Create a copy to avoid mutation issues
@@ -164,6 +183,46 @@ class OnlineGenSelectWrapper:
             )
 
         local_random.shuffle(solutions)
+        return solutions
+
+    @classmethod
+    def hash_prompt(cls, prompt: Union[str, List[dict]]) -> str:
+        """Hash any data structure - handles strings, lists, dicts, etc."""
+        return hashlib.md5(json.dumps(prompt, sort_keys=True, default=str).encode()).hexdigest()
+
+    def _load_solutions(self, input_dir: str) -> Dict[str, List[Dict]]:
+        """Load the solutions from the input directory."""
+        prompt_to_solutions_dict = defaultdict(list)
+        for input_file in glob.glob(os.path.join(input_dir, "output-rs*.jsonl")):
+            with open(input_file, "r") as f:
+                for line in f:
+                    data_point = json.loads(line)
+                    # TODO: Making an assumptiont that the prompt doesn't require all the data for few-shot prompting
+                    # Hashing the prompt to get the key for the solutions
+                    prompt = self.hash_prompt(self.generation_task.fill_prompt(data_point, data=None))
+                    prompt_to_solutions_dict[prompt].append(
+                        {
+                            self.cfg.comparison_key: data_point[self.cfg.comparison_key],
+                            "output_dict": data_point,
+                        }
+                    )
+
+        return prompt_to_solutions_dict
+
+    async def generate_async(self, prompt: Union[str, List], **kwargs):
+        """Generate a single solution using GenSelect."""
+
+        local_random = random.Random(kwargs.get("random_seed", 0))
+
+        # Step 1: Load/Generate the solutions
+        if self.cfg.generation_dir is not None:
+            # Already have the solutions in the input directory
+            # Hashing the prompt to get the key for the solutions
+            solutions = self.prompt_to_solutions_dict[self.hash_prompt(prompt)]
+            local_random.shuffle(solutions)
+        else:
+            # Generate the solutions first
+            solutions = await self.generate_solutions(prompt, local_random, **kwargs)
 
         # Step 2: Run GenSelect to choose the best solution
         best_index, genselect_result = await self._run_genselect(prompt, solutions, local_random)
@@ -175,6 +234,10 @@ class OnlineGenSelectWrapper:
             "solution_list": [solution[self.cfg.comparison_key] for solution in solutions],
             "genselect_comparison": genselect_result["generation"],
         }
+
+        if self.cfg.comparison_key != "generation":
+            # Add the generation key to the result since it's required by inference/generate.py
+            result["generation"] = best_solution["output_dict"]["generation"]
 
         total_num_generated_tokens = 0
         for solution in solutions:
