@@ -243,6 +243,7 @@ def eval_ioi(cfg):
     sandbox = LocalSandbox()
     wait_for_sandbox(sandbox)
     batch_size = eval_config.test_batch_size
+    start_time = time.monotonic()
     if not os.path.exists(eval_config.test_file):
         raise ValueError(f"Failed to find test cases in eval dataset directory: {eval_config.test_file}")
 
@@ -250,7 +251,6 @@ def eval_ioi(cfg):
         metadata = json.load(f)
 
     pool = multiprocessing.Pool(processes=batch_size, initializer=init_worker, initargs=(sandbox,))
-    print("processing with batch size", batch_size)
 
     for jsonl_file in unroll_files(cfg.input_files):
         samples = []
@@ -310,8 +310,6 @@ def eval_ioi(cfg):
                 for test_name, test_data in subtask_data['tests'].items():
                     all_tests.append((subtask, test_name, test_data))
 
-            print("total number of test cases", len(all_tests))
-
             # 2. Walk through the flattened list in chunks of `batch_size`.
             for i in range(0, len(all_tests), batch_size):
                 # Filter out tests whose subtask already failed.
@@ -343,7 +341,6 @@ def eval_ioi(cfg):
                     st['scores'].append(float(result['score']))
                     if float(result['score']) == 0.0:
                         st['passed'] = False
-                    print(result)
 
                     # If compilation failed, surface the compiler output for easy debugging.
                     if not result.get("compile_success", True):
@@ -393,3 +390,5 @@ def eval_ioi(cfg):
 
     pool.close()
     pool.join()
+
+    print(f"Total evaluation time: {(time.monotonic() - start_time)/60:.2f} minutes")
