@@ -47,7 +47,10 @@ class GenSelectConfig:
     regex: str = r"Judg[e]?ment: (\d+)"
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     prompt_config: str = "generic/genselect"
+
+    # Parameter specifically for Offline GenSelect
     generation_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
+    num_initial_solutions: int | None = None  # If specified, will only consider this many solutions for GenSelect
 
 
 class GenSelectWrapper:
@@ -193,7 +196,15 @@ class GenSelectWrapper:
     def _load_solutions(self, input_dir: str) -> Dict[str, List[Dict]]:
         """Load the solutions from the input directory."""
         prompt_to_solutions_dict = defaultdict(list)
-        for input_file in glob.glob(os.path.join(input_dir, "output-rs*.jsonl")):
+        solution_files = glob.glob(os.path.join(input_dir, "output-rs*.jsonl"))
+
+        # If num_initial_solutions is specified, only load the first num_initial_solutions solutions
+        if self.cfg.num_initial_solutions is not None:
+            # Sort the solution files to ensure consistent ordering
+            solution_files.sort()
+            solution_files = solution_files[: self.cfg.num_initial_solutions]
+
+        for input_file in solution_files:
             with open(input_file, "r") as f:
                 for line in f:
                     data_point = json.loads(line)
@@ -220,6 +231,8 @@ class GenSelectWrapper:
             # Hashing the prompt to get the key for the solutions
             solutions = self.prompt_to_solutions_dict[self.hash_prompt(prompt)]
             local_random.shuffle(solutions)
+            # After shuffling, only take the first window_size solutions
+            solutions = solutions[: self.cfg.window_size]
         else:
             # Generate the solutions first
             solutions = await self.generate_solutions(prompt, local_random, **kwargs)
