@@ -21,6 +21,7 @@ import os
 import random
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 from nemo_skills.prompt.utils import get_prompt
@@ -31,27 +32,44 @@ from .base import BaseModel
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+@dataclass
+class GenSelectSpecificConfig:
+    prompt_config: str = "generic/genselect"
+    regex: str = r"Judg[e]?ment: (\d+)"
+
+
+@dataclass
+class GenSynthesisSpecificConfig:
+    prompt_config: str = "generic/gensynthesis"
+    regex: str = r"<NEW_SOLUTION>\n(.*?)\n</NEW_SOLUTION>"
+
+
 @nested_dataclass(kw_only=True)
 class GenSelectConfig:
-    use_completions_api: bool = False
-    tokenizer: str | None = None
-    chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
     temperature: float = 0.6
     tokens_to_generate: int | None = None
+
     remove_thinking: bool = True  # Remove thinking tokens from the comparison key
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
+    use_completions_api: bool = False
+    tokenizer: str | None = None
+    chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
+
+    # GenSelect vs GenSynthesis
+    mode: str = "genselect"  # genselect or gensynthesis
 
     # GenSelect Simple
     window_size: int = 8  # Number of solutions compared in a single request
-    regex: str = r"Judg[e]?ment: (\d+)"
-    prompt_config: str = "generic/genselect"
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     filter_incomplete_solutions: bool = True  # Filter out incomplete solutions
 
-    # Parameters specifically for Offline GenSelect
+    # Parameters specifically for Offline GenSelect/GenSynthesis
     generation_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
-    num_initial_solutions: int | None = None  # If specified, will only consider this many solutions for GenSelect
+    num_initial_solutions: int | None = None  # If specified, will only consider this many solutions
+
+    genselect: GenSelectSpecificConfig = GenSelectSpecificConfig()
+    gensynthesis: GenSynthesisSpecificConfig = GenSynthesisSpecificConfig()
 
 
 class GenSelectWrapper:
@@ -70,7 +88,10 @@ class GenSelectWrapper:
             tokenizer = self.cfg.tokenizer or self.model.model_name_or_path
         else:
             tokenizer = None
-        self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
+        if self.cfg.mode == "genselect":
+            self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
+        else:
+            self.gensynthesis_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
 
         # Initialize the solutions if input_dir is provided
         if self.cfg.generation_dir is not None:
@@ -106,21 +127,38 @@ class GenSelectWrapper:
 
         return judgment
 
-    def _format_solutions_for_genselect(self, solutions: List[Dict]) -> str:
+    def _extract_synthesized_solution(self, generation: str) -> str:
+        """Extract the synthesized solution from the GenSynthesis result."""
+        matches = re.findall(self.cfg.gensynthesis.regex, generation)
+        if matches:
+            return matches[-1]
+        else:
+            return ""
+
+    def _format_solutions_for_genimprovement(self, solutions: List[Dict]) -> str:
         """Format solutions for GenSelect prompt."""
         formatted_solutions = []
         for i, solution in enumerate(solutions):
             formatted_solutions.append(f"Solution {i}: {solution[self.cfg.comparison_key]}")
         return "\n\n".join(formatted_solutions)
 
+    async def _generate_genimprovement(self, prompt: str, **kwargs) -> Dict:
+        return await self.model.generate_async(
+            **kwargs,
+            prompt=prompt,
+            # Overriding the tokens_to_generate, temperature
+            tokens_to_generate=self.cfg.tokens_to_generate,
+            temperature=self.cfg.temperature,
+        )
+
     async def _run_genselect(
-        self, prompt: str, solutions: List[Dict], local_random: random.Random
+        self, prompt: str, solutions: List[Dict], local_random: random.Random, **kwargs
     ) -> tuple[int, Dict]:
         """Run GenSelect to choose the best solution."""
         # Step 1: Format the solutions for GenSelect
         num_solutions = len(solutions)
         max_idx = num_solutions - 1
-        solutions_text = self._format_solutions_for_genselect(solutions)
+        solutions_text = self._format_solutions_for_genimprovement(solutions)
 
         genselect_input = {
             "problem": prompt,
@@ -132,12 +170,7 @@ class GenSelectWrapper:
         genselect_prompt = self.genselect_prompt.fill(genselect_input)
 
         # Step 2: Run Self-GenSelect
-        genselect_result = await self.model.generate_async(
-            prompt=genselect_prompt,
-            tokens_to_generate=self.cfg.tokens_to_generate,
-            temperature=self.cfg.temperature,
-            remove_stop_phrases=True,
-        )
+        genselect_result = await self._generate_genimprovement(prompt=genselect_prompt, **kwargs)
 
         # Step 3: Extract the judgment from the GenSelect result
         judgment = self._extract_judgment(genselect_result["generation"], max_idx)
@@ -146,6 +179,33 @@ class GenSelectWrapper:
             judgment = local_random.randint(0, max_idx)
 
         return judgment, genselect_result
+
+    async def _run_gensynthesis(
+        self, prompt: str, solutions: List[Dict], local_random: random.Random, **kwargs
+    ) -> Dict:
+        """Run GenSynthesis to synthesize a new solution from a list of candidate solutions."""
+        # Step 1: Format the solutions for GenSynthesis
+        num_solutions = len(solutions)
+        solutions_text = self._format_solutions_for_genimprovement(solutions)
+
+        gensynthesis_input = {
+            "problem": prompt,
+            "solutions": solutions_text,
+            "num_solutions": num_solutions,
+        }
+
+        gensynthesis_prompt = self.gensynthesis_prompt.fill(gensynthesis_input)
+
+        # Step 2: Run GenSynthesis
+        gensynthesis_result = await self._generate_genimprovement(prompt=gensynthesis_prompt, **kwargs)
+
+        # Step 3: Extract the synthesized solution from the GenSynthesis result
+        synthesized_solution = self._extract_synthesized_solution(gensynthesis_result["generation"])
+
+        return {
+            self.cfg.comparison_key: synthesized_solution,
+            "output_dict": gensynthesis_result,
+        }
 
     async def generate_solutions(
         self,
@@ -228,6 +288,7 @@ class GenSelectWrapper:
         """Generate a single solution using GenSelect."""
 
         local_random = random.Random(kwargs.get("random_seed", 0))
+        result = {}
 
         # Step 1: Load/Generate the solutions
         if self.cfg.generation_dir is not None:
@@ -244,6 +305,8 @@ class GenSelectWrapper:
         total_num_generated_tokens = 0
         for solution in solutions:
             total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)
+
+        result["total_solution_generated_tokens"] = total_num_generated_tokens
 
         if self.cfg.filter_incomplete_solutions:
             # Remove unfinished solutions
@@ -272,22 +335,21 @@ class GenSelectWrapper:
                 "num_best_solution_generated_tokens": 0,
             }
 
-        # Step 2: Run GenSelect to choose the best solution
-        best_index, genselect_result = await self._run_genselect(prompt, solutions, local_random)
-        best_solution = solutions[best_index]
+        # Step 2: Run GenSelect/GenSynthesis
+        if self.cfg.mode == "genselect":
+            best_index, genselect_result = await self._run_genselect(prompt, solutions, local_random)
+            improved_solution = solutions[best_index]
+            result["genselect_comparison"] = genselect_result["generation"]
+        else:
+            # GenSynthesis
+            improved_solution = await self._run_gensynthesis(prompt, solutions, local_random)
 
-        # Return the best solution in the expected format
-        result = {
-            self.cfg.comparison_key: best_solution[self.cfg.comparison_key],
-            "solution_list": [solution[self.cfg.comparison_key] for solution in solutions],
-            "genselect_comparison": genselect_result["generation"],
-        }
+        result[self.cfg.comparison_key] = improved_solution[self.cfg.comparison_key]
+        result["solution_list"] = [solution[self.cfg.comparison_key] for solution in solutions]
 
         if self.cfg.comparison_key != "generation":
             # Add the generation key to the result since it's required by inference/generate.py
-            result["generation"] = best_solution["output_dict"]["generation"]
-
-        result["total_solution_generated_tokens"] = total_num_generated_tokens
+            result["generation"] = improved_solution["output_dict"]["generation"]
 
         # Add the tokens for genselect
         result["genselect_num_generated_tokens"] = genselect_result.get("num_generated_tokens", 0)
@@ -300,6 +362,6 @@ class GenSelectWrapper:
         result["num_generated_tokens"] = total_gen_tokens
 
         # Add the tokens for the best solution
-        result["num_best_solution_generated_tokens"] = best_solution["output_dict"].get("num_generated_tokens", 0)
+        result["num_best_solution_generated_tokens"] = improved_solution["output_dict"].get("num_generated_tokens", 0)
 
         return result

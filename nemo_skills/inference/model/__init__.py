@@ -78,11 +78,10 @@ def get_genselect_model(
     inference_override_config=None,
 ):
     """A helper function to create GenSelect model."""
-    # Merging priority: genselect_config, main config, main inference config, any overrides from inference_override_config
+    # Merging priority: genselect_config, main config, any overrides from inference_override_config
     merge_config = {
         **genselect_config.__dict__,
         **main_config.__dict__,
-        **main_config.inference.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
 
