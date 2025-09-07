@@ -80,6 +80,9 @@ nav:
     - evaluation/long-context.md
     - evaluation/tool-calling.md
     - evaluation/other-benchmarks.md
+  - Agentic Generation:
+    - agentic_generation/tool_calling.md
+    - agentic_generation/genselect.md
   - Tutorials:
     - tutorials/index.md
   - Papers & Releases:
