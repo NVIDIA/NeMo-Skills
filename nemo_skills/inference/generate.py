@@ -345,6 +345,7 @@ class GenerationTask:
 
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
+                "remove_thinking": self.cfg.genselect_config.remove_thinking,  # Removing thinking from solutions is important for genselect. We don't want to override this with the main generation config
                 "prompt_config": self.cfg.genselect_config.prompt_config,
                 "temperature": self.cfg.genselect_config.temperature,
                 "tokens_to_generate": self.cfg.genselect_config.tokens_to_generate,
