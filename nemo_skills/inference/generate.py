@@ -278,7 +278,7 @@ class GenerationTask:
                 Path(self.cfg.output_file).parent / "litellm_cache" / f"{output_file_name}_{self.cfg.chunk_id or 0}"
             )
             litellm.cache = litellm.Cache(type="disk", disk_cache_dir=self.litellm_cache_dir)
-            
+
         if self.cfg.use_completions_api and self.cfg.inference.tokens_to_generate is None:
             raise ValueError("When using completions API, tokens_to_generate must be specified!")
 
