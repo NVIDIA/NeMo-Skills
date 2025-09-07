@@ -204,6 +204,9 @@ class GenSelectWrapper:
             solution_files.sort()
             solution_files = solution_files[: self.cfg.num_initial_solutions]
 
+        if not solution_files:
+            raise ValueError(f"No solutions found in {input_dir}")
+
         for input_file in solution_files:
             with open(input_file, "r") as f:
                 for line in f:
