@@ -258,8 +258,8 @@ class GenSelectWrapper:
                 else:
                     filtered_solutions.append(solution)
 
-            solutions = filtered_solutions
             LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
+            solutions = filtered_solutions
 
         if not solutions:
             return {
