@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import random
+import shutil
 import subprocess
 import sys
 import time
@@ -25,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import hydra
+import litellm
 from omegaconf import ListConfig
 from tqdm import tqdm
 
@@ -101,7 +103,7 @@ class GenerateSolutionsConfig:
 
     # maximum number of concurrent requests to the server for the async loop
     # if sync loop is used, this is the batch size
-    max_concurrent_requests: int = 1024
+    max_concurrent_requests: int = 512
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -136,13 +138,34 @@ class GenerateSolutionsConfig:
     # genselect config
     online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
-    ## FIXME(sanyamk): Rethink the structure of this configuration.
-    tool_config: str | None = None  # Path to tool configuration file.
+    # Module-based tool configuration
+    #   List of tool provider locators using double-colon syntax for the tool class.
+    #   Each item should be of the form:
+    #     - Module class:  module.path.to.provider::ClassName
+    #     - File class:    /abs/or/rel/path/to/provider.py::ClassName
+    #
+    #   Examples:
+    #     - ++tool_modules=["nemo_skills.mcp.servers.python_tool::PythonTool"]
+    #     - ++tool_modules=["/nemo_run/code/mcp/example_tool.py::ExampleTool","nemo_skills.mcp.servers.exa_tool::ExaTool"]
+    tool_modules: list[str] | None = None
+    #
+    #   Per-tool overrides keyed by the Tool class name (the same ClassName used above).
+    #   Use dotted keys to set nested values (e.g., client_params.base_url).
+    #
+    #   Common patterns:
+    #     - Set PythonTool timeout knob:
+    #         ++tool_overrides.PythonTool.exec_timeout_s=30
+    #     - Set an ExampleTool server-only arg:
+    #         ++tool_overrides.ExampleTool.foo_argument='[TEST] '
+    tool_overrides: dict | None = field(default_factory=dict)
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
+
+    # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
+    enable_litellm_cache: bool = False
 
     def __post_init__(self):
         self._post_init_validate_data()
@@ -247,6 +270,18 @@ class GenerationTask:
         else:
             self.tokenizer = None
 
+        # Setup litellm cache
+        if self.cfg.enable_litellm_cache:
+            # One cache per (output_file_name, chunk_id) pair
+            output_file_name = Path(self.cfg.output_file).name
+            self.litellm_cache_dir = (
+                Path(self.cfg.output_file).parent / "litellm_cache" / f"{output_file_name}_{self.cfg.chunk_id or 0}"
+            )
+            litellm.cache = litellm.Cache(type="disk", disk_cache_dir=self.litellm_cache_dir)
+
+        if self.cfg.use_completions_api and self.cfg.inference.tokens_to_generate is None:
+            raise ValueError("When using completions API, tokens_to_generate must be specified!")
+
         # Setup prompt formatter and LLM
         self.prompt = self.setup_prompt()
         self.llm = self.setup_llm()
@@ -280,12 +315,11 @@ class GenerationTask:
 
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
-            tokenizer=self.tokenizer,
+            tokenizer=self.tokenizer if self.cfg.use_completions_api else None,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
+            system_message=self.cfg.system_message,
         )
-        if self.cfg.system_message is not None:
-            prompt.config.system = self.cfg.system_message
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
@@ -294,10 +328,11 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
-        elif self.cfg.tool_config:
+        elif self.cfg.tool_modules is not None:
             llm = get_tool_calling_model(
                 **self.cfg.server,
-                tool_config=self.cfg.tool_config,
+                tool_modules=self.cfg.tool_modules,
+                tool_overrides=self.cfg.tool_overrides,
                 tokenizer=self.tokenizer,
                 additional_config={"sandbox": self.cfg.sandbox},
             )
@@ -544,6 +579,8 @@ class GenerationTask:
                 fout.write(json.dumps(gen_dict) + "\n")
 
         Path(self.cfg.output_file + "-async").unlink()
+        if self.cfg.enable_litellm_cache:
+            shutil.rmtree(self.litellm_cache_dir)
 
     def wait_for_server(self):
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"

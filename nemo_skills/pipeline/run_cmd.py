@@ -66,6 +66,9 @@ def run_cmd(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
@@ -157,6 +160,7 @@ def run_cmd(
                 server_nodes=server_nodes,
                 server_args=server_args,
                 server_entrypoint=server_entrypoint,
+                server_container=server_container,
                 extra_arguments=extra_arguments,  # this is empty string by design
                 get_random_port=get_random_port,
             )
