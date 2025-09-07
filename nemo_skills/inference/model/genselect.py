@@ -48,7 +48,7 @@ class GenSelectConfig:
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     prompt_config: str = "generic/genselect"
 
-    # Parameter specifically for Offline GenSelect
+    # Parameters specifically for Offline GenSelect
     generation_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
     num_initial_solutions: int | None = None  # If specified, will only consider this many solutions for GenSelect
 
