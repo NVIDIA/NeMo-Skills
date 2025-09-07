@@ -45,8 +45,9 @@ class GenSelectConfig:
     # GenSelect Simple
     window_size: int = 8  # Number of solutions compared in a single request
     regex: str = r"Judg[e]?ment: (\d+)"
-    comparison_key: str = "generation"  # Key used for comparing the different solutions
     prompt_config: str = "generic/genselect"
+    comparison_key: str = "generation"  # Key used for comparing the different solutions
+    filter_incomplete_solutions: bool = True  # Filter out incomplete solutions
 
     # Parameters specifically for Offline GenSelect
     generation_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
@@ -240,6 +241,37 @@ class GenSelectWrapper:
             # Generate the solutions first
             solutions = await self.generate_solutions(prompt, local_random, **kwargs)
 
+        total_num_generated_tokens = 0
+        for solution in solutions:
+            total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)
+
+        if self.cfg.filter_incomplete_solutions:
+            # Remove unfinished solutions
+            filtered_solutions = []
+            for solution in solutions:
+                # Check if thinking_start is in the solution and thinking_end is not in the solution
+                if (
+                    self.cfg.thinking_start in solution[self.cfg.comparison_key]
+                    and self.cfg.thinking_end not in solution[self.cfg.comparison_key]
+                ):
+                    continue
+                else:
+                    filtered_solutions.append(solution)
+
+            solutions = filtered_solutions
+            LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
+
+        if not solutions:
+            return {
+                self.cfg.comparison_key: "",
+                "solution_list": [],
+                "genselect_comparison": "",
+                "genselect_num_generated_tokens": 0,
+                "total_solution_generated_tokens": total_num_generated_tokens,
+                "num_generated_tokens": total_num_generated_tokens,  # No additional tokens for genselect
+                "num_best_solution_generated_tokens": 0,
+            }
+
         # Step 2: Run GenSelect to choose the best solution
         best_index, genselect_result = await self._run_genselect(prompt, solutions, local_random)
         best_solution = solutions[best_index]
@@ -255,9 +287,6 @@ class GenSelectWrapper:
             # Add the generation key to the result since it's required by inference/generate.py
             result["generation"] = best_solution["output_dict"]["generation"]
 
-        total_num_generated_tokens = 0
-        for solution in solutions:
-            total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)
         result["total_solution_generated_tokens"] = total_num_generated_tokens
 
         # Add the tokens for genselect
