@@ -249,9 +249,9 @@ class GenSelectWrapper:
             # Remove unfinished solutions
             filtered_solutions = []
             for solution in solutions:
-                # Check if thinking_start is in the solution and thinking_end is not in the solution
+                # Check if thinking_begin is in the solution and thinking_end is not in the solution
                 if (
-                    self.cfg.thinking_start in solution[self.cfg.comparison_key]
+                    self.cfg.thinking_begin in solution[self.cfg.comparison_key]
                     and self.cfg.thinking_end not in solution[self.cfg.comparison_key]
                 ):
                     continue
