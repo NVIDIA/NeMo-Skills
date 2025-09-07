@@ -72,7 +72,7 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
 
 def get_genselect_model(
     model,
-    generation_task=None,
+    orig_prompt_filler,
     genselect_config=None,
     main_config=None,
     inference_override_config=None,
@@ -92,7 +92,7 @@ def get_genselect_model(
 
     genselect_config = GenSelectConfig(**filtered_config)
 
-    return GenSelectWrapper(model=model, generation_task=generation_task, cfg=genselect_config)
+    return GenSelectWrapper(model=model, orig_prompt_filler=orig_prompt_filler, cfg=genselect_config)
 
 
 def get_tool_calling_model(

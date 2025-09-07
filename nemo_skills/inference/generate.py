@@ -352,7 +352,7 @@ class GenerationTask:
 
             llm = get_genselect_model(
                 model=llm,
-                generation_task=self,  # Needed for prompt fillling
+                orig_prompt_filler=self.fill_prompt,  # Needed for prompt fillling
                 genselect_config=genselect_config,
                 main_config=self.cfg,
                 inference_override_config=inference_override_config,

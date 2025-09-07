@@ -59,9 +59,9 @@ class GenSelectWrapper:
     to choose the best one.
     """
 
-    def __init__(self, model: BaseModel, generation_task, cfg: GenSelectConfig):
+    def __init__(self, model: BaseModel, orig_prompt_filler, cfg: GenSelectConfig):
         self.model = model
-        self.generation_task = generation_task
+        self.orig_prompt_filler = orig_prompt_filler
         self.cfg = cfg
 
         # Load GenSelect prompt
@@ -213,7 +213,7 @@ class GenSelectWrapper:
                     data_point = json.loads(line)
                     # TODO: Making an assumptiont that the prompt doesn't require all the data for few-shot prompting
                     # Hashing the prompt to get the key for the solutions
-                    prompt = self.hash_prompt(self.generation_task.fill_prompt(data_point, data=None))
+                    prompt = self.hash_prompt(self.orig_prompt_filler(data_point, data=None))
                     prompt_to_solutions_dict[prompt].append(
                         {
                             self.cfg.comparison_key: data_point[self.cfg.comparison_key],
