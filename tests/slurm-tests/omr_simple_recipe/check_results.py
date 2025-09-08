@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))  # for utils.py
-from utils import load_json  # noqa: E402
+from utils import assert_all, load_json, soft_assert  # noqa: E402
 
 # Hard-coded accuracy ranges for baseline and after-training results
 # TODO: should we train for longer / generate more data? Variance is really high
@@ -46,11 +46,13 @@ def check_benchmark(benchmark: str, baseline_results: dict, after_training_resul
         lo_b, hi_b = RANGE_CONSTRAINTS["baseline"][benchmark][metric]
         lo_a, hi_a = RANGE_CONSTRAINTS["after_training"][benchmark][metric]
 
-        assert lo_b <= baseline_acc <= hi_b, (
-            f"{benchmark}: baseline {baseline_acc}% out of range [{lo_b}%, {hi_b}%] for metric {metric}"
+        soft_assert(
+            lo_b <= baseline_acc <= hi_b,
+            f"{benchmark}: baseline {baseline_acc}% out of range [{lo_b}%, {hi_b}%] for metric {metric}",
         )
-        assert lo_a <= after_acc <= hi_a, (
-            f"{benchmark}: after_training {after_acc}% out of range [{lo_a}%, {hi_a}%] for metric {metric}"
+        soft_assert(
+            lo_a <= after_acc <= hi_a,
+            f"{benchmark}: after_training {after_acc}% out of range [{lo_a}%, {hi_a}%] for metric {metric}",
         )
 
 
@@ -67,6 +69,8 @@ def main():
         )
         check_benchmark(benchmark, baseline_results, after_training_results)
 
+    # Report any aggregated failures (exits non-zero if present)
+    assert_all()
     print("All checks passed.")
 
 

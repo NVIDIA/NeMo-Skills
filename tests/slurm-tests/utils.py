@@ -29,3 +29,32 @@ def get_nested_value(nested_dict: dict, nested_keys: tuple | list):
         nested_dict = nested_dict[k]
     # resolves to the value eventually
     return nested_dict
+
+
+# --- Minimal soft-assert utilities ---
+_soft_assert_failures: list[str] = []
+
+
+def soft_assert(condition: bool, message: str):
+    """Record a failure instead of raising immediately.
+
+    Use this in place of `assert` when you want to collect all failures
+    and report them at the end of the script.
+    """
+    if not condition:
+        _soft_assert_failures.append(str(message))
+
+
+def assert_all(header: str = "CHECK FAILURES"):
+    """If any soft assertions failed, print them and exit with non-zero status.
+
+    Does nothing if there are no failures. Intended to be called once at the end
+    of a check script, before printing a success message.
+    """
+    if not _soft_assert_failures:
+        return
+    print(f"\n{header} ({len(_soft_assert_failures)})\n" + "-" * 80)
+    for i, msg in enumerate(_soft_assert_failures, 1):
+        print(f"{i:3d}. {msg}")
+    print("-" * 80)
+    raise SystemExit(1)

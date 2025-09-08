@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))  # for utils.py
-from utils import get_nested_value, load_json  # noqa: E402
+from utils import assert_all, get_nested_value, load_json, soft_assert  # noqa: E402
 
 REASONING_TASKS = [
     "math-500",
@@ -175,12 +175,12 @@ def check_reasoning(bucket: str, mode: str):
             for field in REASONING_REQUIRED_FIELDS[bench]:
                 val = float(result_block[field])
                 lo, hi = REASONING_METRIC_RANGES[mode][bench][field]
-                assert lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]"
+                soft_assert(lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]")
         else:
             field = REASONING_REQUIRED_FIELDS[bench][0]
             val = float(result_block[field])
             lo, hi = REASONING_METRIC_RANGES[mode][bench]
-            assert lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]"
+            soft_assert(lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]")
 
 
 def check_toolcalling(bucket: str, mode: str):
@@ -189,7 +189,7 @@ def check_toolcalling(bucket: str, mode: str):
     for cat, path in TOOLCALLING_METRIC_PATHS.items():
         val = float(get_nested_value(data, path))
         lo, hi = TOOLCALLING_METRIC_RANGES[mode][cat]
-        assert lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]"
+    soft_assert(lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]")
 
 
 def check_ruler(bucket: str, mode: str):
@@ -198,7 +198,7 @@ def check_ruler(bucket: str, mode: str):
     for task in RULER_TASKS:
         val = float(data[task]["pass@1"]["accuracy"])
         lo, hi = RULER_METRIC_RANGES[mode][task]
-        assert lo <= val <= hi, f"RULER {task}={val} out of range [{lo},{hi}]"
+    soft_assert(lo <= val <= hi, f"RULER {task}={val} out of range [{lo},{hi}]")
 
 
 def main():
@@ -221,6 +221,7 @@ def main():
         else:
             check_reasoning(bpath, mode)
 
+    assert_all()
     print("ALL CHECKS PASSED")
 
 

@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))  # for utils.py
-from utils import get_nested_value, load_json  # noqa: E402
+from utils import assert_all, get_nested_value, load_json, soft_assert  # noqa: E402
 
 TOOLCALLING_METRIC_RANGES = {
     ("overall_accuracy", "accuracy"): (61.0, 67.0),
@@ -40,7 +40,7 @@ def check_toolcalling(bucket: str):
     for category_tuple, expected_range in TOOLCALLING_METRIC_RANGES.items():
         val = float(get_nested_value(data, category_tuple))
         lo, hi = expected_range
-        assert lo <= val <= hi, f"bfcl-v3 {category_tuple}={val} out of range [{lo},{hi}]"
+    soft_assert(lo <= val <= hi, f"bfcl-v3 {category_tuple}={val} out of range [{lo},{hi}]")
 
 
 def main():
@@ -50,6 +50,7 @@ def main():
 
     check_toolcalling(os.path.join(args.workspace, "reasoning_on_tool_calling"))
 
+    assert_all()
     print("ALL CHECKS PASSED")
 
 
