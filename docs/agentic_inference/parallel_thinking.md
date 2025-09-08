@@ -45,9 +45,9 @@ To specify any of the above variables, say `window_size=16`, pass `++parallel_th
 
 ## Sample Examples
 
-### Online Parallel Thinking (via GenSelect)
+### Online Parallel Thinking (via GenSynthesis)
 
-In this example, we show how to use GenSelect for [aime25](https://nvidia.github.io/NeMo-Skills/evaluation/natural-math/) with [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B).
+In this example, we show how to use GenSynthesis for [aime25](https://nvidia.github.io/NeMo-Skills/evaluation/natural-math/) with [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B).
 
 ```bash hl_lines="9-10"
 ns eval \
@@ -56,15 +56,15 @@ ns eval \
   --model Qwen/Qwen3-8B \
   --server_gpus 2 \
   --server_type vllm \
-  --output_dir /experiments/qwen3_8b/genselect \
+  --output_dir /experiments/qwen3_8b/gensynthesis \
   ++inference.tokens_to_generate=16384 \
-  ++parallel_thinking.mode=genselect \
+  ++parallel_thinking.mode=gensynthesis \
   ++server.enable_soft_fail=True \
   ++server.context_limit_retry_strategy=reduce_generation
 ```
 
-The evaluation pipeline would first generate `window_size` solutions (8 by default), and then run genselect with these solutions in the prompt to pick one.
-Note that the same model is being used for both solution generation and selection, which we refer to as **Self-GenSelect**.
+The evaluation pipeline would first generate `window_size` solutions (8 by default), and then run GenSynthesis with these solutions in the prompt to synthesize a new solution.
+Note that the same model is being used for both solution generation and selection, which we refer to as **Self-GenSynthesis**.
 
 !!!tip
     Parallel Thinking inputs can consume a lot of tokens, especially for large `window_size` values.
@@ -102,7 +102,7 @@ eval(
 )
 
 # Run parallel thinking on initial solutions
-# Using genselect with Qwen3-8B
+# Using GenSelect with Qwen3-8B
 eval(
     ctx=wrap_arguments(
         "++parallel_thinking.tokens_to_generate=16384 "
@@ -124,7 +124,7 @@ eval(
 
 There are three things we want to highlight in the above example:
 
-- We run the GenSelect pipeline a total of 8 times (`livecodebench:8`) over the same set of solutions
+- We run the GenSelect step a total of 8 times (`livecodebench:8`) over the same set of solutions
 - The pre-generated solutions are specified via: `++parallel_thinking.generation_dir=/workspace/qwen3_4b_evals/eval-results/livecodebench`
 - Instead of the usual `generation` key for identifying the solution content, we use `++parallel_thinking.solution_key=completion`
 
