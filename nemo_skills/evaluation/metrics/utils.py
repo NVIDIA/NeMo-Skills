@@ -40,7 +40,13 @@ def is_correct_judgement(judgement, return_none=False) -> Union[bool, None]:
             return True
         elif verdict.lower().startswith("no"):
             return False
-
+    else:
+        verdict = judgement.strip().lower()
+        if verdict.startswith("correct"):
+            return True
+        elif verdict.startswith("incorrect"):
+            return False
+        
     if return_none:
         return None
     else:

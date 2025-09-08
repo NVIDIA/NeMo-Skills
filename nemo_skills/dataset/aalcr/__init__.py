@@ -15,7 +15,7 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = 'generic/default'
 DATASET_GROUP = 'long-context'
-METRICS_TYPE = "aalcr"
+METRICS_TYPE = "answer-judgement"
 EVAL_ARGS = "++eval_type=math"
 GENERATION_ARGS = ""
 JUDGE_PIPELINE_ARGS = {
