@@ -45,7 +45,7 @@ class GenSynthesisSpecificConfig:
 
 
 @nested_dataclass(kw_only=True)
-class GenSelectConfig:
+class GenEvolutionConfig:
     temperature: float = 0.6
     tokens_to_generate: int | None = None
 
@@ -59,7 +59,10 @@ class GenSelectConfig:
     # GenSelect vs GenSynthesis
     mode: str = "genselect"  # genselect or gensynthesis
 
-    # GenSelect Simple
+    genselect: GenSelectSpecificConfig = GenSelectSpecificConfig()
+    gensynthesis: GenSynthesisSpecificConfig = GenSynthesisSpecificConfig()
+
+    # Solution related parameters
     window_size: int = 8  # Number of solutions compared in a single request
     comparison_key: str = "generation"  # Key used for comparing the different solutions
     filter_incomplete_solutions: bool = True  # Filter out incomplete solutions
@@ -68,30 +71,30 @@ class GenSelectConfig:
     generation_dir: str | None = None  # Assumes output-rs[random_seed].jsonl files in this directory
     num_initial_solutions: int | None = None  # If specified, will only consider this many solutions
 
-    genselect: GenSelectSpecificConfig = GenSelectSpecificConfig()
-    gensynthesis: GenSynthesisSpecificConfig = GenSynthesisSpecificConfig()
 
-
-class GenSelectWrapper:
+class GenEvolutionWrapper:
     """
-    Wrapper that generates multiple completions for a datapoint and uses GenSelect
-    to choose the best one.
+    Wrapper that generates/loads multiple solutions for a datapoint and uses GenSelect or GenSynthesis
+    to choose the best one or synthesize a new solution.
     """
 
-    def __init__(self, model: BaseModel, orig_prompt_filler, cfg: GenSelectConfig):
+    def __init__(self, model: BaseModel, orig_prompt_filler, cfg: GenEvolutionConfig):
         self.model = model
         self.orig_prompt_filler = orig_prompt_filler
         self.cfg = cfg
 
-        # Load GenSelect prompt
         if self.cfg.use_completions_api:
             tokenizer = self.cfg.tokenizer or self.model.model_name_or_path
         else:
             tokenizer = None
+
+        # Load GenSelect/GenSynthesis prompt
         if self.cfg.mode == "genselect":
-            self.genselect_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
+            self.genselect_prompt = get_prompt(prompt_config=self.cfg.genselect.prompt_config, tokenizer=tokenizer)
         else:
-            self.gensynthesis_prompt = get_prompt(prompt_config=self.cfg.prompt_config, tokenizer=tokenizer)
+            self.gensynthesis_prompt = get_prompt(
+                prompt_config=self.cfg.gensynthesis.prompt_config, tokenizer=tokenizer
+            )
 
         # Initialize the solutions if input_dir is provided
         if self.cfg.generation_dir is not None:
@@ -106,7 +109,7 @@ class GenSelectWrapper:
             # We will be generating the solutions in parallel
             self.cfg.max_concurrent_requests = self.cfg.window_size
 
-    def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
+    def _extract_chosen_solution(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
         judgment = None
 
@@ -173,12 +176,12 @@ class GenSelectWrapper:
         genselect_result = await self._generate_genimprovement(prompt=genselect_prompt, **kwargs)
 
         # Step 3: Extract the judgment from the GenSelect result
-        judgment = self._extract_judgment(genselect_result["generation"], max_idx)
-        if judgment is None:
-            LOG.warning("GenSelect failed to produce valid judgment, falling back to random selection")
-            judgment = local_random.randint(0, max_idx)
+        chosen_solution_idx = self._extract_chosen_solution(genselect_result["generation"], max_idx)
+        if chosen_solution_idx is None:
+            LOG.warning("GenSelect failed to produce valid solution index, falling back to random selection")
+            chosen_solution_idx = local_random.randint(0, max_idx)
 
-        return judgment, genselect_result
+        return chosen_solution_idx, genselect_result
 
     async def _run_gensynthesis(
         self, prompt: str, solutions: List[Dict], local_random: random.Random, **kwargs
@@ -214,7 +217,7 @@ class GenSelectWrapper:
         **solution_kwargs,
     ) -> Dict:
         """
-        Generate multiple solutions and use Self-GenSelect to choose the best one.
+        Generate multiple solutions for input to GenSelect/GenSynthesis.
         """
         # Generate multiple solutions
         tasks = []
@@ -337,8 +340,8 @@ class GenSelectWrapper:
 
         # Step 2: Run GenSelect/GenSynthesis
         if self.cfg.mode == "genselect":
-            best_index, genselect_result = await self._run_genselect(prompt, solutions, local_random)
-            improved_solution = solutions[best_index]
+            chosen_solution_idx, genselect_result = await self._run_genselect(prompt, solutions, local_random)
+            improved_solution = solutions[chosen_solution_idx]
             result["genselect_comparison"] = genselect_result["generation"]
         else:
             # GenSynthesis

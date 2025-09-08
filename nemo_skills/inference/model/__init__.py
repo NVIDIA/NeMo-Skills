@@ -27,7 +27,7 @@ from .context_retry import ContextLimitRetryConfig
 from .gemini import GeminiModel
 
 # GenSelect
-from .genselect import GenSelectConfig, GenSelectWrapper
+from .gen_evolution import GenEvolutionConfig, GenEvolutionWrapper
 from .megatron import MegatronModel
 from .openai import OpenAIModel
 
@@ -86,12 +86,12 @@ def get_genselect_model(
     }
 
     # Filter to only include valid parameters
-    valid_params = {field.name for field in dataclasses.fields(GenSelectConfig)}
+    valid_params = {field.name for field in dataclasses.fields(GenEvolutionConfig)}
     filtered_config = {key: value for key, value in merge_config.items() if key in valid_params}
 
-    genselect_config = GenSelectConfig(**filtered_config)
+    genselect_config = GenEvolutionConfig(**filtered_config)
 
-    return GenSelectWrapper(model=model, orig_prompt_filler=orig_prompt_filler, cfg=genselect_config)
+    return GenEvolutionWrapper(model=model, orig_prompt_filler=orig_prompt_filler, cfg=genselect_config)
 
 
 def get_tool_calling_model(

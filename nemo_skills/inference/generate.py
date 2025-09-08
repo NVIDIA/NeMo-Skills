@@ -32,9 +32,9 @@ from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
-    GenSelectConfig,
+    GenEvolutionConfig,
     get_code_execution_model,
-    get_genselect_model,
+    get_genevolution_model,
     get_model,
     get_tool_calling_model,
     server_params,
@@ -133,10 +133,10 @@ class GenerateSolutionsConfig:
 
     # stop phrase for llms
     stop_phrase: str | None = None  # if None, will not add any extra stop phrase
-    # set to True if genselect is used
-    genselect: bool = False
-    # genselect config
-    genselect_config: GenSelectConfig = field(default_factory=GenSelectConfig)
+    # set to True if genevolution is used
+    genevolution: bool = False
+    # genevolution config
+    genevolution_config: GenEvolutionConfig = field(default_factory=GenEvolutionConfig)
 
     # Module-based tool configuration
     #   List of tool provider locators using double-colon syntax for the tool class.
@@ -339,20 +339,20 @@ class GenerationTask:
         else:
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
-        if self.cfg.genselect:
+        if self.cfg.genevolution:
             # Allow for overriding the temperature and tokens_to_generate for genselect
-            genselect_config = self.cfg.genselect_config
+            genevolution_config = self.cfg.genevolution_config
 
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
-                "remove_thinking": self.cfg.genselect_config.remove_thinking,  # Removing thinking from solutions is important for genselect. We don't want to override this with the main generation config
-                "prompt_config": self.cfg.genselect_config.prompt_config,
+                "remove_thinking": self.cfg.genevolution_config.remove_thinking,  # Removing thinking from solutions is important for genselect. We don't want to override this with the main generation config
+                "prompt_config": self.cfg.genevolution_config.prompt_config,
             }
 
-            llm = get_genselect_model(
+            llm = get_genevolution_model(
                 model=llm,
                 orig_prompt_filler=self.fill_prompt,  # Needed for prompt fillling
-                genselect_config=genselect_config,
+                genevolution_config=genevolution_config,
                 main_config=self.cfg,
                 inference_override_config=inference_override_config,
             )

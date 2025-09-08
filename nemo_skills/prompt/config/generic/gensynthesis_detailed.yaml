@@ -1,0 +1,27 @@
+# Prompt for synthesizing a new solution from a list of candidate solutions
+
+user: |-
+  You will be given a problem followed by an enumerated list of {num_solutions} candidate solutions that serve as input seeds. Your task is to systematically synthesize a new, improved solution by combining the strongest elements from these candidates while addressing their individual weaknesses.
+
+  Problem: {problem}
+
+  Solutions:
+  {solutions}
+
+  Follow this systematic approach:
+
+  1. **Extract Core Strengths**: Identify the most effective components, techniques, or insights from each candidate solution.
+
+  2. **Identify Common Weaknesses**: Note recurring limitations, gaps, or failure modes across the candidates.
+
+  3. **Cross-Pollinate Ideas**: Look for opportunities to merge complementary approaches or adapt successful techniques from one solution to address weaknesses in another.
+
+  4. **Innovate Beyond**: Generate novel elements that aren't present in any candidate but would enhance the overall solution based on the problem requirements.
+
+  5. **Synthesize**: Combine the extracted strengths, cross-pollinated ideas, and novel innovations into a coherent new solution that aims to be superior to all input candidates.
+
+  End your response with exactly:
+  <NEW_SOLUTION>
+  NEW_SYNTHESIZED_SOLUTION
+  </NEW_SOLUTION>
+  where NEW_SYNTHESIZED_SOLUTION is your complete improved solution.
