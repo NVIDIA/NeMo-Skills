@@ -82,8 +82,8 @@ nav:
     - evaluation/multilingual.md
     - evaluation/other-benchmarks.md
   - Agentic Inference:
-    - agentic_generation/tool_calling.md
-    - agentic_generation/genevolution.md
+    - agentic_inference/parallel_thinking.md
+    - agentic_inference/tool_calling.md
   - Tutorials:
     - tutorials/index.md
   - Papers & Releases:
