@@ -413,6 +413,9 @@ class SweBenchGenerationTask(GenerationTask):
     async def process_single_datapoint(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
         self.output_dir = Path(self.cfg.output_file).parent
+        if self.cfg.inference.random_seed is not None:
+            self.output_dir = self.output_dir / f"seed{self.cfg.inference.random_seed}"
+            self.output_dir.mkdir(exist_ok=True)
 
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
         # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
