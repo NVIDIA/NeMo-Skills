@@ -40,7 +40,7 @@ class GenSelectSpecificConfig:
 @nested_dataclass(kw_only=True)
 class GenSynthesisSpecificConfig:
     prompt_config: str = "generic/gensynthesis"
-    regex: str = r"<NEW_SOLUTION>\n(.*?)\n</NEW_SOLUTION>"
+    regex: str = r"<NEW_SOLUTION>(.*?)</NEW_SOLUTION>"
 
 
 @nested_dataclass(kw_only=True)
@@ -133,7 +133,7 @@ class GenEvolutionWrapper:
         """Extract the synthesized solution from the GenSynthesis result."""
         matches = re.findall(self.cfg.gensynthesis.regex, generation, re.DOTALL)
         if matches:
-            return matches[-1]
+            return matches[-1].strip()  # Remove any trailing newlines
         else:
             return None
 
@@ -179,6 +179,9 @@ class GenEvolutionWrapper:
         if chosen_solution_idx is None:
             LOG.warning("GenSelect failed to produce valid solution index, falling back to random selection")
             chosen_solution_idx = local_random.randint(0, max_idx)
+            genselect_result["selection_successful"] = False
+        else:
+            genselect_result["selection_successful"] = True
 
         return chosen_solution_idx, genselect_result
 
@@ -206,9 +209,10 @@ class GenEvolutionWrapper:
         if synthesized_solution is None:
             LOG.warning("GenSynthesis failed to produce valid solution, falling back to random selection")
             synthesized_solution = local_random.choice(solutions)[self.cfg.comparison_key]
-            gensynthesis_result["new_solution"] = False
+            # Add the boolean flag to aid analysis and debugging
+            gensynthesis_result["synthesis_successful"] = False
         else:
-            gensynthesis_result["new_solution"] = True
+            gensynthesis_result["synthesis_successful"] = True
 
         return {
             self.cfg.comparison_key: synthesized_solution,
