@@ -32,10 +32,10 @@ from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
-    GenEvolutionConfig,
+    ParallelThinkingConfig,
     get_code_execution_model,
-    get_genevolution_model,
     get_model,
+    get_parallel_thinking_model,
     get_tool_calling_model,
     server_params,
 )
@@ -133,10 +133,10 @@ class GenerateSolutionsConfig:
 
     # stop phrase for llms
     stop_phrase: str | None = None  # if None, will not add any extra stop phrase
-    # set to True if genevolution is used
-    genevolution: bool = False
-    # genevolution config
-    genevolution_config: GenEvolutionConfig = field(default_factory=GenEvolutionConfig)
+    # set to True if parallel_thinking is used
+    parallel_thinking: bool = False
+    # parallel_thinking config
+    parallel_thinking_config: ParallelThinkingConfig = field(default_factory=ParallelThinkingConfig)
 
     # Module-based tool configuration
     #   List of tool provider locators using double-colon syntax for the tool class.
@@ -298,7 +298,7 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        if self.cfg.genevolution:
+        if self.cfg.parallel_thinking:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
             self.semaphore = asyncio.Semaphore(
                 self.cfg.max_concurrent_requests // self.llm.cfg.max_concurrent_requests
@@ -339,19 +339,19 @@ class GenerationTask:
         else:
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
-        if self.cfg.genevolution:
-            # Allow for overriding the temperature and tokens_to_generate for genevolution
-            genevolution_config = self.cfg.genevolution_config
+        if self.cfg.parallel_thinking:
+            # Allow for overriding the temperature and tokens_to_generate for parallel thinking
+            parallel_thinking_config = self.cfg.parallel_thinking_config
 
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
-                "remove_thinking": self.cfg.genevolution_config.remove_thinking,  # Removing thinking from solutions is important for genevolution. We don't want to override this with the main generation config
+                "remove_thinking": self.cfg.parallel_thinking_config.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
             }
 
-            llm = get_genevolution_model(
+            llm = get_parallel_thinking_model(
                 model=llm,
                 orig_prompt_filler=self.fill_prompt,  # Needed for prompt fillling
-                genevolution_config=genevolution_config,
+                parallel_thinking_config=parallel_thinking_config,
                 main_config=self.cfg,
                 inference_override_config=inference_override_config,
             )

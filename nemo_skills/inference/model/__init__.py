@@ -25,11 +25,9 @@ from .base import BaseModel
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .context_retry import ContextLimitRetryConfig
 from .gemini import GeminiModel
-
-# GenSelect
-from .genevolution import GenEvolutionConfig, GenEvolutionWrapper
 from .megatron import MegatronModel
 from .openai import OpenAIModel
+from .parallel_thinking import ParallelThinkingConfig, ParallelThinkingTask
 
 # Tool Calling
 from .tool_call import ToolCallingWrapper
@@ -70,28 +68,28 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_genevolution_model(
+def get_parallel_thinking_model(
     model,
     orig_prompt_filler,
-    genevolution_config=None,
+    parallel_thinking_config=None,
     main_config=None,
     inference_override_config=None,
 ):
-    """A helper function to create GenSelect model."""
-    # Merging priority: genselect_config, main config, any overrides from inference_override_config
+    """A helper function to create the Parallel Thinking model."""
+    # Merging priority: parallel_thinking_config, main config, any overrides from inference_override_config
     merge_config = {
-        **genevolution_config.__dict__,
+        **parallel_thinking_config.__dict__,
         **main_config.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
 
     # Filter to only include valid parameters
-    valid_params = {field.name for field in dataclasses.fields(GenEvolutionConfig)}
+    valid_params = {field.name for field in dataclasses.fields(ParallelThinkingConfig)}
     filtered_config = {key: value for key, value in merge_config.items() if key in valid_params}
 
-    genevolution_config = GenEvolutionConfig(**filtered_config)
+    parallel_thinking_config = ParallelThinkingConfig(**filtered_config)
 
-    return GenEvolutionWrapper(model=model, orig_prompt_filler=orig_prompt_filler, cfg=genevolution_config)
+    return ParallelThinkingTask(model=model, orig_prompt_filler=orig_prompt_filler, cfg=parallel_thinking_config)
 
 
 def get_tool_calling_model(
