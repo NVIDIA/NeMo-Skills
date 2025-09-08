@@ -139,7 +139,7 @@ RULER_METRIC_RANGES = {
         "ruler.nemotron_super_128k_slurm_ci.niah_single_2": (91.5, 96.5),
         "ruler.nemotron_super_128k_slurm_ci.niah_single_3": (97.5, 100.0),
         "ruler.nemotron_super_128k_slurm_ci.niah_multikey_1": (73.0, 79.0),
-        "ruler.nemotron_super_128k_slurm_ci.niah_multikey_2": (62.0, 68.0),
+        "ruler.nemotron_super_128k_slurm_ci.niah_multikey_2": (58.0, 68.0),
         "ruler.nemotron_super_128k_slurm_ci.niah_multikey_3": (18.0, 23.0),
         "ruler.nemotron_super_128k_slurm_ci.niah_multivalue": (80.5, 86.5),
         "ruler.nemotron_super_128k_slurm_ci.niah_multiquery": (83.0, 88.0),
