@@ -135,7 +135,7 @@ class GenEvolutionWrapper:
         if matches:
             return matches[-1]
         else:
-            return ""
+            return None
 
     def _format_solutions_for_genimprovement(self, solutions: List[Dict]) -> str:
         """Format solutions for GenSelect prompt."""
@@ -203,6 +203,12 @@ class GenEvolutionWrapper:
 
         # Step 3: Extract the synthesized solution from the GenSynthesis result
         synthesized_solution = self._extract_synthesized_solution(gensynthesis_result["generation"])
+        if synthesized_solution is None:
+            LOG.warning("GenSynthesis failed to produce valid solution, falling back to random selection")
+            synthesized_solution = local_random.choice(solutions)[self.cfg.comparison_key]
+            gensynthesis_result["new_solution"] = False
+        else:
+            gensynthesis_result["new_solution"] = True
 
         return {
             self.cfg.comparison_key: synthesized_solution,
@@ -357,6 +363,7 @@ class GenEvolutionWrapper:
             result["gensynthesis_num_generated_tokens"] = improved_solution["output_dict"].get(
                 "num_generated_tokens", 0
             )
+            result["gensynthesis_new_solution"] = improved_solution["output_dict"]["new_solution"]
             total_gen_tokens = total_num_generated_tokens + result["gensynthesis_num_generated_tokens"]
 
         result[self.cfg.comparison_key] = improved_solution[self.cfg.comparison_key]
