@@ -64,7 +64,7 @@ ns eval \
 ```
 
 The evaluation pipeline would first generate `window_size` solutions (8 by default), and then run GenSynthesis with these solutions in the prompt to synthesize a new solution.
-Note that the same model is being used for both solution generation and selection, which we refer to as **Self-GenSynthesis**.
+Note that the same model is being used for both solution generation and synthesis, which we refer to as **Self-GenSynthesis**.
 
 !!!tip
     Parallel Thinking inputs can consume a lot of tokens, especially for large `window_size` values.
