@@ -20,9 +20,7 @@ from pathlib import Path
 import tiktoken
 from datasets import load_dataset
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 """
 Usage
@@ -70,6 +68,7 @@ def generate_token_plots(n_tokens_list, input_tokens_list, token_differences, to
     """
     Generate plots showing the relationship between n_tokens and input_tokens
     """
+    import matplotlib.pyplot as plt
     print(f"Generating token analysis plots...")
     
     # Create figure with 2 subplots
