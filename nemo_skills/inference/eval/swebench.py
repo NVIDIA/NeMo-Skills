@@ -171,8 +171,6 @@ class SweBenchGenerationTask(GenerationTask):
         # Create logs directory if it doesn't exist
         logs_dir = self.output_dir / "apptainer_logs"
         logs_dir.mkdir(exist_ok=True)
-        log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}.log"
-        LOG.info("Starting execution of an apptainer command. Logs are available at %s", log_file_path)
 
         # Fix localhost URLs not working sometimes
         command = f"echo '127.0.0.1 localhost' >/etc/hosts && {command}"
@@ -187,6 +185,14 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Retry apptainer command up to max_retries times
         for attempt in range(max_retries):
+            log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}_attempt{attempt + 1}.log"
+            LOG.info(
+                "Starting execution of an apptainer command (attempt %d of %d). Logs are available at %s",
+                attempt + 1,
+                max_retries,
+                log_file_path,
+            )
+
             try:
                 # Stream output to log file as it appears
                 with open(log_file_path, "w") as log_file:
