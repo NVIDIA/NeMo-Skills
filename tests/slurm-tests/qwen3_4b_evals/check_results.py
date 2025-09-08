@@ -40,7 +40,7 @@ def check_toolcalling(bucket: str):
     for category_tuple, expected_range in TOOLCALLING_METRIC_RANGES.items():
         val = float(get_nested_value(data, category_tuple))
         lo, hi = expected_range
-    soft_assert(lo <= val <= hi, f"bfcl-v3 {category_tuple}={val} out of range [{lo},{hi}]")
+        soft_assert(lo <= val <= hi, f"bfcl-v3 {category_tuple}={val} out of range [{lo},{hi}]")
 
 
 def main():

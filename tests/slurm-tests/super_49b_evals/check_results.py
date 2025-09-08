@@ -181,7 +181,7 @@ def check_toolcalling(eval_dir: str, mode: str):
     for cat, path in TOOLCALLING_METRIC_PATHS.items():
         val = float(get_nested_value(data, path))
         lo, hi = TOOLCALLING_METRIC_RANGES[mode][cat]
-    soft_assert(lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]")
+        soft_assert(lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]")
 
 
 def check_ruler(eval_dir: str, mode: str):
@@ -190,7 +190,7 @@ def check_ruler(eval_dir: str, mode: str):
     for task in RULER_TASKS:
         val = float(data[task]["pass@1"]["accuracy"])
         lo, hi = RULER_METRIC_RANGES[mode][task]
-    soft_assert(lo <= val <= hi, f"RULER {task}={val} out of range [{lo},{hi}]")
+        soft_assert(lo <= val <= hi, f"RULER {task}={val} out of range [{lo},{hi}]")
 
 
 def main():
