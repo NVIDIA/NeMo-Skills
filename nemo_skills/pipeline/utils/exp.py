@@ -108,6 +108,12 @@ def get_sandbox_command(cluster_config):
     return "/start-with-nginx.sh"
 
 
+def get_search_command(cluster_config):
+    if cluster_config["executor"] == "none":
+        return "python -m nemo_skills.services.search.server --faiss_gpu"
+    return "python /app/server.py --faiss_gpu"
+
+
 @dataclass(kw_only=True)
 class CustomJobDetails(SlurmJobDetails):
     # we have 1 srun per sub-task (e.g. server/sandbox/main), but only a single sbatch
@@ -348,6 +354,8 @@ def add_task(
     with_sandbox=False,
     keep_mounts_for_sandbox=False,
     sandbox_port: int | None = None,
+    with_search_server=False,
+    search_server_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
     reuse_code: bool = True,
@@ -414,6 +422,9 @@ def add_task(
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
 
+    if search_server_port is None:
+        search_server_port = get_free_port(strategy="random")
+
     env_vars = get_env_variables(cluster_config)
     if cluster_config["executor"] != "none" and not skip_hf_home_check:
         if "HF_HOME" not in env_vars:
@@ -427,7 +438,7 @@ def add_task(
 
     het_group = 0
     het_group_indices = []
-    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
+    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox + with_search_server
 
     LOG.info("Adding a task with commands:")
 
@@ -480,7 +491,10 @@ def add_task(
         for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
             if cluster_config["executor"] != "slurm" and cur_tasks > 1:
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
-            with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
+            with temporary_env_update(
+                cluster_config,
+                {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port, "NEMO_SKILLS_SEARCH_SERVER_PORT": search_server_port},
+            ):
                 cur_cmd = install_packages_wrap(cur_cmd, installation_command)
                 commands.append(cur_cmd)
                 executors.append(
@@ -550,6 +564,44 @@ def add_task(
             het_group_indices.append(het_group)
         het_group += 1
         LOG.info("Sandbox command: %s", commands[-1])
+
+    # add search server.
+    if with_search_server:
+        with temporary_env_update(
+            cluster_config,
+            {
+                "SERVER_PORT": search_server_port,
+                ## FIXME(sanyamk): remove hard coded paths.
+                "INDEX_PATH": "/store/data/search/e5_Flat.index",
+                "CORPUS_PATH": "/store/data/search/wiki-18_subset.jsonl",
+            },
+        ):
+            commands.append(get_search_command(cluster_config))
+            search_executor = get_executor(
+                cluster_config=cluster_config,
+                container=cluster_config["containers"]["search"],
+                num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
+                tasks_per_node=1,
+                gpus_per_node=1,
+                partition=partition,
+                time_min=time_min,
+                dependencies=dependencies,
+                job_name=task_name,
+                log_dir=log_dir,
+                log_prefix="search",
+                extra_package_dirs=extra_package_dirs,
+                slurm_kwargs=slurm_kwargs,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
+                overlap=True,
+                with_ray=with_ray,
+            )
+            executors.append(search_executor)
+            het_group_indices.append(het_group)
+            het_group += 1
+
+            LOG.info("Search server command: %s", commands[-1])
 
     if cluster_config["executor"] != "none":
         tunnel = get_tunnel(cluster_config)
