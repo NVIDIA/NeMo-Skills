@@ -152,17 +152,9 @@ RULER_METRIC_RANGES = {
 }
 
 
-def detect_mode(name: str):
-    if "reasoning_on" in name:
-        return "reasoning_on"
-    if "reasoning_off" in name:
-        return "reasoning_off"
-    return None
-
-
-def check_reasoning(bucket: str, mode: str):
+def check_reasoning(eval_dir: str, mode: str):
     for bench in REASONING_TASKS:
-        f = os.path.join(bucket, "eval-results", bench, "metrics.json")
+        f = os.path.join(eval_dir, "eval-results", bench, "metrics.json")
         data = load_json(f)
         if bench in {"math-500", "aime24", "aime25", "gpqa", "livecodebench", "scicode"}:
             result_block = data[bench]["pass@1[avg-of-4]"]
@@ -183,8 +175,8 @@ def check_reasoning(bucket: str, mode: str):
             soft_assert(lo <= val <= hi, f"{bench}:{field}={val} out of range [{lo},{hi}]")
 
 
-def check_toolcalling(bucket: str, mode: str):
-    f = os.path.join(bucket, "eval-results", "bfcl_v3", "metrics.json")
+def check_toolcalling(eval_dir: str, mode: str):
+    f = os.path.join(eval_dir, "eval-results", "bfcl_v3", "metrics.json")
     data = load_json(f)
     for cat, path in TOOLCALLING_METRIC_PATHS.items():
         val = float(get_nested_value(data, path))
@@ -192,8 +184,8 @@ def check_toolcalling(bucket: str, mode: str):
     soft_assert(lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]")
 
 
-def check_ruler(bucket: str, mode: str):
-    f = os.path.join(bucket, "eval-results", "ruler.nemotron_super_128k_slurm_ci", "metrics.json")
+def check_ruler(eval_dir: str, mode: str):
+    f = os.path.join(eval_dir, "eval-results", "ruler.nemotron_super_128k_slurm_ci", "metrics.json")
     data = load_json(f)
     for task in RULER_TASKS:
         val = float(data[task]["pass@1"]["accuracy"])
@@ -206,20 +198,13 @@ def main():
     ap.add_argument("--workspace", required=True, help="Workspace directory containing eval results")
     args = ap.parse_args()
 
-    root = os.path.abspath(os.path.expanduser(args.workspace))
-    for bucket in sorted(os.listdir(root)):
-        bpath = os.path.join(root, bucket)
-        if not os.path.isdir(os.path.join(bpath, "eval-results")):
-            continue
-        mode = detect_mode(bucket)
-        if not mode:
-            continue
-        if "tool_calling" in bucket:
-            check_toolcalling(bpath, mode)
-        elif "ruler" in bucket:
-            check_ruler(bpath, mode)
-        else:
-            check_reasoning(bpath, mode)
+    eval_root = Path(args.workspace)
+
+    check_reasoning(eval_root / "reasoning_off", "reasoning_off")
+    check_reasoning(eval_root / "reasoning_on", "reasoning_on")
+    check_toolcalling(eval_root / "reasoning_on_tool_calling", "reasoning_on")
+    check_toolcalling(eval_root / "reasoning_off_tool_calling", "reasoning_off")
+    check_ruler(eval_root / "reasoning_off_ruler", "reasoning_off")
 
     assert_all()
     print("ALL CHECKS PASSED")
