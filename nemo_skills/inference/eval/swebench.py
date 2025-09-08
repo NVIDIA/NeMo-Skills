@@ -103,6 +103,8 @@ class SweBenchGenerationConfig:
 
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
+    no_dedicated_environments: bool = False
+
     inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
@@ -173,6 +175,17 @@ class SweBenchGenerationTask(GenerationTask):
         container_name = data_point["container_formatter"].format(
             instance_id=data_point["instance_id"].replace("__", "_1776_")
         )
+
+        if self.cfg.no_dedicated_environments:
+            command = (
+                f"rm -rf /testbed && "
+                f"git clone -o origin https://github.com/{data_point['repo']} /testbed && "
+                f"chmod -R 777 /testbed && "
+                f"cd /testbed && "
+                f"git reset --hard {data_point['base_commit']} && "
+                f"git remote remove origin && "
+                f"{command}"
+            )
 
         # Create logs directory if it doesn't exist
         logs_dir = self.output_dir / "apptainer_logs"
@@ -454,7 +467,16 @@ class SweBenchGenerationTask(GenerationTask):
         # Check if the trajectory has an empty patch before running evaluation
         has_patch = trajectory_dict["model_patch"] is not None
 
-        if not has_patch:
+        if self.cfg.no_dedicated_environments:
+            # Can't run evaluation in this case
+            report_json = {
+                data_point["instance_id"]: {
+                    "resolved": None,
+                    "patch_exists": has_patch,
+                    "patch_successfully_applied": None,
+                }
+            }
+        elif not has_patch:
             report_json = {
                 data_point["instance_id"]: {
                     "resolved": False,
