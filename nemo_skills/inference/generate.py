@@ -271,7 +271,7 @@ class GenerationTask:
             self.tokenizer = None
 
         # Setup litellm cache
-        if self.cfg.enable_litellm_cache:
+        if getattr(self.cfg, "enable_litellm_cache", False):
             # One cache per (output_file_name, chunk_id) pair
             output_file_name = Path(self.cfg.output_file).name
             self.litellm_cache_dir = (
@@ -587,7 +587,7 @@ class GenerationTask:
                 fout.write(json.dumps(gen_dict) + "\n")
 
         Path(self.cfg.output_file + "-async").unlink()
-        if self.cfg.enable_litellm_cache:
+        if getattr(self.cfg, "enable_litellm_cache", False):
             shutil.rmtree(self.litellm_cache_dir)
 
     def wait_for_server(self):
