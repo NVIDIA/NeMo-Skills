@@ -27,7 +27,7 @@ from .context_retry import ContextLimitRetryConfig
 from .gemini import GeminiModel
 
 # GenSelect
-from .gen_evolution import GenEvolutionConfig, GenEvolutionWrapper
+from .genevolution import GenEvolutionConfig, GenEvolutionWrapper
 from .megatron import MegatronModel
 from .openai import OpenAIModel
 
@@ -70,17 +70,17 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_genselect_model(
+def get_genevolution_model(
     model,
     orig_prompt_filler,
-    genselect_config=None,
+    genevolution_config=None,
     main_config=None,
     inference_override_config=None,
 ):
     """A helper function to create GenSelect model."""
     # Merging priority: genselect_config, main config, any overrides from inference_override_config
     merge_config = {
-        **genselect_config.__dict__,
+        **genevolution_config.__dict__,
         **main_config.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
@@ -89,9 +89,9 @@ def get_genselect_model(
     valid_params = {field.name for field in dataclasses.fields(GenEvolutionConfig)}
     filtered_config = {key: value for key, value in merge_config.items() if key in valid_params}
 
-    genselect_config = GenEvolutionConfig(**filtered_config)
+    genevolution_config = GenEvolutionConfig(**filtered_config)
 
-    return GenEvolutionWrapper(model=model, orig_prompt_filler=orig_prompt_filler, cfg=genselect_config)
+    return GenEvolutionWrapper(model=model, orig_prompt_filler=orig_prompt_filler, cfg=genevolution_config)
 
 
 def get_tool_calling_model(
