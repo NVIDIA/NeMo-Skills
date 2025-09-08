@@ -323,8 +323,9 @@ class GenEvolutionWrapper:
                 else:
                     filtered_solutions.append(solution)
 
-            LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
-            solutions = filtered_solutions
+            if len(filtered_solutions) < len(solutions):
+                LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
+                solutions = filtered_solutions
 
         if not solutions:
             return {
