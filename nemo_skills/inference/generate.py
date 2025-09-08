@@ -298,7 +298,7 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        if self.cfg.genselect:
+        if self.cfg.genevolution:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
             self.semaphore = asyncio.Semaphore(
                 self.cfg.max_concurrent_requests // self.llm.cfg.max_concurrent_requests
@@ -340,12 +340,12 @@ class GenerationTask:
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
         if self.cfg.genevolution:
-            # Allow for overriding the temperature and tokens_to_generate for genselect
+            # Allow for overriding the temperature and tokens_to_generate for genevolution
             genevolution_config = self.cfg.genevolution_config
 
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
-                "remove_thinking": self.cfg.genevolution_config.remove_thinking,  # Removing thinking from solutions is important for genselect. We don't want to override this with the main generation config
+                "remove_thinking": self.cfg.genevolution_config.remove_thinking,  # Removing thinking from solutions is important for genevolution. We don't want to override this with the main generation config
             }
 
             llm = get_genevolution_model(
