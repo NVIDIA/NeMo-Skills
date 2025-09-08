@@ -342,9 +342,19 @@ class GenEvolutionWrapper:
             chosen_solution_idx, genselect_result = await self._run_genselect(prompt, solutions, local_random)
             improved_solution = solutions[chosen_solution_idx]
             result["genselect_comparison"] = genselect_result["generation"]
+            # Add the tokens for genselect
+            result["genselect_num_generated_tokens"] = genselect_result.get("num_generated_tokens", 0)
+
+            # Add the tokens for all the solutions and genselect
+            total_gen_tokens = result["total_solution_generated_tokens"] + result["genselect_num_generated_tokens"]
+
         else:
             # GenSynthesis
             improved_solution = await self._run_gensynthesis(prompt, solutions, local_random)
+            result["gensynthesis_num_generated_tokens"] = improved_solution["output_dict"].get(
+                "num_generated_tokens", 0
+            )
+            total_gen_tokens = total_num_generated_tokens + result["gensynthesis_num_generated_tokens"]
 
         result[self.cfg.comparison_key] = improved_solution[self.cfg.comparison_key]
         result["solution_list"] = [solution[self.cfg.comparison_key] for solution in solutions]
@@ -352,12 +362,6 @@ class GenEvolutionWrapper:
         if self.cfg.comparison_key != "generation":
             # Add the generation key to the result since it's required by inference/generate.py
             result["generation"] = improved_solution["output_dict"]["generation"]
-
-        # Add the tokens for genselect
-        result["genselect_num_generated_tokens"] = genselect_result.get("num_generated_tokens", 0)
-
-        # Add the tokens for all the solutions and genselect
-        total_gen_tokens = result["total_solution_generated_tokens"] + result["genselect_num_generated_tokens"]
 
         # TODO: Decide what count of generated tokens do we want to report - the total or the best solution?
         # Current implementation returns the total number of generated tokens
