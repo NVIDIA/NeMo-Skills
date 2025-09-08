@@ -354,6 +354,7 @@ class GenEvolutionWrapper:
             chosen_solution_idx, genselect_result = await self._run_genselect(prompt, solutions, local_random)
             improved_solution = solutions[chosen_solution_idx]
             result["genselect_comparison"] = genselect_result["generation"]
+            result["genselect_selection_successful"] = genselect_result["selection_successful"]
             # Add the tokens for genselect
             result["genselect_num_generated_tokens"] = genselect_result.get("num_generated_tokens", 0)
 
@@ -364,6 +365,7 @@ class GenEvolutionWrapper:
             # GenSynthesis
             improved_solution = await self._run_gensynthesis(prompt, solutions, local_random)
             result["gensynthesis_generation"] = improved_solution["output_dict"]["generation"]
+            result["gensynthesis_synthesis_successful"] = improved_solution["output_dict"]["synthesis_successful"]
             result["gensynthesis_num_generated_tokens"] = improved_solution["output_dict"].get(
                 "num_generated_tokens", 0
             )
