@@ -152,7 +152,7 @@ After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-res
   }
 }
 ```
-Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate.
+Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate. To do that automatically, you can set `--benchmarks=swe-bench:N`, where N is your desired number of repeats.
 
 To evaluate the same model with SWE-agent,
 all you need to do is replace `openhands` with `swe_agent` in the command above.
