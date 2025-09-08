@@ -14,9 +14,12 @@
 
 
 import argparse
-import io
-import json
 import os
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))  # for utils.py
+from utils import get_nested_value, load_json  # noqa: E402
 
 REASONING_TASKS = [
     "math-500",
@@ -149,19 +152,6 @@ RULER_METRIC_RANGES = {
 }
 
 
-def load_json(path: str):
-    with io.open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def get_nested(d: dict, path):
-    for k in path:
-        if not isinstance(d, dict) or k not in d:
-            return None
-        d = d[k]
-    return d
-
-
 def detect_mode(name: str):
     if "reasoning_on" in name:
         return "reasoning_on"
@@ -170,17 +160,16 @@ def detect_mode(name: str):
     return None
 
 
-# ---------------- Assert-only checks ----------------
 def check_reasoning(bucket: str, mode: str):
     for bench in REASONING_TASKS:
         f = os.path.join(bucket, "eval-results", bench, "metrics.json")
         data = load_json(f)
         if bench in {"math-500", "aime24", "aime25", "gpqa", "livecodebench", "scicode"}:
-            result_block = get_nested(data[bench], ["pass@1[avg-of-4]"])
+            result_block = data[bench]["pass@1[avg-of-4]"]
         elif bench in {"mmlu-pro", "hle"}:
-            result_block = get_nested(data[bench], ["pass@1"])
+            result_block = data[bench]["pass@1"]
         else:
-            raise AssertionError(f"Unexpected benchmark: {bench}")
+            raise RuntimeError(f"Unexpected benchmark: {bench}")
 
         if bench in REASONING_BENCHMARKS_SCIENCE_HLE:
             for field in REASONING_REQUIRED_FIELDS[bench]:
@@ -198,7 +187,7 @@ def check_toolcalling(bucket: str, mode: str):
     f = os.path.join(bucket, "eval-results", "bfcl_v3", "metrics.json")
     data = load_json(f)
     for cat, path in TOOLCALLING_METRIC_PATHS.items():
-        val = float(get_nested(data, path))
+        val = float(get_nested_value(data, path))
         lo, hi = TOOLCALLING_METRIC_RANGES[mode][cat]
         assert lo <= val <= hi, f"TOOL {cat}={val} out of range [{lo},{hi}]"
 
@@ -212,10 +201,9 @@ def check_ruler(bucket: str, mode: str):
         assert lo <= val <= hi, f"RULER {task}={val} out of range [{lo},{hi}]"
 
 
-# ---------------- Main ----------------
 def main():
-    ap = argparse.ArgumentParser(description="Assert-only verifier: reasoning + tool-calling + ruler")
-    ap.add_argument("--workspace", required=True, help="Workspace root containing eval buckets")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--workspace", required=True, help="Workspace directory containing eval results")
     args = ap.parse_args()
 
     root = os.path.abspath(os.path.expanduser(args.workspace))
