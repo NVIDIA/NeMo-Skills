@@ -47,7 +47,6 @@ METRICS_MAP = {
     "swe-bench": SweBenchMetrics,
     "scicode": SciCodeMetrics,
     "mrcr": MRCRMetrics,
-    "aalcr": AALCRMetrics,
 }
 
 

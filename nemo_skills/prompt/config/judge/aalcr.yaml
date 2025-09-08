@@ -9,6 +9,6 @@ user: |-
 
     The question, for reference only: {question}
     The OFFICIAL ANSWER: {expected_answer}
-    CANDIDATE ANSWER TO ASSESS: {predicted_answer}
+    CANDIDATE ANSWER TO ASSESS: {generation}
 
     Reply only with CORRECT or INCORRECT.
