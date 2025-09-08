@@ -3,7 +3,7 @@
 GenEvolution encompasses methods that scale inference time via parallel sampling. The approach entails primarily two methods:
 
 
-- **GenSelect** is a generative Best-of-N method we introduced in the [OpenReasoning paper](https://arxiv.org/abs/2504.16891, followed by a more focused paper -- [GenSelect: A Generative Approach to Best-of-N](https://arxiv.org/abs/2507.17797). The method essentially uses an LLM to reason over and select the best candidate solution among the N candidates, leveraging LLMs' comparative strengths while scaling efficiently across parallel sampling budgets.
+- **GenSelect** is a generative Best-of-N method we introduced in the [OpenReasoning paper](https://arxiv.org/abs/2504.16891), followed by a more focused paper -- [GenSelect: A Generative Approach to Best-of-N](https://arxiv.org/abs/2507.17797). The method essentially uses an LLM to reason over and select the best candidate solution among the N candidates, leveraging LLMs' comparative strengths while scaling efficiently across parallel sampling budgets.
 
 - **GenSythesis** takes in the input candidate solutions and outputs a new solutions with the goal of improving over the input solutions.
 
