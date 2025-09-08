@@ -81,7 +81,7 @@ nav:
     - evaluation/tool-calling.md
     - evaluation/multilingual.md
     - evaluation/other-benchmarks.md
-  - Agentic Generation:
+  - Agentic Inference:
     - agentic_generation/tool_calling.md
     - agentic_generation/genevolution.md
   - Tutorials:
