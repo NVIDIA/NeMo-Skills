@@ -325,14 +325,15 @@ class GenEvolutionWrapper:
 
             if len(filtered_solutions) < len(solutions):
                 LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
-                solutions = filtered_solutions
+
+            solutions = filtered_solutions
 
         if not solutions:
             return {
                 self.cfg.comparison_key: "",
                 "solution_list": [],
-                "genselect_comparison": "",
-                "genselect_num_generated_tokens": 0,
+                f"{self.cfg.mode}_comparison": "",
+                f"{self.cfg.mode}_num_generated_tokens": 0,
                 "total_solution_generated_tokens": total_num_generated_tokens,
                 "num_generated_tokens": total_num_generated_tokens,  # No additional tokens for genselect
                 "num_best_solution_generated_tokens": 0,
@@ -352,6 +353,7 @@ class GenEvolutionWrapper:
         else:
             # GenSynthesis
             improved_solution = await self._run_gensynthesis(prompt, solutions, local_random)
+            result["gensynthesis_generation"] = improved_solution["output_dict"]["generation"]
             result["gensynthesis_num_generated_tokens"] = improved_solution["output_dict"].get(
                 "num_generated_tokens", 0
             )
