@@ -293,7 +293,7 @@ class ParallelThinkingTask:
             "parallel_thinking_result": gensynthesis_result,
         }
 
-    def _get_multiple_solutions(
+    async def _get_multiple_solutions(
         self, prompt: Union[str, List], local_random: random.Random, **kwargs
     ) -> tuple[List[Dict], int]:
         """Return multiple solutions for the input prompt."""
@@ -340,7 +340,7 @@ class ParallelThinkingTask:
         local_random = random.Random(kwargs.get("random_seed", 0))
 
         # Step 1: Get the multiple solutions
-        solutions, total_num_generated_tokens = self._get_multiple_solutions(prompt, local_random, **kwargs)
+        solutions, total_num_generated_tokens = await self._get_multiple_solutions(prompt, local_random, **kwargs)
         result["total_solution_generated_tokens"] = total_num_generated_tokens
 
         if not solutions:
