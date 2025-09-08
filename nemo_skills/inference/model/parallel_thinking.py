@@ -56,7 +56,7 @@ class ParallelThinkingConfig:
     chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
 
     # GenSelect vs GenSynthesis
-    mode: str = "genselect"  # genselect or gensynthesis
+    mode: str | None = None  # genselect or gensynthesis
 
     genselect: GenSelectSpecificConfig = GenSelectSpecificConfig()
     gensynthesis: GenSynthesisSpecificConfig = GenSynthesisSpecificConfig()
@@ -92,10 +92,12 @@ class ParallelThinkingTask:
             self.parallel_thinking_prompt = get_prompt(
                 prompt_config=self.cfg.genselect.prompt_config, tokenizer=tokenizer
             )
-        else:
+        elif self.cfg.mode == "gensynthesis":
             self.parallel_thinking_prompt = get_prompt(
                 prompt_config=self.cfg.gensynthesis.prompt_config, tokenizer=tokenizer
             )
+        else:
+            raise ValueError(f"Invalid parallel thinking mode: {self.cfg.mode}")
 
         # Initialize the solutions if input_dir is provided
         if self.cfg.generation_dir is not None:

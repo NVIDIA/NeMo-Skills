@@ -71,21 +71,21 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
 def get_parallel_thinking_model(
     model,
     orig_prompt_filler,
-    parallel_thinking_config=None,
+    parallel_thinking: ParallelThinkingConfig = None,
     main_config=None,
     inference_override_config=None,
 ):
     """A helper function to create the Parallel Thinking model."""
     # Merging priority: parallel_thinking_config, main config, any overrides from inference_override_config
-    merge_config = {
-        **parallel_thinking_config.__dict__,
+    merged_config = {
+        **parallel_thinking.__dict__,
         **main_config.__dict__,
         **(inference_override_config if inference_override_config is not None else {}),
     }
 
     # Filter to only include valid parameters
     valid_params = {field.name for field in dataclasses.fields(ParallelThinkingConfig)}
-    filtered_config = {key: value for key, value in merge_config.items() if key in valid_params}
+    filtered_config = {key: value for key, value in merged_config.items() if key in valid_params}
 
     parallel_thinking_config = ParallelThinkingConfig(**filtered_config)
 
