@@ -43,6 +43,9 @@ RUN cd /lean4/my_project && \
     /root/.elan/bin/lake exe cache get && \
     /root/.elan/bin/lake build
 
+RUN cd /lean4 && git clone https://github.com/leanprover-community/repl \
+    && cd repl && /root/.elan/bin/lake build
+
 # Set environment variables to include Lean project path
 ENV LEAN_PATH="/lean4/my_project"
 ENV PATH="/lean4/my_project:$PATH"

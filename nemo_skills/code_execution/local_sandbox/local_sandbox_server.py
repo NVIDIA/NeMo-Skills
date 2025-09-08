@@ -260,8 +260,12 @@ def execute_lean4(generated_code, timeout):
             temp_file.flush()  # Ensure data is written to disk
 
         # Use subprocess.Popen for more control
-        proc = subprocess.Popen(
-            ["lake", "env", "--dir", project_path, "lean", temp_file_name],
+        import json
+
+        proc = subprocess.run(
+            # ["lake", "env", "--dir", project_path, "lean", temp_file_name],
+            ["lake", "env", "/lean4/repl/.lake/build/bin/repl"],
+            input=json.dumps({"path": temp_file_name, "allTactics": True}).encode(),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=project_path,
@@ -270,7 +274,8 @@ def execute_lean4(generated_code, timeout):
 
         # Communicate with the process, which waits for it to finish
         # This will raise TimeoutExpired if the timeout is reached
-        stdout, stderr = proc.communicate(timeout=timeout)
+        stdout = proc.stdout if not hasattr(proc.stdout, "decode") else proc.stdout.decode("utf-8")
+        stderr = proc.stderr if not hasattr(proc.stderr, "decode") else proc.stderr.decode("utf-8")
 
         if proc.returncode == 0:
             process_status = "completed"
@@ -279,8 +284,8 @@ def execute_lean4(generated_code, timeout):
 
         return {
             "process_status": process_status,
-            "stdout": stdout.decode("utf-8"),
-            "stderr": stderr.decode("utf-8"),
+            "stdout": stdout,
+            "stderr": stderr,
         }
 
     except subprocess.TimeoutExpired:
