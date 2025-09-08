@@ -13,16 +13,15 @@
 # limitations under the License.
 
 import json
-from pathlib import Path
 
 
-def load_json(path: Path | str):
+def load_json(path):
     """Load a JSON file from the given path."""
     with open(path, "rt", encoding="utf-8") as f:
         return json.load(f)
 
 
-def get_nested_value(nested_dict: dict, nested_keys: tuple | list):
+def get_nested_value(nested_dict, nested_keys):
     for k in nested_keys:
         if not isinstance(nested_dict, dict) or k not in nested_dict:
             return None
@@ -31,8 +30,7 @@ def get_nested_value(nested_dict: dict, nested_keys: tuple | list):
     return nested_dict
 
 
-# --- Minimal soft-assert utilities ---
-_soft_assert_failures: list[str] = []
+_soft_assert_failures = []
 
 
 def soft_assert(condition: bool, message: str):
