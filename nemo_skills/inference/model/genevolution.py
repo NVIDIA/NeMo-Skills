@@ -113,7 +113,7 @@ class GenEvolutionWrapper:
         judgment = None
 
         try:
-            matches = re.findall(self.cfg.regex, generation)
+            matches = re.findall(self.cfg.genselect.regex, generation)
             if matches:
                 number = matches[-1]
                 judgment = int(number)
@@ -131,7 +131,7 @@ class GenEvolutionWrapper:
 
     def _extract_synthesized_solution(self, generation: str) -> str:
         """Extract the synthesized solution from the GenSynthesis result."""
-        matches = re.findall(self.cfg.gensynthesis.regex, generation)
+        matches = re.findall(self.cfg.gensynthesis.regex, generation, re.DOTALL)
         if matches:
             return matches[-1]
         else:
