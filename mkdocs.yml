@@ -83,7 +83,7 @@ nav:
     - evaluation/other-benchmarks.md
   - Agentic Generation:
     - agentic_generation/tool_calling.md
-    - agentic_generation/genselect.md
+    - agentic_generation/genevolution.md
   - Tutorials:
     - tutorials/index.md
   - Papers & Releases:
