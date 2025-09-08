@@ -21,7 +21,6 @@ import os
 import random
 import re
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 from nemo_skills.prompt.utils import get_prompt
@@ -32,13 +31,13 @@ from .base import BaseModel
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-@dataclass
+@nested_dataclass(kw_only=True)
 class GenSelectSpecificConfig:
     prompt_config: str = "generic/genselect"
     regex: str = r"Judg[e]?ment: (\d+)"
 
 
-@dataclass
+@nested_dataclass(kw_only=True)
 class GenSynthesisSpecificConfig:
     prompt_config: str = "generic/gensynthesis"
     regex: str = r"<NEW_SOLUTION>\n(.*?)\n</NEW_SOLUTION>"
