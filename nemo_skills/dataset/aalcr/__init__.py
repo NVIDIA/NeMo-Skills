@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'generic/default'
-DATASET_GROUP = 'long-context'
+PROMPT_CONFIG = "generic/default"
+DATASET_GROUP = "long-context"
 METRICS_TYPE = "answer-judgement"
 EVAL_ARGS = "++eval_type=math"
 GENERATION_ARGS = ""
@@ -24,4 +24,3 @@ JUDGE_PIPELINE_ARGS = {
     "server_gpus": 8,
 }
 JUDGE_ARGS = "++prompt_config=judge/aalcr ++generation_key=judgement ++add_generation_stats=False"
-

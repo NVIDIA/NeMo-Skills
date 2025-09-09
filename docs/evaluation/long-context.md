@@ -18,7 +18,7 @@ More details are coming soon!
 - Benchmark is defined in [`nemo_skills/dataset/aalcr/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/aalcr/__init__.py)
 - Original benchmark source is [here](https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning).
 
-Data preparation. You will need to get txt files using data_source_url or consult with AA. 
+Data preparation. You will need to get txt files using data_source_url or consult with AA.
 ```bash
 ns prepare_data \
     --data_dir=/workspace/ns-data \
@@ -26,7 +26,7 @@ ns prepare_data \
     aalcr --txt_file_folder=/workspace/do_not_share_data/lcr
 ```
 
-You can also prepare a subset of the data with limited context window. 
+You can also prepare a subset of the data with limited context window.
 ```bash
     --max_context_window 100000 --setup aalcr_100k
 ```
