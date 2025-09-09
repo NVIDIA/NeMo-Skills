@@ -64,86 +64,7 @@ def count_n_tokens(prompt: str, tokenizer_name: str) -> int:
     return len(enc.encode(prompt))
 
 
-def generate_token_plots(n_tokens_list, input_tokens_list, token_differences, tokenizer_name, output_dir):
-    """
-    Generate plots showing the relationship between n_tokens and input_tokens
-    """
-    import matplotlib.pyplot as plt
-    print(f"Generating token analysis plots...")
-    
-    # Create figure with 2 subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-    fig.suptitle(f'Token Analysis - {tokenizer_name}', fontsize=16)
-    
-    # Plot 1: Scatter plot of n_tokens vs input_tokens
-    ax1.scatter(input_tokens_list, n_tokens_list, alpha=0.6, s=20)
-    ax1.plot([min(input_tokens_list), max(input_tokens_list)], 
-             [min(input_tokens_list), max(input_tokens_list)], 'r--', alpha=0.8, label='y=x line')
-    ax1.set_xlabel('Input Tokens')
-    ax1.set_ylabel('N Tokens')
-    ax1.set_title('N Tokens vs Input Tokens')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    
-    # Plot 2: Histogram of token differences
-    ax2.hist(token_differences, bins=50, alpha=0.7, edgecolor='black')
-    ax2.set_xlabel('Token Difference (n_tokens - input_tokens)')
-    ax2.set_ylabel('Frequency')
-    ax2.set_title('Distribution of Token Differences')
-    ax2.axvline(np.mean(token_differences), color='red', linestyle='--', 
-                label=f'Mean: {np.mean(token_differences):.1f}')
-    ax2.axvline(np.median(token_differences), color='orange', linestyle='--', 
-                label=f'Median: {np.median(token_differences):.1f}')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    # Add statistics text
-    stats_text = f"""Statistics:
-    Mean difference: {np.mean(token_differences):.1f}
-    Median difference: {np.median(token_differences):.1f}
-    Std deviation: {np.std(token_differences):.1f}
-    Min difference: {np.min(token_differences)}
-    Max difference: {np.max(token_differences)}
-    Total samples: {len(token_differences)}"""
-    
-    fig.text(0.02, 0.02, stats_text, fontsize=10, verticalalignment='bottom',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    
-    plt.tight_layout()
-    
-    # Save the plot
-    plot_filename = output_dir / f'token_analysis_{tokenizer_name}.png'
-    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
-    print(f"Plot saved to: {plot_filename}")
-    
-    # Show the plot
-    plt.show()
-    
-    # Print summary statistics
-    print(f"\n=== Token Analysis Summary ===")
-    print(f"Tokenizer: {tokenizer_name}")
-    print(f"Total samples processed: {len(token_differences)}")
-    print(f"Mean token difference: {np.mean(token_differences):.2f}")
-    print(f"Median token difference: {np.median(token_differences):.2f}")
-    print(f"Standard deviation: {np.std(token_differences):.2f}")
-    print(f"Min difference: {np.min(token_differences)}")
-    print(f"Max difference: {np.max(token_differences)}")
-    print(f"Range: {np.max(token_differences) - np.min(token_differences)}")
-    
-    # Calculate percentiles
-    percentiles = [10, 25, 50, 75, 90, 95, 99]
-    print(f"\nPercentiles:")
-    for p in percentiles:
-        print(f"  {p}th percentile: {np.percentile(token_differences, p):.1f}")
-    
-    return plot_filename
-
-
-def write_data_to_file(output_file, data, txt_file_folder, max_context_window, tokenizer_name, generate_plots=False):
-    # Lists to collect data for plotting
-    n_tokens_list = []
-    input_tokens_list = []
-    token_differences = []
+def write_data_to_file(output_file, data, txt_file_folder, max_context_window, tokenizer_name):
     
     with open(output_file, "wt", encoding="utf-8") as fout:
         for idx, entry in tqdm(enumerate(data), desc=f"Writing {output_file.name}"):
@@ -181,22 +102,11 @@ def write_data_to_file(output_file, data, txt_file_folder, max_context_window, t
             entry['expected_judgement'] = 'correct' # for judgement metric
             # remove unused columns
             entry.pop("data_source_urls")
-            
-            # Collect data for plotting
-            input_tokens = entry["input_tokens"]
-            token_diff = n_tokens - input_tokens
-            n_tokens_list.append(n_tokens)
-            input_tokens_list.append(input_tokens)
-            token_differences.append(token_diff)
-            
+
             json.dump(entry, fout)
             fout.write("\n")
-    
-    # Generate plots after processing all data
-    if generate_plots and n_tokens_list and input_tokens_list:
-        generate_token_plots(n_tokens_list, input_tokens_list, token_differences, tokenizer_name, output_file.parent)
-
-def get_aalcr_data(txt_file_folder, max_context_window, setup, tokenizer_name, generate_plots=False):
+            
+def get_aalcr_data(txt_file_folder, max_context_window, setup, tokenizer_name):
     dataset = load_dataset("ArtificialAnalysis/AA-LCR")['train'] # testset but named as train
     
     data_dir = Path(__file__).absolute().parent
@@ -208,7 +118,7 @@ def get_aalcr_data(txt_file_folder, max_context_window, setup, tokenizer_name, g
         raise ValueError("txt_file_folder is required. Please consult with AA or process using data_source_urls")
 
     output_file = data_dir / f"{setup}.jsonl"
-    write_data_to_file(output_file, dataset, txt_file_folder, max_context_window, tokenizer_name, generate_plots)
+    write_data_to_file(output_file, dataset, txt_file_folder, max_context_window, tokenizer_name)
 
 
 if __name__ == "__main__":
@@ -237,14 +147,9 @@ if __name__ == "__main__":
         default="cl100k_base",
         help="tokenizer name",
     )
-    parser.add_argument(
-        "--generate_plots",
-        action="store_true",
-        help="Generate token analysis plots",
-    )
     
     args = parser.parse_args()
 
     print(f"Preparing AA-LCR dataset with sadditional arguments: {args}")
-    get_aalcr_data(args.txt_file_folder, args.max_context_window, args.setup, args.tokenizer_name, args.generate_plots)
+    get_aalcr_data(args.txt_file_folder, args.max_context_window, args.setup, args.tokenizer_name)
     print(f"AA-LCR dataset preparation with setup {args.setup} completed. Use --split=${args.setup} to evaluate!")
