@@ -91,9 +91,9 @@ def extract_code_block(text: str, languages=None) -> str:
     if languages is None:
         languages = [""]
     for language in languages:
-        match = re.search(rf"```{language}\s*\n?(.*?)\n?```", text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        matches = re.findall(rf"```{language}\s*\n?(.*?)\n?```", text, re.DOTALL)
+        if matches:
+            return matches[-1].strip()
     return ""
 
 
