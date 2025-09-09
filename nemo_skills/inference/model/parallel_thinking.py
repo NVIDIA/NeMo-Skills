@@ -20,6 +20,7 @@ import logging
 import os
 import random
 import re
+from dataclasses import field
 from collections import defaultdict
 from typing import Dict, List, Optional, Union
 
@@ -58,8 +59,8 @@ class ParallelThinkingConfig:
     # GenSelect vs GenSynthesis
     mode: str | None = None  # genselect or gensynthesis
 
-    genselect: GenSelectSpecificConfig = GenSelectSpecificConfig()
-    gensynthesis: GenSynthesisSpecificConfig = GenSynthesisSpecificConfig()
+    genselect: GenSelectSpecificConfig = field(default_factory=GenSelectSpecificConfig)
+    gensynthesis: GenSynthesisSpecificConfig = field(default_factory=GenSynthesisSpecificConfig)
 
     # Solution related parameters
     window_size: int = 8  # Number of solutions compared in a single request
