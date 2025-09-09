@@ -31,6 +31,7 @@ class IOIEvaluatorConfig:
     test_batch_size: int = 5  # number of tests to run concurrently
     # where test cases are stored in automatically mounted eval datasets folder.
     test_file: str = "/eval_dataset/ioi/test_metadata.json"
+    overwrite: bool = False
 
 
 # A dedicated event loop for all synchronous sandbox operations in the main process.
@@ -253,132 +254,158 @@ def eval_ioi(cfg):
     pool = multiprocessing.Pool(processes=batch_size, initializer=init_worker, initargs=(sandbox,))
 
     for jsonl_file in unroll_files(cfg.input_files):
-        samples = []
+        all_samples = []
         with open(jsonl_file) as f:
             for line in f:
                 sample = json.loads(line)
-                samples.append(sample)
+                all_samples.append(sample)
 
-        if len(samples) == 0:
+        if len(all_samples) == 0:
             raise ValueError(
                 f"No samples found in the file {jsonl_file}.\n"
                 f"Make sure the file contains jsonl data with 'codes' key which is a list containing "
                 f"individual code samples."
             )
 
+        for sample in all_samples:
+            if 'eval_status' not in sample:
+                sample['eval_status'] = {'complete': False, 'eval_error_log': []}
+
+        if not eval_config.overwrite:
+            samples = [s for s in all_samples if not s['eval_status']['complete']]
+        else:
+            samples = all_samples
+
+        print(f"Processing {len(samples)} entries that have not been evaluated")
+
         outputs = []
         # Cache for precompiled grader dirs keyed by IOI problem id
         precompiled_cache: Dict[str, str] = {}
 
         for x, entry in enumerate(samples):
-            print(f"Evaluating {x}/{len(samples)}")
-            completion = extract_final_cpp_block(entry['generation'])
-            completion = add_includes(completion, entry['ioi_id'])
+            try:
+                print(f"Evaluating {x}/{len(samples)}")
+                completion = extract_final_cpp_block(entry['generation'])
+                completion = add_includes(completion, entry['ioi_id'])
 
-            pid = entry['ioi_id']
-            if pid not in precompiled_cache:
-                precompiled_cache[pid] = _precompile_grader(
-                    problem_name=pid,
-                    grader_files=entry['grader_files'],
-                    compile_code=entry['compile'],
-                    run_code=entry['run'],
-                    sandbox=sandbox,
-                )
-            pre_dir = precompiled_cache[pid]
+                pid = entry['ioi_id']
+                if pid not in precompiled_cache:
+                    precompiled_cache[pid] = _precompile_grader(
+                        problem_name=pid,
+                        grader_files=entry['grader_files'],
+                        compile_code=entry['compile'],
+                        run_code=entry['run'],
+                        sandbox=sandbox,
+                    )
+                pre_dir = precompiled_cache[pid]
 
-            test_case_results = {}
-            problem_name = entry['name']
-            problem_metadata = metadata[problem_name]
+                test_case_results = {}
+                problem_name = entry['name']
+                problem_metadata = metadata[problem_name]
 
-            # -------------------------------------------------------------
-            # Batch tests across *all* subtasks so that each pool invocation
-            # works on a larger chunk, making the `test_batch_size` flag
-            # meaningful and speeding up evaluation.
-            # -------------------------------------------------------------
+                # -------------------------------------------------------------
+                # Batch tests across *all* subtasks so that each pool invocation
+                # works on a larger chunk, making the `test_batch_size` flag
+                # meaningful and speeding up evaluation.
+                # -------------------------------------------------------------
 
-            # 1. Flatten all tests and create per-subtask bookkeeping.
-            all_tests = []  # (subtask_name, test_name, test_data)
-            subtask_state = {}
-            for subtask, subtask_data in problem_metadata.items():
-                subtask_state[subtask] = {
-                    "score": subtask_data['score'],
-                    "precision": subtask_data['score_precision'],
-                    "outputs": [],
-                    "scores": [],
-                    "passed": True,
-                }
-                for test_name, test_data in subtask_data['tests'].items():
-                    all_tests.append((subtask, test_name, test_data))
-
-            # 2. Walk through the flattened list in chunks of `batch_size`.
-            for i in range(0, len(all_tests), batch_size):
-                # Filter out tests whose subtask already failed.
-                batch = [t for t in all_tests[i : i + batch_size] if subtask_state[t[0]]["passed"]]
-                if not batch:
-                    continue
-
-                tasks = []
-                for _, _, test_data in batch:
-                    # prepare precompiled dir
-                    task_args = {
-                        "generated_code": completion,
-                        "problem_id": pid,
-                        "precompiled_dir": pre_dir,
-                        "test_input": test_data['input'],
-                        "test_output": test_data['output'],
+                # 1. Flatten all tests and create per-subtask bookkeeping.
+                all_tests = []  # (subtask_name, test_name, test_data)
+                subtask_state = {}
+                for subtask, subtask_data in problem_metadata.items():
+                    subtask_state[subtask] = {
+                        "score": subtask_data['score'],
+                        "precision": subtask_data['score_precision'],
+                        "outputs": [],
+                        "scores": [],
+                        "passed": True,
                     }
-                    # local_idx is irrelevant after flattening
-                    tasks.append((task_args, 0))
+                    for test_name, test_data in subtask_data['tests'].items():
+                        all_tests.append((subtask, test_name, test_data))
 
-                results = pool.starmap(run_test_case, tasks)
+                # 2. Walk through the flattened list in chunks of `batch_size`.
+                for i in range(0, len(all_tests), batch_size):
+                    # Filter out tests whose subtask already failed.
+                    batch = [t for t in all_tests[i : i + batch_size] if subtask_state[t[0]]["passed"]]
+                    if not batch:
+                        continue
 
-                # 3. Scatter results back to the corresponding subtask.
-                for (subtask, test_name, _), result in zip(batch, results):
-                    st = subtask_state[subtask]
-                    result_with_name = dict(result)
-                    result_with_name['test_name'] = test_name
-                    st['outputs'].append(result_with_name)
-                    st['scores'].append(float(result['score']))
-                    if float(result['score']) == 0.0:
-                        st['passed'] = False
+                    tasks = []
+                    for _, _, test_data in batch:
+                        # prepare precompiled dir
+                        task_args = {
+                            "generated_code": completion,
+                            "problem_id": pid,
+                            "precompiled_dir": pre_dir,
+                            "test_input": test_data['input'],
+                            "test_output": test_data['output'],
+                        }
+                        # local_idx is irrelevant after flattening
+                        tasks.append((task_args, 0))
 
-                    # If compilation failed, surface the compiler output for easy debugging.
-                    if not result.get("compile_success", True):
-                        print(
-                            f"Compile failed for problem '{problem_name}', test '{test_name}':\n"
-                            f"--- STDOUT ---\n{result.get('compile_stdout', '').strip()}\n"
-                            f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
-                        )
-                    # Also surface runtime stderr if test failed (score 0) and stderr is non-empty
-                    elif float(result['score']) == 0.0 and result.get('run_stderr'):
-                        print(
-                            f"Runtime error for problem '{problem_name}', test '{test_name}':\n"
-                            f"--- STDOUT ---\n{result.get('run_stdout', '').strip()}\n"
-                            f"--- STDERR ---\n{result.get('run_stderr', '').strip()}\n"
-                        )
+                    results = pool.starmap(run_test_case, tasks)
 
-            # 4. Compute per-subtask scores and build `test_case_results`.
-            for subtask, st in subtask_state.items():
-                if st['scores']:
-                    effective_score = round(min(st['scores']) * st['score'], st['precision'])
-                else:
-                    effective_score = 0.0
-                test_case_results[subtask] = {
-                    "score": effective_score,
-                    "outputs": st['outputs'],
-                }
+                    # 3. Scatter results back to the corresponding subtask.
+                    for (subtask, test_name, _), result in zip(batch, results):
+                        st = subtask_state[subtask]
+                        result_with_name = dict(result)
+                        result_with_name['test_name'] = test_name
+                        st['outputs'].append(result_with_name)
+                        st['scores'].append(float(result['score']))
+                        if float(result['score']) == 0.0:
+                            st['passed'] = False
 
-            outputs.append(
-                {
-                    "name": entry['name'],
-                    "subtask": entry['subtask'],
-                    "test_case_results": test_case_results,
-                }
-            )
+                        # If compilation failed, surface the compiler output for easy debugging.
+                        if not result.get("compile_success", True):
+                            print(
+                                f"Compile failed for problem '{problem_name}', test '{test_name}':\n"
+                                f"--- STDOUT ---\n{result.get('compile_stdout', '').strip()}\n"
+                                f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
+                            )
+                        # Also surface runtime stderr if test failed (score 0) and stderr is non-empty
+                        elif float(result['score']) == 0.0 and result.get('run_stderr'):
+                            print(
+                                f"Runtime error for problem '{problem_name}', test '{test_name}':\n"
+                                f"--- STDOUT ---\n{result.get('run_stdout', '').strip()}\n"
+                                f"--- STDERR ---\n{result.get('run_stderr', '').strip()}\n"
+                            )
+
+                # 4. Compute per-subtask scores and build `test_case_results`.
+                for subtask, st in subtask_state.items():
+                    if st['scores']:
+                        effective_score = round(min(st['scores']) * st['score'], st['precision'])
+                    else:
+                        effective_score = 0.0
+                    test_case_results[subtask] = {
+                        "score": effective_score,
+                        "outputs": st['outputs'],
+                    }
+
+                outputs.append(
+                    {
+                        "name": entry['name'],
+                        "subtask": entry['subtask'],
+                        "test_case_results": test_case_results,
+                        "eval_status": {'complete': True, 'eval_error_log': []},
+                    }
+                )
+            except Exception as e:
+                error_msg = f"Error evaluating {entry.get('name', 'unknown')}: {str(e)}"
+                print(error_msg)
+                outputs.append(
+                    {
+                        "name": entry['name'],
+                        "subtask": entry['subtask'],
+                        "test_case_results": {},
+                        "eval_status": {'complete': False, 'eval_error_log': [error_msg]},
+                    }
+                )
 
         for s, o in zip(samples, outputs):
             s['test_case_results'] = o['test_case_results']
-        jdump(samples, jsonl_file, mode='wt')
+            s['eval_status'] = o['eval_status']
+
+        jdump(all_samples, jsonl_file, mode='wt')
 
         total_passed = 0
         total_problems = len(outputs)
