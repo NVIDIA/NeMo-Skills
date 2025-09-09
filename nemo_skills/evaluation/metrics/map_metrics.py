@@ -33,7 +33,7 @@ from nemo_skills.evaluation.metrics.simpleqa_metrics import SimpleQAMetrics
 METRICS_MAP = {
     "math": MathMetrics,
     "hle": functools.partial(MathMetrics, compute_no_answer=False, answer_key="generation"),
-    "simpleqa": SimpleQAMetrics,
+    "simpleqa": functools.partial(SimpleQAMetrics, compute_no_answer=False),
     "lean4-proof": Lean4Metrics,
     "lean4-statement": Lean4Metrics,
     "answer-judgement": AnswerJudgementMetrics,
