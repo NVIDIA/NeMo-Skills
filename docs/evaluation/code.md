@@ -112,10 +112,10 @@ SWE-bench requires models to call custom tools. By default SWE-agent & OpenHands
 
 For more details and the list of supported parsers, see the docs: [VLLM](https://docs.vllm.ai/en/stable/features/tool_calling.html#automatic-function-calling), [SGLang](https://docs.sglang.ai/advanced_features/function_calling.html).
 
-In addition, both SWE-agent and OpenHands can run without native tool calling. This means the tool calls will be parsed by the agentic framework itself. To try this out:
+In addition, both SWE-agent and OpenHands can run without native tool calling. This means the tool calls will be parsed by the agentic framework itself. To try this out, you can use the following configs with the `++agent_config` parameter:
 
-- for SWE-agent you can use the [config for SWE-agent-LM-32B](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/swe-agent-lm-32b.yaml) with `++agent_config=eval/swe-bench/swe-agent/swe-agent-lm-32b`
-- for OpenHands you can use the [`no-native-tool-calling` config](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/openhands/no-native-tool-calling.toml) with `++agent_config=eval/swe-bench/openhands/no-native-tool-calling`
+- for SWE-agent: [eval/swe-bench/swe-agent/swe-agent-lm-32b](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/swe-agent-lm-32b.yaml). This was the config used for [SWE-agent-LM-32B](https://huggingface.co/SWE-bench/SWE-agent-LM-32B). Note that there are significant differences with the default config.
+- for OpenHands: [eval/swe-bench/openhands/no-native-tool-calling](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/openhands/no-native-tool-calling.toml). This simply sets `native_tool_calling` to `false`.
 
 Keep in mind that by default the tool call format expected by these frameworks will likely be different from the one that the model was trained on.
 
