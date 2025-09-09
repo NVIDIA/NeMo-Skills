@@ -245,14 +245,14 @@ class Sandbox(abc.ABC):
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             return "timeout"
-        if output.get("process_status") == "completed":
-            stdout = (output.get("stdout") or "").lower()
-            stderr = (output.get("stderr") or "").lower()
+        if output["process_status"] == "completed":
+            stdout = output["stdout"].lower()
+            stderr = output["stderr"].lower()
             combined = stdout + "\n" + stderr
             if re.search(r"\bsorry\b", combined) is not None:
                 return "has_sorry"
             return "completed"
-        return output.get("process_status", "error")
+        return output["process_status"]
 
     async def batch_evaluate_results(
         self,
