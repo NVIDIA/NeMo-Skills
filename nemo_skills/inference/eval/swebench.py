@@ -160,6 +160,12 @@ class SweBenchGenerationTask(GenerationTask):
     def setup_llm(self):
         return
 
+    def setup_litellm_cache(self):
+        return
+
+    def cleanup_litellm_cache(self):
+        return
+
     async def _execute_container_command(
         self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
     ):
