@@ -21,8 +21,8 @@ chat_template_kwargs: null
 system_message: null  # can be used to override default from the tokenizer
 
 # Problem params
-min_problem_length: 0
-max_problem_length: 1024
+min_problem_length: null
+max_problem_length: null
 
 input_key: problem
 

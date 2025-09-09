@@ -30,12 +30,12 @@ system_message: null  # can be used to override default from the tokenizer
 assistant_end: null  # can be used to not use jinja and just add this suffix
 
 # Problem params
-min_problem_length: 0
-max_problem_length: 1024
+min_problem_length: null
+max_problem_length: null
 
 # Solution params
-min_solution_length: 0
-max_solution_length: 2048
+min_solution_length: null
+max_solution_length: null
 use_chars_for_min_length: false
 
 
