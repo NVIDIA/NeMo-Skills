@@ -264,7 +264,7 @@ class Sandbox(abc.ABC):
         final_answer_key: str = "**FINAL ANSWER**",
         restate_formal_statement: bool = True,
         strip_theorem_from_proof: bool = True,
-        code_block_from: str = "last",
+        extract_code_mode: str = "last",
     ):
         """Evaluate results and write back to original files."""
 
@@ -283,7 +283,7 @@ class Sandbox(abc.ABC):
             if answer_format == "lean4-proof":
                 if not use_predicted_proof_key:
                     generation = clean_formal_generation(
-                        line_dict["generation"], final_answer_key=final_answer_key, code_block_from=code_block_from
+                        line_dict["generation"], final_answer_key=final_answer_key, extract_code_mode=extract_code_mode
                     )
                     line_dict["predicted_proof"] = (
                         line_dict["header"]
@@ -300,7 +300,7 @@ class Sandbox(abc.ABC):
                         )
             elif answer_format == "lean4-statement":
                 if not use_predicted_proof_key:
-                    generation = clean_formal_generation(line_dict["generation"], code_block_from=code_block_from)
+                    generation = clean_formal_generation(line_dict["generation"], extract_code_mode=extract_code_mode)
                     header = get_lean4_header()
                     line_dict["predicted_proof"] = header + generation + "\n sorry"
                 else:
