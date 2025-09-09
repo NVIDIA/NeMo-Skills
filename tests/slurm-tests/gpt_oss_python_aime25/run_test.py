@@ -67,7 +67,7 @@ def main():
     )
 
     # schedule a dependent check job on the cluster and check if the results are as expected
-    checker_cmd = f"python tests/slurm-tests/gpt-oss-python/check_results.py --workspace {args.workspace} "
+    checker_cmd = f"python tests/slurm-tests/gpt_oss_python_aime25/check_results.py --workspace {args.workspace} "
 
     run_cmd(
         ctx=wrap_arguments(checker_cmd),

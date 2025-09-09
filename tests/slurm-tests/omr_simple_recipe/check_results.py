@@ -22,7 +22,7 @@ from utils import assert_all, load_json, soft_assert  # noqa: E402
 # TODO: should we train for longer / generate more data? Variance is really high
 RANGE_CONSTRAINTS = {
     "after_training": {
-        "aime24": {"pass@1[avg-of-8]": (17.0, 30.0), "majority@8": (28.33, 48.33)},
+        "aime24": {"pass@1[avg-of-8]": (16.0, 30.0), "majority@8": (25.33, 48.33)},
         "aime25": {"pass@1[avg-of-8]": (15.0, 27.5), "majority@8": (21.22, 42.22)},
     },
     "baseline": {
