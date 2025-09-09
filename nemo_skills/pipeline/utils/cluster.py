@@ -198,7 +198,7 @@ def get_cluster_config(cluster=None, config_dir=None):
 
         # either using the provided config_dir or getting from env var
         config_dir = config_dir or os.environ.get("NEMO_SKILLS_CONFIG_DIR")
-        if config_dir:
+        if (Path(config_dir) / f"{cluster}.yaml").exists():
             return read_config(Path(config_dir) / f"{cluster}.yaml")
 
         # if it's not defined we are trying to find locally
