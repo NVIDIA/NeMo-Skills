@@ -10,10 +10,8 @@ exclude_optional_keys: true # exclude keys other than input, output and expected
 metadata: null  # can provide additional metadata to store (e.g. dataset or generation_type)
 skip_first: 0  # useful for skipping validation set from train_full generation (it's always first)
 
-downsampling_method: null  # fair, random or null
 random_seed: 42
 do_shuffle: true
-num_output_samples: null
 
 prompt_config: null
 # Needed to format the data and also for length-based filtering
@@ -53,13 +51,9 @@ processors:
     should_run: ${filters.drop_incorrect_code_blocks}
     output_key: ${output_key}
     test_cases:
-      - {input: {output: "Solution ```python\ndef hello()``` Second code ```python\n"}, output: null}
-      - {input: {output: "Solution ```python\ndef hello()```"}, output: {output: "Solution ```python\ndef hello()```"}}
-      - {input: {output: "She had python\ndef hello()```"}, output: null}
-
-  - _target_: sdp.processors.RenameFields
-    rename_fields:
-      input: question  # we need to match llama3/codegen_sft format which uses 'question' as input key
+      - { input: { output: "Solution ```python\ndef hello()``` Second code ```python\n" }, output: null }
+      - { input: { output: "Solution ```python\ndef hello()```" }, output: { output: "Solution ```python\ndef hello()```" } }
+      - { input: { output: "She had python\ndef hello()```" }, output: null }
 
   - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveLenOutliers
     should_run: ${filters.remove_len_outlier_inputs}
@@ -76,11 +70,16 @@ processors:
     tokenizer: ${tokenizer}
     use_chars_for_min_length: ${use_chars_for_min_length}
 
+  - _target_: nemo_skills.training.data_preparation_utils.preprocessing.GroupSamples
+    group_key: ${input_key}
+
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.ShuffleAndDownsampleData
-    num_samples: ${num_output_samples}
-    sampling_method: ${downsampling_method}
     random_seed: ${random_seed}
     do_shuffle: ${do_shuffle}
+
+  - _target_: sdp.processors.RenameFields
+    rename_fields:
+      input: question  # we need to match llama3/codegen_sft format which uses 'question' as input key
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalSftManifest
     output_manifest_file: ${output_path}

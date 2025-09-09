@@ -49,7 +49,7 @@ processors:
     input_key: ${input_key}
     skip_first: ${skip_first}
     deduplicate: ${deduplicate}
-    keys_to_keep:  # input/output/symbolic_correct/judgement are automatically added
+    keys_to_keep: # input/output/symbolic_correct/judgement are automatically added
       - "expected_answer"
       - "total_votes"
       - "majority_votes"
@@ -61,7 +61,7 @@ processors:
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfEqual
         should_run: ${filters.drop_none_answers}
         key: expected_answer
-        values: [null, ""]
+        values: [ null, "" ]
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveContaminated
         should_run: ${filters.remove_contaminated}
