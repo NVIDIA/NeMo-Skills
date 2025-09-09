@@ -57,7 +57,7 @@ class SweBenchInferenceConfig:
 # Converts the parameter names above to the corresponding OpenAI parameter names.
 NS_TO_OPENAI_PARAM = {
     # Officially part of the OpenAI Chat Completions API.
-    "tokens_to_generate": "max_tokens",
+    "tokens_to_generate": "max_completion_tokens",
     "top_logprobs": "top_logprobs",
     "random_seed": "seed",
     # Not in the official API, but still supported by some servers, e.g. vllm.
