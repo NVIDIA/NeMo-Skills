@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from nemo_skills.evaluation.metrics.base import BaseMetrics
 from collections import defaultdict
+
+from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 
 class IOIMetrics(BaseMetrics):
@@ -21,6 +22,7 @@ class IOIMetrics(BaseMetrics):
         self.reset()
 
     def update(self, predictions):
+        super().update(predictions)
         if len(predictions) > 1:
             self.max_k = len(predictions)
             self.agg_mode = f"pass@{len(predictions)}"
@@ -48,59 +50,33 @@ class IOIMetrics(BaseMetrics):
                 subtask_scores[subtask] = max(subtask_scores[subtask], result["score"])
         return sum(subtask_scores.values()), subtask_scores
 
-    def simulate_round_robin_score(self, submissions) -> float:
-        """
-        Computes a round robin score for a problem.
-        The procedure is as follows:
-         1. For each submission, compute an aggregate score (sum of subtask scores).
-         2. Sort submissions in descending order by the aggregate score.
-         3. Select up to 50 submissions.
-         4. For each subtask, take the maximum score among the selected submissions.
-         5. Return the sum of these maximum subtask scores.
-        """
-        if not submissions:
-            return 0.0
-
-        # compute an aggregate score per submission
-        for submission in submissions:
-            aggregate_score = sum(result["score"] for result in submission["test_case_results"].values())
-            submission["_aggregate_score"] = aggregate_score
-
-        # sort submissions in descending order by aggregate score
-        sorted_submissions = sorted(submissions, key=lambda s: s["_aggregate_score"], reverse=True)
-        # Select up to 50 submissions.
-        selected = sorted_submissions[:50]
-
-        # for each subtask, take the maximum score among the selected submissions
-        subtasks = list(submissions[0]["test_case_results"].keys())
-        subtask_scores = {subtask: 0 for subtask in subtasks}
-        for submission in selected:
-            for subtask, result in submission["test_case_results"].items():
-                subtask_scores[subtask] = max(subtask_scores[subtask], result["score"])
-        return sum(subtask_scores.values())
-
     def get_metrics(self):
-        """
-        Computes two metrics across all problems:
-          1. total_score: For each problem, compute the score by summing, for each subtask,
-             the maximum score over all submissions.
-          2. round_robin_score: For each problem, compute the round robin score as described
-             in simulate_round_robin_score (which limits the submissions to 50 per problem).
-        Returns a dict with both metrics.
-        """
         total_score = 0.0
-        total_round_robin = 0.0
-        for problem, submissions in self.predictions_by_problem.items():
-            score, subtask_scores = self.get_problem_score(submissions)
+        total_submissions = 0
+        success_cnt = 0
+
+        for _, submissions in self.predictions_by_problem.items():
+            # aggregate problem score
+            score, _ = self.get_problem_score(submissions)
             total_score += score
-            total_round_robin += self.simulate_round_robin_score(submissions)
-        return {
-            self.agg_mode: {
-                "total_score": str(total_score),
-                "round_robin_score": str(total_round_robin)
-            }
-        }
+
+            # counts for total & successful submissions
+            total_submissions += len(submissions)
+            for sub in submissions:
+                tc_results = sub.get("test_case_results")
+                if tc_results and len(tc_results) > 0:
+                    success_cnt += 1
+
+        metrics = {self.agg_mode: {}}
+        self.update_common_metrics(metrics[self.agg_mode])
+        metrics[self.agg_mode]["Total Generations"] = total_submissions
+        metrics[self.agg_mode]["Successfully Evaluated"] = success_cnt
+        metrics[self.agg_mode]["Total Score"] = str(round(total_score))
+        return metrics
+
+    def evaluations_to_print(self):
+        return [f"pass@{self.max_k}"]
 
     def reset(self):
-        # Store predictions grouped by problem name.
+        super().reset()
         self.predictions_by_problem = defaultdict(list)
