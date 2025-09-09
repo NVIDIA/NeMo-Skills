@@ -501,6 +501,168 @@ except NameError:
                 assert "last_used" in session_info
                 assert "alive" in session_info
 
+    def test_infinite_loop_timeout_then_simple_job(self, tester):
+        """
+        Test that an infinite loop times out properly and doesn't affect subsequent jobs.
+        Verifies timeout handling and session cleanup work correctly.
+        """
+        session_id = f"test_timeout_recovery_{uuid.uuid4()}"
+
+        # First: Run an infinite loop that should timeout
+        infinite_loop_code = """
+import time
+# This should timeout after the specified timeout period
+counter = 0
+while True:
+    counter += 1
+    time.sleep(0.1)  # Small sleep to make it less CPU intensive
+    if counter % 10 == 0:
+        print(f"Still running... counter={counter}")
+"""
+
+        print(f"Running infinite loop with session {session_id}")
+        result1 = tester.execute_code(infinite_loop_code, session_id, timeout=3)
+
+        # The result should indicate a timeout
+        print(f"Infinite loop result: {result1['process_status']}, time: {result1['response_time']:.2f}s")
+
+        # Should timeout properly
+        assert result1["process_status"] == "timeout", f"Expected timeout, got {result1['process_status']}"
+        assert result1["response_time"] >= 3, (
+            f"Should have taken at least 3 seconds, took {result1['response_time']:.2f}s"
+        )
+
+        # Second: Run a simple job in the same session - this should work if cleanup was proper
+        simple_code = """
+# This should execute quickly and independently
+result = 2 + 2
+print(f"Simple calculation result: {result}")
+"""
+
+        print(f"Running simple job with same session {session_id}")
+        result2 = tester.execute_code(simple_code, session_id, timeout=10)
+
+        print(f"Simple job result: {result2['process_status']}, time: {result2['response_time']:.2f}s")
+
+        # This should complete successfully and quickly
+        assert result2["process_status"] == "completed", f"Simple job failed: {result2.get('stderr', 'Unknown error')}"
+        assert "Simple calculation result: 4" in result2["stdout"], "Simple job didn't produce expected output"
+        assert result2["response_time"] < 5, f"Simple job took too long: {result2['response_time']:.2f}s"
+
+    def test_multiple_timeouts_different_sessions(self, tester):
+        """
+        Test that multiple concurrent timeout scenarios don't interfere with each other
+        """
+        num_sessions = 3
+
+        def run_timeout_then_simple(session_num):
+            session_id = f"test_multi_timeout_{session_num}_{uuid.uuid4()}"
+
+            # Run infinite loop
+            infinite_code = f"""
+import time
+session_num = {session_num}
+counter = 0
+while True:
+    counter += 1
+    time.sleep(0.05)
+    if counter % 20 == 0:
+        print(f"Session {{session_num}} counter={{counter}}")
+"""
+
+            result1 = tester.execute_code(infinite_code, session_id, timeout=2)
+
+            # Run simple job
+            simple_code = f"""
+session_result = "session_{session_num}_completed"
+print(f"Session {session_num} simple job: {{session_result}}")
+"""
+
+            result2 = tester.execute_code(simple_code, session_id, timeout=10)
+
+            return {
+                "session_num": session_num,
+                "timeout_result": result1,
+                "simple_result": result2,
+                "timeout_success": result1["process_status"] == "timeout",
+                "simple_success": result2["process_status"] == "completed"
+                and f"session_{session_num}_completed" in result2["stdout"],
+            }
+
+        # Run multiple sessions concurrently
+        with ThreadPoolExecutor(max_workers=num_sessions) as executor:
+            futures = [executor.submit(run_timeout_then_simple, i) for i in range(num_sessions)]
+            results = [future.result() for future in as_completed(futures)]
+
+        # Analyze results
+        timeout_successes = sum(1 for r in results if r["timeout_success"])
+        simple_successes = sum(1 for r in results if r["simple_success"])
+
+        print(f"Timeout handling: {timeout_successes}/{num_sessions} sessions timed out properly")
+        print(f"Simple job recovery: {simple_successes}/{num_sessions} sessions recovered properly")
+
+        # All timeouts should be handled properly
+        assert timeout_successes == num_sessions, (
+            f"Only {timeout_successes}/{num_sessions} sessions timed out properly"
+        )
+
+        # All simple jobs should complete after timeout cleanup
+        assert simple_successes == num_sessions, f"Only {simple_successes}/{num_sessions} sessions recovered properly"
+
+    def test_timeout_with_resource_intensive_code(self, tester):
+        """
+        Test timeout handling with resource-intensive code that might be harder to interrupt
+        """
+        session_id = f"test_resource_timeout_{uuid.uuid4()}"
+
+        # CPU and memory intensive code
+        resource_intensive_code = """
+import time
+# CPU intensive infinite loop with memory allocation
+data_list = []
+counter = 0
+while True:
+    # Allocate some memory each iteration
+    data_list.append([i for i in range(1000)])
+
+    # CPU intensive calculation
+    for i in range(10000):
+        result = i ** 2 + i ** 3
+
+    counter += 1
+    if counter % 10 == 0:
+        print(f"Resource intensive loop: {counter}, memory items: {len(data_list)}")
+
+    # Small sleep to not completely overwhelm the system
+    time.sleep(0.01)
+"""
+
+        result1 = tester.execute_code(resource_intensive_code, session_id, timeout=3)
+
+        # Should timeout
+        assert result1["process_status"] == "timeout", f"Expected timeout, got {result1['process_status']}"
+        assert result1["response_time"] >= 3, (
+            f"Should have taken at least 3 seconds, took {result1['response_time']:.2f}s"
+        )
+
+        # Follow up with simple code to ensure session is clean
+        simple_code = """
+import gc
+# Check memory usage and run simple calculation
+gc.collect()  # Force garbage collection
+simple_result = sum(range(10))
+print(f"Simple calculation after resource cleanup: {simple_result}")
+"""
+
+        result2 = tester.execute_code(simple_code, session_id, timeout=10)
+
+        assert result2["process_status"] == "completed", (
+            f"Cleanup verification failed: {result2.get('stderr', 'Unknown error')}"
+        )
+        assert "Simple calculation after resource cleanup: 45" in result2["stdout"], (
+            "Session not properly cleaned up after resource-intensive timeout"
+        )
+
 
 if __name__ == "__main__":
     # Allow running as script for quick testing

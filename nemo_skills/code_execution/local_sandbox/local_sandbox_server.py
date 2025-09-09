@@ -117,8 +117,20 @@ def postprocess_output(output, traceback_verbosity):
     return output + ("\n" if output else "")
 
 
-def execute_ipython_session(generated_code, session_id, traceback_verbosity="Plain"):
-    """Execute Python code in a persistent IPython session"""
+def cleanup_session(session_id):
+    """Clean up and remove a specific session"""
+    with session_lock:
+        if session_id in sessions:
+            try:
+                del sessions[session_id]
+                logging.info(f"Cleaned up session after timeout: {session_id}")
+            except Exception as e:
+                logging.warning(f"Error cleaning up session {session_id}: {e}")
+
+
+def execute_ipython_session(generated_code, session_id, timeout=30, traceback_verbosity="Plain"):
+    """Execute Python code in a persistent IPython session with timeout handling"""
+    new_session_created = False
     try:
         # Clean up expired sessions periodically
         if SESSION_TIMEOUT > 0:
@@ -129,31 +141,77 @@ def execute_ipython_session(generated_code, session_id, traceback_verbosity="Pla
         shell = session_data["shell"]
         shell.InteractiveTB.set_mode(mode=traceback_verbosity)
 
-        # Capture stdout/stderr
-        try:
-            with io.capture_output() as captured:
-                result = shell.run_cell(generated_code)
-            stdout_result = captured.stdout
-            stderr_result = captured.stderr
-            has_error = result.error_before_exec or result.error_in_exec
-            process_status = "completed" if not has_error else "error"
+        # Use threading to implement timeout for IPython execution
+        execution_result = {}
+        execution_error = {}
 
-        except Exception as e:
-            process_status = "error"
-            stdout_result = captured.stdout if "captured" in locals() else ""
-            stderr_extra = f"\n{type(e).__name__}: {e}"
-            stderr_result = (captured.stderr if "captured" in locals() else "") + stderr_extra
-            stdout_result += stderr_result
-            stderr_result = ""
+        def execute_with_capture():
+            """Execute the code in a separate thread to enable timeout"""
+            try:
+                with io.capture_output() as captured:
+                    result = shell.run_cell(generated_code)
+                execution_result["stdout"] = captured.stdout
+                execution_result["stderr"] = captured.stderr
+                execution_result["has_error"] = result.error_before_exec or result.error_in_exec
+                execution_result["success"] = True
+            except Exception as e:
+                execution_error["exception"] = e
+                execution_error["stdout"] = captured.stdout if "captured" in locals() else ""
+                execution_error["stderr"] = (
+                    captured.stderr if "captured" in locals() else ""
+                ) + f"\n{type(e).__name__}: {e}"
 
-        return {
-            "process_status": process_status,
-            "stdout": postprocess_output(stdout_result, traceback_verbosity),
-            "stderr": postprocess_output(stderr_result, traceback_verbosity),
-            "new_session_created": new_session_created,
-        }
+        # Start execution in a separate thread
+        execution_thread = threading.Thread(target=execute_with_capture)
+        execution_thread.daemon = True  # Allow main thread to exit even if this is still running
+        execution_thread.start()
+
+        # Wait for completion or timeout
+        execution_thread.join(timeout=timeout)
+
+        if execution_thread.is_alive():
+            # Execution timed out
+            logging.warning(f"IPython session {session_id} timed out after {timeout}s, cleaning up session")
+
+            # Clean up the session since it's in an unknown state
+            cleanup_session(session_id)
+
+            return {
+                "process_status": "timeout",
+                "stdout": "",
+                "stderr": f"Execution timed out after {timeout} seconds\n",
+                "new_session_created": new_session_created,
+            }
+
+        # Execution completed within timeout
+        if execution_error:
+            # There was an exception during execution
+            return {
+                "process_status": "error",
+                "stdout": postprocess_output(execution_error.get("stdout", ""), traceback_verbosity),
+                "stderr": postprocess_output(execution_error.get("stderr", ""), traceback_verbosity),
+                "new_session_created": new_session_created,
+            }
+        elif execution_result.get("success"):
+            # Normal completion
+            process_status = "completed" if not execution_result.get("has_error") else "error"
+            return {
+                "process_status": process_status,
+                "stdout": postprocess_output(execution_result.get("stdout", ""), traceback_verbosity),
+                "stderr": postprocess_output(execution_result.get("stderr", ""), traceback_verbosity),
+                "new_session_created": new_session_created,
+            }
+        else:
+            # Unexpected case - no result and no error
+            return {
+                "process_status": "error",
+                "stdout": "",
+                "stderr": "Unexpected execution state\n",
+                "new_session_created": new_session_created,
+            }
 
     except Exception as e:
+        logging.error(f"Error in execute_ipython_session for session {session_id}: {e}")
         return {
             "process_status": "error",
             "stdout": "",
@@ -346,7 +404,7 @@ def execute():
     if language == "ipython":
         if session_id is None:
             return {"error": "X-Session-ID header required for ipython sessions"}, 400
-        result = execute_ipython_session(generated_code, session_id, traceback_verbosity)
+        result = execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
     elif language == "lean4":
         result = execute_lean4(generated_code, timeout)
     elif language == "shell":
