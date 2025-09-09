@@ -27,6 +27,8 @@ from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 #     --data_dir /workspace/ns-data
 # """
 
+# TODO: we should probably switch to another model as this one is quite heavy to run
+
 
 def setup(workspace, cluster, expname_prefix):
     # download models
