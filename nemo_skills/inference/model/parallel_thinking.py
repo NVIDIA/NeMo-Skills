@@ -189,6 +189,46 @@ class ParallelThinkingTask:
 
         return prompt_to_solutions_dict
 
+    async def _get_multiple_solutions(
+        self, prompt: Union[str, List], local_random: random.Random, **kwargs
+    ) -> tuple[List[Dict], int]:
+        """Return multiple solutions for the input prompt."""
+        if self.cfg.generation_dir is not None:
+            # Already have the solutions in the input directory
+            # Hashing the prompt to get the key for the solutions
+            solutions = self.prompt_to_solutions_dict[self.hash_prompt(prompt)]
+            local_random.shuffle(solutions)
+            # After shuffling, only take the first window_size solutions
+            solutions = solutions[: self.cfg.window_size]
+        else:
+            # Generate the solutions first
+            solutions = await self.generate_solutions(prompt, local_random, **kwargs)
+
+        # Filter out incomplete solutions if specified
+        if self.cfg.filter_incomplete_solutions:
+            # Remove unfinished solutions
+            filtered_solutions = []
+            for solution in solutions:
+                # Check if thinking_begin is in the solution and thinking_end is not in the solution
+                if (
+                    self.cfg.thinking_begin in solution[self.cfg.solution_key]
+                    and self.cfg.thinking_end not in solution[self.cfg.solution_key]
+                ):
+                    continue
+                else:
+                    filtered_solutions.append(solution)
+
+            if len(filtered_solutions) < len(solutions):
+                LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
+
+            solutions = filtered_solutions
+
+        total_num_generated_tokens = 0
+        for solution in solutions:
+            total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)
+
+        return solutions, total_num_generated_tokens
+
     def _format_solutions_for_parallel_thinking(self, solutions: List[Dict]) -> str:
         """Format solutions for parallel thinking prompt."""
 
@@ -295,45 +335,10 @@ class ParallelThinkingTask:
             "parallel_thinking_result": gensynthesis_result,
         }
 
-    async def _get_multiple_solutions(
-        self, prompt: Union[str, List], local_random: random.Random, **kwargs
-    ) -> tuple[List[Dict], int]:
-        """Return multiple solutions for the input prompt."""
-        if self.cfg.generation_dir is not None:
-            # Already have the solutions in the input directory
-            # Hashing the prompt to get the key for the solutions
-            solutions = self.prompt_to_solutions_dict[self.hash_prompt(prompt)]
-            local_random.shuffle(solutions)
-            # After shuffling, only take the first window_size solutions
-            solutions = solutions[: self.cfg.window_size]
-        else:
-            # Generate the solutions first
-            solutions = await self.generate_solutions(prompt, local_random, **kwargs)
-
-        # Filter out incomplete solutions if specified
-        if self.cfg.filter_incomplete_solutions:
-            # Remove unfinished solutions
-            filtered_solutions = []
-            for solution in solutions:
-                # Check if thinking_begin is in the solution and thinking_end is not in the solution
-                if (
-                    self.cfg.thinking_begin in solution[self.cfg.solution_key]
-                    and self.cfg.thinking_end not in solution[self.cfg.solution_key]
-                ):
-                    continue
-                else:
-                    filtered_solutions.append(solution)
-
-            if len(filtered_solutions) < len(solutions):
-                LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
-
-            solutions = filtered_solutions
-
-        total_num_generated_tokens = 0
-        for solution in solutions:
-            total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)
-
-        return solutions, total_num_generated_tokens
+    async def _run_genselect_competition(
+        self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs
+    ):
+        pass
 
     async def generate_async(self, prompt: Union[str, List], **kwargs):
         """Generate a single solution using parallel thinking."""
