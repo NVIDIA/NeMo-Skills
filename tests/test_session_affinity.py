@@ -663,6 +663,153 @@ print(f"Simple calculation after resource cleanup: {simple_result}")
             "Session not properly cleaned up after resource-intensive timeout"
         )
 
+    @pytest.mark.asyncio
+    async def test_sandbox_session_history_after_timeout(self):
+        """
+        Test session history re-execution after timeout using LocalSandbox.
+        This tests the full flow including history rebuilding when a session times out.
+        """
+        import asyncio
+
+        from nemo_skills.code_execution.sandbox import LocalSandbox
+
+        # Create sandbox instance
+        sandbox = LocalSandbox()
+        session_id = f"test_sandbox_timeout_{uuid.uuid4()}"
+
+        try:
+            print(f"Testing sandbox session history with session {session_id}")
+
+            # Step 1: Execute some code to build up session history
+            setup_code1 = """
+# First piece of session state
+session_var_1 = "first_value"
+session_list = [1, 2, 3]
+print(f"Setup 1: {session_var_1}, list length: {len(session_list)}")
+"""
+
+            result1, returned_session_id = await sandbox.execute_code(setup_code1, session_id=session_id, timeout=10)
+
+            assert result1["process_status"] == "completed", (
+                f"Setup 1 failed: {result1.get('stderr', 'Unknown error')}"
+            )
+            assert "Setup 1: first_value, list length: 3" in result1["stdout"]
+            print("Step 1: Initial session state created")
+
+            # Step 2: Add more to the session history
+            setup_code2 = """
+# Second piece of session state
+session_var_2 = "second_value"
+session_list.append(4)
+def session_function(x):
+    return x * 2 + len(session_var_1)
+print(f"Setup 2: {session_var_2}, list: {session_list}")
+"""
+
+            result2, _ = await sandbox.execute_code(setup_code2, session_id=session_id, timeout=10)
+
+            assert result2["process_status"] == "completed", (
+                f"Setup 2 failed: {result2.get('stderr', 'Unknown error')}"
+            )
+            assert "Setup 2: second_value, list: [1, 2, 3, 4]" in result2["stdout"]
+            print("Step 2: Session history built up")
+
+            # Step 3: Execute code that will timeout and cause session cleanup
+            timeout_code = """
+# This will timeout and cause session cleanup
+import time
+print("Starting timeout operation...")
+counter = 0
+while True:
+    counter += 1
+    time.sleep(0.1)
+    if counter % 10 == 0:
+        print(f"Timeout test counter: {counter}")
+"""
+
+            result3, _ = await sandbox.execute_code(
+                timeout_code,
+                session_id=session_id,
+                timeout=3,  # Short timeout to trigger cleanup
+            )
+
+            assert result3["process_status"] == "timeout", f"Expected timeout, got {result3['process_status']}"
+            print("Step 3: Timeout occurred and session was cleaned up")
+
+            # CRITICAL: Force session cleanup to test actual history re-execution
+            # The server thread may still be running, so we explicitly delete the session
+            print("Explicitly deleting session to force cleanup...")
+            await sandbox.delete_session(session_id)
+
+            # Wait a moment for cleanup to propagate
+            await asyncio.sleep(1)
+
+            # Step 4: Execute new code in the same session - should trigger history re-execution
+            test_history_code = """
+# This should work if history was properly re-executed
+try:
+    # Test that all previous state exists
+    print(f"Var 1: {session_var_1}")
+    print(f"Var 2: {session_var_2}")
+    print(f"List: {session_list}")
+    print(f"Function result: {session_function(5)}")
+    print("History re-execution successful!")
+except NameError as e:
+    print(f"History re-execution failed: {e}")
+    raise e
+"""
+
+            # Debug: Check what's in the session history
+            print(f"Session history before Step 4: {sandbox.session_histories.get(session_id, [])}")
+
+            result4, _ = await sandbox.execute_code(test_history_code, session_id=session_id, timeout=10)
+
+            print(f"Step 4 result: {result4['process_status']}")
+            print(f"Step 4 new_session_created: {result4.get('new_session_created', 'Not provided')}")
+            print(f"Step 4 stderr: {result4.get('stderr', 'No stderr')}")
+            print(f"Step 4 stdout: {result4.get('stdout', 'No stdout')}")
+
+            assert result4["process_status"] == "completed", (
+                f"History re-execution failed: {result4.get('stderr', 'Unknown error')}"
+            )
+
+            # Verify the history was properly re-executed
+            assert "Var 1: first_value" in result4["stdout"], "session_var_1 not restored"
+            assert "Var 2: second_value" in result4["stdout"], "session_var_2 not restored"
+            assert "List: [1, 2, 3, 4]" in result4["stdout"], "session_list not restored"
+            assert "Function result: 21" in result4["stdout"], (
+                "session_function not restored"
+            )  # 5*2 + len("first_value") = 10 + 11 = 21
+            assert "History re-execution successful!" in result4["stdout"], "History re-execution check failed"
+
+            print("Step 4: Session history properly re-executed after timeout")
+
+            # Step 5: Verify continued session state works
+            continue_code = """
+# Add to the restored session
+session_var_3 = "third_value"
+session_list.append(5)
+print(f"Continued: {session_var_3}, final list: {session_list}")
+"""
+
+            result5, _ = await sandbox.execute_code(continue_code, session_id=session_id, timeout=10)
+
+            assert result5["process_status"] == "completed", (
+                f"Continue failed: {result5.get('stderr', 'Unknown error')}"
+            )
+            assert "Continued: third_value, final list: [1, 2, 3, 4, 5]" in result5["stdout"], (
+                "Session continuation failed"
+            )
+            print("Step 5: Session continues to work after history re-execution")
+
+        finally:
+            # Clean up
+            try:
+                await sandbox.delete_session(session_id)
+                await sandbox.close()
+            except Exception as e:
+                print(f"Cleanup error: {e}")
+
 
 if __name__ == "__main__":
     # Allow running as script for quick testing
