@@ -89,6 +89,10 @@ class ProverConfig(GenerateSolutionsConfig):
         False  # whether to delete the wrong turns from the generation
     )
 
+    inference: InferenceConfig = field(
+        default_factory=InferenceConfig
+    )  # LLM call parameters
+
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
         if self.prompt_format not in ["ns", "openai"]:
