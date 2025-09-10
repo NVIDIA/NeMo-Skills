@@ -38,7 +38,7 @@ class AutoformalizationExecutionModel(BaseModel):
         super().__init__(model=model, **kwargs)
         self.model = model
         self.sandbox = sandbox
-        if "tokenizer" not in kwargs:
+        if "tokenizer" not in kwargs or kwargs["tokenizer"] is None:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model)
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(kwargs["tokenizer"])
