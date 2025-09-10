@@ -50,8 +50,8 @@ jobs:
       with:
         context: .
         file: dockerfiles/Dockerfile.nemo-skills
-        push: false
-        load: true
+        push: true
+        load: false
         tags: ghcr.io/${{ env.REPO }}/nemo-skills:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -60,14 +60,16 @@ jobs:
       with:
         context: .
         file: dockerfiles/Dockerfile.sandbox
-        push: false
-        load: true
+        push: true
+        load: false
         tags: ghcr.io/${{ env.REPO }}/nemo-skills-sandbox:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
     - name: Tag images
       # if: steps.changes.outputs.docker != 'true'
       run: |
+        docker pull ghcr.io/${{ env.REPO }}/nemo-skills:${{ github.sha }}
+        docker pull ghcr.io/${{ env.REPO }}/nemo-skills-sandbox:${{ github.sha }}
         docker tag ghcr.io/${{ env.REPO }}/nemo-skills:${{ github.sha }} igitman/nemo-skills:${{ env.NEMO_SKILLS_TAG }}
         docker tag ghcr.io/${{ env.REPO }}/nemo-skills-sandbox:${{ github.sha }} igitman/nemo-skills-sandbox:${{ env.SANDBOX_TAG }}
     - name: Run all tests
