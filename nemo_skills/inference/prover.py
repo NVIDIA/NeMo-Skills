@@ -19,7 +19,7 @@ import random
 import sys
 import time
 from copy import deepcopy
-from dataclasses import asdict, field
+from dataclasses import asdict, field, is_dataclass
 from pathlib import Path
 from typing import Any, List
 
@@ -189,10 +189,15 @@ class ProverTask(GenerationTask):
 
     # with adaptive reasoning
     async def _generate_single_completion(self, prompt: List[str], **kwargs):
+        if is_dataclass(self.cfg.inference):
+            inference_params = asdict(self.cfg.inference)
+        else:
+            # Already a dict from Hydra
+            inference_params = dict(self.cfg.inference)
         generation_params = {
             "prompt": prompt,
             "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
-            **asdict(self.cfg.inference),
+            **inference_params,
             **self.extra_generate_params,
         }
         for key, value in kwargs.items():
