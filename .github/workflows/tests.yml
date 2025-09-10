@@ -17,6 +17,7 @@ concurrency:
 env:
   NEMO_SKILLS_TAG: "0.7.0"
   SANDBOX_TAG: "0.7.1"
+  REPO: "nvidia/nemo-skills"
 
 jobs:
   unit-tests:
@@ -49,6 +50,7 @@ jobs:
         context: .
         file: dockerfiles/Dockerfile.nemo-skills
         push: false
+        load: true
         tags: ghcr.io/${{ github.repository }}/nemo-skills:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -58,14 +60,15 @@ jobs:
         context: .
         file: dockerfiles/Dockerfile.sandbox
         push: false
-        tags: ghcr.io/${{ github.repository }}/nemo-skills-sandbox:${{ github.sha }}
+        load: true
+        tags: ghcr.io/${{ env.REPO }}/nemo-skills-sandbox:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
     - name: Tag images
       # if: steps.changes.outputs.docker != 'true'
       run: |
-        docker tag ghcr.io/${{ github.repository }}/nemo-skills:${{ github.sha }} igitman/nemo-skills:${{ env.NEMO_SKILLS_TAG }}
-        docker tag ghcr.io/${{ github.repository }}/nemo-skills-sandbox:${{ github.sha }} igitman/nemo-skills-sandbox:${{ env.SANDBOX_TAG }}
+        docker tag ghcr.io/${{ env.REPO }}/nemo-skills:${{ github.sha }} igitman/nemo-skills:${{ env.NEMO_SKILLS_TAG }}
+        docker tag ghcr.io/${{ env.REPO }}/nemo-skills-sandbox:${{ github.sha }} igitman/nemo-skills-sandbox:${{ env.SANDBOX_TAG }}
     - name: Run all tests
       env:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
