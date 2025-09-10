@@ -28,6 +28,7 @@ from .gemini import GeminiModel
 from .megatron import MegatronModel
 from .openai import OpenAIModel
 from .parallel_thinking import ParallelThinkingConfig, ParallelThinkingTask
+from .autoformalization_execution import AutoformalizationExecutionModel
 
 # Tool Calling
 from .tool_call import ToolCallingWrapper
@@ -47,6 +48,7 @@ models = {
     "gemini": GeminiModel,
     "vllm": VLLMModel,
     "sglang": VLLMModel,
+    "autoformalization": AutoformalizationExecutionModel,
 }
 
 
@@ -59,13 +61,17 @@ def get_model(server_type, tokenizer=None, **kwargs):
     return model_class(tokenizer=tokenizer, **kwargs)
 
 
-def get_code_execution_model(server_type, tokenizer=None, code_execution=None, sandbox=None, **kwargs):
+def get_code_execution_model(
+    server_type, tokenizer=None, code_execution=None, sandbox=None, **kwargs
+):
     """A helper function to make it easier to set server through cmd."""
     model = get_model(server_type=server_type, tokenizer=tokenizer, **kwargs)
     if code_execution is None:
         code_execution = {}
     code_execution_config = CodeExecutionConfig(**code_execution)
-    return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
+    return CodeExecutionWrapper(
+        model=model, sandbox=sandbox, config=code_execution_config
+    )
 
 
 def get_parallel_thinking_model(
@@ -85,11 +91,15 @@ def get_parallel_thinking_model(
 
     # Filter to only include valid parameters
     valid_params = {field.name for field in dataclasses.fields(ParallelThinkingConfig)}
-    filtered_config = {key: value for key, value in merged_config.items() if key in valid_params}
+    filtered_config = {
+        key: value for key, value in merged_config.items() if key in valid_params
+    }
 
     parallel_thinking_config = ParallelThinkingConfig(**filtered_config)
 
-    return ParallelThinkingTask(model=model, orig_prompt_filler=orig_prompt_filler, cfg=parallel_thinking_config)
+    return ParallelThinkingTask(
+        model=model, orig_prompt_filler=orig_prompt_filler, cfg=parallel_thinking_config
+    )
 
 
 def get_tool_calling_model(
