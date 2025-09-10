@@ -418,6 +418,23 @@ class SweBenchGenerationTask(GenerationTask):
             "bash Miniforge3-$(uname)-$(uname -m).sh -b && "
             'eval "$(/root/miniforge3/bin/conda shell.bash hook)" && '
             "mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
+            # OpenHands LocalRuntime uses tmux to manage a bash session. In Apptainer, the real UID (id -ru)
+            # can differ from the effective UID (root) due to `su root -`. tmux chooses its default socket
+            # path based on the REAL UID, e.g., /tmp/tmux-<real-uid>/default. Below we:
+            #  - derive the real UID (fallback to id -u)
+            #  - force tmux to use that socket path via TMUX/TMUX_TMPDIR
+            #  - ensure the directory exists, has proper ownership and permissions
+            #  - start the tmux server idempotently on that exact socket
+            # This avoids 'error connecting to /tmp/tmux-<uid>/default' during LocalRuntime startup.
+            # Ensure tmux socket directory exists with proper permissions, using real UID when available
+            "uid=$(id -ru 2>/dev/null || id -u) && "
+            "export TMUX_TMPDIR=/tmp && "
+            "export TMUX=/tmp/tmux-$uid/default && "
+            "mkdir -p /tmp/tmux-$uid && "
+            "chown $uid:$uid /tmp/tmux-$uid || true && "
+            "chmod 700 /tmp/tmux-$uid && "
+            # Start tmux server on the exact socket path (idempotent)
+            "tmux -S /tmp/tmux-$uid/default start-server || true && "
             "mkdir OpenHands && "
             "cd OpenHands && "
             f"git clone {self.cfg.agent_framework_repo} . && "
