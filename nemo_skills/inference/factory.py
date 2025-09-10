@@ -6,6 +6,7 @@ class GenerationType(str, Enum):
     math_judge = "math_judge"
     check_contamination = "check_contamination"
     prover = "prover"
+    autoformalize = "autoformalize"
 
 
 GENERATION_MODULE_MAP = {
@@ -13,4 +14,5 @@ GENERATION_MODULE_MAP = {
     GenerationType.math_judge: "nemo_skills.inference.llm_math_judge",
     GenerationType.check_contamination: "nemo_skills.inference.check_contamination",
     GenerationType.prover: "nemo_skills.inference.prover",
+    GenerationType.autoformalize: "nemo_skills.inference.autoformalize",
 }

@@ -35,6 +35,13 @@ def remove_comments(text):  # remove comments
     return cleaned_text.strip()
 
 
+def move_imports_to_beginning(input_string):
+    lines = input_string.split("\n")
+    import_lines = [line for line in lines if line.startswith("import")]
+    other_lines = [line for line in lines if not line.startswith("import")]
+    return "\n".join(import_lines + other_lines)
+
+
 def return_theorem_to_prove(text):
     # Pattern that matches from 'theorem' or 'lemma' to ':= by sorry' with any content in between
     pattern = r"((?:theorem).*?:=\s*by\s*sorry)"
