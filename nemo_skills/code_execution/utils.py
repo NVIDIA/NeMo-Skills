@@ -101,7 +101,7 @@ def extract_code_block(text: str, languages=None, extract_code_mode: str = "last
 def clean_formal_generation(
     generation: str,
     final_answer_key: str = "**FINAL ANSWER**",
-    extract_code_mode: str = "first",
+    extract_code_mode: str = "last",
 ) -> str:
     # Extract part after **FINAL ANSWER** if present
     if final_answer_key in generation:
