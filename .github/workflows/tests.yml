@@ -46,7 +46,6 @@ jobs:
     - name: Pull Images
       if: steps.changes.outputs.docker != 'true'
       run: |
-        CACHEBUST=1
         docker pull igitman/nemo-skills:0.7.0
         docker pull igitman/nemo-skills-sandbox:0.7.1
     - name: Run all tests
