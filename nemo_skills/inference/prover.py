@@ -118,6 +118,7 @@ class ProverConfig(GenerateSolutionsConfig):
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_prover_config", node=ProverConfig)
+cs.store(name="inference_config", node=InferenceConfig)
 
 
 class ProverTask(GenerationTask):
