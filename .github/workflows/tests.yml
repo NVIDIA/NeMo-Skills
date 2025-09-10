@@ -51,7 +51,7 @@ jobs:
         file: dockerfiles/Dockerfile.nemo-skills
         push: false
         load: true
-        tags: ghcr.io/${{ github.repository }}/nemo-skills:${{ github.sha }}
+        tags: ghcr.io/${{ env.REPO }}/nemo-skills:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
     - name: Build Sandbox Image
