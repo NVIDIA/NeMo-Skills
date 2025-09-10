@@ -17,6 +17,7 @@ import glob
 import json
 import logging
 import os
+import random
 import shlex
 import sys
 from dataclasses import field
@@ -105,6 +106,10 @@ class SweBenchGenerationConfig:
 
     no_dedicated_environments: bool = False
 
+    apptainer_max_retries: int = 3
+    apptainer_min_retry_interval: int = 0
+    apptainer_max_retry_interval: int = 0
+
     inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
@@ -168,9 +173,7 @@ class SweBenchGenerationTask(GenerationTask):
     def cleanup_litellm_cache(self):
         return
 
-    async def _execute_container_command(
-        self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
-    ):
+    async def _execute_container_command(self, data_point, command, expected_file_pattern, mode, timeout=100000):
         """Execute a command in an Apptainer container with retry logic."""
         container_name = data_point["container_formatter"].format(
             instance_id=data_point["instance_id"].replace("__", "_1776_")
@@ -203,12 +206,12 @@ class SweBenchGenerationTask(GenerationTask):
         )
 
         # Retry apptainer command up to max_retries times
-        for attempt in range(max_retries):
+        for attempt in range(self.cfg.apptainer_max_retries):
             log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}_attempt{attempt + 1}.log"
             LOG.info(
                 "Starting execution of an apptainer command (attempt %d of %d). Logs are available at %s",
                 attempt + 1,
-                max_retries,
+                self.cfg.apptainer_max_retries,
                 log_file_path,
             )
 
@@ -231,7 +234,7 @@ class SweBenchGenerationTask(GenerationTask):
                         if process.returncode is None:
                             process.kill()
                             await process.wait()
-                        attempt = max_retries  # Force exit the loop on timeout
+                        attempt = self.cfg.apptainer_max_retries  # Force exit the loop on timeout
                         raise ValueError("Command timed out")
 
                 # Look for the expected file
@@ -246,15 +249,25 @@ class SweBenchGenerationTask(GenerationTask):
                         f"found {len(pred_files)}."
                     )
             except Exception:
-                if attempt < max_retries - 1:
+                if attempt < self.cfg.apptainer_max_retries - 1:
+                    retry_interval = random.randint(
+                        self.cfg.apptainer_min_retry_interval, self.cfg.apptainer_max_retry_interval
+                    )
                     LOG.warning(
-                        "Attempt %d failed for instance %s. Retrying...",
+                        "Attempt %d failed for instance %s. Retrying in %d seconds...",
                         attempt + 1,
                         data_point["instance_id"],
+                        retry_interval,
                     )
+                    if retry_interval > 0:
+                        asyncio.sleep(retry_interval)
                     continue
                 else:
-                    LOG.error("All %d attempts failed for instance %s", max_retries, data_point["instance_id"])
+                    LOG.error(
+                        "All %d attempts failed for instance %s",
+                        self.cfg.apptainer_max_retries,
+                        data_point["instance_id"],
+                    )
                     LOG.error("Apptainer command failed. Check logs at: %s", log_file_path)
                     raise ValueError(
                         f"Job failed for {data_point['instance_id']}. Check logs at: {log_file_path}. "
