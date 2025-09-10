@@ -174,20 +174,36 @@ class SweBenchGenerationTask(GenerationTask):
         instance_id = data_point["instance_id"]
         container_formatter = data_point["container_formatter"]
         
-        # Strategy 1: Try _1776_ replacement
+        # Strategy 1: Try _1776_ replacement (original case and lowercase)
         container_name = container_formatter.format(
             instance_id=instance_id.replace("__", "_1776_")
         )
         if os.path.exists(container_name):
             return container_name
         
-        # Strategy 2: Try _s_ replacement
+        # Try lowercase version
+        container_name_lower = container_formatter.format(
+            instance_id=instance_id.replace("__", "_1776_").lower()
+        )
+        if os.path.exists(container_name_lower):
+            LOG.info(f"Using _1776_ replacement (lowercase): {container_name_lower}")
+            return container_name_lower
+        
+        # Strategy 2: Try _s_ replacement (original case and lowercase)
         container_name_s = container_formatter.format(
             instance_id=instance_id.replace("__", "_s_")
         )
         if os.path.exists(container_name_s):
             LOG.info(f"Using _s_ replacement: {container_name_s}")
             return container_name_s
+        
+        # Try lowercase version
+        container_name_s_lower = container_formatter.format(
+            instance_id=instance_id.replace("__", "_s_").lower()
+        )
+        if os.path.exists(container_name_s_lower):
+            LOG.info(f"Using _s_ replacement (lowercase): {container_name_s_lower}")
+            return container_name_s_lower
         
         # Strategy 3: Fuzzy search in container directory
         container_dir = os.path.dirname(container_name)
@@ -196,10 +212,13 @@ class SweBenchGenerationTask(GenerationTask):
             replaced_id_1776 = instance_id.replace("__", "_1776_")
             replaced_id_s = instance_id.replace("__", "_s_")
             
-            # Search for .sif files with either replacement pattern
+            # Search for .sif files with either replacement pattern (case-insensitive)
+            # Include both original case and lowercase versions
             patterns = [
                 os.path.join(container_dir, f"*{replaced_id_1776}*.sif"),
-                os.path.join(container_dir, f"*{replaced_id_s}*.sif")
+                os.path.join(container_dir, f"*{replaced_id_s}*.sif"),
+                os.path.join(container_dir, f"*{replaced_id_1776.lower()}*.sif"),
+                os.path.join(container_dir, f"*{replaced_id_s.lower()}*.sif")
             ]
             
             matching_files = []
