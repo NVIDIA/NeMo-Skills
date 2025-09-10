@@ -136,7 +136,7 @@ policy:
     optimizer:
       optimizer: "adam"
       lr: ${policy.lr}
-      min_lr: 1.0e-6
+      min_lr: ${policy.megatron_cfg.optimizer.lr}
       weight_decay: ${policy.weight_decay}
       bf16: true
       fp16: false
@@ -160,7 +160,7 @@ policy:
       start_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       end_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       weight_decay_incr_style: "constant"
-      lr_decay_style: "constant"
+      lr_decay_style: "cosine"
       lr_decay_iters: ${sft.max_num_steps}
       lr_warmup_iters: 0
       lr_warmup_init: 1.0e-6
