@@ -14,10 +14,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  NEMO_SKILLS_TAG: "0.7.0"
-  SANDBOX_TAG: "0.7.1"
-
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
@@ -33,41 +29,17 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
-    - name: Log in to GHCR
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Build Nemo Skills Image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: dockerfiles/Dockerfile.nemo-skills
-        push: false
-        tags: ghcr.io/${{ github.repository }}/nemo-skills:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-    - name: Build Sandbox Image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: dockerfiles/Dockerfile.sandbox
-        push: false
-        tags: ghcr.io/${{ github.repository }}/nemo-skills-sandbox:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-    - name: Tag images
-      # if: steps.changes.outputs.docker != 'true'
+    - name: Build Images
       run: |
-        docker tag ghcr.io/${{ github.repository }}/nemo-skills:${{ github.sha }} igitman/nemo-skills:${{ env.NEMO_SKILLS_TAG }}
-        docker tag ghcr.io/${{ github.repository }}/nemo-skills-sandbox:${{ github.sha }} igitman/nemo-skills-sandbox:${{ env.SANDBOX_TAG }}
+        # these tags need to match the ones in tests/gpu-tests/test-local.yaml
+        docker build -t igitman/nemo-skills:0.7.0 -f dockerfiles/Dockerfile.nemo-skills .
+        docker build -t igitman/nemo-skills-sandbox:0.7.1 -f dockerfiles/Dockerfile.sandbox .
     - name: Run all tests
       env:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
-        docker run --rm --network=host igitman/nemo-skills-sandbox:${{ env.SANDBOX_TAG }} &
+        docker run --rm --network=host igitman/nemo-skills-sandbox:0.7.1 &
         sleep 10
         set -o pipefail # this will make sure next line returns non-0 exit code if tests fail
         ns prepare_data gsm8k math-500
