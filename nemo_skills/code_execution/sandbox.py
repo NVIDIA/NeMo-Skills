@@ -216,21 +216,6 @@ class Sandbox(abc.ABC):
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
-            if session_id is not None:
-                history = self.session_histories.get(session_id, [])
-                combined_code = "\n".join(history) + ("\n" if history else "") + generated_code
-                request = self._prepare_request(
-                    combined_code, timeout, language, std_input, max_output_characters, traceback_verbosity
-                )
-                request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
-                try:
-                    await self._send_request(request, timeout)
-                except httpx.TimeoutException:
-                    output = {
-                        "process_status": "timeout",
-                        "stdout": "",
-                        "stderr": "Timed out while rebuilding history\n",
-                    }
         new_session_created = output.pop("new_session_created", False)
 
         # Rebuild state by executing concatenated history
