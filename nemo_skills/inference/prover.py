@@ -31,8 +31,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
-    OnlineGenSelectConfig,
-    get_code_execution_model,
     get_model,
     server_params,
 )
