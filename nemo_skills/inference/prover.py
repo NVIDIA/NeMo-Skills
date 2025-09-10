@@ -58,21 +58,6 @@ reasoning_effort_list = [
 
 
 @nested_dataclass(kw_only=True)
-class InferenceConfig:
-    temperature: float = 0.6  # Temperature of 0 means greedy decoding
-    top_k: int = 0
-    top_p: float = 0.95
-    min_p: float = 0.0
-    random_seed: int = 0
-    tokens_to_generate: int = 40960
-    repetition_penalty: float = 1.0
-    top_logprobs: int | None = None
-    extra_body: dict = field(
-        default_factory=dict
-    )  # Any other extra params passed with extra_body argument
-
-
-@nested_dataclass(kw_only=True)
 class ProverConfig(GenerateSolutionsConfig):
 
     max_tokens: int = 40960  # model max tokens
@@ -87,9 +72,6 @@ class ProverConfig(GenerateSolutionsConfig):
     remove_cot: bool = False  # whether to remove the cot from the generation
     # whether to delete the wrong turns from the generation
     delete_wrong_turns: bool = False
-
-    inference: InferenceConfig = field(default_factory=lambda: InferenceConfig())
-    # LLM call parameters
 
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
