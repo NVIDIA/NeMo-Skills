@@ -85,10 +85,8 @@ class ProverConfig(GenerateSolutionsConfig):
     adaptive_reasoning: bool = False  # whether to adapt the reasoning effort
     parse_generation: bool = False  # whether to parse the generation
     remove_cot: bool = False  # whether to remove the cot from the generation
-    delete_wrong_turns: bool = (
-        False  # whether to delete the wrong turns from the generation
-    )
-
+    # whether to delete the wrong turns from the generation
+    delete_wrong_turns: bool = False
     inference: InferenceConfig = field(default_factory=lambda: InferenceConfig())
 
     def _post_init_validate_params(self):
