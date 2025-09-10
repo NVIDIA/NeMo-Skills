@@ -87,7 +87,9 @@ class ProverConfig(GenerateSolutionsConfig):
     remove_cot: bool = False  # whether to remove the cot from the generation
     # whether to delete the wrong turns from the generation
     delete_wrong_turns: bool = False
-    inference: InferenceConfig = field(default_factory=lambda: InferenceConfig())
+
+    inference: InferenceConfig = field(default_factory=InferenceConfig())
+    # LLM call parameters
 
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
