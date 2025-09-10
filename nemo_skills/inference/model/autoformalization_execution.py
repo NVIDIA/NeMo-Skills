@@ -13,19 +13,7 @@
 # limitations under the License.
 
 import logging
-import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-import openai
-import requests
-from openai import BadRequestError
-
-from typing import Any, Dict, Optional, Union
-import uuid
-from openai import DefaultHttpxClient, Stream
-
 from nemo_skills.utils import get_logger_name
-
 from .base import BaseModel
 from nemo_skills.code_execution.sandbox import Sandbox
 from transformers import AutoTokenizer

@@ -13,21 +13,13 @@
 # limitations under the License.
 
 import asyncio
-import json
 import logging
-import random
 import sys
-import time
 from copy import deepcopy
-from dataclasses import asdict, field, is_dataclass
-from pathlib import Path
-from typing import Any, List
+from dataclasses import asdict, is_dataclass
+from typing import List
 
-import re
 import hydra
-from omegaconf import ListConfig, OmegaConf
-from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
@@ -36,14 +28,12 @@ from nemo_skills.inference.model import (
 )
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import (
-    chunk_data,
     get_help_message,
     get_logger_name,
     nested_dataclass,
     remove_thinking,
     setup_logging,
 )
-from openai import BadRequestError
 
 from .lean4_utils import *
 from .generate import GenerateSolutionsConfig, GenerationTask
