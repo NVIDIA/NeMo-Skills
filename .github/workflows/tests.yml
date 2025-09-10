@@ -33,7 +33,7 @@ jobs:
       run: |
         # these tags need to match the ones in tests/gpu-tests/test-local.yaml
         docker build -t igitman/nemo-skills:0.7.0 -f dockerfiles/Dockerfile.nemo-skills .
-        docker build -t igitman/nemo-skills-sandbox:0.7.1 -f dockerfiles/Dockerfile.nemo-skills-sandbox .
+        docker build -t igitman/nemo-skills-sandbox:0.7.1 -f dockerfiles/Dockerfile.sandbox .
     - name: Run all tests
       env:
         NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
