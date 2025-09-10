@@ -24,10 +24,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v5
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      with:
-        driver: docker-container
     - name: Set up Python 3.10
       uses: actions/setup-python@v5
       with:
