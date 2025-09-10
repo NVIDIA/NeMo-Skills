@@ -33,6 +33,7 @@ jobs:
           docker:
             - 'dockerfiles/**'
             - 'nemo_skills/code_execution/local_sandbox/**'
+            - 'requirements/**'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
