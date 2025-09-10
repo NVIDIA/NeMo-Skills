@@ -18,6 +18,7 @@ env:
   NEMO_SKILLS_TAG: "0.7.0"
   SANDBOX_TAG: "0.7.1"
   REPO: "nvidia/nemo-skills"
+  BUILD: "0"
 
 jobs:
   unit-tests:
