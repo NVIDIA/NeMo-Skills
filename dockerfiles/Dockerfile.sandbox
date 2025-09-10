@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # Use the base image with Python 3.10 and Flask
-ARG CACHEBUST=1
 FROM tiangolo/uwsgi-nginx-flask:python3.10
 
 # Install dependencies required for Lean 4 and other tools
