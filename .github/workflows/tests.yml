@@ -31,7 +31,8 @@ jobs:
       with:
         filters: |
           docker:
-            - 'dockerfiles/**'
+            - 'dockerfiles/Dockerfile.sandbox'
+            - 'dockerfiles/Dockerfile.nemo-skills'
             - 'nemo_skills/code_execution/local_sandbox/**'
             - 'requirements/**'
     - name: Install dependencies
