@@ -221,10 +221,7 @@ class Sandbox(abc.ABC):
         # Rebuild state by executing concatenated history
         if session_id is not None and new_session_created:
             history = self.session_histories.get(session_id, [])
-            add_generated_code = output.get("process_status") not in ["timeout", "interrupted"]
-            combined_code = (
-                "\n".join(history) + ("\n" if history else "") + (generated_code if add_generated_code else "")
-            )
+            combined_code = "\n".join(history) + ("\n" if history else "") + generated_code
             request = self._prepare_request(
                 combined_code, timeout, language, std_input, max_output_characters, traceback_verbosity
             )
