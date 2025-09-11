@@ -260,7 +260,7 @@ class SweBenchGenerationTask(GenerationTask):
                         retry_interval,
                     )
                     if retry_interval > 0:
-                        asyncio.sleep(retry_interval)
+                        await asyncio.sleep(retry_interval)
                     continue
                 else:
                     LOG.error(
