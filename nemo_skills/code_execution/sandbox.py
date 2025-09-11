@@ -238,6 +238,8 @@ class Sandbox(abc.ABC):
         if output.get("process_status") == "completed":
             self.session_histories[request_session_id].append(generated_code)
 
+        output.pop("new_session_created", None)
+
         return output, request_session_id
 
     async def is_proof_correct(self, pred_output, timeout=30.0):
