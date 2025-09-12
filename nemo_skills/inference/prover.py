@@ -142,6 +142,9 @@ class ProverTask(GenerationTask):
                 self.cfg.remove_cot
             ), "remove_cot is required when delete_wrong_turns is enabled"
 
+    def log_example_prompt(self, data):
+        return
+
     def setup_llm(self):
         if self.cfg.code_execution:
             raise ValueError("Code execution is not supported for prover")
