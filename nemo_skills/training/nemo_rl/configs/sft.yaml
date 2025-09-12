@@ -39,6 +39,7 @@ policy:
   context_parallel_size: 1
   lr: 1e-6
   weight_decay: 0.01
+  min_lr: 1e-6
 
 
   dtensor_cfg:
@@ -75,7 +76,7 @@ policy:
     optimizer:
       optimizer: "adam"
       lr: ${policy.lr}
-      min_lr: ${policy.megatron_cfg.optimizer.lr}
+      min_lr: ${policy.min_lr}
       weight_decay: ${policy.weight_decay}
       bf16: true  # must be true to avoid checkpoint load error
       fp16: false

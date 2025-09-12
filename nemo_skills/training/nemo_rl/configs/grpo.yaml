@@ -51,6 +51,7 @@ policy:
   context_parallel_size: 1
   lr: 1e-6
   weight_decay: 0.01
+  min_lr: 1e-6
 
   dtensor_cfg:
     enabled: true
@@ -136,7 +137,7 @@ policy:
     optimizer:
       optimizer: "adam"
       lr: ${policy.lr}
-      min_lr: ${policy.megatron_cfg.optimizer.lr}
+      min_lr: ${policy.min_lr}
       weight_decay: ${policy.weight_decay}
       bf16: true
       fp16: false
