@@ -35,8 +35,8 @@ from nemo_skills.utils import (
     setup_logging,
 )
 
-from .lean4_utils import *
 from .generate import GenerateSolutionsConfig, GenerationTask
+from .lean4_utils import *
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -49,7 +49,6 @@ reasoning_effort_list = [
 
 @nested_dataclass(kw_only=True)
 class ProverConfig(GenerateSolutionsConfig):
-
     max_tokens: int = 40960  # model max tokens
     n_pass: int = 1  # number of passes to run the prover
 
@@ -66,18 +65,12 @@ class ProverConfig(GenerateSolutionsConfig):
     def _post_init_validate_params(self):
         """Validate that certain parameters are restricted to certain values"""
         if self.prompt_format not in ["ns", "openai"]:
-            raise ValueError(
-                f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'"
-            )
+            raise ValueError(f"prompt_format must be either 'ns' or 'openai', got '{self.prompt_format}'")
 
         if self.prompt_format == "openai":
-            assert (
-                self.prompt_config is None
-            ), "prompt_config is not supported for prompt_format == 'openai'"
+            assert self.prompt_config is None, "prompt_config is not supported for prompt_format == 'openai'"
         else:
-            assert (
-                self.prompt_config is not None
-            ), "prompt_config is required when prompt_format == 'ns'"
+            assert self.prompt_config is not None, "prompt_config is required when prompt_format == 'ns'"
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
@@ -91,7 +84,6 @@ cs.store(name="base_prover_config", node=ProverConfig)
 
 
 class ProverTask(GenerationTask):
-
     def __init__(self, cfg: ProverConfig):
         """
         Class that represents a generation task. It implements a template of steps to generate solutions using LLMs.
@@ -111,9 +103,7 @@ class ProverTask(GenerationTask):
                         "You can only use one of them!"
                     )
                 self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
-                self.cfg.inference.extra_body["chat_template_kwargs"] = dict(
-                    self.cfg.chat_template_kwargs
-                )
+                self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
 
         self.llm = self.setup_llm()
@@ -138,9 +128,7 @@ class ProverTask(GenerationTask):
         self.output_lock = None
 
         if self.cfg.delete_wrong_turns:
-            assert (
-                self.cfg.remove_cot
-            ), "remove_cot is required when delete_wrong_turns is enabled"
+            assert self.cfg.remove_cot, "remove_cot is required when delete_wrong_turns is enabled"
 
     def log_example_prompt(self, data):
         return
@@ -148,9 +136,7 @@ class ProverTask(GenerationTask):
     def setup_llm(self):
         if self.cfg.code_execution:
             raise ValueError("Code execution is not supported for prover")
-        sandbox = (
-            get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-        )
+        sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
         server = deepcopy(self.cfg.server)
         server["server_type"] = "autoformalization"
         llm = get_model(**server, sandbox=sandbox)
@@ -175,9 +161,9 @@ class ProverTask(GenerationTask):
         return prompt
 
     def setup_refine_prompt(self):
-        assert (
-            self.cfg.refinement_prompt_config is not None
-        ), "refinement_prompt_config is required when refinement is enabled. Please set refinement=False to disable refinement."
+        assert self.cfg.refinement_prompt_config is not None, (
+            "refinement_prompt_config is required when refinement is enabled. Please set refinement=False to disable refinement."
+        )
         self.refine_prompt = get_prompt(self.cfg.refinement_prompt_config)
 
     # with adaptive reasoning
@@ -197,21 +183,16 @@ class ProverTask(GenerationTask):
             generation_params[key] = value
         generation = await self.llm.generate_async(**generation_params)
         if self.cfg.adaptive_reasoning:
-            assert (
-                generation_params["extra_body"].get("reasoning_effort", None)
-                is not None
-            ), "reasoning_effort is required when adaptive_reasoning is enabled"
+            assert generation_params["extra_body"].get("reasoning_effort", None) is not None, (
+                "reasoning_effort is required when adaptive_reasoning is enabled"
+            )
             reasoning_effort_index = reasoning_effort_list.index(
                 generation_params["extra_body"].get("reasoning_effort", None)
             )
             while len(generation["generation"]) == 0 and reasoning_effort_index > 0:
-                print(
-                    f"Reasoning effort is too high, reducing to {reasoning_effort_list[reasoning_effort_index-1]}"
-                )
+                print(f"Reasoning effort is too high, reducing to {reasoning_effort_list[reasoning_effort_index - 1]}")
                 reasoning_effort_index = reasoning_effort_index - 1
-                generation_params["extra_body"]["reasoning_effort"] = (
-                    reasoning_effort_list[reasoning_effort_index]
-                )
+                generation_params["extra_body"]["reasoning_effort"] = reasoning_effort_list[reasoning_effort_index]
                 generation = await self.llm.generate_async(**generation_params)
         if self.cfg.parse_generation:
             remove_thinking(
@@ -229,7 +210,6 @@ class ProverTask(GenerationTask):
         return code, full_code
 
     async def _signle_data_point_generate(self, data_point, data):
-
         formal_statement = (
             (data_point["header"].strip() + "\n")
             + data_point["informal_prefix"].strip()
@@ -241,9 +221,7 @@ class ProverTask(GenerationTask):
         full_prompt_turn_list = deepcopy(
             prompt_turn_list
         )  # We need to get a full copy of the prompt turn list for the final result in case remove_cot is enabled. This is only used to generate SFT data.
-        promt_turn_list_list = (
-            []
-        )  # We need to store the prompt turn list for each turn for the final result in case delete_wrong_turns is enabled. This is only used to generate SFT data.
+        promt_turn_list_list = []  # We need to store the prompt turn list for each turn for the final result in case delete_wrong_turns is enabled. This is only used to generate SFT data.
         base_prompt_turn_list = deepcopy(prompt_turn_list)
 
         code_list = []
@@ -253,13 +231,9 @@ class ProverTask(GenerationTask):
         success = False
         for turn_idx in range(self.cfg.refinement_max_turns):
             results_dict = {}  # everything will be stored in this dict
-            prefix_tokens = self.llm.tokenizer.apply_chat_template(
-                prompt_turn_list, tokenize=True
-            )
+            prefix_tokens = self.llm.tokenizer.apply_chat_template(prompt_turn_list, tokenize=True)
             num_tokens_prefix = len(prefix_tokens)
-            prefix = self.llm.tokenizer.apply_chat_template(
-                prompt_turn_list, tokenize=False
-            )
+            prefix = self.llm.tokenizer.apply_chat_template(prompt_turn_list, tokenize=False)
             # We need to check if the prefix is too long, if it is, we need to break the loop
             if num_tokens_prefix > self.cfg.max_tokens:
                 break
@@ -273,17 +247,13 @@ class ProverTask(GenerationTask):
             )
 
             new_prompt_turn_list = deepcopy(prompt_turn_list)
-            new_prompt_turn_list += [
-                {"role": "assistant", "content": generation["generation"]}
-            ]
+            new_prompt_turn_list += [{"role": "assistant", "content": generation["generation"]}]
 
             promt_turn_list_list.append(
                 new_prompt_turn_list
             )  # This stores the latest turn list after each generation.
 
-            code, full_code = await self._extract_and_replace_code(
-                formal_statement, generation["generation"]
-            )
+            code, full_code = await self._extract_and_replace_code(formal_statement, generation["generation"])
             code_list.append(full_code)
             results_dict["code"] = code  # We keep track of the uncleaned code.
             if self.cfg.remove_cot and not (
@@ -303,16 +273,10 @@ class ProverTask(GenerationTask):
                             "content": f"```lean4\n{full_code.strip()}\n```",
                         }
                     ]
-                full_prompt_turn_list += [
-                    {"role": "assistant", "content": generation["generation"]}
-                ]
+                full_prompt_turn_list += [{"role": "assistant", "content": generation["generation"]}]
             else:
-                prompt_turn_list += [
-                    {"role": "assistant", "content": generation["generation"]}
-                ]
-                full_prompt_turn_list += [
-                    {"role": "assistant", "content": generation["generation"]}
-                ]
+                prompt_turn_list += [{"role": "assistant", "content": generation["generation"]}]
+                full_prompt_turn_list += [{"role": "assistant", "content": generation["generation"]}]
 
             if code == "None" or "**Error**" in full_code:
                 if code == "None":
@@ -329,14 +293,10 @@ class ProverTask(GenerationTask):
                     }
                 results_dict["execution_result"] = execution_result
                 results_dict["success"] = False
-                feedback = self.refine_prompt.fill(
-                    {"error_message": execution_result["stdout"]}
-                )
+                feedback = self.refine_prompt.fill({"error_message": execution_result["stdout"]})
                 results_dict["feedback"] = feedback[0]["content"]
             else:
-                execution_result = await self.llm.sandbox.execute_lean4_code(
-                    full_code, timeout=60.0
-                )
+                execution_result = await self.llm.sandbox.execute_lean4_code(full_code, timeout=60.0)
                 results_dict["execution_result"] = execution_result
                 if type(execution_result) == dict:
                     if (
@@ -347,9 +307,7 @@ class ProverTask(GenerationTask):
                         results_dict["success"] = True
                     else:
                         error_list = parse_error(execution_result["stdout"])
-                        error_message = get_error_str(
-                            full_code, error_list, error_thres=True
-                        )
+                        error_message = get_error_str(full_code, error_list, error_thres=True)
                         feedback = self.refine_prompt.fill(
                             {
                                 "error_message": "We use <error></error> to signal the position of the error. \n"
@@ -374,9 +332,7 @@ class ProverTask(GenerationTask):
                     )
                     results_dict["feedback"] = feedback[0]["content"]
                 else:
-                    raise ValueError(
-                        f"Unknown execution result type: {type(execution_result)}"
-                    )
+                    raise ValueError(f"Unknown execution result type: {type(execution_result)}")
 
             results_dict_list.append(results_dict)
 
@@ -425,7 +381,6 @@ class ProverTask(GenerationTask):
         return new_results_dict
 
     async def process_single_datapoint(self, data_point, all_data):
-
         result = await self.pass_at_N(data_point, all_data)
         result_dict = {"generation": result}
 
