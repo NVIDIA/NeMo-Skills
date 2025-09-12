@@ -9,6 +9,7 @@ We support many popular benchmarks and it's easy to add new in the future. The f
 - [**Instruction following**](./instruction-following.md): e.g. [ifbench](./instruction-following.md#ifbench), [ifeval](./instruction-following.md#ifeval)
 - [**Long-context**](./long-context.md): e.g. [ruler](./long-context.md#ruler), [mrcr](./long-context.md#mrcr)
 - [**Tool-calling**](./tool-calling.md): e.g. [bfcl_v3](./tool-calling.md#bfcl_v3)
+- [**Multilingual**](./multilingual.md): e.g. [mmlu-prox](./multilingual.md#mmlu-prox)
 
 See [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 
@@ -116,6 +117,23 @@ evaluation_mode  | num_entries | avg_tokens | gen_seconds | passing_base_tests |
 pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             | 59.30%
 pass@4           | 164         | 215        | 219         | 79.27%             | 74.39%
 ```
+
+### Variance analysis
+
+When using multiple samples (`:<num repeats>` after the benchmark name), the evaluation automatically computes standard deviation and standard error metrics. These metrics are included inside `{metric_name}_statistics` dictionary.
+
+- **`avg`**: Average of all values across runs. This is typically exactly the same as `{metric_name}` except not multiplied by 100.
+
+- **`std_dev_across_runs`**: Standard deviation of average metric values across runs. Measures how much the average metric value varies between different runs (each run uses attempt i from each sample).
+
+- **`std_err_across_runs`**: Standard error of average metric values across runs. Calculated as `std_dev_across_runs / sqrt(k)` where k is the number of runs. Provides a measure of uncertainty in the run variance estimate.
+
+- **`avg_sample_std_dev`**: Average of per-sample standard deviations. Measures the average within-sample variance across all samples (for each sample, calculates standard deviation across its k attempts, then averages).
+
+These statistical metrics are added as additional columns to `pass@1[avg-of-k]` evaluation modes, providing comprehensive variance and uncertainty statistics alongside the main performance metrics.
+
+!!! warning
+    Currently the extra statistics are only available for a subset of metrics, not everything inside `pass@1[avg-of-k]`.
 
 ## Customizing evaluations
 

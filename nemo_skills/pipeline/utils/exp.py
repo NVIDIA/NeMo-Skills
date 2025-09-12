@@ -432,10 +432,11 @@ def add_task(
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
-    if server_config is not None and server_config["num_gpus"] > 0:
+    if server_config is not None and int(server_config["num_gpus"]) > 0:
+        # do not pass container into the command builder
+        server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
-        if "container" not in server_config:
-            server_container = cluster_config["containers"][server_config["server_type"]]
+
         server_executor = get_executor(
             cluster_config=cluster_config,
             container=server_container,

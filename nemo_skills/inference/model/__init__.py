@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import dataclasses
+
 from nemo_skills.utils import python_doc_to_cmd_help
 
 from .azure import AzureOpenAIModel
@@ -24,10 +26,8 @@ from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
 from .context_retry import ContextLimitRetryConfig
 from .gemini import GeminiModel
 from .megatron import MegatronModel
-
-# Online GenSelect
-from .online_genselect import OnlineGenSelectConfig, OnlineGenSelectWrapper
 from .openai import OpenAIModel
+from .parallel_thinking import ParallelThinkingConfig, ParallelThinkingTask
 
 # Tool Calling
 from .tool_call import ToolCallingWrapper
@@ -53,6 +53,9 @@ models = {
 def get_model(server_type, tokenizer=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
+    if server_type == "trtllm" and kwargs.get("enable_soft_fail", False):
+        if kwargs.get("context_limit_retry_strategy", None) is not None:
+            raise ValueError("context_limit_retry_strategy is not supported for trtllm")
     return model_class(tokenizer=tokenizer, **kwargs)
 
 
@@ -65,17 +68,46 @@ def get_code_execution_model(server_type, tokenizer=None, code_execution=None, s
     return CodeExecutionWrapper(model=model, sandbox=sandbox, config=code_execution_config)
 
 
-def get_online_genselect_model(model, tokenizer=None, online_genselect_config=None, **kwargs):
-    """A helper function to create OnlineGenSelect model."""
-    if isinstance(model, str):
-        model = get_model(model=model, tokenizer=tokenizer, **kwargs)
-    return OnlineGenSelectWrapper(model=model, cfg=online_genselect_config or OnlineGenSelectConfig())
+def get_parallel_thinking_model(
+    model,
+    orig_prompt_filler,
+    parallel_thinking: ParallelThinkingConfig = None,
+    main_config=None,
+    inference_override_config=None,
+):
+    """A helper function to create the Parallel Thinking model."""
+    # Merging priority: parallel_thinking_config, main config, any overrides from inference_override_config
+    merged_config = {
+        **parallel_thinking.__dict__,
+        **main_config.__dict__,
+        **(inference_override_config if inference_override_config is not None else {}),
+    }
+
+    # Filter to only include valid parameters
+    valid_params = {field.name for field in dataclasses.fields(ParallelThinkingConfig)}
+    filtered_config = {key: value for key, value in merged_config.items() if key in valid_params}
+
+    parallel_thinking_config = ParallelThinkingConfig(**filtered_config)
+
+    return ParallelThinkingTask(model=model, orig_prompt_filler=orig_prompt_filler, cfg=parallel_thinking_config)
 
 
-def get_tool_calling_model(model, tool_config, tokenizer=None, additional_config=None, **kwargs):
+def get_tool_calling_model(
+    model,
+    tokenizer=None,
+    additional_config=None,
+    tool_modules: list[str] | None = None,
+    tool_overrides: dict | None = None,
+    **kwargs,
+):
     if isinstance(model, str):
         model = get_model(model=model, tokenizer=tokenizer, **kwargs)
-    return ToolCallingWrapper(model, tool_config_yaml=tool_config, additional_config=additional_config)
+    return ToolCallingWrapper(
+        model,
+        tool_modules=tool_modules,
+        tool_overrides=tool_overrides,
+        additional_config=additional_config,
+    )
 
 
 def server_params():

@@ -112,7 +112,12 @@ SWE-bench requires models to call custom tools. By default SWE-agent & OpenHands
 
 For more details and the list of supported parsers, see the docs: [VLLM](https://docs.vllm.ai/en/stable/features/tool_calling.html#automatic-function-calling), [SGLang](https://docs.sglang.ai/advanced_features/function_calling.html).
 
-In addition, both SWE-agent and OpenHands can run without native tool calling. This means the tool calls will be parsed by the agentic framework itself. To try this out, for SWE-agent you can use the [config for SWE-agent-LM-32B](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/swe-agent-lm-32b.yaml) and for OpenHands you can set `native_tool_calling = false` in the config. Keep in mind that by default the tool call format expected by these frameworks will likely be different from the one that the model was trained on.
+In addition, both SWE-agent and OpenHands can run without native tool calling. This means the tool calls will be parsed by the agentic framework itself. To try this out, you can use the following configs with the `++agent_config` parameter:
+
+- for SWE-agent: [eval/swe-bench/swe-agent/swe-agent-lm-32b](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/swe-agent/swe-agent-lm-32b.yaml). This was the config used for [SWE-agent-LM-32B](https://huggingface.co/SWE-bench/SWE-agent-LM-32B). Note that there are significant differences with the default config.
+- for OpenHands: [eval/swe-bench/openhands/no-native-tool-calling](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/eval/swe-bench/openhands/no-native-tool-calling.toml). This simply sets `native_tool_calling` to `false`.
+
+Keep in mind that by default the tool call format expected by these frameworks will likely be different from the one that the model was trained on.
 
 #### Sample run
 
@@ -138,8 +143,30 @@ ns eval \
 ```
 replacing <...> with your desired parameters.
 
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/swe-bench/metrics.json`. They should look something like this:
+```
+{
+  "swe-bench": {
+    "pass@1": {
+      "num_entries": 500,
+      "gen_seconds": 7172,
+      "issues_resolved": 50.0,
+      "no_patch": 0.2,
+      "patch_cant_apply": 2.0
+    }
+  }
+}
+```
+Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate. To do that automatically, you can set `--benchmarks=swe-bench:N`, where N is your desired number of repeats.
+
 To evaluate the same model with SWE-agent,
 all you need to do is replace `openhands` with `swe_agent` in the command above.
+
+!!! note
+    There are some instances where the gold (ground truth) patches do not pass the evaluation tests. Therefore, it's likely that on those instances even patches that resolve the issue will be incorrectly evaluated as "unresolved". We have observed 11 such instances in SWE-bench Verified: `astropy__astropy-7606`, `astropy__astropy-8707`, `astropy__astropy-8872`, `django__django-10097`, `psf__requests-1724`, `psf__requests-1766`, `psf__requests-1921`, `psf__requests-2317`, `pylint-dev__pylint-6528`, `pylint-dev__pylint-7080`, `pylint-dev__pylint-7277`. Depending on your setup, this set of instances may be different.
+
+!!! note
+    For evaluation, we use a [custom fork](https://github.com/Kipok/SWE-bench) of the SWE-bench repository that supports running evaluation inside of an existing container. It may not always have the latest updates from the upstream repo.
 
 ### ioi24
 
