@@ -14,9 +14,9 @@ from transformers import AutoTokenizer
 LOG = logging.getLogger(get_logger_name(__file__))
 
 def sampling_func(x):
-    return int(32*(128+4-x)/(128+4-32))
+    return int(16*(32+2-x)/(32-16))
 def temp_func(x):
-    if len(x) <= 32:
+    if len(x) <= 16:
         return x
     else:
         sample_numble=sampling_func(len(x))
