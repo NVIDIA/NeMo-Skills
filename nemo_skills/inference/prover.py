@@ -301,7 +301,7 @@ class ProverTask(GenerationTask):
                 results_dict["feedback"] = feedback[0]["content"]
             else:
                 execution_result = await self.llm.sandbox.execute_lean4_code(
-                    full_code, timeout=60.0, max_output_characters=1000000
+                    full_code, timeout=600.0, max_output_characters=1000000
                 )
                 results_dict["execution_result"] = execution_result
                 if type(execution_result) == dict:
@@ -314,6 +314,8 @@ class ProverTask(GenerationTask):
                     else:
                         error_list = parse_error(execution_result["stdout"])
                         error_message = get_error_str(full_code, error_list, error_thres=True)
+                        if execution_result["status"] == "has_sorry":
+                            error_message += "\nThe code contains 'sorry', which means the proof is incomplete."
                         feedback = self.refine_prompt.fill(
                             {
                                 "error_message": "We use <error></error> to signal the position of the error. \n"
