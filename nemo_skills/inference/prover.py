@@ -296,7 +296,7 @@ class ProverTask(GenerationTask):
                 feedback = self.refine_prompt.fill({"error_message": execution_result["stdout"]})
                 results_dict["feedback"] = feedback[0]["content"]
             else:
-                execution_result = await self.llm.sandbox.execute_lean4_code(full_code, timeout=60.0)
+                execution_result = await self.llm.sandbox.execute_lean4_code(full_code, timeout=60.0, max_output_characters=1000000)
                 results_dict["execution_result"] = execution_result
                 if type(execution_result) == dict:
                     if (

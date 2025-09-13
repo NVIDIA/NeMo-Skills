@@ -187,9 +187,9 @@ class Sandbox(abc.ABC):
         """Delete a remote execution session if supported by the backend."""
         pass
 
-    async def execute_lean4_code(self, pred_output, timeout=30.0):
+    async def execute_lean4_code(self, pred_output, timeout=30.0, max_output_characters: int = 1000):
         TO_EXECUTE = pred_output
-        request = self._prepare_request(TO_EXECUTE, timeout, "lean4")
+        request = self._prepare_request(TO_EXECUTE, timeout, "lean4", max_output_characters=max_output_characters)
         try:
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
