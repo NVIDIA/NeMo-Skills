@@ -158,9 +158,9 @@ class ProverTask(GenerationTask):
         return prompt
 
     def setup_refine_prompt(self):
-        assert (
-            self.cfg.refinement_prompt_config is not None
-        ), "refinement_prompt_config is required when refinement is enabled. Please set refinement=False to disable refinement."
+        assert self.cfg.refinement_prompt_config is not None, (
+            "refinement_prompt_config is required when refinement is enabled. Please set refinement=False to disable refinement."
+        )
         self.refine_prompt = get_prompt(self.cfg.refinement_prompt_config)
 
     # with adaptive reasoning
@@ -180,9 +180,9 @@ class ProverTask(GenerationTask):
             generation_params[key] = value
         generation = await self.llm.generate_async(**generation_params)
         if self.cfg.adaptive_reasoning:
-            assert (
-                generation_params["extra_body"].get("reasoning_effort", None) is not None
-            ), "reasoning_effort is required when adaptive_reasoning is enabled"
+            assert generation_params["extra_body"].get("reasoning_effort", None) is not None, (
+                "reasoning_effort is required when adaptive_reasoning is enabled"
+            )
             reasoning_effort_index = reasoning_effort_list.index(
                 generation_params["extra_body"].get("reasoning_effort", None)
             )
@@ -218,9 +218,7 @@ class ProverTask(GenerationTask):
         full_prompt_turn_list = deepcopy(
             prompt_turn_list
         )  # We need to get a full copy of the prompt turn list for the final result in case remove_cot is enabled. This is only used to generate SFT data.
-        promt_turn_list_list = (
-            []
-        )  # We need to store the prompt turn list for each turn for the final result in case delete_wrong_turns is enabled. This is only used to generate SFT data.
+        promt_turn_list_list = []  # We need to store the prompt turn list for each turn for the final result in case delete_wrong_turns is enabled. This is only used to generate SFT data.
         base_prompt_turn_list = deepcopy(prompt_turn_list)
 
         code_list = []
@@ -228,6 +226,7 @@ class ProverTask(GenerationTask):
         assert type(prompt_turn_list) == list, "prompt_turn_list should be a list"
 
         success = False
+        turn_idx = 0
         for turn_idx in range(self.cfg.refinement_max_turns):
             results_dict = {}  # everything will be stored in this dict
             prefix_tokens = self.llm.tokenizer.apply_chat_template(
