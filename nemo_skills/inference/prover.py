@@ -231,9 +231,14 @@ class ProverTask(GenerationTask):
         success = False
         for turn_idx in range(self.cfg.refinement_max_turns):
             results_dict = {}  # everything will be stored in this dict
-            prefix_tokens = self.llm.tokenizer.apply_chat_template(prompt_turn_list, tokenize=True)
+            prefix_tokens = self.llm.tokenizer.apply_chat_template(prompt_turn_list, tokenize=True, add_generation_prompt=True)
             num_tokens_prefix = len(prefix_tokens)
-            prefix = self.llm.tokenizer.apply_chat_template(prompt_turn_list, tokenize=False)
+            prefix = self.llm.tokenizer.apply_chat_template(prompt_turn_list, tokenize=False, add_generation_prompt=True)
+            prefix2 = self.llm.tokenizer.apply_chat_template(prompt_turn_list, tokenize=False)
+            print(prefix)
+            print("*****************")
+            print(prefix2)
+            print("#################")
             # We need to check if the prefix is too long, if it is, we need to break the loop
             if num_tokens_prefix > self.cfg.max_tokens:
                 break
