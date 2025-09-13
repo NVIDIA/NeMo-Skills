@@ -94,7 +94,9 @@ def refine_by_sorry(text):
 
 
 def extract_code(inputs):
-    import_head = "import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n"
+    import_head = (
+        "import Mathlib\nimport Aesop\n\nset_option maxHeartbeats 0\n\nopen BigOperators Real Nat Topology Rat\n\n"
+    )
     pattern = r"```lean4\n(.*?)\n```"
     matches = re.findall(pattern, inputs, re.DOTALL)
     if matches:
@@ -165,12 +167,7 @@ def get_error_str(code, errors, error_thres=True):
             if start_line + ii >= 0:
                 error_code += f"{code_lines[start_line + ii]}\n"
         if start_line != end_line:
-            error_code += (
-                code_lines[start_line][:start_col]
-                + "<error>"
-                + code_lines[start_line][start_col:]
-                + "\n"
-            )
+            error_code += code_lines[start_line][:start_col] + "<error>" + code_lines[start_line][start_col:] + "\n"
             if not error_thres:
                 for j in range(start_line + 1, end_line):
                     error_code += f"{code_lines[j]}\n"
@@ -180,15 +177,8 @@ def get_error_str(code, errors, error_thres=True):
                     error_code += f"{code_lines[j]}\n"
                 if end_line > start_line + show_line:
                     leading_spaces = len(code_lines[j]) - len(code_lines[j].lstrip(" "))
-                    error_code += (
-                        "\n" + " " * leading_spaces + "... --[Truncated]-- ...\n"
-                    )
-            error_code += (
-                code_lines[end_line][:end_col]
-                + "</error>"
-                + code_lines[end_line][end_col:]
-                + "\n"
-            )
+                    error_code += "\n" + " " * leading_spaces + "... --[Truncated]-- ...\n"
+            error_code += code_lines[end_line][:end_col] + "</error>" + code_lines[end_line][end_col:] + "\n"
         else:
             error_code += (
                 code_lines[start_line][:start_col]

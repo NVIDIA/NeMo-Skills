@@ -22,10 +22,7 @@ from typing import List
 import hydra
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.inference.model import (
-    get_model,
-    server_params,
-)
+from nemo_skills.inference.model import get_model, server_params
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import (
     get_help_message,
@@ -161,9 +158,9 @@ class ProverTask(GenerationTask):
         return prompt
 
     def setup_refine_prompt(self):
-        assert self.cfg.refinement_prompt_config is not None, (
-            "refinement_prompt_config is required when refinement is enabled. Please set refinement=False to disable refinement."
-        )
+        assert (
+            self.cfg.refinement_prompt_config is not None
+        ), "refinement_prompt_config is required when refinement is enabled. Please set refinement=False to disable refinement."
         self.refine_prompt = get_prompt(self.cfg.refinement_prompt_config)
 
     # with adaptive reasoning
@@ -183,9 +180,9 @@ class ProverTask(GenerationTask):
             generation_params[key] = value
         generation = await self.llm.generate_async(**generation_params)
         if self.cfg.adaptive_reasoning:
-            assert generation_params["extra_body"].get("reasoning_effort", None) is not None, (
-                "reasoning_effort is required when adaptive_reasoning is enabled"
-            )
+            assert (
+                generation_params["extra_body"].get("reasoning_effort", None) is not None
+            ), "reasoning_effort is required when adaptive_reasoning is enabled"
             reasoning_effort_index = reasoning_effort_list.index(
                 generation_params["extra_body"].get("reasoning_effort", None)
             )
@@ -221,7 +218,9 @@ class ProverTask(GenerationTask):
         full_prompt_turn_list = deepcopy(
             prompt_turn_list
         )  # We need to get a full copy of the prompt turn list for the final result in case remove_cot is enabled. This is only used to generate SFT data.
-        promt_turn_list_list = []  # We need to store the prompt turn list for each turn for the final result in case delete_wrong_turns is enabled. This is only used to generate SFT data.
+        promt_turn_list_list = (
+            []
+        )  # We need to store the prompt turn list for each turn for the final result in case delete_wrong_turns is enabled. This is only used to generate SFT data.
         base_prompt_turn_list = deepcopy(prompt_turn_list)
 
         code_list = []
@@ -304,7 +303,7 @@ class ProverTask(GenerationTask):
                     full_code, timeout=600.0, max_output_characters=1000000
                 )
                 results_dict["execution_result"] = execution_result
-                if type(execution_result) == dict:
+                if isinstance(execution_result, dict):
                     if (
                         execution_result["process_status"] == "completed"
                         and "sorry" not in execution_result["stdout"]
@@ -314,8 +313,13 @@ class ProverTask(GenerationTask):
                     else:
                         error_list = parse_error(execution_result["stdout"])
                         error_message = get_error_str(full_code, error_list, error_thres=True)
-                        if execution_result["status"] == "has_sorry":
-                            error_message += "\nThe code contains 'sorry', which means the proof is incomplete."
+                        # checking for sorry
+                        if execution_result["process_status"] == "completed":
+                            stdout = execution_result["stdout"].lower()
+                            stderr = execution_result["stderr"].lower()
+                            combined = stdout + "\n" + stderr
+                            if re.search(r"\bsorry\b", combined) is not None:
+                                error_message += "\nThe code contains 'sorry', which means the proof is incomplete."
                         feedback = self.refine_prompt.fill(
                             {
                                 "error_message": "We use <error></error> to signal the position of the error. \n"
@@ -324,9 +328,8 @@ class ProverTask(GenerationTask):
                         )
                         results_dict["feedback"] = feedback[0]["content"]
                         results_dict["success"] = False
-                elif (
-                    type(execution_result) == str
-                ):  # This is only used for the case when the code execution timed out.
+                # This is only used for the case when the code execution timed out.
+                elif isinstance(execution_result, str):
                     execution_result = {
                         "process_status": "failed",
                         "stderr": "",
