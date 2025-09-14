@@ -293,6 +293,12 @@ class ProverTask(GenerationTask):
                         "stderr": "",
                         "stdout": full_code,
                     }
+                else:
+                    execution_result = {
+                        "process_status": "failed",
+                        "stderr": "",
+                        "stdout": "Unknown error when parsing code.",
+                    }
                 results_dict["execution_result"] = execution_result
                 results_dict["success"] = False
                 feedback = self.refine_prompt.fill({"error_message": execution_result["stdout"]})
@@ -319,6 +325,11 @@ class ProverTask(GenerationTask):
                             combined = stdout + "\n" + stderr
                             if re.search(r"\bsorry\b", combined) is not None:
                                 error_message += "\nThe code contains 'sorry', which means the proof is incomplete."
+                        if error_message.strip() == "":  # something in stderr indicating failure
+                            error_message = execution_result["stderr"][:1000]
+                            if len(execution_result["stderr"]) > 1000:
+                                error_message += "... (truncated)"
+
                         feedback = self.refine_prompt.fill(
                             {
                                 "error_message": "We use <error></error> to signal the position of the error. \n"
