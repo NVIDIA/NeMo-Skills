@@ -116,7 +116,6 @@ class ToolCallingWrapper:
         while True:
             if isinstance(tokens_to_generate, int) and tokens_to_generate <= 0:
                 break
-
             generation = await self.model.generate_async(
                 prompt=conversation,
                 tools=tools,
