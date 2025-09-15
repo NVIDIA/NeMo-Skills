@@ -49,7 +49,7 @@ description = (
 
 
 @mcp.tool(name="stateful_python_code_exec", description=description)
-async def execute(
+async def stateful_python_code_exec(
     code: Annotated[str, Field(description="Code to execute")],
     session_id: Annotated[str | None, Field(description="Session id for session persistence")] = None,
     timeout: Annotated[float, Field(description="Time in seconds to allow the job to run")] = 10,

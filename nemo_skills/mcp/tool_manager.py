@@ -119,6 +119,11 @@ class ToolManager:
                         raise ValueError(f"Duplicate raw tool name across providers: '{raw_name}'")
                     self._raw_to_qualified_map[raw_name] = qualified_name
                     local_qualified_map[qualified_name] = provider_id
+                    # dropping title (recursively) as it's meant to be shown to users, not model
+                    entry.get("input_schema", {}).pop("title", None)
+                    for parameter in entry.get("input_schema", {}).get("properties", {}).values():
+                        parameter.pop("title", None)
+
                     out.append({**entry, "name": raw_name, "server": provider_id})
                 return out
 
