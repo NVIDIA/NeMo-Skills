@@ -578,7 +578,7 @@ def add_task(
                 container=cluster_config["containers"]["search"],
                 num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
                 tasks_per_node=1,
-                gpus_per_node=2,
+                gpus_per_node=num_gpus if server_config is None else 0,
                 partition=partition,
                 time_min=time_min,
                 dependencies=dependencies,
