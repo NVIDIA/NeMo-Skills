@@ -41,14 +41,19 @@ mcp = FastMCP(name="python_tool")
 # Initialized from config in main()
 sandbox = None
 
+# TODO: how should we control timeout in description?
+description = (
+    "Call this function to execute Python code in a stateful Jupyter notebook environment. "
+    "Python will respond with the output of the execution or time out after 120.0 seconds."
+)
 
-@mcp.tool()
+
+@mcp.tool(name="stateful_python_code_exec", description=description)
 async def execute(
-    code: Annotated[str, Field(description="Code to run in python interpreter")],
+    code: Annotated[str, Field(description="Code to execute")],
     session_id: Annotated[str | None, Field(description="Session id for session persistence")] = None,
     timeout: Annotated[float, Field(description="Time in seconds to allow the job to run")] = 10,
 ) -> ExecutionResult:
-    """Executes the given python code"""
     language = "ipython"
     try:
         output, _ = await sandbox.execute_code(code, language=language, timeout=timeout, session_id=session_id)
