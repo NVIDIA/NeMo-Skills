@@ -45,6 +45,13 @@ class GenSynthesisSpecificConfig:
 
 
 @nested_dataclass(kw_only=True)
+class GenHybridSpecificConfig:
+    prompt_config: str = "generic/genhybrid"
+    genselect_regex: str = r"Judg[e]?ment: (\d+)"
+    gensynthesis_regex: str = r"<NEW_SOLUTION>(.*?)</NEW_SOLUTION>"
+
+
+@nested_dataclass(kw_only=True)
 class ParallelThinkingConfig:
     temperature: float = 0.6
     tokens_to_generate: int | None = None
@@ -61,6 +68,7 @@ class ParallelThinkingConfig:
 
     genselect: GenSelectSpecificConfig = field(default_factory=GenSelectSpecificConfig)
     gensynthesis: GenSynthesisSpecificConfig = field(default_factory=GenSynthesisSpecificConfig)
+    genhybrid: GenHybridSpecificConfig = field(default_factory=GenHybridSpecificConfig)
 
     # Solution related parameters
     window_size: int = 8  # Number of solutions compared in a single request
@@ -96,6 +104,10 @@ class ParallelThinkingTask:
         elif self.cfg.mode == "gensynthesis":
             self.parallel_thinking_prompt = get_prompt(
                 prompt_config=self.cfg.gensynthesis.prompt_config, tokenizer=tokenizer
+            )
+        elif self.cfg.mode == "genhybrid":
+            self.parallel_thinking_prompt = get_prompt(
+                prompt_config=self.cfg.genhybrid.prompt_config, tokenizer=tokenizer
             )
         else:
             raise ValueError(f"Invalid parallel thinking mode: {self.cfg.mode}")
@@ -198,9 +210,6 @@ class ParallelThinkingTask:
     ) -> Dict:
         """Output which combines the solutions into a single solution/selection."""
 
-        num_solutions = len(solutions)
-        max_idx = num_solutions - 1
-
         formatted_solutions = []
         for i, solution in enumerate(solutions):
             formatted_solutions.append(f"Solution {i}: {solution[self.cfg.solution_key]}")
@@ -209,8 +218,8 @@ class ParallelThinkingTask:
         parallel_thinking_input = {
             "problem": prompt,
             "solutions": solutions_text,
-            "num_solutions": num_solutions,
-            "max_idx": max_idx,
+            "num_solutions": len(solutions),
+            "max_idx": len(solutions) - 1,
         }
 
         parallel_thinking_prompt = self.parallel_thinking_prompt.fill(parallel_thinking_input)
@@ -253,16 +262,15 @@ class ParallelThinkingTask:
     ) -> tuple[int, Dict]:
         """Run GenSelect to choose the best solution."""
 
-        max_idx = len(solutions) - 1
         genselect_result = await self._generate_parallel_thinking_contraction(
             prompt=prompt, solutions=solutions, **kwargs
         )
 
         # Extract the judgment from the GenSelect result
-        sel_solution_idx = self._extract_selected_solution(genselect_result["generation"], max_idx)
+        sel_solution_idx = self._extract_selected_solution(genselect_result["generation"], len(solutions) - 1)
         if sel_solution_idx is None:
             LOG.warning("GenSelect failed to produce valid solution index, falling back to random selection")
-            sel_solution_idx = local_random.randint(0, max_idx)
+            sel_solution_idx = local_random.randint(0, len(solutions) - 1)
             genselect_result["selection_successful"] = False
         else:
             genselect_result["selection_successful"] = True
@@ -294,6 +302,40 @@ class ParallelThinkingTask:
         return {
             self.cfg.solution_key: synthesized_solution,
             "parallel_thinking_result": gensynthesis_result,
+        }
+
+    async def _run_genhybrid(
+        self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs
+    ) -> Dict:
+        """Run GenHybrid to select or synthesize a new solution from a list of candidate solutions."""
+        genhybrid_result = await self._generate_parallel_thinking_contraction(
+            prompt=prompt, solutions=solutions, **kwargs
+        )
+
+        # First check for GenSelect otherwise check for GenSynthesis
+        sel_solution_idx = self._extract_selected_solution(genhybrid_result["generation"], len(solutions) - 1)
+        if sel_solution_idx is None:
+            genhybrid_result["selection_successful"] = False
+        else:
+            genhybrid_result["selection_successful"] = True
+            return {
+                self.cfg.solution_key: solutions[sel_solution_idx][self.cfg.solution_key],
+                "parallel_thinking_result": genhybrid_result,
+            }
+
+        synthesized_solution = self._extract_synthesized_solution(genhybrid_result["generation"])
+        if synthesized_solution is None:
+            LOG.warning(
+                "GenHybrid failed to produce valid solution or select an existing solution, falling back to random selection"
+            )
+            synthesized_solution = local_random.choice(solutions)[self.cfg.solution_key]
+            genhybrid_result["synthesis_successful"] = False
+        else:
+            genhybrid_result["synthesis_successful"] = True
+
+        return {
+            self.cfg.solution_key: synthesized_solution,
+            "parallel_thinking_result": genhybrid_result,
         }
 
     async def _get_multiple_solutions(
@@ -363,12 +405,18 @@ class ParallelThinkingTask:
             parallel_thinking_result = output_dict["parallel_thinking_result"]
             result["genselect_comparison"] = parallel_thinking_result["generation"]
             result["genselect_selection_successful"] = parallel_thinking_result["selection_successful"]
-        else:
+        elif self.cfg.mode == "gensynthesis":
             # GenSynthesis
             output_dict = await self._run_gensynthesis(prompt, solutions, local_random)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
             result["gensynthesis_generation"] = parallel_thinking_result["generation"]
             result["gensynthesis_synthesis_successful"] = parallel_thinking_result["synthesis_successful"]
+        elif self.cfg.mode == "genhybrid":
+            output_dict = await self._run_genhybrid(prompt, solutions, local_random)
+            parallel_thinking_result = output_dict["parallel_thinking_result"]
+            result["genhybrid_comparison"] = parallel_thinking_result["generation"]
+            result["genhybrid_selection_successful"] = parallel_thinking_result.get("selection_successful", False)
+            result["genhybrid_synthesis_successful"] = parallel_thinking_result.get("synthesis_successful", False)
 
         # Add the tokens for parallel thinking
         result["parallel_thinking_num_generated_tokens"] = parallel_thinking_result.get("num_generated_tokens", 0)

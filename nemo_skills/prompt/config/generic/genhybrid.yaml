@@ -1,0 +1,32 @@
+# Prompt for selecting or synthesizing a new solution from a list of candidate solutions
+# TODO:
+
+user: |-
+  You will be given a problem followed by {num_solutions} candidate solutions. Your task is to either select the best existing solution or synthesize a new, improved one.
+
+  Problem: {problem}
+
+  Solutions:
+  {solutions}
+
+  Selection Criteria: Choose an existing solution if it:
+  - Fully addresses all aspects of the problem
+  - Is clearly superior to other candidates
+  - Requires no significant improvements
+
+  Synthesis Criteria: Create a new solution if:
+  - No single candidate fully solves the problem
+  - Multiple candidates have complementary strengths
+  - You can combine approaches to create something demonstrably better
+
+  For Synthesis:
+  1. Identify the strongest aspect of each candidate
+  2. Combine these elements while maintaining coherence and feasibility
+
+  Response Format:
+  If selecting: End with "Judgment: [IDX]" where IDX is 0-{max_idx}
+
+  If synthesizing:
+  <NEW_SOLUTION>
+  [Your complete solution here - must follow all format requirements from the problem description]
+  </NEW_SOLUTION>
