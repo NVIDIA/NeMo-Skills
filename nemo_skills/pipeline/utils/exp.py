@@ -568,8 +568,8 @@ def add_task(
             {
                 "SERVER_PORT": search_server_port,
                 ## FIXME(sanyamk): remove hard coded paths.
-                "INDEX_PATH": "/store/data/search/e5_Flat.index",
-                "CORPUS_PATH": "/store/data/search/wiki-18_subset.jsonl",
+                "INDEX_PATH": "/store/data/search/wiki_dump_0628/docs.index",
+                "CORPUS_PATH": "/store/data/search/wiki_dump_0628/docs.jsonl",
             },
         ):
             commands.append(get_search_command(cluster_config))
@@ -578,7 +578,7 @@ def add_task(
                 container=cluster_config["containers"]["search"],
                 num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
                 tasks_per_node=1,
-                gpus_per_node=1,
+                gpus_per_node=2,
                 partition=partition,
                 time_min=time_min,
                 dependencies=dependencies,
