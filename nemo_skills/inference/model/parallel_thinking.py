@@ -362,7 +362,7 @@ class ParallelThinkingTask:
                 if (
                     self.cfg.thinking_begin in solution[self.cfg.solution_key]
                     and self.cfg.thinking_end not in solution[self.cfg.solution_key]
-                ):
+                ) or solution[self.cfg.solution_key] == "":
                     continue
                 else:
                     filtered_solutions.append(solution)
