@@ -1,5 +1,4 @@
 # Prompt for selecting or synthesizing a new solution from a list of candidate solutions
-# TODO:
 
 user: |-
   You will be given a problem followed by {num_solutions} candidate solutions. Your task is to either select the best existing solution or synthesize a new, improved one.
@@ -9,24 +8,27 @@ user: |-
   Solutions:
   {solutions}
 
-  Selection Criteria: Choose an existing solution if it:
+  Selection Criteria: Choose an existing solution ONLY if it:
   - Fully addresses all aspects of the problem
   - Is clearly superior to other candidates
   - Requires no significant improvements
 
-  Synthesis Criteria: Create a new solution if:
-  - No single candidate fully solves the problem
-  - Multiple candidates have complementary strengths
-  - You can combine approaches to create something demonstrably better
+  Synthesis Requirements: If no single solution meets the selection criteria, you MUST synthesize by:
+  - Identifying specific strengths/weaknesses in each candidate
+  - Combining the best approaches from multiple solutions
+  - Creating something demonstrably different from any individual candidate
 
-  For Synthesis:
-  1. Identify the strongest aspect of each candidate
-  2. Combine these elements while maintaining coherence and feasibility
+  CRITICAL FORMAT REQUIREMENT:
+  Your response MUST end with exactly one of these two formats:
 
-  Response Format:
-  If selecting: End with "Judgment: [IDX]" where IDX is 0-{max_idx}
+  For selection:
+  "Judgment: [IDX]" (where IDX is 0-{max_idx})
 
-  If synthesizing:
-  <NEW_SOLUTION>
+  For synthesis:
+  "<NEW_SOLUTION>
   [Your complete solution here - must follow all format requirements from the problem description]
-  </NEW_SOLUTION>
+  </NEW_SOLUTION>"
+
+  DO NOT write the solution anywhere else. The solution must be inside the <NEW_SOLUTION> tags. Write nothing after the closing tag.
+
+  Responses that don't follow this exact format will be rejected.
