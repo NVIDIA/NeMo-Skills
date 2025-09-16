@@ -95,9 +95,11 @@ class LeanEvalModel(ContextAwareModel):
                 )
 
                 # Combine header + formal_statement + proof
-                header = data_point.get("header", "")
+                header = data_point.get("header", "") if data_point else ""
                 formal_statement = (
-                    data_point.get("formal_statement", "") if self.config["restate_formal_statement"] else ""
+                    data_point.get("formal_statement", "")
+                    if data_point and self.config["restate_formal_statement"]
+                    else ""
                 )
 
                 if self.config["strip_theorem_from_proof"]:
@@ -108,8 +110,8 @@ class LeanEvalModel(ContextAwareModel):
 
             else:
                 # Use existing predicted_proof key
-                if "predicted_proof" not in data_point:
-                    raise ValueError("predicted_proof key not found in data_point")
+                if not data_point or "predicted_proof" not in data_point:
+                    raise ValueError("predicted_proof key not found in data_point or data_point is None")
                 predicted_proof = data_point["predicted_proof"]
 
         elif answer_format == "lean4-statement":
@@ -121,8 +123,8 @@ class LeanEvalModel(ContextAwareModel):
                 header = get_lean4_header()
                 predicted_proof = header + cleaned_generation + "\n sorry"
             else:
-                if "predicted_proof" not in data_point:
-                    raise ValueError("predicted_proof key not found in data_point")
+                if not data_point or "predicted_proof" not in data_point:
+                    raise ValueError("predicted_proof key not found in data_point or data_point is None")
                 predicted_proof = data_point["predicted_proof"]
         else:
             raise ValueError(f"Unknown answer_format: {answer_format}")

@@ -20,7 +20,7 @@ import hydra
 
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
-from nemo_skills.inference.model import get_enhanced_model, server_params
+from nemo_skills.inference.model import server_params
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -75,7 +75,27 @@ class EnhancedGenerationTask(GenerationTask):
         # Set up sandbox as usual
         self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
 
-        # Check if we need enhanced model with wrappers
+        # Create base model with existing functionality (code execution, tools, etc.)
+        if self.cfg.code_execution:
+            from nemo_skills.inference.model import get_code_execution_model
+
+            base_model = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
+        elif self.cfg.tool_modules is not None:
+            from nemo_skills.inference.model import get_tool_calling_model
+
+            base_model = get_tool_calling_model(
+                **self.cfg.server,
+                tool_modules=self.cfg.tool_modules,
+                tool_overrides=self.cfg.tool_overrides,
+                tokenizer=self.tokenizer,
+                additional_config={"sandbox": self.cfg.sandbox},
+            )
+        else:
+            from nemo_skills.inference.model import get_model
+
+            base_model = get_model(**self.cfg.server, tokenizer=self.tokenizer)
+
+        # Apply wrappers on top of the base model (if any)
         if self.cfg.wrapper_modules:
             # Prepare context to pass to wrappers
             wrapper_context = {
@@ -85,33 +105,17 @@ class EnhancedGenerationTask(GenerationTask):
                 "prompt": self.prompt,  # Pass prompt formatter
             }
 
-            return get_enhanced_model(
-                tokenizer=self.tokenizer,
-                wrapper_modules=self.cfg.wrapper_modules,
-                wrapper_overrides=self.cfg.wrapper_overrides,
-                additional_config=wrapper_context,
-                **self.cfg.server,
+            # Apply wrappers to the base model (which could be code execution, tool calling, etc.)
+            from nemo_skills.inference.model.wrapper import WrapperManager
+
+            wrapper_manager = WrapperManager(
+                module_specs=self.cfg.wrapper_modules,
+                overrides=self.cfg.wrapper_overrides or {},
+                context=wrapper_context,
             )
+            return wrapper_manager.wrap_model(base_model)
         else:
-            # Fall back to standard model creation logic from parent
-            if self.cfg.code_execution:
-                from nemo_skills.inference.model import get_code_execution_model
-
-                return get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
-            elif self.cfg.tool_modules is not None:
-                from nemo_skills.inference.model import get_tool_calling_model
-
-                return get_tool_calling_model(
-                    **self.cfg.server,
-                    tool_modules=self.cfg.tool_modules,
-                    tool_overrides=self.cfg.tool_overrides,
-                    tokenizer=self.tokenizer,
-                    additional_config={"sandbox": self.cfg.sandbox},
-                )
-            else:
-                from nemo_skills.inference.model import get_model
-
-                return get_model(**self.cfg.server, tokenizer=self.tokenizer)
+            return base_model
 
     async def process_single_datapoint(self, data_point, all_data):
         # Handle inference config - same as parent
@@ -129,8 +133,8 @@ class EnhancedGenerationTask(GenerationTask):
             "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
         }
 
-        # Only pass context if enabled
-        if self.cfg.enable_context_passing:
+        # Pass context if explicitly enabled OR if wrappers are used (they likely need context)
+        if self.cfg.wrapper_modules:
             generation_params["data_point"] = data_point
             generation_params["all_data"] = all_data
 
