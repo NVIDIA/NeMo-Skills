@@ -450,12 +450,6 @@ def add_task(
             ## FIXME(sanyamk): hardcoded for now.
             search_server_gpus = 2
 
-            assert int(server_config["num_gpus"]) > search_server_gpus, (
-                f"Search server needs {search_server_gpus} GPUs"
-            )
-
-            server_config["num_gpus"] = int(server_config["num_gpus"]) - search_server_gpus
-
         # do not pass container into the command builder
         server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
@@ -487,12 +481,59 @@ def add_task(
         het_group_indices.append(het_group)
         het_group += 1
         LOG.info("Server command: %s", server_cmd)
+        with temporary_env_update(
+            cluster_config,
+            {
+                "CUDA_VISIBLE_DEVICES": ",".join(
+                    [
+                        str(i)
+                        for i in range(
+                            int(server_config["num_gpus"]) + (search_server_gpus if with_search_server else 0)
+                        )
+                        if i < int(server_config["num_gpus"])
+                    ]
+                ),
+            },
+        ):
+            server_executor = get_executor(
+                cluster_config=cluster_config,
+                container=server_container,
+                num_nodes=server_config["num_nodes"],
+                tasks_per_node=num_server_tasks,
+                gpus_per_node=int(server_config["num_gpus"]) + (search_server_gpus if with_search_server else 0),
+                partition=partition,
+                time_min=time_min,
+                dependencies=dependencies,
+                job_name=task_name,
+                log_dir=log_dir,
+                log_prefix="server",
+                extra_package_dirs=extra_package_dirs,
+                slurm_kwargs=slurm_kwargs,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
+                with_ray=with_ray,
+            )
+            if cluster_config["executor"] != "slurm" and num_server_tasks > 1:
+                server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
+            commands.append(server_cmd)
+            executors.append(server_executor)
+            het_group_indices.append(het_group)
+            het_group += 1
+            LOG.info("Server command: %s", server_cmd)
 
         # add search server.
         if with_search_server:
             with temporary_env_update(
                 cluster_config,
                 {
+                    "CUDA_VISIBLE_DEVICES": ",".join(
+                        [
+                            str(i)
+                            for i in range(int(server_config["num_gpus"]) + search_server_gpus)
+                            if i >= int(server_config["num_gpus"])
+                        ]
+                    ),
                     "SERVER_PORT": search_server_port,
                     ## FIXME(sanyamk): remove hard coded paths.
                     "INDEX_PATH": "/store/data/search/wiki-202503/docs.index",
@@ -505,7 +546,7 @@ def add_task(
                     container=cluster_config["containers"]["search"],
                     num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
                     tasks_per_node=1,
-                    gpus_per_node=search_server_gpus,
+                    gpus_per_node=int(server_config["num_gpus"]) + search_server_gpus,
                     partition=partition,
                     time_min=time_min,
                     dependencies=dependencies,
