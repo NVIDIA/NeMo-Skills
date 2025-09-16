@@ -120,12 +120,29 @@ class ToolCallingWrapper:
         while True:
             if isinstance(tokens_to_generate, int) and tokens_to_generate <= 0:
                 break
+            print("!!", conversation)
+            from transformers import AutoTokenizer
+
+            tok = AutoTokenizer.from_pretrained(
+                "/home/igitman/workspace/openreasoning-toolcall-hf/", trust_remote_code=True
+            )
+            conv_to_print = copy.deepcopy(conversation)
+            for conv in conv_to_print:
+                if "tool_calls" in conv:
+                    conv["tool_calls"][0]["function"]["arguments"] = json.loads(
+                        conv["tool_calls"][0]["function"]["arguments"]
+                    )
+            prompt_str = tok.apply_chat_template(
+                conv_to_print, tools=tools, tokenize=False, add_generation_prompt=False
+            )
+            print("@@", prompt_str)
             generation = await self.model.generate_async(
                 prompt=conversation,
                 tools=tools,
-                tokens_to_generate=tokens_to_generate,
+                tokens_to_generate=16000,
                 **generation_kwargs,
             )
+            print("##", generation)
             if isinstance(tokens_to_generate, int):
                 tokens_to_generate -= generation["num_generated_tokens"]
 
@@ -133,12 +150,14 @@ class ToolCallingWrapper:
                 if k in generation:
                     result_steps[k].append(generation[k])
 
-            conversation.append({"role": "assistant", "content": result_steps["generation"][-1]})
+            conversation.append({"role": "assistant", "content": generation["generation"]})
+            if "reasoning_content" in generation:
+                conversation[-1]["reasoning_content"] = generation["reasoning_content"]
 
             tool_calls = generation.get("tool_calls", [])
             if tool_calls:
                 tool_calls_message = self.call_interpreter.parse(tool_calls)
-                conversation.append(tool_calls_message)
+                conversation[-1].update(tool_calls_message)
 
                 ## TODO(sanyamk): refactor to not rely on hardcoded dict keys.
                 tool_calls_output_messages = await self._execute_tool_calls(
