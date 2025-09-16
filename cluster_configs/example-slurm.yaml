@@ -16,7 +16,7 @@ executor: slurm
 
 containers:
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
-  vllm: vllm/vllm-openai:v0.10.1.1
+  vllm: vllm/vllm-openai:v0.10.2
   sglang: igitman/nemo-skills-sglang:0.7.0
   nemo: igitman/nemo-skills-nemo:0.7.0
   megatron: igitman/nemo-skills-megatron:0.7.0

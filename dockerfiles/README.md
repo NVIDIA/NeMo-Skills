@@ -14,4 +14,4 @@ We directly use official TensorRT-LLM ngc containers. Current version is `nvcr.i
 
 ## Building vllm image
 
-We directly use official `vllm/vllm-openai:v0.10.1.1` image.
+We directly use official `vllm/vllm-openai:v0.10.2` image.
