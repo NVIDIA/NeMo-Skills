@@ -110,8 +110,8 @@ def get_sandbox_command(cluster_config):
 
 def get_search_command(cluster_config):
     if cluster_config["executor"] == "none":
-        return "python -m nemo_skills.services.search.server --faiss_gpu"
-    return "python /app/server.py --faiss_gpu"
+        return "python -m nemo_tir.services.search.server"
+    return "/entrypoint.sh"
 
 
 @dataclass(kw_only=True)
@@ -443,6 +443,11 @@ def add_task(
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
     if server_config is not None and int(server_config["num_gpus"]) > 0:
+        if with_search_server:
+            ## FIXME(sanyamk): hardcoded for now.
+            search_server_gpus = 2
+            assert int(server_config["num_gpus"]) > search_server_gpus, "Search server needs 2 GPUs"
+
         # do not pass container into the command builder
         server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
@@ -452,7 +457,7 @@ def add_task(
             container=server_container,
             num_nodes=server_config["num_nodes"],
             tasks_per_node=num_server_tasks,
-            gpus_per_node=server_config["num_gpus"],
+            gpus_per_node=int(server_config["num_gpus"]) - (search_server_gpus if with_search_server else 0),
             partition=partition,
             time_min=time_min,
             dependencies=dependencies,
@@ -473,6 +478,44 @@ def add_task(
         het_group_indices.append(het_group)
         het_group += 1
         LOG.info("Server command: %s", server_cmd)
+
+        # add search server.
+        if with_search_server:
+            with temporary_env_update(
+                cluster_config,
+                {
+                    "SERVER_PORT": search_server_port,
+                    ## FIXME(sanyamk): remove hard coded paths.
+                    "INDEX_PATH": "/store/data/search/wiki-202503/docs.index",
+                    "CORPUS_PATH": "/store/data/search/wiki-202503/docs.jsonl",
+                },
+            ):
+                commands.append(get_search_command(cluster_config))
+                search_executor = get_executor(
+                    cluster_config=cluster_config,
+                    container=cluster_config["containers"]["search"],
+                    num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
+                    tasks_per_node=1,
+                    gpus_per_node=search_server_gpus,
+                    partition=partition,
+                    time_min=time_min,
+                    dependencies=dependencies,
+                    job_name=task_name,
+                    log_dir=log_dir,
+                    log_prefix="search",
+                    extra_package_dirs=extra_package_dirs,
+                    slurm_kwargs=slurm_kwargs,
+                    heterogeneous=heterogeneous,
+                    het_group=het_group,
+                    total_het_groups=total_het_groups,
+                    overlap=True,
+                    with_ray=with_ray,
+                )
+                executors.append(search_executor)
+                het_group_indices.append(het_group)
+                het_group += 1
+
+                LOG.info("Search server command: %s", commands[-1])
 
     # then goes the main task(s) unless it's empty
     if cmd:
@@ -559,44 +602,6 @@ def add_task(
             het_group_indices.append(het_group)
         het_group += 1
         LOG.info("Sandbox command: %s", commands[-1])
-
-    # add search server.
-    if with_search_server:
-        with temporary_env_update(
-            cluster_config,
-            {
-                "SERVER_PORT": search_server_port,
-                ## FIXME(sanyamk): remove hard coded paths.
-                "INDEX_PATH": "/store/data/search/wiki_dump_0628/docs.index",
-                "CORPUS_PATH": "/store/data/search/wiki_dump_0628/docs.jsonl",
-            },
-        ):
-            commands.append(get_search_command(cluster_config))
-            search_executor = get_executor(
-                cluster_config=cluster_config,
-                container=cluster_config["containers"]["search"],
-                num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
-                tasks_per_node=1,
-                gpus_per_node=num_gpus if server_config is None else 0,
-                partition=partition,
-                time_min=time_min,
-                dependencies=dependencies,
-                job_name=task_name,
-                log_dir=log_dir,
-                log_prefix="search",
-                extra_package_dirs=extra_package_dirs,
-                slurm_kwargs=slurm_kwargs,
-                heterogeneous=heterogeneous,
-                het_group=het_group,
-                total_het_groups=total_het_groups,
-                overlap=True,
-                with_ray=with_ray,
-            )
-            executors.append(search_executor)
-            het_group_indices.append(het_group)
-            het_group += 1
-
-            LOG.info("Search server command: %s", commands[-1])
 
     if cluster_config["executor"] != "none":
         tunnel = get_tunnel(cluster_config)
