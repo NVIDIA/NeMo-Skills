@@ -454,6 +454,7 @@ def add_task(
         with temporary_env_update(
             cluster_config,
             {
+                ## NOTE(sanyamk): Isolating GPUs hack.
                 "CUDA_VISIBLE_DEVICES": ",".join(
                     [
                         str(i)
@@ -497,6 +498,7 @@ def add_task(
             with temporary_env_update(
                 cluster_config,
                 {
+                    ## NOTE(sanyamk): Isolating GPUs hack.
                     "CUDA_VISIBLE_DEVICES": ",".join(
                         [
                             str(i)
@@ -504,10 +506,7 @@ def add_task(
                             if i >= int(server_config["num_gpus"])
                         ]
                     ),
-                    "SERVER_PORT": search_server_port,
-                    ## FIXME(sanyamk): remove hard coded paths.
-                    "INDEX_PATH": "/store/data/search/wiki-202503/docs.index",
-                    "CORPUS_PATH": "/store/data/search/wiki-202503/docs.jsonl",
+                    "SEARCH_SERVER_PORT": search_server_port,
                 },
             ):
                 commands.append(get_search_command(cluster_config))
