@@ -17,6 +17,7 @@
 import re
 from typing import Any, Dict
 
+from nemo_skills.code_execution.sandbox import Sandbox
 from nemo_skills.inference.model.base import BaseModel
 from nemo_skills.inference.model.wrapper import ContextAwareModel, ContextAwareWrapper
 
@@ -27,8 +28,8 @@ class SandboxExecutionWrapper(ContextAwareWrapper):
     def default_config(self) -> Dict[str, Any]:
         return {
             "extract_code_blocks": True,
-            "code_block_pattern": r"```python\n(.*?)\n```",
-            "timeout_override": None,  # Can override sandbox timeout
+            "code_block_pattern": r"```lean4\n(.*?)\n```",
+            "timeout_override": 300,  # Can override sandbox timeout
         }
 
     def configure(self, overrides=None, context=None):
@@ -47,7 +48,7 @@ class SandboxExecutionWrapper(ContextAwareWrapper):
 class SandboxExecutionModel(ContextAwareModel):
     """Model that executes code from generation in sandbox."""
 
-    def __init__(self, model: BaseModel, config: dict, sandbox):
+    def __init__(self, model: BaseModel, config: dict, sandbox: Sandbox):
         super().__init__(model, config)
         self.sandbox = sandbox
 
@@ -58,7 +59,9 @@ class SandboxExecutionModel(ContextAwareModel):
             if code:
                 try:
                     # Use the sandbox from GenerationTask
-                    execution_result = await self.sandbox.execute(code)
+                    execution_result = await self.sandbox.execute_code(
+                        code, language="lean4", timeout=self.config["timeout_override"]
+                    )
                     result["sandbox_execution"] = {"code": code, "result": execution_result, "success": True}
                 except Exception as e:
                     result["sandbox_execution"] = {"code": code, "error": str(e), "success": False}
