@@ -41,14 +41,12 @@ class GenSelectSpecificConfig:
 @nested_dataclass(kw_only=True)
 class GenSynthesisSpecificConfig:
     prompt_config: str = "generic/gensynthesis"
-    regex: str = r"<NEW_SOLUTION>(.*?)</NEW_SOLUTION>"
 
 
 @nested_dataclass(kw_only=True)
 class GenHybridSpecificConfig:
     prompt_config: str = "generic/genhybrid"
     genselect_regex: str = r"Judg[e]?ment: (\d+)"
-    gensynthesis_regex: str = r"<NEW_SOLUTION>(.*?)</NEW_SOLUTION>"
 
 
 @nested_dataclass(kw_only=True)
@@ -202,9 +200,6 @@ class ParallelThinkingTask:
 
         return prompt_to_solutions_dict
 
-    def _format_solutions_for_parallel_thinking(self, solutions: List[Dict]) -> str:
-        """Format solutions for parallel thinking prompt."""
-
     async def _generate_parallel_thinking_contraction(
         self, prompt: Union[str, List], solutions: List[Dict], **kwargs
     ) -> Dict:
@@ -251,11 +246,15 @@ class ParallelThinkingTask:
 
     def _extract_synthesized_solution(self, generation: str) -> str:
         """Extract the synthesized solution from the GenSynthesis result."""
-        matches = re.findall(self.cfg.gensynthesis.regex, generation, re.DOTALL)
-        if matches:
-            return matches[-1].strip()  # Remove any trailing newlines
-        else:
-            return None
+        # Remove the thinking part from the gensynthesis result
+        solution = {"generation": generation}
+        remove_thinking(
+            solution,
+            generation_key="generation",
+            thinking_begin=self.cfg.thinking_begin,
+            thinking_end=self.cfg.thinking_end,
+        )
+        return solution["generation"]
 
     async def _run_genselect(
         self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs

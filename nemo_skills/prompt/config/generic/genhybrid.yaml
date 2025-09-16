@@ -25,10 +25,4 @@ user: |-
   "Judgment: [IDX]" (where IDX is 0-{max_idx})
 
   For synthesis:
-  "<NEW_SOLUTION>
-  [Your complete solution here - must follow all format requirements from the problem description]
-  </NEW_SOLUTION>"
-
-  DO NOT write the solution anywhere else. The solution must be inside the <NEW_SOLUTION> tags. Write nothing after the closing tag.
-
-  Responses that don't follow this exact format will be rejected.
+  Provide your synthesized solution at the end. If the problem specifies format requirements, follow them exactly.
