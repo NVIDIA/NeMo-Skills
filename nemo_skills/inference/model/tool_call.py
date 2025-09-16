@@ -120,29 +120,12 @@ class ToolCallingWrapper:
         while True:
             if isinstance(tokens_to_generate, int) and tokens_to_generate <= 0:
                 break
-            print("!!", conversation)
-            from transformers import AutoTokenizer
-
-            tok = AutoTokenizer.from_pretrained(
-                "/home/igitman/workspace/openreasoning-toolcall-hf/", trust_remote_code=True
-            )
-            conv_to_print = copy.deepcopy(conversation)
-            for conv in conv_to_print:
-                if "tool_calls" in conv:
-                    conv["tool_calls"][0]["function"]["arguments"] = json.loads(
-                        conv["tool_calls"][0]["function"]["arguments"]
-                    )
-            prompt_str = tok.apply_chat_template(
-                conv_to_print, tools=tools, tokenize=False, add_generation_prompt=False
-            )
-            print("@@", prompt_str)
             generation = await self.model.generate_async(
                 prompt=conversation,
                 tools=tools,
-                tokens_to_generate=16000,
+                tokens_to_generate=tokens_to_generate,
                 **generation_kwargs,
             )
-            print("##", generation)
             if isinstance(tokens_to_generate, int):
                 tokens_to_generate -= generation["num_generated_tokens"]
 
