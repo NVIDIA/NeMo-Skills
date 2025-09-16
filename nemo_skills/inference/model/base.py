@@ -245,47 +245,25 @@ class BaseModel:
             "extra_body": extra_body,
         }
 
-        # TODO: remove this after we no longer use gpt-oss or it's fixed in vllm
-        max_retries = 2
-        retry_count = 0
+        if isinstance(prompt, list):
+            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+            response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+            if stream:
+                result = self._stream_chat_chunks_async(response)
+            else:
+                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
 
-        while retry_count <= max_retries:
-            try:
-                if isinstance(prompt, list):
-                    request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-                    response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
-                    if stream:
-                        result = self._stream_chat_chunks_async(response)
-                    else:
-                        result = self._parse_chat_completion_response(
-                            response, include_response=include_response, **kwargs
-                        )
-
-                elif isinstance(prompt, str):
-                    request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-                    response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
-                    if stream:
-                        result = self._stream_completion_chunks_async(response)
-                    else:
-                        result = self._parse_completion_response(response, include_response=include_response, **kwargs)
-                else:
-                    raise TypeError(f"Unsupported prompt type: {type(prompt)}")
-                if not stream:
-                    self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
-                return result
-
-            except openai.BadRequestError as e:
-                if "output messages (reasoning and final)" in str(e):
-                    if retry_count < max_retries:
-                        retry_count += 1
-                        LOG.warning(f"BadRequestError, retrying {retry_count}/{max_retries}: {e}")
-                        continue
-
-                    LOG.error(f"BadRequestError after {max_retries} retries, returning empty response: {e}")
-                    return {"generation": "", "reasoning_content": "", "num_generated_tokens": 0}
-                else:
-                    raise e
-
+        elif isinstance(prompt, str):
+            request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+            response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
+            if stream:
+                result = self._stream_completion_chunks_async(response)
+            else:
+                result = self._parse_completion_response(response, include_response=include_response, **kwargs)
+        else:
+            raise TypeError(f"Unsupported prompt type: {type(prompt)}")
+        if not stream:
+            self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
         return result
 
     @with_context_retry
