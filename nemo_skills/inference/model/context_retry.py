@@ -20,8 +20,6 @@ import re
 from dataclasses import dataclass
 from typing import Callable, Dict, Union
 
-import litellm
-
 from nemo_skills.utils import get_logger_name
 
 from .utils import ServerTokenizer, WrapperAutoTokenizer, is_context_window_exceeded_error
@@ -191,7 +189,7 @@ async def handle_context_retries_async(
     try:
         result = await func(self, *args, **kwargs)
         return result
-    except (litellm.exceptions.ContextWindowExceededError, litellm.BadRequestError) as error:
+    except Exception as error:
         if is_context_window_exceeded_error(error):
             if not config.enable_soft_fail:
                 raise error
