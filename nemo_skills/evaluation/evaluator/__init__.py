@@ -54,6 +54,7 @@ EVALUATOR_MAP = {
     "scicode": eval_scicode,
     "mrcr": eval_mrcr,
     "ioi": eval_ioi,
+    "passthrough": dummy_eval,
 }
 
 
