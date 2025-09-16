@@ -35,6 +35,9 @@ from .tool_call import ToolCallingWrapper
 # Utilities
 from .vllm import VLLMModel
 
+# Wrappers
+from .wrapper import WrapperManager
+
 # Model implementations
 
 
@@ -108,6 +111,26 @@ def get_tool_calling_model(
         tool_overrides=tool_overrides,
         additional_config=additional_config,
     )
+
+
+def get_enhanced_model(
+    server_type, tokenizer=None, wrapper_modules=None, wrapper_overrides=None, additional_config=None, **kwargs
+):
+    """Create a model with optional wrappers applied."""
+
+    # Start with base model
+    model = get_model(server_type=server_type, tokenizer=tokenizer, **kwargs)
+
+    # Apply wrappers if specified
+    if wrapper_modules:
+        wrapper_manager = WrapperManager(
+            module_specs=wrapper_modules,
+            overrides=wrapper_overrides or {},
+            context=additional_config or {},
+        )
+        model = wrapper_manager.wrap_model(model)
+
+    return model
 
 
 def server_params():
