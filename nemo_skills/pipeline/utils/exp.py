@@ -449,7 +449,12 @@ def add_task(
         if with_search_server:
             ## FIXME(sanyamk): hardcoded for now.
             search_server_gpus = 2
-            assert int(server_config["num_gpus"]) > search_server_gpus, "Search server needs 2 GPUs"
+
+            assert int(server_config["num_gpus"]) > search_server_gpus, (
+                f"Search server needs {search_server_gpus} GPUs"
+            )
+
+            server_config["num_gpus"] = int(server_config["num_gpus"]) - search_server_gpus
 
         # do not pass container into the command builder
         server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
@@ -460,7 +465,7 @@ def add_task(
             container=server_container,
             num_nodes=server_config["num_nodes"],
             tasks_per_node=num_server_tasks,
-            gpus_per_node=int(server_config["num_gpus"]) - (search_server_gpus if with_search_server else 0),
+            gpus_per_node=server_config["num_gpus"] + (search_server_gpus if with_search_server else 0),
             partition=partition,
             qos=qos,
             time_min=time_min,
