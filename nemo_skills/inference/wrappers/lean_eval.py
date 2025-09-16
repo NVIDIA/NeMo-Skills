@@ -63,20 +63,22 @@ class LeanEvalModel(ContextAwareModel):
             # Prepare predicted_proof based on format (replicating batch_evaluate_results logic)
             predicted_proof = await self._prepare_predicted_proof(result, data_point)
 
-            # Evaluate proof using sandbox
-            proof_status = await self._is_proof_correct(predicted_proof)
+            # Execute proof and get raw compiler output
+            compiler_output = await self._execute_lean_proof(predicted_proof)
 
             # Add evaluation results to output
             result["predicted_proof"] = predicted_proof
-            result["proof_status"] = proof_status
-            result["lean_evaluation"] = {
-                "success": proof_status == "correct",
-                "status": proof_status,
-                "timeout": self.config["timeout"],
-            }
+            result["proof_status"] = self._determine_proof_status(compiler_output)
+            result["lean_evaluation"] = compiler_output
 
         except Exception as e:
-            result["lean_evaluation"] = {"success": False, "status": "error", "error": str(e)}
+            result["proof_status"] = "error"
+            result["lean_evaluation"] = {
+                "process_status": "error",
+                "stdout": "",
+                "stderr": f"Error during evaluation: {str(e)}",
+                "timeout": self.config["timeout"],
+            }
 
         return result
 
@@ -131,6 +133,45 @@ class LeanEvalModel(ContextAwareModel):
 
         return predicted_proof
 
-    async def _is_proof_correct(self, pred_output):
-        """Check if the proof is correct using sandbox's is_proof_correct method."""
-        return await self.sandbox.is_proof_correct(pred_output, timeout=self.config["timeout"])
+    async def _execute_lean_proof(self, pred_output):
+        """Execute Lean proof and return raw compiler output."""
+        try:
+            output, _ = await self.sandbox.execute_code(
+                generated_code=pred_output,
+                language="lean4",
+                timeout=self.config["timeout"],
+            )
+
+            # Return the raw compiler output with timeout info
+            return {**output, "timeout": self.config["timeout"]}
+
+        except Exception as e:
+            return {
+                "process_status": "error",
+                "stdout": "",
+                "stderr": f"Execution error: {str(e)}",
+                "timeout": self.config["timeout"],
+            }
+
+    def _determine_proof_status(self, compiler_output):
+        """Determine proof status from compiler output (replicates sandbox.is_proof_correct logic)."""
+        import re
+
+        process_status = compiler_output.get("process_status", "unknown")
+
+        if process_status == "timeout":
+            return "timeout"
+        elif process_status != "completed":
+            return process_status
+
+        # Check stdout and stderr for proof status indicators
+        stdout = compiler_output.get("stdout", "").lower()
+        stderr = compiler_output.get("stderr", "").lower()
+        combined = stdout + "\n" + stderr
+
+        # Check for sorry (incomplete proof)
+        if re.search(r"\bsorry\b", combined) is not None:
+            return "has_sorry"
+
+        # If process completed without errors, consider it successful
+        return "completed"
