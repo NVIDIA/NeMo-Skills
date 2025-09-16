@@ -86,7 +86,6 @@ class EnhancedGenerationTask(GenerationTask):
             }
 
             return get_enhanced_model(
-                server_type=self.cfg.server["server_type"],
                 tokenizer=self.tokenizer,
                 wrapper_modules=self.cfg.wrapper_modules,
                 wrapper_overrides=self.cfg.wrapper_overrides,
