@@ -107,7 +107,7 @@ policy:
       total_iters: 1   # must be >=1, here it keeps LR constant
   - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
     kwargs:
-      T_max: ${sft.max_num_steps}      # total training steps
+      T_max: ${grpo.max_num_steps}      # total training steps
       eta_min: ${policy.lr}   # set min_lr = initial_lr -> constant schedule
   - milestones: [0]  # required to avoid config errors
 
