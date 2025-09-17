@@ -242,6 +242,7 @@ def eval_bigcodebench(cfg):
         LOG.info("Package 'bigcodebench' not found. Attempting to install...")
         install_requirements(BIGCODEBENCH_REQUIREMENTS_URL)
         install_or_upgrade_package("bigcodebench")
+        install_or_upgrade_package("numpy==1.26.4")
         try:
             from bigcodebench.evaluate import evaluate
         except ImportError:
