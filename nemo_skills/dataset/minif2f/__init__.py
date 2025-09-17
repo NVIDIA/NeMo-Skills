@@ -16,6 +16,7 @@
 # Default evaluation and generation settings for the minif2f dataset
 DATASET_GROUP = "lean4"
 METRICS_TYPE = "lean4-proof"
-EVAL_ARGS = "++eval_type=lean4-proof"
-GENERATION_ARGS = "++prompt_config=lean4/formal-proof-deepseek-prover-v2"
+EVAL_ARGS = "++eval_type=passthrough"
+GENERATION_ARGS = '++prompt_config=lean4/formal-proof-deepseek-prover-v2 ++wrapper_modules=["nemo_skills.inference.wrappers.lean_eval::LeanEvalWrapper"]'
+GENERATION_MODULE = "nemo_skills.inference.enhanced_generate"
 REQUIRES_SANDBOX = True
