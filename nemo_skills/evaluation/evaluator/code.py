@@ -263,11 +263,19 @@ def eval_bigcodebench(cfg):
                 f.write(json.dumps(sample) + "\n")
 
         # https://github.com/bigcode-project/bigcodebench/blob/main/bigcodebench/evaluate.py#L117
-        evaluate("instruct", eval_config.subset, samples=jsonl_file, execution="local")  # subset [full, hard]
         # if the input filename is "output.jsonl"
         # then there will be two output files (generated) after evaluation:
         # "output_eval_results-saved.json"
         # "output_pass_at_k.json"
+        evaluate(
+            "instruct",
+            eval_config.subset,  # full, hard
+            samples=jsonl_file,
+            execution="local",
+            pass_k="1",
+            calibrated=True,
+            save_pass_rate=True,  # saves pass_at_k results in file: "output_pass_at_k.json"
+        )
 
         with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
             eval_grades = json.load(fin)
