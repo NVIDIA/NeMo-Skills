@@ -420,7 +420,7 @@ def add_task(
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
 
-    if search_server_port is None:
+    if with_search_server:
         search_server_port = get_free_port(strategy="random")
 
     env_vars = get_env_variables(cluster_config)
