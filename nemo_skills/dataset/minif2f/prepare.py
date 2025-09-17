@@ -103,10 +103,13 @@ def split_data(input_file):
                 continue
             entry = json.loads(line)
             entry = process_entry(entry)
-            if entry.get("split") == "valid":
+            split_value = entry["split"]  # Will raise KeyError if missing
+            if split_value == "valid":
                 valid_data.append(entry)
-            elif entry.get("split") == "test":
+            elif split_value == "test":
                 test_data.append(entry)
+            else:
+                raise ValueError(f"Unknown split value: {split_value!r} in entry: {entry}")
 
     return valid_data, test_data
 
