@@ -41,32 +41,31 @@ Training arguments:
 https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
 """
 
-import os
 import math
 import multiprocessing
+import os
 import pathlib
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import datasets
 import numpy as np
 import torch
 import transformers
-from transformers import Trainer
-
 from recurrent_drafting.configuration_drafter import DrafterConfig
 from recurrent_drafting.modeling_drafter import Drafter
-from recurrent_drafting.train import data
 from recurrent_drafting.train.loss import drafter_loss
 from recurrent_drafting.train.model import ReDrafter
+from transformers import Trainer
 
 local_rank = int(os.getenv("LOCAL_RANK", "0"))
+
 
 class ReDrafterTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.last_logged_step = -1
-    
+
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """
         Compute the training loss for the model.
@@ -82,26 +81,24 @@ class ReDrafterTrainer(Trainer):
         """
 
         next_n = self.args.drafter_predict_n_tokens
-        logits = model(
-            input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"], next_n=next_n
-        )
-        loss, log, eval_log = drafter_loss(
-            logits, inputs["labels"], next_n, self.args.drafter_top_k
-        )
-        
+        logits = model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"], next_n=next_n)
+        loss, log, eval_log = drafter_loss(logits, inputs["labels"], next_n, self.args.drafter_top_k)
+
         # Only log once per global step
-        should_log = (local_rank == 0) and \
-                    (self.state.global_step % self.args.logging_steps == 0) and \
-                    (self.state.global_step != self.last_logged_step)
-        
+        should_log = (
+            (local_rank == 0)
+            and (self.state.global_step % self.args.logging_steps == 0)
+            and (self.state.global_step != self.last_logged_step)
+        )
+
         if should_log:
             self.last_logged_step = self.state.global_step
-            rounded_log = {k: round(v, 4) if isinstance(v, (float, np.float32, np.float64)) else v 
-                           for k, v in log.items()}
+            rounded_log = {
+                k: round(v, 4) if isinstance(v, (float, np.float32, np.float64)) else v for k, v in log.items()
+            }
             self.log(rounded_log)
-        
-        return (loss, eval_log) if return_outputs else loss
 
+        return (loss, eval_log) if return_outputs else loss
 
 
 @dataclass
@@ -116,10 +113,7 @@ class TrainingArguments(transformers.TrainingArguments):
     optim: str = field(default="adamw_torch")
     model_max_length: int = field(
         default=2048,
-        metadata={
-            "help": "Maximum sequence length. "
-            "Sequences will be right padded (and possibly truncated)."
-        },
+        metadata={"help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."},
     )
     drafter_predict_n_tokens: int = field(
         default=5,
@@ -195,6 +189,7 @@ def generate_drafter_config_from_base(llm, training_args):
         rnn=training_args.rnn,
     )
 
+
 def get_compute_metrics(training_args):
     predict_n_tokens = training_args.drafter_predict_n_tokens
 
@@ -226,46 +221,39 @@ def record_to_training_instance(
     IGNORE_TOKEN_ID = -100
 
     messages = [
-            {"role": "system", "content": f""},
-            {"role": "user", "content": problem},
-            {"role": "assistant", "content": solution}]
+        {"role": "system", "content": ""},
+        {"role": "user", "content": problem},
+        {"role": "assistant", "content": solution},
+    ]
 
-    input_text = tokenizer.apply_chat_template(messages,
-                                                   tokenize = False,
-                                                   add_generation_prompt = False)
+    input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
 
     input_dict = tokenizer(
-            input_text,
-            return_tensors="pt",
-            padding="max_length",
-            max_length=tokenizer.model_max_length,
-            truncation=True,
-        )
-    input_dict = {k:v.flatten() for k,v in input_dict.items()}
-    input_dict['labels'] = input_dict['input_ids'].clone()
-    input_dict['labels'][~input_dict['attention_mask'].bool()] = IGNORE_TOKEN_ID
+        input_text,
+        return_tensors="pt",
+        padding="max_length",
+        max_length=tokenizer.model_max_length,
+        truncation=True,
+    )
+    input_dict = {k: v.flatten() for k, v in input_dict.items()}
+    input_dict["labels"] = input_dict["input_ids"].clone()
+    input_dict["labels"][~input_dict["attention_mask"].bool()] = IGNORE_TOKEN_ID
 
     return input_dict
+
 
 def train(model_args, training_args):
     tokenizer = get_tokenizer(model_args, training_args)
     compute_metrics = get_compute_metrics(training_args)
     # Load data in streaming mode
-    train_dataset = datasets.load_dataset(
-        training_args.dataset, 
-        split=training_args.dataset_split,
-        streaming=True
-    )
-    
+    train_dataset = datasets.load_dataset(training_args.dataset, split=training_args.dataset_split, streaming=True)
+
     # Take only the required number of samples if specified
-    if hasattr(training_args, 'dataset_nrows') and training_args.dataset_nrows:
+    if hasattr(training_args, "dataset_nrows") and training_args.dataset_nrows:
         train_dataset = train_dataset.take(training_args.dataset_nrows)
-    
+
     # Convert to regular dataset and map
-    train_dataset = datasets.Dataset.from_generator(
-        lambda: train_dataset, 
-        features=train_dataset.features
-    ).map(
+    train_dataset = datasets.Dataset.from_generator(lambda: train_dataset, features=train_dataset.features).map(
         lambda x: record_to_training_instance(x, tokenizer),
         num_proc=min(32, multiprocessing.cpu_count()),
     )
@@ -303,11 +291,7 @@ def train(model_args, training_args):
         compute_metrics=compute_metrics,
         train_dataset=train_dataset,
     )
-    trainer.train(
-        resume_from_checkpoint=bool(
-            list(pathlib.Path(training_args.output_dir).glob("checkpoint-*"))
-        )
-    )
+    trainer.train(resume_from_checkpoint=bool(list(pathlib.Path(training_args.output_dir).glob("checkpoint-*"))))
     # Save ReDrafter
     drafter.save_pretrained(training_args.output_dir)
 
@@ -316,14 +300,11 @@ def eval(model_args, training_args):
     tokenizer = get_tokenizer(model_args, training_args)
     compute_metrics = get_compute_metrics(training_args)
     # Load data
-    eval_dataset = (
-        datasets.load_dataset(training_args.dataset, 
-                              num_proc=multiprocessing.cpu_count(),
-                              split=training_args.dataset_split)
-        .map(
-            lambda x: record_to_training_instance(x, tokenizer),
-            num_proc=min(32, multiprocessing.cpu_count()),
-        )
+    eval_dataset = datasets.load_dataset(
+        training_args.dataset, num_proc=multiprocessing.cpu_count(), split=training_args.dataset_split
+    ).map(
+        lambda x: record_to_training_instance(x, tokenizer),
+        num_proc=min(32, multiprocessing.cpu_count()),
     )
     # Load ReDrafter
     redrafter = ReDrafter.from_pretrained(

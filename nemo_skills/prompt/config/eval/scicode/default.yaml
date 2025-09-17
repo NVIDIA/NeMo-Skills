@@ -1,5 +1,3 @@
-system: ""
-
 user: |-
   PROBLEM DESCRIPTION:
   You will be provided with the main description of the problem, previous steps, and the next step. Your task will be to generate the disciplinary knowledge necessary for solving the next step and then develop a Python solution focused on this step.

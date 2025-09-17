@@ -23,9 +23,14 @@ class IFMetrics(BaseMetrics):
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         return {
-            'prompt': prediction['follow_all_instructions'],
-            'instruction': sum(prediction['follow_instruction_list']),
+            "prompt": prediction["follow_all_instructions"],
+            "instruction": sum(prediction["follow_instruction_list"]),
         }
+
+    def get_incorrect_sample(self, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        prediction["follow_all_instructions"] = [0 for _ in prediction["follow_all_instructions"]]
+        return prediction
 
     def update(self, predictions):
         """Updating the evaluation results with the current element.
@@ -35,9 +40,9 @@ class IFMetrics(BaseMetrics):
                 The content of the file is benchmark specific.
         """
         super().update(predictions)
-        self.instruction_total += len(predictions[0]['instruction_id_list'])
-        strict_predictions = [pred['strict_eval'] for pred in predictions]
-        loose_predictions = [pred['loose_eval'] for pred in predictions]
+        self.instruction_total += len(predictions[0]["instruction_id_list"])
+        strict_predictions = [pred["strict_eval"] for pred in predictions]
+        loose_predictions = [pred["loose_eval"] for pred in predictions]
 
         self._compute_pass_at_k(predictions=strict_predictions, eval_dict=self.strict_eval_dict)
         self._compute_pass_at_k(predictions=loose_predictions, eval_dict=self.loose_eval_dict)
@@ -45,10 +50,10 @@ class IFMetrics(BaseMetrics):
     def get_metrics(self):
         metrics_dict = {}
         for agg_mode in self.strict_eval_dict:
-            prompt_strict = self.strict_eval_dict[agg_mode]['prompt'] / self.total * 100.0
-            inst_strict = self.strict_eval_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
-            prompt_loose = self.loose_eval_dict[agg_mode]['prompt'] / self.total * 100.0
-            inst_loose = self.loose_eval_dict[agg_mode]['instruction'] / self.instruction_total * 100.0
+            prompt_strict = self.strict_eval_dict[agg_mode]["prompt"] / self.total * 100.0
+            inst_strict = self.strict_eval_dict[agg_mode]["instruction"] / self.instruction_total * 100.0
+            prompt_loose = self.loose_eval_dict[agg_mode]["prompt"] / self.total * 100.0
+            inst_loose = self.loose_eval_dict[agg_mode]["instruction"] / self.instruction_total * 100.0
             metrics_dict[agg_mode] = {
                 "num_prompts": self.total,
                 "num_instructions": self.instruction_total,
@@ -58,7 +63,8 @@ class IFMetrics(BaseMetrics):
                 "prompt_loose_accuracy": prompt_loose,
                 "instruction_loose_accuracy": inst_loose,
             }
-
+            self.update_common_metrics(metrics_dict[agg_mode])
+        self._add_std_metrics(metrics_dict)
         return metrics_dict
 
     def reset(self):

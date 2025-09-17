@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 
@@ -22,7 +21,12 @@ class Lean4Metrics(BaseMetrics):
         self.reset()
 
     def _get_score_dict(self, prediction):
-        return {"lean4_correct": prediction['proof_status'] == "completed"}
+        return {"lean4_correct": prediction["proof_status"] == "completed"}
+
+    def get_incorrect_sample(self, prediction: dict) -> dict:
+        prediction = prediction.copy()
+        prediction["proof_status"] = "error"
+        return prediction
 
     def _update_score_metrics_for_pass(
         self,
@@ -34,10 +38,10 @@ class Lean4Metrics(BaseMetrics):
         predictions: list[dict],
         predicted_answers: list[str] | None,
     ):
-        assert score_method == 'lean4_correct'
-        timeout_errors = [pred['proof_status'] == "timeout" for pred in predictions[:k]]
-        eval_dict[f'pass@{k}']['timeout_error'] += all(timeout_errors)
-        eval_dict[f'pass@1[{k}]']['timeout_error'] += sum(timeout_errors) / k
+        assert score_method == "lean4_correct"
+        timeout_errors = [pred["proof_status"] == "timeout" for pred in predictions[:k]]
+        eval_dict[f"pass@{k}"]["timeout_error"] += all(timeout_errors)
+        eval_dict[f"pass@1[avg-of-{k}]"]["timeout_error"] += sum(timeout_errors) / k
 
     def update(self, predictions):
         super().update(predictions)

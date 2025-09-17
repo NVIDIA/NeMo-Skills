@@ -73,7 +73,7 @@ def get_hf_to_trtllm_cmd(
 
     tmp_engine_dir = f"{output_model}-tmp-ckpt"
 
-    setup_cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
+    setup_cmd = "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
 
     if dtype == "fp8":
         hf_to_trtllm_cmd = (
@@ -102,31 +102,6 @@ def get_hf_to_trtllm_cmd(
             f"    {extra_arguments} && "
             f"cp {input_model}/tokenizer* {output_model} "
         )
-    else:
-        hf_to_trtllm_cmd = (
-            f"python -m nemo_skills.conversion.hf_to_trtllm_{model_type} "
-            f"    --model_dir {input_model} "
-            f"    --output_dir {tmp_engine_dir} "
-            f"    --dtype {dtype} "
-            f"    --tp_size {num_gpus} "
-            f"    --pp_size {num_nodes} "
-            f"    --workers 16 "
-            f"    {trt_prepare_args} "
-        )
-        trtllm_build_cmd = (
-            f"trtllm-build "
-            f"    --checkpoint_dir {tmp_engine_dir} "
-            f"    --output_dir {output_model} "
-            f"    --gpt_attention_plugin {dtype} "
-            f"    --use_paged_context_fmha enable "
-            f"    --max_batch_size 512 "
-            f"    --max_input_len 4096 "
-            f"    --max_seq_len 8192 "
-            f"    --max_num_tokens 8192 "
-            f"    {extra_arguments} && "
-            f"cp {input_model}/tokenizer* {output_model} "
-        )
-
     if trt_reuse_tmp_engine:
         cmd = (
             setup_cmd + f"if [ ! -f {tmp_engine_dir}/config.json ]; then {hf_to_trtllm_cmd}; fi && {trtllm_build_cmd}"
@@ -261,11 +236,20 @@ def convert(
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
     ),
 ):
     """Convert a checkpoint from one format to another.
@@ -273,7 +257,7 @@ def convert(
     All extra arguments are passed directly to the underlying conversion script (see their docs).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting conversion job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -292,9 +276,8 @@ def convert(
         if convert_to != "trtllm":
             raise ValueError("FP8 dtype is only supported when converting to TensorRT LLM (convert_to='trtllm')")
 
-    # TODO: add support for conversion from NeMo to trtllm using nemo.export (need to test thoroughly)
-    if convert_from == "nemo" and convert_to == "trtllm":
-        raise ValueError("Conversion from NeMo to TensorRT LLM is not supported directly. Convert to HF first.")
+    if convert_to == "trtllm" and dtype != "fp8":
+        raise ValueError("Conversion to TensorRT-LLM is no longer needed, please use HF checkpoint directly!")
 
     if convert_to != "trtllm" and hf_model_name is None:
         raise ValueError("--hf_model_name is required")
@@ -315,12 +298,22 @@ def convert(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    input_model, output_model, log_dir = check_mounts(
-        cluster_config,
-        log_dir=log_dir,
-        mount_map={input_model: '/input_model', output_model: '/output_model'},
-        check_mounted_paths=check_mounted_paths,
-    )
+    if convert_from == "hf" and not input_model.startswith("/"):
+        # For HF, we don't need to check the input_model path if the huggingface model name is used
+        output_model, log_dir = check_mounts(
+            cluster_config,
+            log_dir=log_dir,
+            mount_map={output_model: "/output_model"},
+            check_mounted_paths=check_mounted_paths,
+        )
+
+    else:
+        input_model, output_model, log_dir = check_mounts(
+            cluster_config,
+            log_dir=log_dir,
+            mount_map={input_model: "/input_model", output_model: "/output_model"},
+            check_mounted_paths=check_mounted_paths,
+        )
 
     if log_dir is None:
         log_dir = str(Path(output_model) / "conversion-logs")
@@ -353,9 +346,9 @@ def convert(
         num_nodes=num_nodes,
         extra_arguments=extra_arguments,
     )
-    with get_exp(expname, cluster_config) as exp:
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
         LOG.info("Launching task with command %s", conversion_cmd)
-        add_task(
+        prev_task = add_task(
             exp,
             cmd=conversion_cmd,
             task_name=expname,
@@ -372,9 +365,13 @@ def convert(
             reuse_code_exp=reuse_code_exp,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
+            task_dependencies=_task_dependencies,
+            skip_hf_home_check=skip_hf_home_check,
         )
-        run_exp(exp, cluster_config)
+        run_exp(exp, cluster_config, dry_run=dry_run)
 
+    if _reuse_exp:
+        return [prev_task]
     return exp
 
 

@@ -44,12 +44,12 @@ PATTERN_PYTHON_CODE = re.compile("```[pP]ython")
 
 class BaseFilter(BaseParallelProcessor):
     def __init__(self, **kwargs):
-        if 'in_memory_chunksize' not in kwargs:
-            kwargs['in_memory_chunksize'] = 250000
-        if 'chunksize' not in kwargs:
-            kwargs['chunksize'] = 2500
-        if 'max_workers' not in kwargs:
-            kwargs['max_workers'] = max(100, os.cpu_count())
+        if "in_memory_chunksize" not in kwargs:
+            kwargs["in_memory_chunksize"] = 250000
+        if "chunksize" not in kwargs:
+            kwargs["chunksize"] = 2500
+        if "max_workers" not in kwargs:
+            kwargs["max_workers"] = max(100, os.cpu_count())
         super().__init__(**kwargs)
 
     def finalize(self, metrics: List):
@@ -58,12 +58,12 @@ class BaseFilter(BaseParallelProcessor):
         if not metrics:
             return
 
-        if 'num_removed' in metrics[0]:
-            num_removed_entries = sum(metric.get('num_removed', 0) for metric in metrics)
+        if "num_removed" in metrics[0]:
+            num_removed_entries = sum(metric.get("num_removed", 0) for metric in metrics)
             LOG.info("Number of removed entries: %d", num_removed_entries)
 
-        if 'num_modified' in metrics[0]:
-            num_modified_entries = sum(metric.get('num_modified', 0) for metric in metrics)
+        if "num_modified" in metrics[0]:
+            num_modified_entries = sum(metric.get("num_modified", 0) for metric in metrics)
             LOG.info("Number of modified entries: %d", num_modified_entries)
 
     def _chunk_manifest(self):
@@ -205,7 +205,7 @@ class DropIncorrectArithmetic(BaseFilter):
                         return [DataEntry(data=None, metrics=dict(num_removed=1))]
             except KeyboardInterrupt:
                 raise
-            except:
+            except Exception:
                 pass
 
         return [DataEntry(data=data_entry, metrics=dict(num_removed=0))]
@@ -261,7 +261,7 @@ class RemoveLenOutliers(BaseFilter):
         property_key: str = "generation",
         min_length: int = 0,
         max_length: int = None,
-        hf_model_name: str = None,
+        tokenizer: str = None,
         use_chars_for_min_length: bool = False,
         **kwargs,
     ):
@@ -271,11 +271,11 @@ class RemoveLenOutliers(BaseFilter):
         self.min_length = min_length
         self.use_chars_for_min_length = use_chars_for_min_length
 
-        if hf_model_name is None:
-            raise ValueError("Specify 'hf_model_name' for length-based filtering")
+        if tokenizer is None:
+            raise ValueError("Specify 'tokenizer' for length-based filtering")
         from transformers import AutoTokenizer
 
-        self.tokenizer = AutoTokenizer.from_pretrained(hf_model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
 
     def process_dataset_entry(self, data_entry):
         property_val = data_entry[self.property_key]
@@ -356,7 +356,7 @@ class SplitArithmetic(BaseFilter):
 
             try:
                 solution_steps = solve_expression(expr)
-            except:
+            except Exception:
                 new_text.append(text[last_end:end])
                 last_end = end
                 continue
@@ -375,7 +375,7 @@ class SplitArithmetic(BaseFilter):
                 last_end = end
             except KeyboardInterrupt:
                 raise
-            except:
+            except Exception:
                 new_text.append(text[last_end:end])
                 last_end = end
 
@@ -387,11 +387,11 @@ class SplitArithmetic(BaseFilter):
 
 
 class CodeTextFilter(BaseParallelProcessor):
-    def __init__(self, filter_type, code_tags, solution_key='generation', **kwargs):
-        if 'in_memory_chunksize' not in kwargs:
-            kwargs['in_memory_chunksize'] = 100000000
-        if 'chunksize' not in kwargs:
-            kwargs['chunksize'] = 100000
+    def __init__(self, filter_type, code_tags, solution_key="generation", **kwargs):
+        if "in_memory_chunksize" not in kwargs:
+            kwargs["in_memory_chunksize"] = 100000000
+        if "chunksize" not in kwargs:
+            kwargs["chunksize"] = 100000
         super().__init__(**kwargs)
         self.code_tags = code_tags
         self.text_filter_type = filter_type
@@ -410,18 +410,18 @@ class CodeTextFilter(BaseParallelProcessor):
         if self.text_filter_type is None:
             filtered_predictions.extend(code_solns)
             filtered_predictions.extend(text_solns)
-        elif self.text_filter_type == 'all':
+        elif self.text_filter_type == "all":
             filtered_predictions.extend(code_solns)
-        elif self.text_filter_type == 'majority_code':
+        elif self.text_filter_type == "majority_code":
             filtered_predictions.extend(code_solns)
             if len(code_solns) <= len(grouped_samples) // 2:
                 filtered_predictions.extend(text_solns)
-        elif self.text_filter_type == 'majority_text':
+        elif self.text_filter_type == "majority_text":
             if len(code_solns) > len(grouped_samples) // 2:
                 filtered_predictions.extend(code_solns)
             else:
                 filtered_predictions.extend(text_solns)
-        elif self.text_filter_type == 'any_code':
+        elif self.text_filter_type == "any_code":
             if code_solns:
                 filtered_predictions.extend(code_solns)
             else:
@@ -436,7 +436,7 @@ class CodeTextFilter(BaseParallelProcessor):
         self.prepare()
         os.makedirs(os.path.dirname(self.output_manifest_file), exist_ok=True)
         metrics = []
-        code_tags_config = load_config(self.code_tags, Path(__file__).absolute().parents[2] / 'prompt' / 'code_tags')
+        code_tags_config = load_config(self.code_tags, Path(__file__).absolute().parents[2] / "prompt" / "code_tags")
         code_begin_token = code_tags_config.code_begin
 
         with open(self.output_manifest_file, "wt", encoding="utf-8") as fout:
@@ -467,6 +467,6 @@ class CodeTextFilter(BaseParallelProcessor):
         if not metrics:
             return
 
-        if 'num_removed' in metrics[0]:
-            num_removed_entries = sum(metric.get('num_removed', 0) for metric in metrics)
+        if "num_removed" in metrics[0]:
+            num_removed_entries = sum(metric.get("num_removed", 0) for metric in metrics)
             LOG.info("Number of removed entries: %d", num_removed_entries)

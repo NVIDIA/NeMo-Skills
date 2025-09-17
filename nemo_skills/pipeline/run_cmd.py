@@ -66,6 +66,9 @@ def run_cmd(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
@@ -83,8 +86,6 @@ def run_cmd(
         help="If specified, will reuse the code from this experiment. "
         "Can provide an experiment name or an experiment object if running from code.",
     ),
-    preprocess_cmd: str = typer.Option(None, help="Command to run before job"),
-    postprocess_cmd: str = typer.Option(None, help="Command to run after job"),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
     log_dir: str = typer.Option(
@@ -101,10 +102,19 @@ def run_cmd(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
 
     # Assert that either command or extra_arguments is provided, not both
     if command and extra_arguments:
@@ -121,14 +131,25 @@ def run_cmd(
         cluster_config, mount_paths, create_remote_dir=check_mounted_paths
     )
 
+    # we support running multiple commands in their own containers inside a job
+    commands = command
+    containers = container
+    if not isinstance(commands, list):
+        commands = [commands]
+    if not isinstance(containers, list):
+        containers = [containers]
+
+    commands = [get_cmd(cmd) for cmd in commands]
+    containers = [cluster_config["containers"].get(container, container) for container in containers]
+
+    if len(commands) != len(containers):
+        raise ValueError(
+            "If you provide multiple commands, you must also provide the same number of containers to run them in."
+        )
+
     log_dir = check_mounts(cluster_config, log_dir, check_mounted_paths=check_mounted_paths)
 
-    # by default we use exclusive if no gpus are needed and use non-exclusive if gpus are required
-    # as cpu jobs almost always need more resources than automatically allocated by slurm
-    if exclusive is None and num_gpus is None:
-        exclusive = True
-
-    with get_exp(expname, cluster_config) as exp:
+    with get_exp(expname, cluster_config, _reuse_exp) as exp:
         # Setup server config if model is provided
         if model is not None:
             server_config, server_address, extra_arguments = pipeline_utils.configure_client(
@@ -139,29 +160,25 @@ def run_cmd(
                 server_nodes=server_nodes,
                 server_args=server_args,
                 server_entrypoint=server_entrypoint,
+                server_container=server_container,
                 extra_arguments=extra_arguments,  # this is empty string by design
                 get_random_port=get_random_port,
             )
         else:
             server_config = None
 
-        # Prepare command
-        cmd = get_cmd(command=command)
-        cmd = pipeline_utils.wrap_cmd(cmd, preprocess_cmd, postprocess_cmd)
-
         # Wrap command with generation command if model is provided
         if model is not None and server_config is not None:
-            cmd = pipeline_utils.wait_for_server(server_address, cmd)
+            commands = [pipeline_utils.set_python_path_and_wait_for_server(server_address, cmd) for cmd in commands]
 
-        prev_tasks = None
+        prev_tasks = _task_dependencies
         for _ in range(dependent_jobs + 1):
-            # Add the task to the experiment
             new_task = add_task(
                 exp,
-                cmd=cmd,
+                cmd=commands,
                 task_name=expname,
                 log_dir=log_dir,
-                container=cluster_config["containers"][container],
+                container=containers,
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
@@ -174,12 +191,16 @@ def run_cmd(
                 task_dependencies=prev_tasks,
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
+                num_tasks=[1] * len(commands),
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
             prev_tasks = [new_task]
-        run_exp(exp, cluster_config)
+        run_exp(exp, cluster_config, dry_run=dry_run)
 
+    if _reuse_exp:
+        return prev_tasks
     return exp
 
 

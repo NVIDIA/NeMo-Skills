@@ -11,7 +11,7 @@ such as account, partition, ssh-tunnel arguments and so on.
 
 The recommended way to launch jobs on slurm is by running all commands locally and specifying `ssh_tunnel` portion in cluster config
 to let [NeMo-Run](https://github.com/NVIDIA/NeMo-Run) know how to connect there.
-But if you prefer to run from the cluster directly, you can instal NeMo-Skills there
+But if you prefer to run from the cluster directly, you can install NeMo-Skills there
 and then only specify `job_dir` parameter without using `ssh_tunnel` section in the config.
 
 You can see example configs in [cluster_configs](https://github.com/NVIDIA/NeMo-Skills/tree/main/cluster_configs) folder.
@@ -58,7 +58,7 @@ export NVIDIA_API_KEY=...
 
 Here are some suggestions on what can be defined in cluster configs for different use-cases
 
-1. Set `HUGGINGFACE_HUB_CACHE` environment variable to ensure all HuggingFace downloads are cached
+1. Set `HF_HOME` environment variable to ensure all HuggingFace downloads are cached
 
 2. If you want to have a custom version of one of the underlying libraries that we use
    (e.g. [NeMo](https://github.com/NVIDIA/NeMo) or [verl](https://github.com/volcengine/verl)),

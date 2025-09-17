@@ -31,8 +31,8 @@ def process_fragments(novelty_files: List[str], significance_files: List[str], o
         output_file: Path to output file for filtered entries
     """
     # Open all files
-    novelty_handles = [open(path, 'r', encoding='utf-8') for path in novelty_files]
-    significance_handles = [open(path, 'r', encoding='utf-8') for path in significance_files]
+    novelty_handles = [open(path, "r", encoding="utf-8") for path in novelty_files]
+    significance_handles = [open(path, "r", encoding="utf-8") for path in significance_files]
 
     try:
         with open(output_file, "w") as fout:
@@ -64,15 +64,15 @@ def process_fragments(novelty_files: List[str], significance_files: List[str], o
                     except json.JSONDecodeError:
                         break
 
-                fragment_orig_idx = novelty_batch[0]['index']
-                fragment_idx = novelty_batch[0]['fragment_index']
+                fragment_orig_idx = novelty_batch[0]["index"]
+                fragment_idx = novelty_batch[0]["fragment_index"]
 
                 # Ensure all fragments in this batch have the same index
-                if not all(f['index'] == fragment_orig_idx for f in novelty_batch + significance_batch):
+                if not all(f["index"] == fragment_orig_idx for f in novelty_batch + significance_batch):
                     raise ValueError(f"Misaligned fragments at line {line_num}: not all fragments have the same index")
 
                 # Ensure all fragments in this batch have the same fragment_index
-                if not all(f['fragment_index'] == fragment_idx for f in novelty_batch + significance_batch):
+                if not all(f["fragment_index"] == fragment_idx for f in novelty_batch + significance_batch):
                     raise ValueError(
                         f"Misaligned fragments at line {line_num}: not all fragments have the same fragment_index"
                     )
@@ -112,7 +112,7 @@ def process_fragments(novelty_files: List[str], significance_files: List[str], o
                     total_filtered += 1
 
         print(f"Filtered {total_filtered} entries based on combined novelty and significance criteria.")
-        print(f"Applied criteria: at least one significant novel fragment OR ≥0.5 moderate novel fragments")
+        print("Applied criteria: at least one significant novel fragment OR ≥0.5 moderate novel fragments")
 
     finally:
         # Close all file handles
@@ -255,33 +255,33 @@ def process_single_index(
 
     # Copy all fields except the excluded ones
     excluded_fields = [
-        'fragment',
-        'fragment_index',
-        'fragment_novelty',
-        'fragment_significance',
-        'index',
-        'original_generation',
+        "fragment",
+        "fragment_index",
+        "fragment_novelty",
+        "fragment_significance",
+        "index",
+        "original_generation",
     ]
     for k, v in first_fragment.items():
         if k not in excluded_fields:
             original_entry[k] = v
 
     # Add the original 'generation' field back if available
-    if 'original_generation' in first_fragment:
-        original_entry['generation'] = first_fragment['original_generation']
+    if "original_generation" in first_fragment:
+        original_entry["generation"] = first_fragment["original_generation"]
 
     # Add classifier information
-    original_entry['significant_novel_count'] = significant_novel_count
-    original_entry['moderate_novel_count'] = moderate_novel_count
-    original_entry['total_fragments'] = total_fragments
-    original_entry['fragment_details'] = fragment_details
+    original_entry["significant_novel_count"] = significant_novel_count
+    original_entry["moderate_novel_count"] = moderate_novel_count
+    original_entry["total_fragments"] = total_fragments
+    original_entry["fragment_details"] = fragment_details
 
     # Add flags for quick filtering
-    original_entry['has_significant_novel'] = significant_novel_count >= 1
-    original_entry['moderate_novel_ratio'] = moderate_novel_count / total_fragments if total_fragments > 0 else 0
+    original_entry["has_significant_novel"] = significant_novel_count >= 1
+    original_entry["moderate_novel_ratio"] = moderate_novel_count / total_fragments if total_fragments > 0 else 0
 
     # Mark as correct
-    original_entry['is_correct'] = True
+    original_entry["symbolic_correct"] = True
 
     return original_entry
 

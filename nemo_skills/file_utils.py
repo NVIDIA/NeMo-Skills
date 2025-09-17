@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import os
 import glob
+import io
 import json
+import os
 
 
 def unroll_files(input_files, parent_dir: str | None = None):
@@ -129,8 +129,9 @@ def jload(filepath, mode="r", verbose=False):
             try:
                 data = json.loads(line)
                 dataset.append(data)
-            except:
-                if verbose: print(f"[jload] Error parsing line {line_id} in file {f}: {line}")
+            except Exception:
+                if verbose:
+                    print(f"[jload] Error parsing line {line_id} in file {f}: {line}")
                 continue
 
         f.close()
@@ -149,19 +150,22 @@ def count_newlines(fname, verbose: bool = False):
     Returns:
         int: The number of newlines in the file.
     """
+
     def _make_gen(reader):
         while True:
-            b = reader(2 ** 16)
+            b = reader(2**16)
             if not b:
                 break
             yield b
 
-    if verbose: print("Counting newlines in file :", fname)
+    if verbose:
+        print("Counting newlines in file :", fname)
 
     with open(fname, "rb") as f:
         count = sum(buf.count(b"\n") for buf in _make_gen(f.raw.read))
 
-    if verbose: print("Number of lines in file :", count)
+    if verbose:
+        print("Number of lines in file :", count)
     return count
 
 
@@ -258,8 +262,9 @@ def jload_chunk(filepath, num_chunks: int, chunk_id: int, mode="r", verbose=Fals
         try:
             data = json.loads(line)
             dataset.append(data)
-        except:
-            if verbose: print(f"[jload_chunk] Error parsing line {idx} in file {filepath}: {line}")
+        except Exception:
+            if verbose:
+                print(f"[jload_chunk] Error parsing line {idx} in file {filepath}: {line}")
             continue
 
     f.close()

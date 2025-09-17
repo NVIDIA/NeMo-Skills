@@ -34,7 +34,7 @@ def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False,
         target_datasets = []
         for dataset in datasets:
             dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
-            if dataset_module.DATASET_GROUP in dataset_groups:
+            if getattr(dataset_module, "DATASET_GROUP", None) in dataset_groups:
                 target_datasets.append(dataset)
         datasets = target_datasets
 
@@ -44,7 +44,7 @@ def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False,
         subprocess.run(f"{sys.executable} {dataset_path / 'prepare.py'} {extra_args}", shell=True, check=True)
         dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
 
-        if dataset_module.DATASET_GROUP == "math":
+        if getattr(dataset_module, "DATASET_GROUP", None) == "math":
             if add_lean4_header:
                 jsonl_files = list(dataset_path.glob("*.jsonl"))
                 header = get_lean4_header()
@@ -55,18 +55,18 @@ def prepare_datasets(datasets=None, dataset_groups=None, add_lean4_header=False,
     return datasets
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Prepare all datasets')
-    parser.add_argument('datasets', default=[], nargs="*", help='Can specify a subset here')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Prepare all datasets")
+    parser.add_argument("datasets", default=[], nargs="*", help="Can specify a subset here")
     parser.add_argument(
-        '--dataset_groups',
+        "--dataset_groups",
         default=[],
         nargs="*",
-        choices=["math", "code", "chat", "multichoice", "long-context"],
-        help='Can specify a dataset groups here',
+        choices=["math", "code", "chat", "multichoice", "long-context", "tool"],
+        help="Can specify a dataset groups here",
     )
     parser.add_argument(
-        '--add_lean4_header', action='store_true', help='Add Lean4 header to JSONL files during preparation'
+        "--add_lean4_header", action="store_true", help="Add Lean4 header to JSONL files during preparation"
     )
     args, unknown = parser.parse_known_args()
     extra_args = " ".join(unknown)

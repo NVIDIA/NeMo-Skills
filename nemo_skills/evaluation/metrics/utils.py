@@ -26,7 +26,7 @@ def read_predictions(predictions, line_idx, file_handles):
         try:
             prediction_dict = json.loads(prediction)
         except Exception as e:
-            LOG.error(f"\n\n ***** Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
+            LOG.error("\n\n ***** Error reading line %s in file %s: %s", line_idx + 1, file_handles[file_idx].name, e)
             raise
         data.append(prediction_dict)
 
@@ -34,13 +34,13 @@ def read_predictions(predictions, line_idx, file_handles):
 
 
 def is_correct_judgement(judgement, return_none=False) -> Union[bool, None]:
-    if 'Judgement:' in judgement:
-        verdict = judgement.split('Judgement:')[-1].strip()
-        if verdict.lower().startswith('yes'):
+    if "Judgement:" in judgement:
+        verdict = judgement.split("Judgement:")[-1].strip()
+        if verdict.lower().startswith("yes"):
             return True
-        elif verdict.lower().startswith('no'):
+        elif verdict.lower().startswith("no"):
             return False
-    
+
     if return_none:
         return None
     else:

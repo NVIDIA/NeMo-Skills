@@ -66,11 +66,11 @@ if __name__ == "__main__":
                     ### remove all white space and remove all $ sign so that we can match previous formats
                     answer = answer[: -(len(ending))].strip()
                     if answer.startswith("\\") or answer.endswith("\\"):
-                        answer = answer.strip('\\').strip()
-                    if answer[-1] == '.':
+                        answer = answer.strip("\\").strip()
+                    if answer[-1] == ".":
                         answer = answer[:-1]
                     if "$" in answer:
-                        answer = answer.replace('$', '').strip()
+                        answer = answer.replace("$", "").strip()
 
             new_entry["expected_answer"] = answer
             new_entry["original_answer"] = original_entry["answer"]

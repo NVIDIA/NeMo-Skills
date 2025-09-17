@@ -2,7 +2,6 @@ processors_to_run: all
 
 output_path: ???
 prompt_config: null
-prompt_template: null
 code_tags: null
 
 preprocessed_dataset_files: null  # can specify multiple patters separated by space
@@ -16,13 +15,14 @@ random_seed: 42
 do_shuffle: true
 num_output_samples: null
 
-# Params for length-based filtering
-# Unit of length - Tokens
-hf_model_name: null
+# Needed to format the data and also for length-based filtering
+tokenizer: null
+chat_template_kwargs: null
+system_message: null  # can be used to override default from the tokenizer
 
 # Problem params
-min_problem_length: 0
-max_problem_length: 1024
+min_problem_length: null
+max_problem_length: null
 
 input_key: problem
 
@@ -49,7 +49,7 @@ processors:
     input_key: ${input_key}
     skip_first: ${skip_first}
     deduplicate: ${deduplicate}
-    keys_to_keep:  # input/output/is_correct/judgement are automatically added
+    keys_to_keep: # input/output/symbolic_correct/judgement are automatically added
       - "expected_answer"
       - "total_votes"
       - "majority_votes"
@@ -61,7 +61,7 @@ processors:
       - _target_: nemo_skills.training.data_preparation_utils.filters.DropIfEqual
         should_run: ${filters.drop_none_answers}
         key: expected_answer
-        values: [null, ""]
+        values: [ null, "" ]
 
       - _target_: nemo_skills.training.data_preparation_utils.filters.RemoveContaminated
         should_run: ${filters.remove_contaminated}
@@ -77,12 +77,14 @@ processors:
         property_key: ${input_key}
         min_length: ${min_problem_length}
         max_length: ${max_problem_length}
-        hf_model_name: ${hf_model_name}
+        tokenizer: ${tokenizer}
 
   - _target_: nemo_skills.training.data_preparation_utils.preprocessing.WriteFinalRLManifest
     output_manifest_file: ${output_path}
     prompt_config: ${prompt_config}
-    prompt_template: ${prompt_template}
+    tokenizer: ${tokenizer}
+    chat_template_kwargs: ${chat_template_kwargs}
+    system_message: ${system_message}
     code_tags: ${code_tags}
     task_name: math
     input_key: ${input_key}

@@ -41,6 +41,8 @@ class LlmMathJudgeConfig(GenerateSolutionsConfig):
     prompt_config: str = "judge/math"
     generation_key: str = "judgement"
 
+    add_generation_stats: bool = False
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_llm_math_judge_config", node=LlmMathJudgeConfig)
@@ -66,20 +68,12 @@ class LLMMathJudgeTask(GenerationTask):
         else:
             return {"generation": judgement}
 
-    def dump_outputs(self, outputs, data_points, fout):
-        # removing num_generated_tokens to keep the original ones instead of the judge as it's often not relevant
-        for output, original_data_point in zip(outputs, data_points):
-            if "num_generated_tokens" in output and "num_generated_tokens" in original_data_point:
-                output.pop("num_generated_tokens")
-
-        super().dump_outputs(outputs, data_points, fout)
-
 
 GENERATION_TASK_CLASS = LLMMathJudgeTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_llm_math_judge_config')
+@hydra.main(version_base=None, config_name="base_llm_math_judge_config")
 def generate(cfg: LlmMathJudgeConfig):
     cfg = LlmMathJudgeConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -95,7 +89,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

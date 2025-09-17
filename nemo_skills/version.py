@@ -14,11 +14,11 @@
 
 
 MAJOR = 0
-MINOR = 6
-PATCH = 1
+MINOR = 7
+PATCH = 0
 
 # Use the following formatting: (major, minor, patch, pre-release)
 VERSION = (MAJOR, MINOR, PATCH)
 
-__shortversion__ = '.'.join(map(str, VERSION[:3]))
-__version__ = '.'.join(map(str, VERSION[:3]))
+__shortversion__ = ".".join(map(str, VERSION[:3]))
+__version__ = ".".join(map(str, VERSION[:3]))

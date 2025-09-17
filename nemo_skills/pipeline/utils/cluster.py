@@ -40,7 +40,7 @@ _logged_optional_env_vars = set()
 
 
 def get_timeout(cluster_config, partition):
-    if 'timeouts' not in cluster_config:
+    if "timeouts" not in cluster_config:
         timeout = "10000:00:00:00"
     else:
         timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
@@ -49,7 +49,7 @@ def get_timeout(cluster_config, partition):
         # the format expected by nemo is days:hours:minutes:seconds
         time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
         timeout = (
-            f'00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}'
+            f"00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}"
         )
     return timeout
 
@@ -76,7 +76,7 @@ def get_env_variables(cluster_config):
     # Check for user requested env variables
     required_env_vars = cluster_config.get("required_env_vars", [])
     for env_var in required_env_vars:
-        env_var_name = env_var.split('=')[0].strip() if "=" in env_var else env_var
+        env_var_name = env_var.split("=")[0].strip() if "=" in env_var else env_var
 
         if "=" in env_var:
             if env_var.count("=") == 1:
@@ -113,7 +113,7 @@ def get_env_variables(cluster_config):
     # Add optional env variables
     optional_env_vars = cluster_config.get("env_vars", [])
     for env_var in optional_env_vars + always_optional_env_vars:
-        env_var_name = env_var.split('=')[0].strip() if "=" in env_var else env_var
+        env_var_name = env_var.split("=")[0].strip() if "=" in env_var else env_var
 
         if "=" in env_var:
             if env_var.count("=") == 1:
@@ -165,16 +165,10 @@ def read_config(config_file):
     if "ssh_tunnel" in cluster_config:
         cluster_config = update_ssh_tunnel_config(cluster_config)
 
-    if cluster_config['executor'] == 'slurm' and "ssh_tunnel" not in cluster_config:
+    if cluster_config["executor"] == "slurm" and "ssh_tunnel" not in cluster_config:
         if "job_dir" not in cluster_config:
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
         set_nemorun_home(cluster_config["job_dir"])
-
-    if 'trtllm' in cluster_config['containers']:
-        # automatically setting same container for trtllm-serve
-        if 'trtllm-serve' not in cluster_config['containers']:
-            LOG.info("Setting trtllm-serve container to be the same as trtllm.")
-            cluster_config['containers']['trtllm-serve'] = cluster_config['containers']['trtllm']
 
     return cluster_config
 
@@ -208,11 +202,11 @@ def get_cluster_config(cluster=None, config_dir=None):
             return read_config(Path(config_dir) / f"{cluster}.yaml")
 
         # if it's not defined we are trying to find locally
-        if (Path.cwd() / 'cluster_configs' / f"{cluster}.yaml").exists():
-            return read_config(Path.cwd() / 'cluster_configs' / f"{cluster}.yaml")
+        if (Path.cwd() / "cluster_configs" / f"{cluster}.yaml").exists():
+            return read_config(Path.cwd() / "cluster_configs" / f"{cluster}.yaml")
 
-        if (Path(__file__).parents[3] / 'cluster_configs' / f"{cluster}.yaml").exists():
-            return read_config(Path(__file__).parents[3] / 'cluster_configs' / f"{cluster}.yaml")
+        if (Path(__file__).parents[3] / "cluster_configs" / f"{cluster}.yaml").exists():
+            return read_config(Path(__file__).parents[3] / "cluster_configs" / f"{cluster}.yaml")
 
         raise ValueError(f"Cluster config {cluster} not found in any of the supported folders.")
 
@@ -225,7 +219,7 @@ def get_cluster_config(cluster=None, config_dir=None):
             "It's recommended to run `ns setup` to define appropriate configs!"
         )
         # just returning empty string for any container on access
-        cluster_config = {'executor': 'none', 'containers': defaultdict(str)}
+        cluster_config = {"executor": "none", "containers": defaultdict(str)}
         return cluster_config
 
     if not Path(config_file).exists():
@@ -247,30 +241,30 @@ def update_ssh_tunnel_config(cluster_config: dict):
     Returns:
         dict: The updated cluster configuration dictionary
     """
-    if 'ssh_tunnel' not in cluster_config:
+    if "ssh_tunnel" not in cluster_config:
         return cluster_config
 
     resolve_map = [
-        dict(key='user', default_env_key='USER'),
-        dict(key='job_dir', default_env_key=None),
-        dict(key='identity', default_env_key=None),
+        dict(key="user", default_env_key="USER"),
+        dict(key="job_dir", default_env_key=None),
+        dict(key="identity", default_env_key=None),
     ]
 
     for item in resolve_map:
-        key = item['key']
-        default_env_key = item['default_env_key']
+        key = item["key"]
+        default_env_key = item["default_env_key"]
 
-        if key in cluster_config['ssh_tunnel']:
+        if key in cluster_config["ssh_tunnel"]:
             # Resolve `user` from env if not provided
-            if cluster_config['ssh_tunnel'][key] is None and default_env_key is not None:
-                cluster_config['ssh_tunnel'][key] = os.environ[default_env_key]
+            if cluster_config["ssh_tunnel"][key] is None and default_env_key is not None:
+                cluster_config["ssh_tunnel"][key] = os.environ[default_env_key]
                 LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
 
-            elif isinstance(cluster_config['ssh_tunnel'][key], str) and '$' in cluster_config['ssh_tunnel'][key]:
-                cluster_config['ssh_tunnel'][key] = os.path.expandvars(cluster_config['ssh_tunnel'][key])
+            elif isinstance(cluster_config["ssh_tunnel"][key], str) and "$" in cluster_config["ssh_tunnel"][key]:
+                cluster_config["ssh_tunnel"][key] = os.path.expandvars(cluster_config["ssh_tunnel"][key])
                 LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
 
-    if "$" in cluster_config['ssh_tunnel']['identity']:
+    if "$" in cluster_config["ssh_tunnel"]["identity"]:
         raise ValueError(
             "SSH identity cannot be resolved from environment variables. "
             "Please provide a valid path to the identity file."
@@ -299,6 +293,8 @@ def _get_tunnel_cached(
 
 
 def tunnel_hash(tunnel):
+    if isinstance(tunnel, run.LocalTunnel):
+        return "local"
     return f"{tunnel.job_dir}:{tunnel.host}:{tunnel.user}:{tunnel.identity}:{tunnel.shell}:{tunnel.pre_command}"
 
 
@@ -315,7 +311,7 @@ class OutputWatcher(StreamWatcher):
     """Class for streaming remote tar/compression process."""
 
     def submit(self, stream):
-        print(stream, end='\r')
+        print(stream, end="\r")
         sys.stdout.flush()
         return []
 
@@ -323,10 +319,10 @@ class OutputWatcher(StreamWatcher):
 def progress_callback(transferred: int, total: int) -> None:
     """Display SFTP transfer progress."""
     percent = (transferred / total) * 100
-    bar = '=' * int(percent / 2) + '>'
+    bar = "=" * int(percent / 2) + ">"
     sys.stdout.write(
-        f'\rFile Transfer Progress: [{bar:<50}] {percent:.1f}% '
-        f'({transferred/1024/1024:.1f}MB/{total/1024/1024:.1f}MB)'
+        f"\rFile Transfer Progress: [{bar:<50}] {percent:.1f}% "
+        f"({transferred / 1024 / 1024:.1f}MB/{total / 1024 / 1024:.1f}MB)"
     )
     sys.stdout.flush()
 
@@ -356,7 +352,7 @@ def cluster_download_dir(
         verbose: Print download progress
     """
     tunnel = get_tunnel(cluster_config)
-    remote_dir = remote_dir.rstrip('/')
+    remote_dir = remote_dir.rstrip("/")
     remote_dir_parent, remote_dir_name = os.path.split(remote_dir)
 
     # Directory where the remote tarball is written
@@ -369,7 +365,7 @@ def cluster_download_dir(
     local_tar = os.path.join(local_dir, remote_tar_filename)
 
     # Get the directory size
-    result = tunnel.run(f'du -sb {remote_dir} | cut -f1')
+    result = tunnel.run(f"du -sb {remote_dir} | cut -f1")
     total_size = int(result.stdout.strip())
 
     # Check if result directory compression is streamable
@@ -377,7 +373,7 @@ def cluster_download_dir(
     try:
         # Check whether the command pv is present on the remote system or not.
         # Certain systems may not have the `pv` command
-        result = tunnel.run('which pv', warn=True)
+        result = tunnel.run("which pv", warn=True)
         streaming_possible = result.exited == 0
     except Exception:
         streaming_possible = False
@@ -386,15 +382,15 @@ def cluster_download_dir(
         # We can do streaming compression
         # Command for streaming the compression progress
         command = (
-            f'cd {remote_dir_parent} && '
+            f"cd {remote_dir_parent} && "
             f'tar --exclude="*.log" -cf - {remote_dir_name} | '
             f'pv -s {total_size} -p -t -e -b -F "Compressing Remote Directory: %b %t %p" | '
-            f'gzip > {remote_tar}'
+            f"gzip > {remote_tar}"
         )
         # Run the remote compression command and stream the progress
         result = tunnel.run(command, watchers=[OutputWatcher()], pty=True, hide=(not verbose))
     else:
-        command = f'cd {remote_dir_parent} && tar -czf {remote_tar} {remote_dir_name}'
+        command = f"cd {remote_dir_parent} && tar -czf {remote_tar} {remote_dir_name}"
         result = tunnel.run(command, hide=(not verbose))
 
     # Get SFTP client from tunnel's session's underlying client
@@ -410,7 +406,7 @@ def cluster_download_dir(
         tar.extractall(path=local_dir)
 
     # Clean up the tarball from the remote server
-    tunnel.run(f'rm {remote_tar}', hide=True)
+    tunnel.run(f"rm {remote_tar}", hide=True)
 
     # Clean up the local tarball
     os.remove(local_tar)
@@ -430,4 +426,4 @@ def cluster_upload(cluster_config: dict, local_file: str, remote_dir: str, verbo
     tunnel = get_tunnel(cluster_config)
     sftp = tunnel.session.client.open_sftp()
     sftp.put(str(local_file), str(remote_dir), callback=progress_callback if verbose else None)
-    print(f"\nTransfer complete")
+    print("\nTransfer complete")

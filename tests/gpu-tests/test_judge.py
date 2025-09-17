@@ -24,15 +24,14 @@ from tests.conftest import docker_rm
 
 @pytest.mark.gpu
 def test_trtllm_judge():
-    model_path = os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')
+    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_TRTLLM_MODEL to run this test")
-    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != 'llama':
+    if model_type != "llama":
         pytest.skip("Only running this test for llama models")
-    prompt_template = 'llama3-instruct'
 
     input_dir = "/nemo_run/code/tests/data"
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/judge/math"
@@ -51,7 +50,7 @@ def test_trtllm_judge():
         f"    --output_dir={output_dir} "
         f"    --num_random_seeds=1 "
         f"    --preprocess_cmd='cp {input_dir}/output-rs0.test {input_dir}/output-rs0.jsonl' "
-        f"    ++prompt_template={prompt_template} "
+        f"    --server_args='--backend pytorch' "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
     )
@@ -65,7 +64,7 @@ def test_trtllm_judge():
     assert len(lines) == 10
     for line in lines:
         data = json.loads(line)
-        assert 'judgement' in data
+        assert "judgement" in data
 
     # Adding a summarization step to check that the results are formatted correctly
     cmd = (

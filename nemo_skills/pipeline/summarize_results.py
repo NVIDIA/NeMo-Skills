@@ -41,12 +41,19 @@ from nemo_skills.utils import get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+def get_subset_name(benchmark: str, subset: str) -> str:
+    """Construct a subset name based on the benchmark and subset."""
+    if subset == "_all_":
+        return benchmark
+    return f"{benchmark}-{subset}"
+
+
 def add_benchmark_groups(results, metrics_to_print, evaluations_to_print):
     # Average results for benchmarks with dot notation (e.g., ruler.niah_single_1, ruler.niah_single_2)
     benchmark_groups = defaultdict(list)
     for benchmark in results.keys():
-        if '.' in benchmark:
-            prefix = benchmark.rsplit('.', 1)[0]
+        if "." in benchmark:
+            prefix = benchmark.rsplit(".", 1)[0]
             benchmark_groups[prefix].append(benchmark)
 
     # Create a new ordered dictionary to ensure prefix benchmarks appear first
@@ -170,11 +177,19 @@ def summarize_results(
         None,
         help="Specify metric type to use a specific metric calculator.",
     ),
+    max_seq_len: Optional[int] = typer.Option(
+        None,
+        help="Specify max_seq_len for computing metrics. Will consider anything longer as incorrect.",
+    ),
+    save_metrics_path: Optional[str] = typer.Option(
+        None,
+        help="Path to save the metrics.json file. If not specified, will save to results_dir/metrics.json.",
+    ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
     wandb_name: Optional[str] = typer.Option(None, help="Name of the wandb experiment to sync these results to"),
     wandb_group: str = typer.Option(None, help="Name of the wandb group to sync results to."),
     wandb_project: str = typer.Option(
-        'nemo-skills',
+        "nemo-skills",
         help="Name of the wandb project to sync results to.",
     ),
 ):
@@ -211,7 +226,6 @@ def summarize_results(
         data_dir = data_dir or env_vars.get("NEMO_SKILLS_DATA_DIR") or os.environ.get("NEMO_SKILLS_DATA_DIR")
     else:
         cluster_config = None
-    # running compute_metrics.py to get greedy, majority and pass @k results for all benchmarks available
 
     # Check for all possible directory structures
     # 1. {results_dir}/eval-results/{benchmark}/output*jsonl
@@ -222,25 +236,25 @@ def summarize_results(
     benchmarks_paths = []
 
     # Check for Option 3 - Root directory corresponds to a benchmark
-    if Path(results_dir).is_dir() and len(glob.glob(f'{results_dir}/output*jsonl')) > 0:
+    if Path(results_dir).is_dir() and len(glob.glob(f"{results_dir}/output*jsonl")) > 0:
         benchmarks_paths = [results_dir]
     else:
-        cand_results_dir = Path(results_dir) / 'eval-results'
+        cand_results_dir = Path(results_dir) / "eval-results"
         # Check for Option 1
         if cand_results_dir.exists() and cand_results_dir.is_dir():
             results_dir = cand_results_dir
         else:
             # Assume by default it's Option 2.
             # Verify if it indeed has this structure: {results_dir}/{benchmark}/output*jsonl
-            if len(glob.glob(f'{results_dir}/*/output*jsonl')) == 0:
+            if len(glob.glob(f"{results_dir}/*/output*jsonl")) == 0:
                 raise ValueError(
                     f"The results directory {results_dir} does not contain any valid eval-results or output*jsonl files."
                 )
 
         benchmarks_paths = [
             cand_path
-            for cand_path in glob.glob(f'{results_dir}/*')
-            if '-logs' not in os.path.basename(cand_path) and Path(cand_path).is_dir()
+            for cand_path in glob.glob(f"{results_dir}/*")
+            if "-logs" not in os.path.basename(cand_path) and Path(cand_path).is_dir()
         ]
 
     if benchmarks:
@@ -251,7 +265,7 @@ def summarize_results(
         # Ascertain that the benchmarks_paths are valid
         for benchmark_path in benchmarks_paths:
             # Valid benchmark_path should contain output*jsonl files
-            if len(glob.glob(f'{benchmark_path}/output*jsonl')) == 0:
+            if len(glob.glob(f"{benchmark_path}/output*jsonl")) == 0:
                 raise ValueError(f"The benchmark directory {benchmark_path} lacks output*jsonl files.")
     else:
         print(f"No benchmarks found in {results_dir}")
@@ -266,66 +280,60 @@ def summarize_results(
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
             continue
-        try:
-            if metric_type is not None:
-                metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
-            else:
-                metrics_calculator = ComputeMetrics(
-                    benchmark,
-                    data_dir=data_dir,
-                    cluster_config=cluster_config,
-                    extra_datasets=extra_datasets,
-                    extra_datasets_type=extra_datasets_type,
-                    max_samples=max_samples,
-                )
 
-            metrics = {}
-            # TODO: this is hacky, basically just assuming that if there is a greedy prediction, we need to add
-            #       an extra aggregation to print
-            has_greedy = False
+        if metric_type is not None:
+            metrics_calculator = ComputeMetrics(benchmark, metric_type=metric_type, max_samples=max_samples)
+        else:
+            metrics_calculator = ComputeMetrics(
+                benchmark,
+                data_dir=data_dir,
+                cluster_config=cluster_config,
+                extra_datasets=extra_datasets,
+                extra_datasets_type=extra_datasets_type,
+                max_samples=max_samples,
+                max_seq_len=max_seq_len,
+            )
 
-            if Path(f'{benchmark_path}/output.jsonl').exists():
-                has_greedy = True
-                metrics = metrics_calculator.compute_metrics(input_files=[f"{benchmark_path}/output.jsonl"])
-                if len(metrics) > 1:  # has subsets
-                    for subset, subset_metrics in metrics.items():
-                        results[f"{benchmark}-{subset}"].update(subset_metrics)
-                else:
-                    results[benchmark].update(metrics['all'])
+        metrics = {}
 
-            sampling_outputs = glob.glob(f'{benchmark_path}/output-rs*.jsonl')
-            if len(sampling_outputs) > 0:
-                metrics = metrics_calculator.compute_metrics(input_files=sampling_outputs)
-                if len(metrics) > 1:  # has subsets
-                    for subset, subset_metrics in metrics.items():
-                        results[f"{benchmark}-{subset}"].update(subset_metrics)
-                else:
-                    results[benchmark].update(metrics['all'])
+        has_greedy = Path(f"{benchmark_path}/output.jsonl").exists()
+        input_files = glob.glob(f"{benchmark_path}/output-rs*.jsonl")
+        has_sampling = len(input_files) > 0
 
-            if len(metrics) > 1:
-                for subset, subset_metrics in metrics.items():
-                    metrics_to_print[f"{benchmark}-{subset}"] = metrics_calculator.metrics_to_print()
-                    evaluations_to_print[f"{benchmark}-{subset}"] = metrics_calculator.evaluations_to_print()
-                    if evaluations_to_print[f"{benchmark}-{subset}"] is not None and has_greedy:
-                        evaluations_to_print[f"{benchmark}-{subset}"].insert(0, 'greedy')
-            else:
-                metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
-                evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
-                if evaluations_to_print[benchmark] is not None and has_greedy:
-                    evaluations_to_print[benchmark].insert(0, 'greedy')
+        if has_greedy and has_sampling:
+            raise ValueError(
+                f"Both output.jsonl and output-rs*.jsonl found for benchmark {benchmark}. "
+                "This indicates that the evaluation was done multiple times with different sampling parameters. "
+                "It's not clear how to process this! Please remove output.jsonl or output-rs*.jsonl files and rerun."
+            )
 
-        except Exception as e:
-            LOG.exception(f"Error computing metrics for {benchmark}: {e}")
+        if has_greedy:
+            input_files = [f"{benchmark_path}/output.jsonl"]
+
+        metrics = metrics_calculator.compute_metrics(input_files=input_files)
+        if len(metrics) > 1:  # has subsets
+            for subset, subset_metrics in metrics.items():
+                results[get_subset_name(benchmark, subset)].update(subset_metrics)
+        else:
+            results[benchmark].update(metrics["_all_"])
+
+        if len(metrics) > 1:
+            for subset, subset_metrics in metrics.items():
+                metrics_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.metrics_to_print()
+                evaluations_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.evaluations_to_print()
+        else:
+            metrics_to_print[benchmark] = metrics_calculator.metrics_to_print()
+            evaluations_to_print[benchmark] = metrics_calculator.evaluations_to_print()
 
     # grouping benchmarks that have a "." e.g ruler.niah_single_1, ruler.niah_single_2 -> ruler
     # to report average numbers
     add_benchmark_groups(results, metrics_to_print, evaluations_to_print)
-
+    printed_max_seq_len = False
     for benchmark, benchmark_results in results.items():
         if not benchmark_results:
             continue
         max_widths = {}
-        max_widths['evaluation_mode'] = len('evaluation_mode')
+        max_widths["evaluation_mode"] = len("evaluation_mode")
         for eval_mode in evaluations_to_print[benchmark]:
             if eval_mode not in benchmark_results:
                 continue
@@ -339,44 +347,68 @@ def summarize_results(
 
             for metric_key, format_fn in metrics_to_print[benchmark].items():
                 metric_value = metrics[metric_key]
-                max_widths[metric_key] = max(
-                    max_widths.get(metric_key, len(metric_key)),
-                    len(str(format_fn(metric_value))),
-                )
-            max_widths['evaluation_mode'] = max(max_widths['evaluation_mode'], len(eval_mode))
+                formatted_value = format_fn(metric_key, metric_value, metrics)
+                if formatted_value is not None:
+                    max_widths[metric_key] = max(
+                        max_widths.get(metric_key, len(metric_key)),
+                        len(str(formatted_value)),
+                    )
+            max_widths["evaluation_mode"] = max(max_widths["evaluation_mode"], len(eval_mode))
+
+        # Filter out metrics that would return None for any evaluation mode
+        valid_metrics = {}
+        for metric_key, format_fn in metrics_to_print[benchmark].items():
+            is_valid = True
+            for eval_mode in evaluations_to_print[benchmark]:
+                if eval_mode not in benchmark_results:
+                    continue
+                metrics = benchmark_results[eval_mode]
+                if metric_key in metrics and format_fn(metric_key, metrics[metric_key], metrics) is None:
+                    is_valid = False
+                    break
+            if is_valid:
+                valid_metrics[metric_key] = format_fn
+        metrics_to_print[benchmark] = valid_metrics
 
         total_width = sum(max_widths.values()) + (len(max_widths) - 1) * 3
-        print(f' {benchmark} '.center(total_width, '-'))
-        headers = ['evaluation_mode'] + list(metrics_to_print[benchmark].keys())
-        print(' | '.join([f'{header:<{max_widths[header]}}' for header in headers]))
+        if max_seq_len is not None and not printed_max_seq_len:
+            print(f" Metrics for Max Sequence Length {max_seq_len} ".center(total_width, "-"))
+        printed_max_seq_len = True
+        print(f" {benchmark} ".center(total_width, "-"))
+        headers = ["evaluation_mode"] + list(metrics_to_print[benchmark].keys())
+        print(" | ".join([f"{header:<{max_widths[header]}}" for header in headers]))
 
         for eval_mode in evaluations_to_print[benchmark]:
             if eval_mode not in benchmark_results:
                 continue
             metrics = benchmark_results[eval_mode]
-            values = [f'{eval_mode:<{max_widths["evaluation_mode"]}}']
+            values = [f"{eval_mode:<{max_widths['evaluation_mode']}}"]
             for metric_key, format_fn in metrics_to_print[benchmark].items():
                 metric_value = metrics[metric_key]
-                values.append(f'{str(format_fn(metric_value)):<{max_widths[metric_key]}}')
-            print(' | '.join(values))
+                formatted_value = format_fn(metric_key, metric_value, metrics)
+                if formatted_value is not None:
+                    values.append(f"{str(formatted_value):<{max_widths[metric_key]}}")
+            print(" | ".join(values))
 
-        print('\n')
+        print("\n")
 
     try:
-        with open(Path(results_dir) / 'metrics.json', 'wt', encoding='utf-8') as fout:
+        save_metrics_path = save_metrics_path or str(Path(results_dir) / "metrics.json")
+        Path(save_metrics_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(save_metrics_path, "wt", encoding="utf-8") as fout:
             json.dump(results, fout, indent=2)
         if upload_path is not None:
             cluster_upload(
                 cluster_config,
-                Path(results_dir) / 'metrics.json',
-                Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json',
+                save_metrics_path,
+                Path(get_unmounted_path(cluster_config, upload_path)) / "metrics.json",
                 verbose=verbose,
             )
-            print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / 'metrics.json'))
+            print("Metrics are saved to", str(Path(get_unmounted_path(cluster_config, upload_path)) / "metrics.json"))
         else:
-            print("Metrics are saved to", str(Path(results_dir) / 'metrics.json'))
+            print("Metrics are saved to", save_metrics_path)
     except PermissionError:
-        print(f"Could not save metrics.json to {Path(results_dir) / 'metrics.json'}. Please check the permissions.")
+        print(f"Could not save metrics.json to {save_metrics_path}. Please check the permissions.")
 
     # syncing to wandb if asked
     if wandb_name is not None:
@@ -401,10 +433,10 @@ def summarize_results(
 
             for eval_mode, metrics in benchmark_results.items():
                 # Check if this is a @k metric
-                k_match = re.search(r'@(\d+)$', eval_mode)
+                k_match = re.search(r"@(\d+)$", eval_mode)
                 if k_match:
                     k = int(k_match.group(1))
-                    base_name = eval_mode.rsplit('@', 1)[0]
+                    base_name = eval_mode.rsplit("@", 1)[0]
 
                 # Store k and corresponding values for each metric, but log everything
                 for metric_key, metric_value in metrics.items():
@@ -459,7 +491,10 @@ def summarize_results(
                     )
 
         # Log all plots
-        run.log({**plots})
+        try:
+            run.log({**plots})
+        except ValueError as e:
+            print("Couldn't upload plots to wandb due to error:", str(e))
         run.finish()
         print(
             f"Results are synced to wandb project {wandb_project} under the name {wandb_name} and group {wandb_group}"

@@ -30,16 +30,20 @@ from rich.logging import RichHandler
 
 # isort: off
 import nemo_skills
-from nemo_skills.file_utils import (
-    jdump,
-    jload,
-    jload_chunk,
-    count_newlines,
-    calculate_chunk_indices,
-    unroll_files,
-)  # noqa # pylint: disable=unused-import
-
+from nemo_skills.file_utils import calculate_chunk_indices, unroll_files, jdump, jload, jload_chunk, count_newlines
 # isort: on
+
+
+def remove_thinking(
+    sample: dict, generation_key: str = "generation", thinking_begin: str = "<think>", thinking_end: str = "</think>"
+):
+    sample["_has_think_tags"] = thinking_begin in sample[generation_key]
+    if thinking_end in sample[generation_key]:
+        sample["_full_generation"] = sample[generation_key]
+        sample[generation_key] = sample[generation_key].split(thinking_end)[-1].strip()
+    elif thinking_begin in sample[generation_key]:
+        sample["_full_generation"] = sample[generation_key]
+        sample[generation_key] = ""  # no end tag, so setting the generation to empty
 
 
 def nested_dataclass(*args, **kwargs):
@@ -79,8 +83,12 @@ def nested_dataclass(*args, **kwargs):
 
 
 def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO, use_rich: bool = False):
-    logger = logging.getLogger('nemo_skills')
+    logger = logging.getLogger("nemo_skills")
     logger.setLevel(log_level)
+
+    # Remove all existing handlers
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
     if use_rich:
         handler = RichHandler(
@@ -95,12 +103,11 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
                 datefmt="[%X]",
             )
         )
-        for hdlr in logger.handlers[:]:
-            logger.removeHandler(hdlr)
     else:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s %(levelname)s  %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = logging.Formatter("%(asctime)s %(levelname)s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
         handler.setFormatter(formatter)
+
     logger.addHandler(handler)
     logging.getLogger("sshtunnel_requests.cache").setLevel(logging.ERROR)
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -115,13 +122,13 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
 
 def remove_handlers():
     """Can be used to remove all nemo-skills log handlers."""
-    logger = logging.getLogger('nemo_skills')
+    logger = logging.getLogger("nemo_skills")
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
 
 
 def get_logger_name(file):
-    return 'nemo_skills' + file.split('nemo_skills')[1].replace('/', '.').replace('.py', '')
+    return "nemo_skills" + file.split("nemo_skills")[1].replace("/", ".").replace(".py", "")
 
 
 def get_skills_root_dir():
@@ -169,7 +176,7 @@ def init_wandb(project, name, exp_dir=None, verbose=False):
 
     # Initialize wandb with the specified parameters
     try:
-        wandb.init(project=project, name=name, resume='auto', reinit=True, save_code=True, dir=log_dir)
+        wandb.init(project=project, name=name, resume="auto", reinit=True, save_code=True, dir=log_dir)
         if verbose:
             print("Wandb initialized.")
         return True
@@ -187,7 +194,7 @@ def extract_comments(code: str):
 
     for token, line, *_ in tokens:
         if token is tokenize.COMMENT:
-            comments.append(line.lstrip('#').strip())
+            comments.append(line.lstrip("#").strip())
 
     return comments
 
@@ -197,34 +204,34 @@ def type_to_str(type_hint):
     origin = typing.get_origin(type_hint)
     args = typing.get_args(type_hint)
 
-    if hasattr(type_hint, '__name__'):
-        return type_hint.__name__.replace('NoneType', 'None')
+    if hasattr(type_hint, "__name__"):
+        return type_hint.__name__.replace("NoneType", "None")
     elif origin is typing.Union:
         if len(args) == 2 and type(None) in args:
-            return f'Optional[{type_to_str(args[0])}]'
+            return f"Optional[{type_to_str(args[0])}]"
         else:
-            return ' or '.join(type_to_str(arg) for arg in args)
+            return " or ".join(type_to_str(arg) for arg in args)
     elif origin is typing.Callable:
         if args[0] is Ellipsis:
-            args_str = '...'
+            args_str = "..."
         else:
-            args_str = ', '.join(type_to_str(arg) for arg in args[:-1])
-        return f'Callable[[{args_str}], {type_to_str(args[-1])}]'
+            args_str = ", ".join(type_to_str(arg) for arg in args[:-1])
+        return f"Callable[[{args_str}], {type_to_str(args[-1])}]"
     elif origin:
-        inner_types = ', '.join(type_to_str(arg) for arg in args)
-        origin_name = origin.__name__ if hasattr(origin, '__name__') else str(origin)
-        return f'{origin_name}[{inner_types}]'
+        inner_types = ", ".join(type_to_str(arg) for arg in args)
+        origin_name = origin.__name__ if hasattr(origin, "__name__") else str(origin)
+        return f"{origin_name}[{inner_types}]"
     else:
-        return str(type_hint).replace('typing.', '')
+        return str(type_hint).replace("typing.", "")
 
 
-def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 0, **kwargs):
-    source_lines = inspect.getsource(dataclass_obj).split('\n')
+def extract_comments_above_fields(dataclass_obj, prefix: str = "", level: int = 0, **kwargs):
+    source_lines = inspect.getsource(dataclass_obj).split("\n")
     fields_info = {
         field.name: {
-            'type': field.type,
-            'default': field.default if field.default != MISSING else None,
-            'default_factory': field.default_factory if field.default_factory != MISSING else None,
+            "type": field.type,
+            "default": field.default if field.default != MISSING else None,
+            "default_factory": field.default_factory if field.default_factory != MISSING else None,
         }
         for field in fields(dataclass_obj)
     }
@@ -233,47 +240,47 @@ def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 
     for line in source_lines:
         # skip unfinished multiline comments
         line_comment = []
-        if '#' in line:
+        if "#" in line:
             line_comment = extract_comments(line)
         if line_comment:
             comment_cache.append(line_comment[0])
-        if ':' not in line:
+        if ":" not in line:
             continue
 
-        field_name = line.split(':')[0].strip()
+        field_name = line.split(":")[0].strip()
         if field_name not in fields_info:
             continue
 
         field_info = fields_info[field_name]
         field_name = prefix + field_name
-        field_type = type_to_str(field_info['type'])
-        default = field_info['default']
-        default_factory = field_info['default_factory']
-        if default == '???':
-            default_str = ' = MISSING'
+        field_type = type_to_str(field_info["type"])
+        default = field_info["default"]
+        default_factory = field_info["default_factory"]
+        if default == "???":
+            default_str = " = MISSING"
         else:
-            default_str = f' = {default}'
+            default_str = f" = {default}"
         if default_factory:
             try:
                 default_factory = default_factory()
-                default_str = f' = {default_factory}'
-            except:
+                default_str = f" = {default_factory}"
+            except Exception:
                 pass
             if is_dataclass(default_factory):
-                default_str = f' = {field_type}()'
+                default_str = f" = {field_type}()"
 
-        indent = '  ' * level
+        indent = "  " * level
         comment = f"\n{indent}".join(comment_cache)
         comment = "- " + comment if comment else ""
-        comment = comment.replace('\n', f'\n{indent}  ')
+        comment = comment.replace("\n", f"\n{indent}  ")
         field_detail = f"{indent}\033[92m{field_name}: {field_type}{default_str}\033[0m {comment}"
         comments[field_name] = field_detail
         comment_cache = []
 
         # Recursively extract nested dataclasses
-        if is_dataclass(field_info['type']):
+        if is_dataclass(field_info["type"]):
             nested_comments = extract_comments_above_fields(
-                field_info['type'], prefix=field_name + '.', level=level + 1
+                field_info["type"], prefix=field_name + ".", level=level + 1
             )
             for k, v in nested_comments.items():
                 comments[f"{field_name}.{k}"] = v
@@ -284,7 +291,7 @@ def extract_comments_above_fields(dataclass_obj, prefix: str = '', level: int = 
 def get_fields_docstring(dataclass_obj, **kwargs):
     commented_fields = extract_comments_above_fields(dataclass_obj, **kwargs)
     docstring = [content for content in commented_fields.values()]
-    return '\n'.join(docstring)
+    return "\n".join(docstring)
 
 
 def get_help_message(dataclass_obj, help_message="", **kwargs):
@@ -296,9 +303,9 @@ Below are the available configuration options and their default values:
 
     docstring = get_fields_docstring(dataclass_obj)
     # to handle {} in docstring.
-    docstring = docstring.replace('{}', '{{}}')
+    docstring = docstring.replace("{}", "{{}}")
     # to handle any dictionaries as defaults (replacing {...} with {{...}} if there is a space inside)
-    docstring = re.sub(r'{([^}]+(?=\s)[^}]*)}', r'{{\1}}', docstring)
+    docstring = re.sub(r"{([^}]+(?=\s)[^}]*)}", r"{{\1}}", docstring)
     # Might need to add some other edge-case handling
     # here, so that formatting does not complain
     docstring = dataclass_obj.__doc__ + "\n\n" + docstring.format(**kwargs)
@@ -324,10 +331,10 @@ def python_doc_to_cmd_help(doc_class, docs_prefix="", arg_prefix=""):
             # add colors
             line = line.replace("        ", "        \033[92m").replace(" - ", "\033[0m - ")
             # fixing arg format
-            line = line.replace('        \033[92m', f'        \033[92m{arg_prefix}')
+            line = line.replace("        \033[92m", f"        \033[92m{arg_prefix}")
         # fixing indent
         line = line.replace("        ", "    ").replace("    ", "  ")
-        colored_args += line + '\n'
+        colored_args += line + "\n"
     return colored_args[:-1]
 
 
@@ -384,15 +391,15 @@ def str_ids_to_list(ids: str) -> list[int]:
     Returns:
         List of ids.
     """
-    if ',' in ids and '..' in ids:
+    if "," in ids and ".." in ids:
         raise ValueError(
             "Invalid chunk ids format. Can be a comma separated list or a range separated by '..' but not both"
         )
-    if ',' in ids:
-        ids = ids.split(',')
-        ids = [int(x.strip()) for x in ids if x.strip() != '']
-    elif '..' in ids:
-        start, end = ids.split('..')
+    if "," in ids:
+        ids = ids.split(",")
+        ids = [int(x.strip()) for x in ids if x.strip() != ""]
+    elif ".." in ids:
+        start, end = ids.split("..")
         ids = list(range(int(start), int(end) + 1))
     else:
         try:  # could be a single number
@@ -435,10 +442,10 @@ def compute_chunk_ids(chunk_ids: list[int] | str, num_chunks: int) -> list[int] 
 
 def prefill_judgement(data_point: dict) -> str | None:
     """Will automatically fill judgement if there is an exact match or the answer is None."""
-    if data_point['predicted_answer'] is None or data_point['predicted_answer'] == '':
+    if data_point["predicted_answer"] is None or data_point["predicted_answer"] == "":
         return "Reasoning: No answer was provided.\nJudgement: No"
 
-    if str(data_point['predicted_answer']).strip() == str(data_point['expected_answer']).strip():
+    if str(data_point["predicted_answer"]).strip() == str(data_point["expected_answer"]).strip():
         return "Reasoning: The two answers are identical.\nJudgement: Yes"
 
     return None
@@ -471,7 +478,7 @@ def check_no_extra_args_fire():
     context.update(caller_locals)
 
     # Check if the help flag is present
-    if any(arg.startswith("--help") for arg in function_args) or '--help' in function_name:
+    if any(arg.startswith("--help") for arg in function_args) or "--help" in function_name:
         return None  # Skip the check if the help flag is present
 
     # Check if the function name exists in the calling context
@@ -484,11 +491,11 @@ def check_no_extra_args_fire():
 
     # Determine if the component is a class or a routine
     is_class = inspect.isclass(component)
-    treatment = ('class' if is_class else 'routine',)
+    treatment = ("class" if is_class else "routine",)
 
     # Get the metadata and parse function arguments
     metadata = fire_decorators.GetMetadata(component)
-    fn = component.__call__ if treatment == 'callable' else component
+    fn = component.__call__ if treatment == "callable" else component
     parse = fire.core._MakeParseFn(fn, metadata)
     (varargs, kwargs), consumed_args, remaining_args, capacity = parse(function_args)
 
@@ -500,7 +507,7 @@ def check_no_extra_args_fire():
         )
 
 
-def resolve_python_module_from_file(py_filepath: str, root_module: str = 'nemo_skills'):
+def resolve_python_module_from_file(py_filepath: str, root_module: str = "nemo_skills"):
     """
     Get the python module path from a python file path.
     Ex: /.../NeMo-Skills/nemo_skills/dataset/abc.py -> nemo_skills.dataset.abc
@@ -562,3 +569,12 @@ def maybe_get_env(value: Union[Any, List[Any]], env_name, default=None, cast: Ca
         if not found_value:
             value = default
     return value
+
+
+def get_server_wait_cmd(server_address):
+    # might be required if we are not hosting server ourselves
+    # this will try to handshake in a loop and unblock when the server responds
+    return (
+        f"echo 'Waiting for the server to start at {server_address}' && "
+        f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done "
+    )

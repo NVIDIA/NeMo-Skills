@@ -17,7 +17,11 @@ FROM tiangolo/uwsgi-nginx-flask:python3.10
 
 # Install dependencies required for Lean 4 and other tools
 RUN apt-get update && \
-    apt-get install -y curl git
+    apt-get install -y curl git net-tools bzip2 && \
+    curl -L https://downloads.python.org/pypy/pypy3.10-v7.3.17-linux64.tar.bz2 -o /tmp/pypy.tar.bz2 && \
+    tar -xjf /tmp/pypy.tar.bz2 -C /opt/ && \
+    ln -s /opt/pypy3.10-v7.3.17-linux64/bin/pypy3 /usr/local/bin/pypy3 && \
+    rm /tmp/pypy.tar.bz2
 
 RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y && \
     /root/.elan/bin/elan toolchain install leanprover/lean4:v4.12.0 && \
@@ -46,20 +50,40 @@ ENV PATH="/lean4/my_project:$PATH"
 # Set up application code and install Python dependencies
 COPY requirements/code_execution.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
-COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
 
 # For scicode eval
 RUN mkdir /data && pip install gdown && \
     python -c "import gdown; url = f'https://drive.google.com/uc?id=17G_k65N_6yFFZ2O-jQH00Lh6iaw3z-AW'; gdown.download(url, '/data/test_data.h5', quiet=False)"
 
+COPY nemo_skills/code_execution/local_sandbox/local_sandbox_server.py /app/main.py
+
+# Copy nginx configuration template and startup scripts
+COPY dockerfiles/sandbox/nginx.conf.template /etc/nginx/nginx.conf.template
+COPY dockerfiles/sandbox/start-with-nginx.sh /start-with-nginx.sh
+
+# Make scripts executable
+RUN chmod +x /start-with-nginx.sh
+
 # Set the working directory to /app
 WORKDIR /app
 
-# Set Flask app environment variables and ports
+# Environment variables for multi-worker setup
+ENV NGINX_PORT=6000
+
+# Set default port for single worker mode
+ENV LISTEN_PORT=6000
+
+# Default uwsgi configuration
 ARG UWSGI_CHEAPER
 ENV UWSGI_CHEAPER=$UWSGI_CHEAPER
+
+ARG NUM_WORKERS
+ENV NUM_WORKERS=$NUM_WORKERS
 
 ARG UWSGI_PROCESSES
 ENV UWSGI_PROCESSES=$UWSGI_PROCESSES
 
 ENV LISTEN_PORT=6000
+RUN echo "uwsgi_read_timeout 14400s;" > /etc/nginx/conf.d/custom_timeout.conf
+
+CMD /start-with-nginx.sh

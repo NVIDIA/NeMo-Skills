@@ -12,17 +12,66 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[tool.isort]
-profile = "black"  # black-compatible
-line_length = 119  # should match black parameters
-py_version = 310  # python 3.10 as a target version
+[build-system]
+requires = [
+    "setuptools",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
 
+[project]
+dynamic = [
+    "version",
+    "dependencies",
+    "optional-dependencies",
+]
 
-[tool.black]
-line_length = 119
-skip_string_normalization = true
+name = "nemo_skills"
+description = "NeMo Skills - a project to improve skills of LLMs"
+readme = "README.md"
+# license-files = ["LICENSE"]  # causing problems in nemo-aligner container
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.10"
+
+[project.urls]
+homepage = "https://nvidia.github.io/NeMo-Skills"
+source = "https://github.com/NVIDIA/NeMo-Skills"
+issues = "https://github.com/NVIDIA/NeMo-Skills/issues"
+
+[project.scripts]
+ns = "nemo_skills.pipeline.cli:app"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "tests.*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "nemo_skills.version.__version__" }
+dependencies = {file = ["requirements/main.txt"]}
+optional-dependencies = {dev = { file = ["requirements/common-tests.txt", "requirements/common-dev.txt"] } }
 
 [tool.pytest.ini_options]
 markers = [
     "gpu: tests that require a GPU to run",
 ]
+addopts = "--ignore=tests/slurm-tests"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 119
+
+[tool.ruff.lint]
+## See https://docs.astral.sh/ruff/formatter/#sorting-imports.
+extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"nemo_skills/utils.py" = ["F401"]
+"nemo_skills/pipeline/cli.py" = ["F401"]

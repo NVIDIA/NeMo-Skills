@@ -1,5 +1,3 @@
-system: ""
-
 user: |-
     You will be given a fragment of a solution to a math problem that includes a Python code block.
     Your task is to evaluate the significance of this Python code in solving the math problem.
@@ -20,7 +18,7 @@ user: |-
         Reasoning: <a couple of sentences explaining your rationale>
         Significance: <Trivial, Moderate, or Significant>
         ```
-    
+
     ---
 
     **EXAMPLES**
@@ -127,20 +125,20 @@ user: |-
         cities = list(range(1, n))  # Start from city 0
         min_length = float('inf')
         best_route = None
-        
+
         start_time = time.time()
         count = 0
-        
+
         # Try all possible permutations of cities (excluding starting city)
         for perm in permutations(cities):
             route = (0,) + perm + (0,)  # Complete route starting and ending at city 0
             length = sum(distances[route[i]][route[i+1]] for i in range(len(route)-1))
-            
+
             count += 1
             if length < min_length:
                 min_length = length
                 best_route = route
-        
+
         end_time = time.time()
         return best_route, min_length, count, end_time - start_time
 
@@ -174,21 +172,21 @@ user: |-
     ```python
     def find_solutions(a, b, c):
         solutions = []
-        
+
         # Find the maximum possible value of x
         max_x = c // a
-        
+
         # Check all possible values of x from 0 to max_x
         for x in range(max_x + 1):
             # Calculate the corresponding y value
             remaining = c - a * x
-            
+
             # If remaining is divisible by b and the result is non-negative,
             # we have a valid solution
             if remaining >= 0 and remaining % b == 0:
                 y = remaining // b
                 solutions.append((x, y))
-        
+
         return solutions
 
     # Given equation: 17x + 23y = 3284
@@ -252,7 +250,7 @@ user: |-
 
     # Calculate P(X ≥ 3) when flipping a fair coin 10 times
     p_at_least_3 = sum(binomial_probability(10, k, 0.5) for k in range(3, 11))
-    
+
     print(f"P(X ≥ 3) = {{p_at_least_3:.6f}}")
     print(f"Percentage: {{p_at_least_3 * 100:.2f}}%")
     ```

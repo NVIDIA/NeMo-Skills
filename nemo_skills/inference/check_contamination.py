@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import logging
 import sys
-import time
-from collections import defaultdict
 from dataclasses import field
 
 import hydra
-from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
@@ -74,17 +72,17 @@ class CheckContaminationTask(GenerationTask):
 
         # Adjust the batch size to account for the number of similar items
         if self.cfg.top_k is None:
-            self.cfg.top_k = len(data[0]['similar_items'])
+            self.cfg.top_k = len(data[0]["similar_items"])
 
         return data
 
     def log_example_prompt(self, data):
         data_point = data[0]
         query_item = data_point[self.cfg.retrieve_key]
-        similar_item = data_point['similar_items'][0]
+        similar_item = data_point["similar_items"][0]
         first_element = {
-            f'{self.cfg.retrieve_key}1': query_item,
-            f'{self.cfg.retrieve_key}2': similar_item,
+            f"{self.cfg.retrieve_key}1": query_item,
+            f"{self.cfg.retrieve_key}2": similar_item,
         }
         LOG.info(
             "Example prompt:\nData dictionary: %s\nPrompt: %s",
@@ -95,19 +93,19 @@ class CheckContaminationTask(GenerationTask):
     def _create_query_data(self, data_point):
         """Create query instances given the original instance"""
         query_data = []
-        for similar_item in data_point['similar_items'][: self.cfg.top_k]:
+        for similar_item in data_point["similar_items"][: self.cfg.top_k]:
             query_data.append(
                 {
-                    f'{self.cfg.retrieve_key}1': data_point[self.cfg.retrieve_key],
-                    f'{self.cfg.retrieve_key}2': similar_item,
+                    f"{self.cfg.retrieve_key}1": data_point[self.cfg.retrieve_key],
+                    f"{self.cfg.retrieve_key}2": similar_item,
                 }
             )
 
             if self.cfg.check_both_ways:
                 query_data.append(
                     {
-                        f'{self.cfg.retrieve_key}2': data_point[self.cfg.retrieve_key],
-                        f'{self.cfg.retrieve_key}1': similar_item,
+                        f"{self.cfg.retrieve_key}2": data_point[self.cfg.retrieve_key],
+                        f"{self.cfg.retrieve_key}1": similar_item,
                     }
                 )
 
@@ -115,88 +113,32 @@ class CheckContaminationTask(GenerationTask):
 
     def prefill_generation(self, data_point):
         """Prefill contamination if there is a string match between the problem and the similar items"""
-        for similar_item in data_point['similar_items']:
+        for similar_item in data_point["similar_items"]:
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
                 return {"generation": True}
         return None
 
-    def llm_generate(self, data_points, data, is_async=False):
-        """Override the base class method to create a 1:N mapping between data points and contamination queries."""
-        # Create the query instances per data point
-        query_data_batch = [
-            query_point for data_point in data_points for query_point in self._create_query_data(data_point)
-        ]
+    async def process_single_datapoint(self, data_point, all_data):
+        """Process a single data point by running contamination checks on all similar items."""
+        query_data = self._create_query_data(data_point)
 
-        # Get the LLM judgement on the queries
-        outputs = super().llm_generate(query_data_batch, data, is_async)
+        # Create tasks for all queries using super().process_single_datapoint
+        tasks = []
+        for query_point in query_data:
+            tasks.append(super().process_single_datapoint(query_point, all_data))
 
-        # Postprocessing of outputs to create a N:1 mapping between contamination results and data points
-        query_per_data_point = self.cfg.top_k * (2 if self.cfg.check_both_ways else 1)
+        query_results = await asyncio.gather(*tasks)
 
-        if not is_async:
-            proc_outputs = []
-            for idx in range(0, len(outputs), query_per_data_point):
-                proc_output = {"all_generations": [], "generation": False}
-                for output in outputs[idx : idx + query_per_data_point]:
-                    proc_output["all_generations"].append(output['generation'])
-                    # If any of the generations is True, then the data point is considered contaminated
-                    if output['generation'].strip() == "True":
-                        proc_output["generation"] = True
+        # Process results to determine if contaminated
+        all_generations = []
+        contaminated = False
+        for result in query_results:
+            generation = result["generation"]
+            all_generations.append(generation)
+            if generation.strip() == "True":
+                contaminated = True
 
-                proc_outputs.append(proc_output)
-
-            return proc_outputs
-        else:
-            # Create a list of lists, where each inner list contains the generation IDs for a data point
-            generation_ids = []
-            for idx in range(0, len(outputs), query_per_data_point):
-                generation_ids.append(outputs[idx : idx + query_per_data_point])
-
-            return generation_ids
-
-    def get_llm_generations(self, requests_in_progress, generations):
-        """Override the base class method to synchronize the N:1 mapping between
-        contamination results and original data points.
-
-        This is done by getting the LLM generations for all the queries
-        for each data point and then processing the "generation" key.
-
-        requests_in_progress: A dictionary of the form {original_data_point_idx: gen_id_list}
-        generations: A dictionary of the form {original_data_point_idx: gen_dict}
-        """
-        for original_dp_idx, gen_id_list in requests_in_progress.items():
-            # Get the LLM generations for all the queries remaining for this data point
-            gen_dict_list = self.llm.get_generations(gen_id_list)
-            # List to track the generation IDs corresponding to this data point that are not done yet
-            rem_gen_id_list = []
-            for gen_id, gen_dict in zip(gen_id_list, gen_dict_list):
-                if gen_dict['generation'] is None:
-                    # This generation is not done yet, so we will add it to the list of remaining generation IDs
-                    rem_gen_id_list.append(gen_id)
-                else:
-                    # The entry corresponding to "all_generations" is a list of all the finished generations for this data point
-                    # If it is not present, then this must be the first finished generation for this data point
-                    if "all_generations" not in generations[original_dp_idx]:
-                        generations[original_dp_idx]['all_generations'] = []
-
-                    generations[original_dp_idx]['all_generations'].append(gen_dict['generation'])
-
-            # Update the remaining generation IDs for this data point
-            requests_in_progress[original_dp_idx] = rem_gen_id_list
-
-            if rem_gen_id_list:
-                # There are still generations to be processed
-                generations[original_dp_idx]["generation"] = None
-            else:
-                # All generations have finished
-                # If any of the generations is True, then the data point is considered contaminated
-                contaminated = any(
-                    [generation.strip() == "True" for generation in generations[original_dp_idx]['all_generations']]
-                )
-                generations[original_dp_idx]['generation'] = contaminated
-
-        # Return the remaining requests in progress and the generations
-        return (requests_in_progress, generations)
+        return {"all_generations": all_generations, "generation": contaminated}
 
     def postprocess(self):
         """Postprocess the output file to calculate the contamination portion."""
@@ -216,7 +158,7 @@ GENERATION_TASK_CLASS = CheckContaminationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_check_contamination_config')
+@hydra.main(version_base=None, config_name="base_check_contamination_config")
 def check_contamination(cfg: CheckContaminationConfig):
     cfg = CheckContaminationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -231,7 +173,7 @@ HELP_MESSAGE = get_help_message(
 )
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

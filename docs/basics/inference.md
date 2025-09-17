@@ -4,22 +4,17 @@ Here are the instructions on how to run inference with our repo.
 
 ## Download/convert the model
 
-Get the model you want to use. You can use any model that's supported by vLLM, TensorRT-LLM or NeMo.
+Get the model you want to use. You can use any model that's supported by vLLM, sglang, TensorRT-LLM or Megatron.
 You can also use [Nvidia NIM API](https://www.nvidia.com/en-us/ai/) for models that are hosted there.
-
-[Convert the model](../pipelines/checkpoint-conversion.md) if it's not in the format you want to use.
-You do not need any conversion if using vLLM inference with HF models
-(and can directly use model id if you want vLLM to download it for you).
-For fastest inference we recommend to convert the model to TensorRT-LLM format.
 
 ## Start the server
 
-Start the server hosting your model. Here is an example (make sure the `/hf_models` mount is defined in your cluster config). Skip this step if you want to use cloud models through an API.
+Start the server hosting your model. Skip this step if you want to use cloud models through an API.
 
 ```bash
 ns start_server \
     --cluster local \
-    --model /hf_models/Meta-Llama-3.1-8B-Instruct \
+    --model meta-llama/Llama-3.1-8B-Instruct \
     --server_type vllm \
     --server_gpus 1 \
     --server_nodes 1
@@ -40,37 +35,32 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     from nemo_skills.inference.model import get_model
     from nemo_skills.prompt.utils import get_prompt
 
-    llm = get_model(server_type="vllm")  # localhost by default
-    prompt = get_prompt('generic/default', 'llama3-instruct') # (1)!
-    prompts = [prompt.fill({'question': "What's 2 + 2?"})]
-    print(prompts[0]) # (2)!
-    outputs = llm.generate(prompts=prompts)
-    print(outputs[0]["generation"]) # (3)!
+    llm = get_model(model="meta-llama/Llama-3.1-8B-Instruct", server_type="vllm")  # localhost by default
+    prompt_obj = get_prompt('generic/default') # (1)!
+    prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
+    print(prompt) # (2)!
+    output = llm.generate_sync(prompt=prompt)
+    print(output["generation"]) # (3)!
     ```
 
-    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
-         and [llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
+    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
 
     2.   This should print
 
          ```python-console
-         >>> print(prompts[0])
-         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-         <|eot_id|><|start_header_id|>user<|end_header_id|>
-
-         What's 2 + 2?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+         >>> print(prompt)
+         [{'role': 'user', 'content': "What's 2 + 2?"}]
          ```
 
-         If you don't want to use our prompt class, just create this string yourself
+         If you don't want to use our prompt class, just create this list yourself
 
     3.   This should print
          ```python-console
-         >>> print(outputs[0]["generation"])
+         >>> print(output["generation"])
          2 + 2 = 4.
          ```
 
@@ -85,13 +75,13 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
         base_url="https://integrate.api.nvidia.com/v1",
         model="meta/llama-3.1-8b-instruct",
     )
-    prompt = get_prompt('generic/default') # (2)!
+    prompt_obj = get_prompt('generic/default') # (2)!
 
-    prompts = [prompt.fill({'question': "What's 2 + 2?"})]
+    prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
 
-    print(prompts[0]) # (3)!
-    outputs = llm.generate(prompts=prompts)
-    print(outputs[0]["generation"]) # (4)!
+    print(prompt) # (3)!
+    output = llm.generate_sync(prompt=prompt)
+    print(output["generation"]) # (4)!
     ```
 
     1.   Don't forget to define `NVIDIA_API_KEY`.
@@ -99,16 +89,15 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
          To use OpenAI models, use `OPENAI_API_KEY` and set `base_url=https://api.openai.com/v1`.
 
     2.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
-         Note that with API models we can't add special tokens, so prompt template is not specified.
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
 
 
     3.   This should print
 
          ```python-console
-         >>> print(prompts[0])
+         >>> print(prompt)
          [{'role': 'user', 'content': "What's 2 + 2?"}]
          ```
 
@@ -116,7 +105,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     4.   This should print
          ```python-console
-         >>> print(outputs[0]["generation"])
+         >>> print(output["generation"])
          2 + 2 = 4.
          ```
 
@@ -128,42 +117,49 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
     from nemo_skills.prompt.utils import get_prompt
 
     sandbox = get_sandbox()  # localhost by default
-    llm = get_code_execution_model(server_type="vllm", sandbox=sandbox)
-    prompt = get_prompt('generic/default', 'llama3-instruct', code_tags='llama3') # (1)!
-    prompt.config.system = ( # (2)!
+    llm = get_code_execution_model(
+        model="meta-llama/Llama-3.1-8B-Instruct",
+        server_type="vllm",
+        sandbox=sandbox,
+    )
+    system_message = ( # (1)!
         "Environment: ipython\n\n"
         "Use Python to solve this math problem."
     )
-    prompts = [prompt.fill({'question': "What's 2 + 2?"})]
-    print(prompts[0]) # (3)!
-    outputs = llm.generate(prompts=prompts, **prompt.get_code_execution_args()) # (4)!
-    print(outputs[0]["generation"]) # (5)!
+    prompt_obj = get_prompt( # (2)!
+        'generic/default',
+        code_tags='llama3',
+        system_message=system_message
+     )
+    prompt = prompt_obj.fill({'question': "What's 2 + 2?"})
+    print(prompt) # (3)!
+    output = await llm.generate_async(
+        prompt=prompt,
+        **prompt.get_code_execution_args() # (4)!
+     )
+    print(output["generation"]) # (5)!
     ```
 
-    1.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config
-         and [llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/template/llama3-instruct.yaml) template.
+    1.   8B model doesn't always follow these instructions, so using 70B or 405B for code execution is recommended.
 
-         Note how we are updating system message on the next line (you can also include it in the config directly).
+    2.   Here we use [generic/default](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config/generic/default.yaml) config.
 
-         See [nemo_skills/prompt](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt) for more config/template options
+         Note how we are updating system message on the previous line (you can also include it in the config directly).
+
+         See [nemo_skills/prompt/config](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/prompt/config) for more config options
          or [create your own prompts](prompt-format.md)
-
-    2.   8B model doesn't always follow these instructions, so using 70B or 405B for code execution is recommended.
 
     3.   This should print
 
          ```python-console
-         >>> print(prompts[0])
-         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-         Environment: ipython
-
-         Use Python to solve this math problem.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-         What's 2 + 2?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+         >>> print(prompt)
+         [
+            {'role': 'system', 'content': 'Environment: ipython\n\nUse Python to solve this math problem.'},
+            {'role': 'user', 'content': "What's 2 + 2?"}
+         ]
          ```
 
-         If you don't want to use our prompt class, just create this string yourself
+         If you don't want to use our prompt class, just create this object yourself
 
     4.   `prompt.get_code_execution_args()` simply returns a dictionary with start/stop tokens,
          so that we know when to stop LLM generation and how to format the output.
@@ -172,7 +168,7 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
     5.   This should print
          ```python-console
-         >>> print(outputs[0]["generation"])
+         >>> print(output["generation"])
          <|python_tag|>print(2 + 2)<|eom_id|><|start_header_id|>ipython<|end_header_id|>
 
          completed
@@ -185,9 +181,8 @@ Click on :material-plus-circle: symbols in the snippet below to learn more detai
 
          The "4" in the stdout is coming directly from Python interpreter running in the sandbox.
 
-Note that for self-hosted models we are explicitly adding all the special tokens before sending prompt to an LLM.
-This is necessary to retain flexibility. E.g. this way we can use base model format with
-instruct models that we found to work better with few-shot examples.
+If you want to use completions api, you can also provide `tokenizer` parameter to `get_prompt` and it will use
+tokenizer's chat template to format messages and return you a string.
 
 You can learn more about how our prompt formatting works in the [prompt format docs](../basics/prompt-format.md).
 

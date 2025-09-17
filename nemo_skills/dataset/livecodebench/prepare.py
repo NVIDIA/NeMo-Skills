@@ -28,7 +28,7 @@ class PromptConstants:
     FORMATTING_WITHOUT_STARTER_CODE = "Read the inputs from stdin solve the problem and write the answer to stdout (do not directly test on the sample inputs). Enclose your code within delimiters as follows. Ensure that when the python program runs, it reads the inputs, runs the algorithm and writes output to STDOUT."
 
 
-def parse_data(release_version='release_latest'):
+def parse_data(release_version="release_latest"):
     data = load_dataset(
         "livecodebench/code_generation_lite", split="test", version_tag=release_version, trust_remote_code=True
     )
@@ -74,22 +74,22 @@ def clean_data(dataset):
             question += f"```python\n{data['starter_code']}\n```\n\n"
         else:
             question += f"{PromptConstants.FORMATTING_WITHOUT_STARTER_CODE}\n\n"
-            question += f"```python\n# YOUR CODE HERE\n```\n\n"
+            question += "```python\n# YOUR CODE HERE\n```\n\n"
 
         data["task_id"] = data["question_id"]
-        data['question'] = question.replace('    ', '\t')
+        data["question"] = question.replace("    ", "\t")
         return data
 
     remove_columns = [
-        'question_title',
-        'contest_id',
-        'public_test_cases',
-        'private_test_cases',
-        'metadata',
-        'question_content',
-        'platform',
-        'question_id',
-        'starter_code',
+        "question_title",
+        "contest_id",
+        "public_test_cases",
+        "private_test_cases",
+        "metadata",
+        "question_content",
+        "platform",
+        "question_id",
+        "starter_code",
     ]
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
@@ -111,9 +111,9 @@ def prepare(start_date, end_date, release_version, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    with open(output_file_path, 'w') as f:
+    with open(output_file_path, "w") as f:
         for problem in data:
-            input_date = datetime.strptime(problem['contest_date'], '%Y-%m-%dT%H:%M:%S').date()
+            input_date = datetime.strptime(problem["contest_date"], "%Y-%m-%dT%H:%M:%S").date()
             if start_date <= input_date <= end_date:
                 json.dump(
                     {
@@ -121,39 +121,38 @@ def prepare(start_date, end_date, release_version, output_dir):
                         "question": problem["question"],
                         "difficulty": problem["difficulty"],
                         "subset_for_metrics": problem["difficulty"],
+                        "release_version": release_version,
                     },
                     f,
                 )
-                f.write('\n')
+                f.write("\n")
 
 
 DEFAULT_SPLITS = [
-    ('v5', '2024-08', '2025-02'),
-    ('v5', '2024-10', '2025-02'),
-    ('v5', '2024-10', '2025-04'),
-    ('v6', '2024-08', '2025-02'),
-    ('v6', '2024-10', '2025-02'),
-    ('v6', '2024-10', '2025-04'),
+    ("v5", "2024-08", "2025-02"),  # previous default
+    ("v5", "2024-07", "2024-12"),  # aai split
+    ("v5", "2024-10", "2025-02"),
+    ("v6", "2024-08", "2025-05"),  # current default in lb
 ]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Write an argparse to a json file, read it in and parse it
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output_dir', type=str, default=str(Path(__file__).parent))
-    parser.add_argument('--release_version', type=str, default='all')
-    parser.add_argument('--start_date', type=str, default='all', help="End date in YYYY-MM format")
-    parser.add_argument('--end_date', type=str, default='all', help="End date in YYYY-MM format")
+    parser.add_argument("--output_dir", type=str, default=str(Path(__file__).parent))
+    parser.add_argument("--release_version", type=str, default="all")
+    parser.add_argument("--start_date", type=str, default="all", help="End date in YYYY-MM format")
+    parser.add_argument("--end_date", type=str, default="all", help="End date in YYYY-MM format")
 
     args = parser.parse_args()
 
-    if args.release_version == 'all' and args.start_date == 'all' and args.end_date == 'all':
+    if args.release_version == "all" and args.start_date == "all" and args.end_date == "all":
         # Prepare all splits
         for release_version, start_date, end_date in DEFAULT_SPLITS:
             print(f"Processing data for {release_version} from {start_date} to {end_date}")
             prepare(start_date, end_date, release_version, args.output_dir)
     else:
-        if args.release_version == 'all' or args.start_date == 'all' or args.end_date == 'all':
+        if args.release_version == "all" or args.start_date == "all" or args.end_date == "all":
             raise ValueError(
                 "If preparing a custom split, you must specify all "
                 "--release_version, --start_date, and --end_date arguments."

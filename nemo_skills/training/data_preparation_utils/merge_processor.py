@@ -28,10 +28,10 @@ class MergeProcessor(BaseFilter):
         super().__init__(**kwargs)
         self.processors = []
         for processor_cfg in processor_configs:
-            if not processor_cfg.pop('should_run', True):
+            if not processor_cfg.pop("should_run", True):
                 continue
-            processor_cfg['input_manifest_file'] = None
-            processor_cfg['output_manifest_file'] = None
+            processor_cfg["input_manifest_file"] = None
+            processor_cfg["output_manifest_file"] = None
             processor = hydra.utils.instantiate(processor_cfg)
             # running runtime tests to fail right-away if something is not
             # matching users expectations
@@ -43,7 +43,7 @@ class MergeProcessor(BaseFilter):
         num_modified = 0
         for processor in self.processors:
             data_entry = processor.process_dataset_entry(data_entry)[0]
-            if data_entry.metrics.get('num_modified', 0) > 0:
+            if data_entry.metrics.get("num_modified", 0) > 0:
                 num_modified = 1
             data_entry = data_entry.data
             if data_entry is None:
@@ -57,10 +57,10 @@ class MergeProcessor(BaseFilter):
         if not metrics:
             return
 
-        if 'num_removed' in metrics[0]:
-            num_removed_entries = sum(metric.get('num_removed', 0) for metric in metrics)
+        if "num_removed" in metrics[0]:
+            num_removed_entries = sum(metric.get("num_removed", 0) for metric in metrics)
             LOG.info("Number of removed entries: %d", num_removed_entries)
 
-        if 'num_modified' in metrics[0]:
-            num_modified_entries = sum(metric.get('num_modified', 0) for metric in metrics)
+        if "num_modified" in metrics[0]:
+            num_modified_entries = sum(metric.get("num_modified", 0) for metric in metrics)
             LOG.info("Number of modified entries: %d", num_modified_entries)

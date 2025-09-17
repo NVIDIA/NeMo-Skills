@@ -13,33 +13,25 @@
 # limitations under the License.
 import importlib
 import logging
-from enum import Enum
+import os
 from typing import List
 
 import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
+from nemo_skills.dataset.utils import import_from_path
+from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
-from nemo_skills.utils import compute_chunk_ids, get_logger_name, setup_logging, str_ids_to_list
+from nemo_skills.utils import (
+    compute_chunk_ids,
+    get_logger_name,
+    setup_logging,
+    str_ids_to_list,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 # TODO: add num_jobs here for consistency with eval?
-
-
-class GenerationType(str, Enum):
-    generate = "generate"
-    reward = "reward"
-    math_judge = "math_judge"
-    check_contamination = "check_contamination"
-
-
-GENERATION_MODULE_MAP = {
-    GenerationType.generate: "nemo_skills.inference.generate",
-    GenerationType.reward: "nemo_skills.inference.reward_model",
-    GenerationType.math_judge: "nemo_skills.inference.llm_math_judge",
-    GenerationType.check_contamination: "nemo_skills.inference.check_contamination",
-}
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -82,6 +74,9 @@ def generate(
         None,
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
+    ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
     ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
@@ -147,7 +142,7 @@ def generate(
     ),
     wandb_group: str = typer.Option(None, help="Name of the wandb group to sync samples to."),
     wandb_project: str = typer.Option(
-        'nemo-skills',
+        "nemo-skills",
         help="Name of the wandb project to sync samples to.",
     ),
     installation_command: str | None = typer.Option(
@@ -156,6 +151,15 @@ def generate(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
+    dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
+    _task_dependencies: List[str] = typer.Option(
+        None, help="Internal option to specify task dependencies.", hidden=True
+    ),
 ):
     """Generate LLM completions for a given input file.
 
@@ -163,7 +167,7 @@ def generate(
     (need to be prefixed with ++, since we use Hydra for that script).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -174,9 +178,9 @@ def generate(
 
     if log_samples:
         wandb_parameters = {
-            'name': wandb_name or expname,
-            'project': wandb_project,
-            'group': wandb_group,
+            "name": wandb_name or expname,
+            "project": wandb_project,
+            "group": wandb_group,
         }
     else:
         wandb_parameters = None
@@ -218,8 +222,11 @@ def generate(
     if generation_module is None:
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
-    generation_task = importlib.import_module(generation_module)
-    if not hasattr(generation_task, 'GENERATION_TASK_CLASS'):
+    if os.sep in generation_module:
+        generation_task = import_from_path(generation_module)
+    else:
+        generation_task = importlib.import_module(generation_module)
+    if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
         raise ValueError(
             f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
             "Please provide a valid generation module."
@@ -240,12 +247,14 @@ def generate(
         rerun_done=rerun_done,
     )
     has_tasks = False
-
-    with pipeline_utils.get_exp(expname, cluster_config) as exp:
+    all_tasks = []
+    if _task_dependencies is None:
+        _task_dependencies = []
+    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
             if wandb_parameters:
                 # no need for chunks as it will run after merging
-                wandb_parameters['samples_file'] = pipeline_utils.get_chunked_rs_filename(
+                wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
                     output_dir,
                     random_seed=seed,
                     chunk_id=None,
@@ -260,6 +269,7 @@ def generate(
                     server_nodes=server_nodes,
                     server_args=server_args,
                     server_entrypoint=server_entrypoint,
+                    server_container=server_container,
                     extra_arguments=extra_arguments_original,
                     get_random_port=get_random_port,
                 )
@@ -277,14 +287,14 @@ def generate(
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                     script=generation_module,
                 )
-                prev_tasks = None
+                prev_tasks = _task_dependencies
                 for _ in range(dependent_jobs + 1):
-                    task_name = f'{expname}-rs{seed}' if seed is not None else expname
+                    task_name = f"{expname}-rs{seed}" if seed is not None else expname
                     if chunk_id is not None:
-                        task_name += f'-chunk{chunk_id}'
+                        task_name += f"-chunk{chunk_id}"
                     new_task = pipeline_utils.add_task(
                         exp,
-                        cmd=pipeline_utils.wait_for_server(server_address=server_address, generation_commands=cmd),
+                        cmd=pipeline_utils.wrap_python_path(cmd=cmd),
                         task_name=task_name,
                         log_dir=log_dir,
                         container=cluster_config["containers"]["nemo-skills"],
@@ -297,18 +307,25 @@ def generate(
                         run_after=run_after,
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
-                        task_dependencies=prev_tasks,
+                        task_dependencies=(
+                            prev_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
+                        ),
                         get_server_command=generation_task.get_server_command_fn(),
                         slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                         installation_command=installation_command,
+                        skip_hf_home_check=skip_hf_home_check,
                     )
                     prev_tasks = [new_task]
-        if has_tasks:
-            pipeline_utils.run_exp(exp, cluster_config)
+                    all_tasks.append(new_task)
+        if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
+            pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
-    if has_tasks:
-        return exp
-    return None
+    if _reuse_exp:
+        return all_tasks
+    else:
+        if has_tasks:
+            return exp
+        return None
 
 
 if __name__ == "__main__":

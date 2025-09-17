@@ -64,17 +64,18 @@ class ReadData(BaseProcessor):
             self.keys_to_keep.add(self.input_key)
             if self.output_key is not None:
                 self.keys_to_keep.add(self.output_key)
-                self.keys_to_keep.add("is_correct")
+                self.keys_to_keep.add("symbolic_correct")
                 self.keys_to_keep.add("judgement")
+                self.keys_to_keep.add("reasoning_content")
 
         if isinstance(self.input_files, str):
-            if ',' in self.input_files:
+            if "," in self.input_files:
                 self.input_files = self.input_files.split(",")
             else:
                 self.input_files = self.input_files.split(" ")
 
         if isinstance(self.preprocessed_dataset_files, str):
-            if ',' in self.preprocessed_dataset_files:
+            if "," in self.preprocessed_dataset_files:
                 self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(",")
             else:
                 self.preprocessed_dataset_files = self.preprocessed_dataset_files.split(" ")
@@ -121,14 +122,14 @@ class ReadData(BaseProcessor):
 
             if self.output_key is not None and not self.add_unlabeled:
                 if not self.use_judgement:
-                    if "is_correct" not in line_dict:
-                        LOG.warning("Found incomplete generations (is_correct field is missing) - skipping")
+                    if "symbolic_correct" not in line_dict:
+                        LOG.warning("Found incomplete generations (symbolic_correct field is missing) - skipping")
                         continue
 
-                    if not self.add_correct and line_dict["is_correct"]:
+                    if not self.add_correct and line_dict["symbolic_correct"]:
                         continue
 
-                    if not self.add_incorrect and not line_dict["is_correct"]:
+                    if not self.add_incorrect and not line_dict["symbolic_correct"]:
                         continue
                 else:
                     if "judgement" not in line_dict:
@@ -141,7 +142,7 @@ class ReadData(BaseProcessor):
                     if not self.add_incorrect and not is_correct_judgement(line_dict["judgement"]):
                         continue
 
-            line_dict['filename'] = file_handle.name
+            line_dict["filename"] = file_handle.name
 
             if self.keys_to_keep:
                 line_dict = {k: v for k, v in line_dict.items() if k in self.keys_to_keep}
@@ -219,7 +220,7 @@ class ReadData(BaseProcessor):
 
 
 class GroupSamples(BaseProcessor):
-    def __init__(self, group_key='input', **kwargs):
+    def __init__(self, group_key="input", **kwargs):
         super().__init__(**kwargs)
         self.group_key = group_key
 
@@ -309,9 +310,11 @@ class WriteFinalSftManifest(BaseProcessor):
     def __init__(
         self,
         prompt_config: str,
-        prompt_template: str,
-        code_tags: str,
-        chat_format: str | None = None,  # nemotron/llama/None
+        tokenizer: str | None = None,
+        chat_template_kwargs: dict | None = None,
+        system_message: str | None = None,
+        assistant_end: str | None = None,
+        code_tags: str | None = None,
         input_key: str = "input",
         output_key: str = "output",
         metadata: Optional[Dict] = None,
@@ -321,24 +324,37 @@ class WriteFinalSftManifest(BaseProcessor):
         super().__init__(**kwargs)
         self.input_key = input_key
         self.output_key = output_key
-        self.chat_format = chat_format
         self.metadata = metadata
         self.exclude_optional_keys = exclude_optional_keys
         if not self.metadata:
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
+        if prompt_config and tokenizer:
+            self.prompt = get_prompt(
+                prompt_config, tokenizer=tokenizer, system_message=system_message, code_tags=code_tags
+            )
         else:
-            if prompt_template:
+            if tokenizer:
                 LOG.warning(
-                    "Prompt template is provided, but prompt config is missing! "
+                    "tokenizer is provided, but prompt config is missing! "
                     "Assuming 'user: {input_key}' and no special formatting for output."
                 )
-                self.prompt = get_prompt({"user": "{" + input_key + "}"}, prompt_template, code_tags)
+                self.prompt = get_prompt(
+                    {"user": "{" + input_key + "}"},
+                    tokenizer=tokenizer,
+                    system_message=system_message,
+                    code_tags=code_tags,
+                )
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+
+        if system_message is not None:
+            if prompt_config is None or tokenizer is None:
+                raise ValueError("prompt_config and tokenizer are required when system_message is provided")
+
+        self.chat_template_kwargs = chat_template_kwargs
+        self.assistant_end = assistant_end
 
     def process(self):
         samples_count = 0
@@ -355,8 +371,8 @@ class WriteFinalSftManifest(BaseProcessor):
                 if elem[self.output_key] in seen_predictions[question]:
                     continue
                 seen_predictions[question].add(elem[self.output_key])
-                if 'expected_answer' in elem:
-                    elem['expected_answer'] = str(elem['expected_answer'])
+                if "expected_answer" in elem:
+                    elem["expected_answer"] = str(elem["expected_answer"])
                 # take only required keys from the input if exclude_optional_keys is True
                 output_sample = {}
                 if not self.exclude_optional_keys:
@@ -364,43 +380,33 @@ class WriteFinalSftManifest(BaseProcessor):
                 elif "expected_answer" in elem:
                     output_sample["expected_answer"] = elem["expected_answer"]
 
-                if self.chat_format is None:
-                    generation = elem.pop(self.output_key)
-                    if self.prompt:
-                        output_sample["input"] = self.prompt.fill(input_dict=elem)
-                        output_sample["output"] = generation + self.prompt.config.template.assistant_end
+                generation = elem.pop(self.output_key)
+                if self.prompt:
+                    output_sample["input"] = self.prompt.fill(
+                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs
+                    )
+                    # not adding end-of-turn for incomplete generations
+                    if output_sample.get("finish_reason", "stop") == "stop":
+                        if self.assistant_end is None:
+                            output_sample["output"] = self.prompt.format_assistant_response(
+                                content=generation,
+                                thinking=elem.get("reasoning_content"),
+                                chat_template_kwargs=self.chat_template_kwargs,
+                            )
+                        else:
+                            if elem.get("reasoning_content"):
+                                raise ValueError("reasoning_content is not supported with assistant_end parameter")
+                            output_sample["output"] = generation + self.assistant_end
                     else:
-                        output_sample["input"] = elem[self.input_key]
+                        # this doesn't work properly with reasoning_content, so let's fail for now. TODO: fix this
+                        if elem.get("reasoning_content"):
+                            raise ValueError("reasoning_content is not supported yet for incomplete generations")
                         output_sample["output"] = generation
 
-                elif self.chat_format.lower() == "nemotron":
-                    output_sample['conversations'] = [
-                        {
-                            'value': self.prompt.config.user.format(**elem) if self.prompt else elem[self.input_key],
-                            'from': 'User',
-                            'canonical_form': '',
-                        },
-                        {'value': elem.pop(self.output_key), 'from': 'Assistant', 'canonical_form': ''},
-                    ]
-                    output_sample['system'] = self.prompt.config.system if self.prompt else ''
-                    output_sample['mask'] = 'User'
-                elif self.chat_format.lower() == "llama":
-                    output_sample['conversations'] = [
-                        {
-                            'value': self.prompt.config.user.format(**elem) if self.prompt else elem[self.input_key],
-                            'from': '<|start_header_id|>user<|end_header_id|>',
-                            'canonical_form': '',
-                        },
-                        {
-                            'value': elem.pop(self.output_key),
-                            'from': '<|start_header_id|>assistant<|end_header_id|>',
-                            'canonical_form': '',
-                        },
-                    ]
-                    output_sample['system'] = self.prompt.config.system if self.prompt else ''
-                    output_sample['mask'] = '<|start_header_id|>user<|end_header_id|>'
                 else:
-                    raise ValueError(f"Chat format {self.chat_format} is not supported")
+                    output_sample["input"] = elem[self.input_key]
+                    output_sample["output"] = generation
+
                 output_sample.update(self.metadata)
                 fout.write(json.dumps(output_sample) + "\n")
                 samples_count += 1
@@ -412,8 +418,10 @@ class WriteFinalRLManifest(BaseProcessor):
     def __init__(
         self,
         prompt_config: str,
-        prompt_template: str,
-        code_tags: str,
+        tokenizer: str | None = None,
+        chat_template_kwargs: dict | None = None,
+        system_message: str | None = None,
+        code_tags: str | None = None,
         task_name: str | None = None,
         input_key: str = "input",
         metadata: dict | None = None,
@@ -431,11 +439,25 @@ class WriteFinalRLManifest(BaseProcessor):
             self.metadata = {}
 
         self.prompt = None
-        if prompt_config and prompt_template:
-            self.prompt = get_prompt(prompt_config, prompt_template, code_tags)
+        if prompt_config and tokenizer:
+            self.prompt = get_prompt(
+                prompt_config, tokenizer=tokenizer, system_message=system_message, code_tags=code_tags
+            )
         else:
-            LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
+            if tokenizer:
+                LOG.warning(
+                    "tokenizer is provided, but prompt config is missing! "
+                    "Assuming 'user: {input_key}' and no special formatting for output."
+                )
+                self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
+            else:
+                LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
+        if system_message is not None:
+            if prompt_config is None or tokenizer is None:
+                raise ValueError("prompt_config and tokenizer are required when system_message is provided")
+
+        self.chat_template_kwargs = chat_template_kwargs
         self.random_seed = random_seed
         self.do_shuffle = do_shuffle
         self.num_output_samples = num_output_samples
@@ -444,12 +466,12 @@ class WriteFinalRLManifest(BaseProcessor):
     def process(self):
         samples_count = 0
         all_data = []
-        with (open(self.input_manifest_file, "rt", encoding="utf-8") as fin,):
+        with open(self.input_manifest_file, "rt", encoding="utf-8") as fin:
             # only looping over the correct samples (unless asked for incorrect)
             for line in fin:
                 elem = json.loads(line)
-                if 'expected_answer' in elem:
-                    elem['expected_answer'] = str(elem['expected_answer'])
+                if "expected_answer" in elem:
+                    elem["expected_answer"] = str(elem["expected_answer"])
                 # take only required keys from the input if exclude_optional_keys is True
                 output_sample = {}
                 if not self.exclude_optional_keys:
@@ -462,7 +484,9 @@ class WriteFinalRLManifest(BaseProcessor):
                         output_sample["problem"] = elem["problem"]
 
                 if self.prompt:
-                    output_sample["input"] = self.prompt.fill(input_dict=elem)
+                    output_sample["input"] = self.prompt.fill(
+                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs
+                    )
                 else:
                     output_sample["input"] = elem[self.input_key]
 

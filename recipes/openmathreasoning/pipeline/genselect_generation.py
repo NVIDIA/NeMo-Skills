@@ -43,7 +43,7 @@ def prepare_labeling_data(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
         run_after=run_after,
         log_dir=f"{output_dir}/logs",
-        **stage_config.get('stage_kwargs', {}),
+        **stage_config.get("stage_kwargs", {}),
     )
 
 
@@ -54,14 +54,14 @@ def label_data(cluster, expname, run_after, stage_config, **kwargs):
     output_file = f"{output_dir}/output.jsonl"
 
     generate(
-        ctx=wrap_arguments(f"++output_file={output_file} " f"{stage_config.get('inline_args', '')} "),
+        ctx=wrap_arguments(f"++output_file={output_file} {stage_config.get('inline_args', '')} "),
         cluster=cluster,
         input_file=input_file,
         output_dir=output_dir,
         expname=expname,
         run_after=run_after,
         log_dir=f"{output_dir}/logs",
-        **stage_config.get('stage_kwargs', {}),
+        **stage_config.get("stage_kwargs", {}),
     )
 
 
@@ -82,7 +82,7 @@ def extract_judgment(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
         run_after=run_after,
         log_dir=f"{output_dir}/logs",
-        **stage_config.get('stage_kwargs', {}),
+        **stage_config.get("stage_kwargs", {}),
     )
 
 
@@ -99,7 +99,7 @@ def generate_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
         run_after=run_after,
         log_dir=f"{output_dir}/logs",
-        **stage_config.get('stage_kwargs', {}),
+        **stage_config.get("stage_kwargs", {}),
     )
 
 
@@ -123,7 +123,7 @@ def merge_new_summaries(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
         run_after=run_after,
         log_dir=f"{output_dir}/logs",
-        **stage_config.get('stage_kwargs', {}),
+        **stage_config.get("stage_kwargs", {}),
     )
 
 
@@ -136,11 +136,11 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     if not prompt_config:
         raise ValueError("`prompt_config` is not defined in `prepare_for_sft` stage config")
 
-    prompt_template = stage_config.get("prompt_template")
-    if not prompt_template:
-        raise ValueError("`prompt_template` is not defined in `prepare_for_sft` stage config")
+    tokenizer = stage_config.get("tokenizer")
+    if not tokenizer:
+        raise ValueError("`tokenizer` is not defined in `prepare_for_sft` stage config")
 
-    contamination_file = stage_config.get('contamination_file')
+    contamination_file = stage_config.get("contamination_file")
     if not contamination_file:
         raise ValueError("`contamination_file` is not defined in `prepare_for_sft` stage config")
 
@@ -149,7 +149,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         f"    ++preprocessed_dataset_files='{input_file}' "
         f"    ++output_path={output_file} "
         f"    ++prompt_config={prompt_config} "
-        f"    ++prompt_template={prompt_template} "
+        f"    ++tokenizer={tokenizer} "
         f"    ++filters.trim_prefix=false "
         f"    ++filters.trim_solutions=false "
         f"    ++filters.drop_incorrect_arithmetic=false "
@@ -171,12 +171,12 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
 
 
 stages_map = {
-    'prepare_labeling_data': prepare_labeling_data,
-    'label_data': label_data,
-    'extract_judgment': extract_judgment,
-    'generate_new_summaries': generate_new_summaries,
-    'merge_new_summaries': merge_new_summaries,
-    'prepare_for_sft': prepare_for_sft,
+    "prepare_labeling_data": prepare_labeling_data,
+    "label_data": label_data,
+    "extract_judgment": extract_judgment,
+    "generate_new_summaries": generate_new_summaries,
+    "merge_new_summaries": merge_new_summaries,
+    "prepare_for_sft": prepare_for_sft,
 }
 
 
@@ -186,27 +186,27 @@ def get_available_configs(config_dir):
     if not config_dir.exists() or not config_dir.is_dir():
         return []
     yaml_files = list(config_dir.glob("*.yaml"))
-    config_names = [file.stem for file in yaml_files if not file.name.startswith('template')]
+    config_names = [file.stem for file in yaml_files if not file.name.startswith("template")]
     return config_names
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     config_dir = Path(__file__).parents[1] / "configs" / "genselect_sdg"
     available_configs = get_available_configs(config_dir)
 
-    parser = argparse.ArgumentParser(description='OpenMathReasoning-1 GenSelect instance generation pipeline')
+    parser = argparse.ArgumentParser(description="OpenMathReasoning-1 GenSelect instance generation pipeline")
     parser.add_argument(
-        '--mode',
+        "--mode",
         type=str,
         required=True,
         choices=available_configs,
         help="Will pick a corresponding config from configs folder",
     )
     parser.add_argument(
-        '--stages',
+        "--stages",
         type=str,
         default=None,
-        help='Comma-separated list of stages to run. If not specified, runs all stages from the config.',
+        help="Comma-separated list of stages to run. If not specified, runs all stages from the config.",
     )
 
     args = parser.parse_args()
@@ -214,13 +214,13 @@ if __name__ == '__main__':
     config_path = config_dir / f"{args.mode}.yaml"
     config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
 
-    if 'pipeline_stages' not in config or not config['pipeline_stages']:
+    if "pipeline_stages" not in config or not config["pipeline_stages"]:
         raise ValueError(f"Config file {config_path} must define a non-empty 'pipeline_stages' list.")
-    full_stage_sequence = config['pipeline_stages']
+    full_stage_sequence = config["pipeline_stages"]
 
     if args.stages:
         # Stages specified via command line
-        stages_to_run = args.stages.split(',')
+        stages_to_run = args.stages.split(",")
         print(f"Running specified stages: {stages_to_run}")
     else:
         # No command line override, run all stages from config
@@ -237,20 +237,20 @@ if __name__ == '__main__':
             )
 
     # --- Common parameters ---
-    base_output_dir = config['base_output_dir']
-    suffix = config.get('suffix', args.mode)
-    cluster = config['cluster']
-    expname_base = config['expname']
+    base_output_dir = config["base_output_dir"]
+    suffix = config.get("suffix", args.mode)
+    cluster = config["cluster"]
+    expname_base = config["expname"]
 
     # --- Run selected stages ---
     for stage in stages_to_run:
         print(f"\n--- Running stage: {stage} ---")
         stage_func = stages_map[stage]
-        stage_config = config.get('stages', {}).get(stage, {})
+        stage_config = config.get("stages", {}).get(stage, {})
 
         current_expname = get_stage_expname(expname_base, stage, suffix)
 
-        dep_stages = stage_config.get('dependencies', None)
+        dep_stages = stage_config.get("dependencies", None)
         dependencies = None
         if dep_stages is not None:
             dependencies = [get_stage_expname(expname_base, dep_stage, suffix) for dep_stage in dep_stages]
@@ -258,10 +258,10 @@ if __name__ == '__main__':
         print(f"Dependency for '{stage}': {dependencies}")
 
         stage_args = {
-            'cluster': cluster,
-            'expname': current_expname,
-            'run_after': dependencies,
-            'stage_config': stage_config,
+            "cluster": cluster,
+            "expname": current_expname,
+            "run_after": dependencies,
+            "stage_config": stage_config,
         }
 
         # Call the stage function

@@ -11,34 +11,43 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific lang
 
+import functools
+
 from nemo_skills.evaluation.metrics.answer_judgement_metrics import AnswerJudgementMetrics
 from nemo_skills.evaluation.metrics.arena_metrics import ArenaMetrics
+from nemo_skills.evaluation.metrics.bfcl_metrics import BFCLMetrics
 from nemo_skills.evaluation.metrics.code_metrics import (
     BigCodeBenchMetrics,
-    CodeMetrics,
+    EvalPlusMetrics,
     LiveCodeBenchMetrics,
     SciCodeMetrics,
+    SweBenchMetrics,
 )
 from nemo_skills.evaluation.metrics.if_metrics import IFMetrics
+from nemo_skills.evaluation.metrics.ioi_metrics import IOIMetrics
 from nemo_skills.evaluation.metrics.lean4_metrics import Lean4Metrics
 from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
-from nemo_skills.evaluation.metrics.mtbench_metrics import MtBenchMetrics
+from nemo_skills.evaluation.metrics.mrcr_metrics import MRCRMetrics
 from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 
 METRICS_MAP = {
     "math": MathMetrics,
+    "hle": functools.partial(MathMetrics, compute_no_answer=False, answer_key="generation"),
     "lean4-proof": Lean4Metrics,
     "lean4-statement": Lean4Metrics,
     "answer-judgement": AnswerJudgementMetrics,
     "arena": ArenaMetrics,
-    "code": CodeMetrics,
+    "bfcl": BFCLMetrics,
+    "evalplus": EvalPlusMetrics,
     "if": IFMetrics,
-    "mt-bench": MtBenchMetrics,
+    "ioi": IOIMetrics,
     "multichoice": MathMetrics,
     "ruler": RulerMetrics,
     "livecodebench": LiveCodeBenchMetrics,
+    "swe-bench": SweBenchMetrics,
     "scicode": SciCodeMetrics,
     "bigcodebench": BigCodeBenchMetrics,
+    "mrcr": MRCRMetrics,
 }
 
 

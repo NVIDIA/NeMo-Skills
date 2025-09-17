@@ -7,7 +7,7 @@
     All extra parameters are passed to [nemo_skills/inference/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/generate.py)
 
 Generation pipeline can be used for large-scale data generation
-using LLMs. You provide an input jsonl file as well as the prompt config/template and we run LLM for each line
+using LLMs. You provide an input jsonl file as well as the prompt config and we run LLM for each line
 of the input using the dictionary there to format the prompt. You input file keys need to match the prompt config
 but otherwise there is no restrictions on what data you can use for input. See [prompt format](../basics/prompt-format.md)
 documentation for more details on how to create new prompts.
@@ -67,20 +67,16 @@ Here is an example of a self-hosted model call:
 ns generate \
     --cluster=local \
     --server_type=vllm \
-    --model=/hf_models/Meta-Llama-3.1-8B-Instruct \
+    --model=meta-llama/Llama-3.1-8B-Instruct \
     --server_gpus=1 \
     --output_dir=/workspace/test-generate \
     --input_file=/workspace/input.jsonl \
     ++prompt_config=/workspace/prompt.yaml \
-    ++prompt_template=llama3-instruct \
     ++skip_filled=False
 ```
 
 Note the `++skip_filled=False` which you need to add if you're rerunning some generation and don't want
-to reuse existing output. And since we are hosting the model ourselves, we need to specify the template
-to use ([llama3-instruct](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-instruct.yaml)
-in this case). You can have
-a custom template as well if you need to (just reference a full path to it same as we do with config above).
+to reuse existing output.
 
 Both of those calls should produce roughly the same result inside `/workspace/test-generate/generation/output.jsonl`
 
@@ -121,7 +117,7 @@ Then we can run the generation
 ns generate \
        --cluster=slurm \
        --server_type=trtllm \
-       --model=/trt_models/llama-3.1-405b-instruct \
+       --model=/hf_models/Llama-3.1-405B-Instruct \
        --server_gpus=8 \
        --server_nodes=2 \
        --num_random_seeds=32 \
@@ -130,7 +126,9 @@ ns generate \
        --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
-       ++prompt_template=llama3-base
+       ++use_completions_api=True \
+       ++tokenizer=meta-llama/Llama-3.1-405B \
+       ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
 In this case we are assuming you're running on a slurm cluster and have prepared Llama 3.1 405B
@@ -140,7 +138,7 @@ models to different formats.
 
 Note that in this case we use a path to one the train set of the "math" dataset which we prepared with previous command.
 We are using a [generic/math](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
-and a [template for the base model](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/template/llama3-base.yaml)
+and a tokenizer for the base model
 (we found Llama 3.1 follows few-shots much better without chat tokens).
 Finally, we are specifying few shot examples which come from
 [here](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/prompt/few_shot_examples/math.py)
@@ -296,7 +294,7 @@ Base prime representation of a natural number is defined using the exponents of 
 
 After the jobs are finished, you will see `/workspace/synthetic-math-solutions/generation/output-rsX.jsonl`
 files with X ranging from 0 to 31. Each of them will have the `generation` key (LLM solution), `predicted_answer`
-key (extracted answer from `\boxed{}` field) and `is_correct` key which is a True/False evaluation of whether
+key (extracted answer from `\boxed{}` field) and `symbolic_correct` key which is a True/False evaluation of whether
 the `predicted_answer` is matching the `expected_answer` done via a
 [symbolic comparison](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/evaluation/math_grader.py).
 
@@ -309,24 +307,148 @@ To get a more robust assessment of whether the solutions are correct you can fol
 
 Here are some suggestions on how to make your generation jobs more efficient
 
-1. Whenever your job is not fully done, you can just resubmit it with exactly the same parameters and we will reuse
-   what was generated already (if you want to ignore existing data add `++skip_filled=False`). You can also schedule
-   multiple dependent jobs on slurm right away with `--dependent_jobs=X` parameter.
-2. Use `--num_chunks` parameter to parallelize each generation this many times
-   (we will split the data file and merge back when all jobs are finished). If some chunks run into error
-   or don't finish for other reasons, you can just resubmit the same job and we will only rerun missing chunks.
-3. Use `preprocess_cmd` and `postprocess_cmd` commands to add some pre/post-processing logic that might be needed
-   for some generations. Keep in mind that if you use `--num_random_seeds` those commands will be run for each
-   random seed separately. We will run `.format(random_seed=random_seed)` on your command which lets you run the same
-   logic on each output file, e.g.
+### Handling Long/Unfinished Jobs
 
-    ```python
-    cmd = f"python /nemo_run/code/my_script.py {output_dir}/output.jsonl"
-    generate(
-        # ...
-        postprocess_cmd=cmd
+Whenever your job is not fully done, you can just resubmit it with exactly the same parameters and we will reuse
+what was generated already (if you want to ignore existing data add `++skip_filled=False`). You can also schedule
+multiple dependent jobs on slurm right away with `--dependent_jobs=X` parameter.
+
+### Parallelizing Generation Across Multiple Jobs
+Use `--num_chunks` parameter to parallelize each generation this many times (we will split the data file and merge back when all jobs are finished).
+If some chunks run into error or don't finish for other reasons, you can just resubmit the same job and we will only rerun missing chunks.
+
+
+### Preprocessing and Postprocessing Commands
+
+Use `preprocess_cmd` and `postprocess_cmd` commands to add some pre/post-processing logic that might be needed
+for some generations. Keep in mind that if you use `--num_random_seeds` those commands will be run for each
+random seed separately. We will run `.format(random_seed=random_seed)` on your command which lets you run the same
+logic on each output file, e.g.
+
+```python
+cmd = f"python /nemo_run/code/my_script.py {output_dir}/output.jsonl"
+generate(
+    # ...
+    postprocess_cmd=cmd
+)
+```
+
+If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
+a dependent [run_cmd command](./run-cmd.md).
+
+!!! warning
+    Currently preprocess_cmd doesn't work correctly with `num_chunks>1`
+
+### Context-Window Limits
+
+Certain input-output combinations can exceed a model's context window limits. By default, such generation/evaluation jobs will fail.
+
+By passing in `++server.enable_soft_fail=True`, any context length errors will be caught during the generation, and the output dictionary would have an
+
+```python
+{"generation": "", "error": "context_window_exceeded"}
+```
+and a `"detailed_error"` field which has the detailed reason for the context.
+
+We also support automatic trimming of generation budget or context when using vllm or sglang using the following three methods:
+
+
+1. `reduce_generation`: Reduces the generation budget (if specified). For example, if a prompt is 40K tokens long, and the requested generation budget for the job is 2048, and the context window is 41K, we will dynamically reduce the generation budget for this instance so that the prompt and the output fit in the context window.
+
+2. `reduce_prompt_from_start`: Removes tokens from the start of the prompt to accommodate the requested `tokens_to_generate`. Note that for this strategy we require the generation budget, i.e., `++inference.tokens_to_generate` to be specified for the job.
+
+3. `reduce_prompt_from_end`: Same as `reduce_prompt_from_start` except that tokens are removed from the end of the input prompt.
+
+
+=== "reduce_generation"
+
+    ```python hl_lines="13-14"
+
+    from nemo_skills.prompt.utils import get_prompt
+    from nemo_skills.inference.model import get_model
+
+    prompt = get_prompt(
+        "generic/math",
+        tokenizer="Qwen/Qwen3-0.6B",
     )
+
+    input_prompt = prompt.fill({"problem": "What's 2 + 2?"})
+    llm = get_model(
+        model="Qwen/Qwen3-0.6B",
+        server_type="vllm",
+        enable_soft_fail=True,
+        context_limit_retry_strategy="reduce_generation"
+    )
+
+    # The 1M generation budget is well beyond the 40960 context window size of Qwen/Qwen3-0.6B
+    # We will automatically reduce the generation budget to fit in the context window
+    output_dict = llm.generate_sync(input_prompt, tokens_to_generate=1_000_000)
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++server.enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_generation
     ```
 
-    If you need to run some logic that aggregates information from across all random seeds, you can instead schedule
-    a dependent [run_cmd command](./run-cmd.md).
+=== "reduce_prompt_from_start"
+
+    ```python hl_lines="15-16"
+    from nemo_skills.prompt.utils import get_prompt
+    from nemo_skills.inference.model import get_model
+
+    prompt = get_prompt(
+        "generic/math",
+        tokenizer="Qwen/Qwen3-0.6B",
+    )
+
+    # Construct a fake long prompt
+    fake_long_prompt = "aa" * 500_000 + "bb" * 500_000
+    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt})
+    llm = get_model(
+        model="Qwen/Qwen3-0.6B",
+        server_type="vllm",
+        enable_soft_fail=True,
+        context_limit_retry_strategy="reduce_prompt_from_start",
+    )
+
+    # We will automatically reduce the prompt from the start to fit in the context window
+    # Note that this requires the `tokens_to_generate` budget to be specified
+    output_dict = llm.generate_sync(prompt=input_prompt, tokens_to_generate=1024)
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++server.enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_prompt_from_start
+    ```
+
+=== "reduce_prompt_from_end"
+
+    ```python hl_lines="15-16"
+
+    from nemo_skills.prompt.utils import get_prompt
+    from nemo_skills.inference.model import get_model
+
+    prompt = get_prompt(
+        "generic/math",
+        tokenizer="Qwen/Qwen3-0.6B",
+    )
+
+    # Construct a fake long prompt
+    fake_long_prompt = "aa" * 500_000 + "bb" * 500_000
+    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt})
+    llm = get_model(
+        model="Qwen/Qwen3-0.6B",
+        server_type="vllm",
+        enable_soft_fail=True,
+        context_limit_retry_strategy="reduce_prompt_from_end"
+    )
+
+    # We will automatically reduce the prompt from the end to fit in the context window
+    # Note that this requires the `tokens_to_generate` budget to be specified
+    output_dict = llm.generate_sync(prompt=input_prompt, tokens_to_generate=1024)
+    ```
+    To specify this setting for the generation or eval pipeline use
+    ```bash
+        ++server.enable_soft_fail=True
+        ++server.context_limit_retry_strategy=reduce_prompt_from_end
+    ```

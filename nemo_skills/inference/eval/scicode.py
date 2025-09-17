@@ -14,16 +14,15 @@
 
 import logging
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import field
 
 import hydra
-import openai
 
 from nemo_skills.inference.eval.scicode_utils import extract_python_script, prefilled_steps_code, process_problem_steps
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.inference.model.utils import is_context_window_exceeded_error
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, remove_thinking, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -42,9 +41,7 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     prompt_config: str = "eval/scicode/background"
     with_background: bool = True
 
-    thinking_begin: str = "<think>"
-    thinking_end: str = "</think>"
-    remove_thinking: bool = True
+    remove_thinking: bool = True  # changing default
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -52,34 +49,17 @@ cs.store(name="base_scicode_generation_config", node=SciCodeGenerationConfig)
 
 
 class SciCodeGenerationTask(GenerationTask):
-    def __init__(self, cfg: SciCodeGenerationConfig):
-        super().__init__(cfg)
-
-        if not self.use_async_loop:  # if it was True, this message is printed by base class
-            LOG.info(
-                "Async loop is maintaining %d generations in parallel. "
-                "Use max_concurrent_requests to control the number of concurrent requests.",
-                self.cfg.max_concurrent_requests,
-            )
-            if self.server["server_type"] in ["nemo", "megatron"] and self.prompt_template is None:
-                LOG.warning(
-                    "NeMo/Megatron servers don't support inflight batching, "
-                    "but SciCode evaluation requires it for efficient inference. "
-                    "Each request will be processed 1 by 1, which is extremely inefficient and slow! "
-                    "We highly recommend switching to a server that supports inflight batching."
-                )
-        self.use_async_loop = True  # SciCode is a multi-call benchmark, so we have to use async loop
-
     def log_example_prompt(self, data):
         """Scicode is multi-call benchmark, so we can't print a single prompt."""
         return
 
-    def generate_single_answer(self, data_point, data):
+    async def process_single_datapoint(self, data_point, all_data):
         """Will do all necessary generations to get a single answer for the data point."""
-        problem_id = data_point['problem_id']
-        total_steps = len(data_point['sub_steps'])
+        problem_id = data_point["problem_id"]
+        total_steps = len(data_point["sub_steps"])
         previous_llm_code = [None] * total_steps
         task_solutions = {}
+        full_outputs = {}
         total_generated_tokens = 0
         out_of_context = False
         for cur_step in range(total_steps):
@@ -89,7 +69,7 @@ class SciCodeGenerationTask(GenerationTask):
                 continue
 
             if out_of_context:
-                task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
+                task_solutions[f"{problem_id}.{cur_step}"] = "_ran_out_of_context_"
                 continue
 
             problem_steps_str, next_step_str, previous_code_str = process_problem_steps(
@@ -97,68 +77,52 @@ class SciCodeGenerationTask(GenerationTask):
             )
             dependencies = data_point["required_dependencies"]
             assert next_step_str
-            previous_code = f'{dependencies}\n{previous_code_str}\n'
+            previous_code = (
+                f"{dependencies}\n{previous_code_str}\n" if previous_code_str else f"{dependencies}\n"
+            )  # Otherwise subtask.step[0] has extra newline
             prepare_data_point = {
-                'problem_steps_str': problem_steps_str,
-                'next_step_str': next_step_str,
-                'dependencies': dependencies,
+                "problem_steps_str": problem_steps_str,
+                "next_step_str": next_step_str,
+                "dependencies": dependencies,
             }
             try:
-                # we want a synchronous generation here, but it will run in a thread
-                llm_output = super().llm_generate([prepare_data_point], data, is_async=False)[0]
+                llm_output = await super().process_single_datapoint(prepare_data_point, all_data)
             # TODO: this is a hack (as not all servers return that),
             # but eventually we should support handling errors like this globally for all generations
-            except openai.BadRequestError as e:
-                if 'Please reduce the length of the messages or completion' in str(e):
+            except Exception as error:
+                if is_context_window_exceeded_error(error):
                     LOG.warning(
                         "SciCode generation failed due to running out of context. "
                         "Failing for subsequent subtasks automatically.",
                     )
                     out_of_context = True
-                    task_solutions[f"{problem_id}.{cur_step}"] = '_ran_out_of_context_'
+                    task_solutions[f"{problem_id}.{cur_step + 1}"] = "_ran_out_of_context_"
                     continue
                 else:
-                    raise
+                    raise error
 
-            total_generated_tokens += llm_output.get('num_generated_tokens', 0)
-            if self.cfg.thinking_end in llm_output['generation']:
-                llm_output['generation'] = llm_output['generation'].split(self.cfg.thinking_end)[-1].strip()
-            elif self.cfg.thinking_begin in llm_output['generation']:
-                # thinking part wasn't finished, so setting answer as empty to not blow away the context
-                llm_output['generation'] = ''
-            extracted_python = extract_python_script(llm_output['generation'])
+            full_outputs[f"{problem_id}.{cur_step + 1}"] = llm_output
+            total_generated_tokens += llm_output.get("num_generated_tokens", 0)
+            if self.cfg.remove_thinking:
+                remove_thinking(llm_output, "generation", self.cfg.thinking_begin, self.cfg.thinking_end)
+            extracted_python = extract_python_script(llm_output["generation"])
             previous_llm_code[cur_step] = extracted_python
             # TODO: save those as separate entries so that we can preserve intermediate progress on reruns
-            task_solutions[f"{problem_id}.{cur_step}"] = f'{previous_code}\n{extracted_python}'
+            task_solutions[f"{problem_id}.{cur_step + 1}"] = f"{previous_code}\n{extracted_python}"
 
         # generation is a dict["problem_id.subtask_step": full_solution] here
-        return {'generation': task_solutions, 'num_generated_tokens': total_generated_tokens}
-
-    def llm_generate(self, data_points, data, is_async=False):
-        futures = []
-
-        with ThreadPoolExecutor(max_workers=len(data_points)) as executor:
-            for data_point in data_points:
-                future = executor.submit(self.generate_single_answer, data_point, data)
-                futures.append(future)
-
-        return futures
-
-    def get_llm_generations(self, requests_in_progress, generations):
-        for dp_idx, future in requests_in_progress.items():
-            if future.done():
-                generations[dp_idx] = future.result()
-            else:
-                generations[dp_idx] = {'generation': None}
-
-        return requests_in_progress, generations
+        return {
+            "generation": task_solutions,
+            "num_generated_tokens": total_generated_tokens,
+            "full_outputs": full_outputs,
+        }
 
 
 GENERATION_TASK_CLASS = SciCodeGenerationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_scicode_generation_config')
+@hydra.main(version_base=None, config_name="base_scicode_generation_config")
 def scicode_generation(cfg: SciCodeGenerationConfig):
     cfg = SciCodeGenerationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -173,7 +137,7 @@ HELP_MESSAGE = get_help_message(
 )
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

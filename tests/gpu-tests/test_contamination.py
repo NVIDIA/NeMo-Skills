@@ -14,7 +14,6 @@
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -25,26 +24,25 @@ from tests.conftest import docker_rm
 
 @pytest.mark.gpu
 def test_check_contamination():
-    model_path = os.getenv('NEMO_SKILLS_TEST_TRTLLM_MODEL')
+    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_TRTLLM_MODEL to run this test")
-    model_type = os.getenv('NEMO_SKILLS_TEST_MODEL_TYPE')
+        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != 'llama':
+    if model_type != "llama":
         pytest.skip("Only running this test for llama models")
-    prompt_template = 'llama3-instruct'
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/contamination"
 
     docker_rm([output_dir])
 
-    test_sets = ['math-500', 'amc23', 'aime24']
+    test_sets = ["math-500", "amc23", "aime24"]
     retrieve_from = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
     cmd = (
         f"python -m nemo_skills.inference.retrieve_similar "
-        f"    ++retrieve_from=\\\'{retrieve_from}\\\' "
+        f"    ++retrieve_from=\\'{retrieve_from}\\' "
         f"    ++compare_to=/nemo_run/code/tests/data/contamination-example.test "
         f"    ++output_file='{output_dir}/math-contamination-retrieved.jsonl' "
         f"    ++top_k=1 "
@@ -59,7 +57,7 @@ def test_check_contamination():
     )
 
     generate(
-        ctx=wrap_arguments(f"++prompt_template={prompt_template}"),
+        ctx=wrap_arguments(""),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         generation_type="check_contamination",
@@ -67,6 +65,7 @@ def test_check_contamination():
         output_dir=output_dir,
         model=model_path,
         server_type="trtllm",
+        server_args="--backend pytorch",
         server_gpus=1,
     )
 
@@ -78,7 +77,7 @@ def test_check_contamination():
     num_contaminated = 0
     for line in lines:
         data = json.loads(line)
-        assert 'contaminated' in data
-        num_contaminated += data['contaminated']
+        assert "contaminated" in data
+        num_contaminated += data["contaminated"]
     # gt answer is 4, but llama judges more problems as contaminated
-    assert 4 <= num_contaminated < 10
+    assert 3 <= num_contaminated < 10

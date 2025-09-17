@@ -21,8 +21,8 @@ from typing import List
 
 import gradio as gr
 
-from nemo_skills.inference.chat_interface.core import CodeExecStatus, ModelLoader
-from nemo_skills.inference.chat_interface.chat_service import ChatService, AppContext
+from nemo_skills.inference.chat_interface.chat_service import AppContext
+from nemo_skills.inference.chat_interface.core import CodeExecStatus
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def _format_output(text: str) -> str:
         if not part:
             continue
         if part.startswith("<tool_call>") and part.endswith("</tool_call>"):
-            processed.append(f"```python{part[len('<tool_call>'):-len('</tool_call>')]}```")
+            processed.append(f"```python{part[len('<tool_call>') : -len('</tool_call>')]}```")
         elif part.startswith("```output") and part.endswith("```"):
             processed.append(part)
         else:
@@ -89,13 +89,15 @@ class ChatUI:
         self.code_exec_checkbox.interactive = can_toggle
         if not can_toggle:
             # Force checkbox value based on capabilities.
-            forced_code_exec = (mode_cap == "tir")
+            forced_code_exec = mode_cap == "tir"
             self.code_exec_checkbox.value = forced_code_exec
             # Also update the prompt config to match the forced mode
             correct_prompt = self._get_default_prompt_config(forced_code_exec)
             self.prompt_config_tb.value = correct_prompt
             note = (
-                "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
+                "Model only supports code execution mode."
+                if mode_cap == "tir"
+                else "Model does not support code execution mode."
             )
             self.subtitle_md.value = f"Status: {note}"
 
@@ -116,32 +118,38 @@ class ChatUI:
         with gr.Column(visible=False) as self.chat_group:
             gr.Markdown("## Chat")
             self.subtitle_md = gr.Markdown("")
-            
+
             # Parameters panel
             with gr.Accordion("Parameters", open=False) as self.params_accordion:
                 with gr.Row():
                     self.max_tokens = gr.Slider(50, 20000, value=4000, step=50, label="Max new tokens")
                     self.temperature = gr.Slider(0.0, 1.2, value=0.0, step=0.05, label="Temperature")
-                self.code_exec_checkbox = gr.Checkbox(label="Enable code execution", value=self.ctx.cfg.initial_code_execution_state)
+                self.code_exec_checkbox = gr.Checkbox(
+                    label="Enable code execution", value=self.ctx.cfg.initial_code_execution_state
+                )
                 # Set initial prompt config based on initial code execution state
                 initial_prompt = self._get_default_prompt_config(self.ctx.cfg.initial_code_execution_state)
                 self.prompt_config_tb = gr.Textbox(
                     value=initial_prompt,
-                    label="Prompt Config", 
+                    label="Prompt Config",
                     placeholder="e.g., generic/math or openmath/tir",
-                    info="Override prompt config for this session"
+                    info="Override prompt config for this session",
                 )
                 self.reset_params_btn = gr.Button("Reset to defaults", variant="secondary", size="sm")
-            
+
             # Sandbox banner (hidden by default)
             self.banner_html = gr.HTML(value="", visible=False)
             self.chatbot = gr.Chatbot(height=450, show_label=False, bubble_full_width=False)
             with gr.Row(elem_id="input-row", equal_height=True):
-                self.msg_tb = gr.Textbox(show_label=False, placeholder="Type your message...", lines=3, scale=8, elem_id="msg-box")
+                self.msg_tb = gr.Textbox(
+                    show_label=False, placeholder="Type your message...", lines=3, scale=8, elem_id="msg-box"
+                )
                 # Send (arrow) and Cancel (square) buttons mimic a typical chat UI.
                 self.send_btn = gr.Button("➤", variant="primary", elem_id="send-btn", scale=0)
                 # Square stop icon (■). Hidden until a generation is in progress.
-                self.cancel_btn = gr.Button("■", variant="secondary", visible=False, interactive=False, elem_id="cancel-btn", scale=0)
+                self.cancel_btn = gr.Button(
+                    "■", variant="secondary", visible=False, interactive=False, elem_id="cancel-btn", scale=0
+                )
             self.clear_btn = gr.Button("Clear chat")
 
             # Bind events
@@ -158,7 +166,14 @@ class ChatUI:
             self.reset_params_btn.click(
                 self.on_reset_params,
                 inputs=[],
-                outputs=[self.max_tokens, self.temperature, self.code_exec_checkbox, self.prompt_config_tb, self.subtitle_md, self.banner_html],
+                outputs=[
+                    self.max_tokens,
+                    self.temperature,
+                    self.code_exec_checkbox,
+                    self.prompt_config_tb,
+                    self.subtitle_md,
+                    self.banner_html,
+                ],
             )
             self.send_btn.click(
                 self.handle_chat_submit,
@@ -197,9 +212,11 @@ class ChatUI:
         mode_cap = self.ctx.cfg.supported_modes
         if mode_cap != "both":
             # Revert to the allowed state and show explanatory message.
-            allowed_val = (mode_cap == "tir")
+            allowed_val = mode_cap == "tir"
             msg = (
-                "Model only supports code execution mode." if mode_cap == "tir" else "Model does not support code execution mode."
+                "Model only supports code execution mode."
+                if mode_cap == "tir"
+                else "Model does not support code execution mode."
             )
             self.latest_code_status = self.ctx.loader.get_code_execution_status(allowed_val)
             # Keep current prompt config override unchanged
@@ -219,11 +236,7 @@ class ChatUI:
             CodeExecStatus.DISABLED: "Interpreter unavailable.",
         }[self.latest_code_status]
         # If sandbox/model unavailable, force checkbox back to OFF; otherwise leave unchanged
-        checkbox_update = (
-            gr.update(value=False)
-            if self.latest_code_status == CodeExecStatus.DISABLED
-            else gr.update()
-        )
+        checkbox_update = gr.update(value=False) if self.latest_code_status == CodeExecStatus.DISABLED else gr.update()
 
         # Update prompt config to default for the new mode if no override is set
         new_prompt_config = self.prompt_config_tb.value
@@ -247,10 +260,10 @@ class ChatUI:
         self.cancel_requested = True
         # Immediately swap buttons in UI.
         return (
-            gr.update(visible=True, interactive=True),   # send button visible again
+            gr.update(visible=True, interactive=True),  # send button visible again
             gr.update(visible=False, interactive=False),  # cancel button hidden
         )
-    
+
     def on_clear_chat(self):
         """Clear chat history both in UI and internal state."""
         self.turns_for_prompt = []
@@ -261,27 +274,28 @@ class ChatUI:
         """Reset all parameters in the accordion to their default values."""
         # Reset internal state
         self.prompt_config_override = None
-        
+
         # Get default values
         default_max_tokens = 4000
         default_temperature = 0.0
         default_code_exec = self.ctx.cfg.initial_code_execution_state
         default_prompt = self._get_default_prompt_config(default_code_exec)
-        
+
         # Update status based on default code execution state
         self.latest_code_status = self.ctx.loader.get_code_execution_status(default_code_exec)
         mode_cap = self.ctx.cfg.supported_modes
-        
+
         # Handle forced modes
         if mode_cap != "both":
-            default_code_exec = (mode_cap == "tir")
+            default_code_exec = mode_cap == "tir"
             default_prompt = self._get_default_prompt_config(default_code_exec)
             self.latest_code_status = self.ctx.loader.get_code_execution_status(default_code_exec)
-        
+
         # Generate status message
         if mode_cap != "both":
             status_msg = (
-                "Model only supports code execution mode." if mode_cap == "tir" 
+                "Model only supports code execution mode."
+                if mode_cap == "tir"
                 else "Model does not support code execution mode."
             )
         else:
@@ -291,16 +305,21 @@ class ChatUI:
                 CodeExecStatus.DISABLED: "Interpreter unavailable.",
             }[self.latest_code_status]
             status_msg = f"Status: {status_txt}"
-        
-        logger.info("Reset params: max_tokens=%s, temp=%s, code_exec=%s, prompt=%s", 
-                   default_max_tokens, default_temperature, default_code_exec, default_prompt)
-        
+
+        logger.info(
+            "Reset params: max_tokens=%s, temp=%s, code_exec=%s, prompt=%s",
+            default_max_tokens,
+            default_temperature,
+            default_code_exec,
+            default_prompt,
+        )
+
         return (
-            gr.update(value=default_max_tokens),           # max_tokens
-            gr.update(value=default_temperature),          # temperature  
-            gr.update(value=default_code_exec),            # code_exec_checkbox
-            gr.update(value=default_prompt),               # prompt_config_tb
-            gr.update(value=status_msg),                   # subtitle_md
+            gr.update(value=default_max_tokens),  # max_tokens
+            gr.update(value=default_temperature),  # temperature
+            gr.update(value=default_code_exec),  # code_exec_checkbox
+            gr.update(value=default_prompt),  # prompt_config_tb
+            gr.update(value=status_msg),  # subtitle_md
             self._banner_from_code_status(self.latest_code_status),  # banner_html
         )
 
@@ -344,7 +363,7 @@ class ChatUI:
             display_history,
             gr.update(value="", visible=False),
             gr.update(visible=False, interactive=False),  # hide send
-            gr.update(visible=True, interactive=True),    # show cancel
+            gr.update(visible=True, interactive=True),  # show cancel
         )
 
         try:
@@ -353,7 +372,9 @@ class ChatUI:
                 max_tokens,
                 temperature,
                 self.latest_code_status,
-                prompt_config_override=self._get_current_prompt_config(self.latest_code_status == CodeExecStatus.ENABLED),
+                prompt_config_override=self._get_current_prompt_config(
+                    self.latest_code_status == CodeExecStatus.ENABLED
+                ),
             )
             for chunk in stream:
                 if self.cancel_requested:
@@ -381,8 +402,8 @@ class ChatUI:
             yield (
                 display_history,
                 gr.update(value=self.banner_html.value, visible=self.banner_html.visible),
-                gr.update(visible=True, interactive=True),   # show send again
-                gr.update(visible=False, interactive=False), # hide cancel
+                gr.update(visible=True, interactive=True),  # show send again
+                gr.update(visible=False, interactive=False),  # hide cancel
             )
         except Exception as e:
             # On error reset last turn to avoid broken history.
@@ -399,7 +420,7 @@ class ChatUI:
             )
 
     def launch(self):
-        return self.demo 
+        return self.demo
 
     def _banner_from_code_status(self, code_status: CodeExecStatus):
         sandbox_down = self.ctx.loader.get_code_execution_status(True) != CodeExecStatus.ENABLED  # check if sandbox ok

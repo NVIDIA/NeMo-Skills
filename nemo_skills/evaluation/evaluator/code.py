@@ -33,7 +33,7 @@ BIGCODEBENCH_REQUIREMENTS_URL = (
 
 
 def preprocess_code(generation_dict: dict, language="python"):
-    completion = generation_dict['generation']
+    completion = generation_dict["generation"]
     completion = completion.strip()
     completion = completion.replace("\r", "")
 
@@ -52,8 +52,8 @@ def preprocess_code(generation_dict: dict, language="python"):
         return generation_dict
     #####
 
-    start_with_lang_tag = f'```{language}'
-    generic_start_end_tag = f'```'
+    start_with_lang_tag = f"```{language}"
+    generic_start_end_tag = "```"
 
     if start_with_lang_tag in completion:
         def_line = completion.index(start_with_lang_tag) + len(start_with_lang_tag)
@@ -61,7 +61,7 @@ def preprocess_code(generation_dict: dict, language="python"):
         try:
             next_line = completion.index(generic_start_end_tag)
             completion = completion[:next_line].strip()
-        except:
+        except Exception:
             print(completion)
             print("================\n")
 
@@ -71,7 +71,7 @@ def preprocess_code(generation_dict: dict, language="python"):
         try:
             next_line = completion.index(generic_start_end_tag)
             completion = completion[:next_line].strip()
-        except:
+        except Exception:
             print(completion)
             print("================\n")
 
@@ -93,9 +93,7 @@ def install_from_git(git_url):
 # TODO: use sandbox
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
-    dataset: str = "livecodebench"
     language: str = "python"  # "cpp" is another option now
-    release_version: str = "v5"
     test_file: str = None
 
 
@@ -104,7 +102,8 @@ def eval_livecodebench(cfg):
         from livecodebench.evaluate import evaluate
     except ImportError:
         LOG.info("Package 'livecodebench' not found. Attempting to install...")
-        install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
+        # install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
+        install_from_git("git+https://github.com/wasiahmad/livecodebench.git@f285640c20aaf18df1ee5917621a596af4630b5e")
         try:
             from livecodebench.evaluate import evaluate
         except ImportError:
@@ -116,12 +115,21 @@ def eval_livecodebench(cfg):
     if eval_config.language == "cpp":
         assert eval_config.test_file is not None
 
+    release_version = None
     for jsonl_file in unroll_files(cfg.input_files):
         with open(jsonl_file) as f:
             samples = [preprocess_code(json.loads(line), eval_config.language) for line in f]
             for sample in samples:
                 sample["question_id"] = sample["task_id"]
                 sample["code_list"] = [sample["completion"]]
+                if release_version is None:
+                    release_version = sample["release_version"]
+                if release_version != sample["release_version"]:
+                    raise ValueError(
+                        f"All samples should have the same release version, "
+                        f"but got {release_version} and {sample['release_version']}"
+                    )
+
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
@@ -129,7 +137,7 @@ def eval_livecodebench(cfg):
         # https://github.com/wasiahmad/livecodebench/blob/main/livecodebench/evaluate.py#L10
         evaluate(
             custom_output_file=jsonl_file,
-            release_version=f"release_{eval_config.release_version}",
+            release_version=f"release_{release_version}",
             k_list=[1],
             language=eval_config.language,
             test_file=None if eval_config.language == "python" else eval_config.test_file,
@@ -137,16 +145,29 @@ def eval_livecodebench(cfg):
             timeout=6 if eval_config.language == "python" else 30,
         )
 
-        with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
+        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
             eval_grades = json.load(fin)
-        # adding is_correct key to allow compute_metrics to work
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
-                sample['graded_list'] = eval_grades['eval'][sample['task_id']]['graded_list']
+                sample["graded_list"] = eval_grades["eval"][sample["task_id"]]["graded_list"]
                 f.write(json.dumps(sample) + "\n")
 
         # moving eval file to ensure metrics are recomputed
-        shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
+        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+
+
+def eval_livecodebench_pro(cfg):
+    for jsonl_file in unroll_files(cfg.input_files):
+        with open(jsonl_file) as f:
+            samples = [preprocess_code(json.loads(line), "python") for line in f]
+            for sample in samples:
+                sample["problem_id"] = sample.pop("task_id")
+                sample["text_response"] = sample.pop("completion")
+                sample["response_meta"] = None
+
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in samples:
+                f.write(json.dumps(sample) + "\n")
 
 
 def eval_evalplus(cfg):
@@ -175,19 +196,19 @@ def eval_evalplus(cfg):
         }
         eval_config.update(OmegaConf.to_container(cfg.eval_config))
         evaluate(Namespace(**eval_config))
-        with open(jsonl_file[:-6] + '_eval_results.json', 'rt', encoding="utf-8") as fin:
+        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
             evalplus_grades = json.load(fin)
         # adding is_correct key to allow compute_metrics to work
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
-                sample['is_correct'] = evalplus_grades['eval'][sample['task_id']][0]['base_status'] == "pass"
-                sample['is_correct-plus'] = (
-                    sample['is_correct'] and evalplus_grades['eval'][sample['task_id']][0]['plus_status'] == "pass"
+                sample["is_correct"] = evalplus_grades["eval"][sample["task_id"]][0]["base_status"] == "pass"
+                sample["is_correct-plus"] = (
+                    sample["is_correct"] and evalplus_grades["eval"][sample["task_id"]][0]["plus_status"] == "pass"
                 )
                 f.write(json.dumps(sample) + "\n")
 
         # moving eval file as otherwise evalplus does not want to recompute metrics if it's present..
-        shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
+        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
 
 
 def install_requirements(url):
@@ -248,4 +269,4 @@ def eval_bigcodebench(cfg):
         # "output_pass_at_k.json"
 
         # moving eval file to ensure metrics are recomputed
-        shutil.move(jsonl_file[:-6] + '_eval_results.json', jsonl_file[:-6] + '_eval_results-saved.json')
+        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
