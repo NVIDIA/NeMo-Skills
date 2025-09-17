@@ -358,6 +358,7 @@ def eval(
                     keep_mounts_for_sandbox=job_needs_sandbox_to_keep_mounts or keep_mounts_for_sandbox,
                     with_search_server=with_search_server,
                     sandbox_port=None if get_random_port else 6000,
+                    with_search_server=with_search_server,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,

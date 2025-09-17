@@ -134,6 +134,7 @@ def generate(
         False,
         help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
     ),
+    with_search_server: bool = typer.Option(False, help="If True, will start a search container alongside this job"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     log_samples: bool = typer.Option(
         False,
@@ -315,6 +316,7 @@ def generate(
                         with_sandbox=with_sandbox,
                         keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                         sandbox_port=None if get_random_port else 6000,
+                        with_search_server=with_search_server,
                         run_after=run_after,
                         reuse_code=reuse_code,
                         reuse_code_exp=reuse_code_exp,
