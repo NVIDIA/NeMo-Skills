@@ -23,7 +23,7 @@ import datasets
 BIGCODEBENCH_VERSION = "v0.1.4"
 
 
-def parse_data(split='hard'):
+def parse_data(split="hard"):
     dataset_name = "bigcode/bigcodebench" if split == "full" else "bigcode/bigcodebench-hard"
     data = datasets.load_dataset(dataset_name, split=BIGCODEBENCH_VERSION)
     return data
@@ -37,35 +37,35 @@ def extract_prefix(text: str, delimiter: str) -> str:
 
 def clean_data(dataset, subset):
     def map_fn(data):
-        prefix = extract_prefix(data['instruct_prompt'], "You should write self-contained code starting with:")
+        prefix = extract_prefix(data["instruct_prompt"], "You should write self-contained code starting with:")
         code_prompt = wrap_in_code_tag(data["code_prompt"])
         data["question"] = prefix + "\n\n" + "You should write self-contained code starting with:" + "\n" + code_prompt
         return data
 
     if subset == "hard":
         remove_columns = [
-            '_id',
-            'complete_prompt',
-            'instruct_prompt',
-            'canonical_solution',
-            'code_prompt',
-            'test',
-            'entry_point',
-            'doc_struct',
-            'libs',
-            'q_idx',
-            'score',
+            "_id",
+            "complete_prompt",
+            "instruct_prompt",
+            "canonical_solution",
+            "code_prompt",
+            "test",
+            "entry_point",
+            "doc_struct",
+            "libs",
+            "q_idx",
+            "score",
         ]
     else:
         remove_columns = [
-            'complete_prompt',
-            'instruct_prompt',
-            'canonical_solution',
-            'code_prompt',
-            'test',
-            'entry_point',
-            'doc_struct',
-            'libs',
+            "complete_prompt",
+            "instruct_prompt",
+            "canonical_solution",
+            "code_prompt",
+            "test",
+            "entry_point",
+            "doc_struct",
+            "libs",
         ]
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
@@ -77,25 +77,25 @@ def wrap_in_code_tag(text):
     return text
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output_dir', type=str, default=str(Path(__file__).parent))
-    parser.add_argument('--subset', type=str, default='hard', choices=['full', 'hard'])
+    parser.add_argument("--output_dir", type=str, default=str(Path(__file__).parent))
+    parser.add_argument("--split", type=str, default="hard", choices=["full", "hard"])
 
     args = parser.parse_args()
 
-    data = parse_data(split=args.subset)
-    data = clean_data(data, args.subset)
+    data = parse_data(split=args.split)
+    data = clean_data(data, args.split)
     print("Len of data: ", len(data))
 
     print("Writing to file...")
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    output_file_path = os.path.join(args.output_dir, f"{args.subset}.jsonl")
-    with open(output_file_path, 'w') as f:
+    output_file_path = os.path.join(args.output_dir, f"{args.split}.jsonl")
+    with open(output_file_path, "w") as f:
         for problem in data:
             # somehow models like tabs more than spaces
-            problem['question'] = problem['question'].replace('    ', '\t')
+            problem["question"] = problem["question"].replace("    ", "\t")
             json.dump(problem, f)
-            f.write('\n')
+            f.write("\n")

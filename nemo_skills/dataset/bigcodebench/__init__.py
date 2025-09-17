@@ -13,9 +13,8 @@
 # limitations under the License.
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-PROMPT_CONFIG = 'eval/bigcodebench/codegen_reasoning'
-DATASET_GROUP = 'code'
-METRICS_TYPE = 'bigcodebench'
-EVAL_SPLIT = 'hard'
-EVAL_ARGS = "++eval_type=bigcodebench ++eval_config.dataset=bigcodebench"
-GENERATION_ARGS = ""
+DATASET_GROUP = "code"
+METRICS_TYPE = "bigcodebench"
+EVAL_SPLIT = "full"
+EVAL_ARGS = "++eval_type=bigcodebench"
+GENERATION_ARGS = "++prompt_config=eval/bigcodebench/codegen_reasoning"

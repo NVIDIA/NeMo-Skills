@@ -231,8 +231,7 @@ def install_or_upgrade_package(package_name):
 # TODO: use sandbox
 @nested_dataclass(kw_only=True)
 class BigCodeBenchEvaluatorConfig:
-    dataset: str = "bigcodebench"
-    subset: str = "hard"
+    split: str = "hard"
 
 
 def eval_bigcodebench(cfg):
@@ -269,7 +268,7 @@ def eval_bigcodebench(cfg):
         # "output_pass_at_k.json"
         evaluate(
             "instruct",
-            eval_config.subset,  # full, hard
+            eval_config.split,  # full, hard
             samples=jsonl_file,
             execution="local",
             pass_k="1",
