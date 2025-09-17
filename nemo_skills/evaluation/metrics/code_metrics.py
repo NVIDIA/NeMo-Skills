@@ -103,6 +103,9 @@ class BigCodeBenchMetrics(BaseMetrics):
             "accuracy": prediction["status"] == "pass",
         }
 
+    def get_incorrect_sample(self, prediction: dict) -> dict:
+        return {"status": "fail"}
+
     def update(self, predictions):
         super().update(predictions)
         self._compute_pass_at_k(predictions=predictions)
