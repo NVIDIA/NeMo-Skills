@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# Default evaluation and generation settings for the minif2f dataset
+# Default evaluation and generation settings for Lean4 proof benchmarks
 DATASET_GROUP = "lean4"
 METRICS_TYPE = "lean4-proof"
 EVAL_ARGS = "++eval_type=lean4-proof"
