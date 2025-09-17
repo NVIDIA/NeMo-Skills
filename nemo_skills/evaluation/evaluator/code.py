@@ -242,7 +242,7 @@ def eval_bigcodebench(cfg):
         LOG.info("Package 'bigcodebench' not found. Attempting to install...")
         install_requirements(BIGCODEBENCH_REQUIREMENTS_URL)
         install_or_upgrade_package("bigcodebench")
-        install_or_upgrade_package("numpy==1.26.4")
+        install_or_upgrade_package("numpy==1.26.4")  # <= needed to work with scikit-learn version 1.3.1
         try:
             from bigcodebench.evaluate import evaluate
         except ImportError:
