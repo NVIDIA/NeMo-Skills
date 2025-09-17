@@ -30,7 +30,7 @@ from nemo_skills.evaluation.evaluator.math import (
 )
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
-from nemo_skills.evaluation.evaluator.ruler import eval_ruler
+from nemo_skills.evaluation.evaluator.ruler import eval_ruler, eval_ruler2
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
 
 
@@ -49,6 +49,7 @@ EVALUATOR_MAP = {
     "lean4-statement": eval_lean4_statement,
     "multichoice": eval_mcq,
     "ruler": eval_ruler,
+    "ruler2": eval_ruler2,
     "livecodebench": eval_livecodebench,
     "livecodebench_pro": eval_livecodebench_pro,
     "scicode": eval_scicode,
