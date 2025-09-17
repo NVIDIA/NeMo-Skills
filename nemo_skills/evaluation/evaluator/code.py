@@ -269,5 +269,12 @@ def eval_bigcodebench(cfg):
         # "output_eval_results-saved.json"
         # "output_pass_at_k.json"
 
+        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+            eval_grades = json.load(fin)
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in samples:
+                sample["status"] = eval_grades["eval"][sample["task_id"]]["status"]
+                f.write(json.dumps(sample) + "\n")
+
         # moving eval file to ensure metrics are recomputed
         shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
