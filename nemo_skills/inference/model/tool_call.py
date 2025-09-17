@@ -142,7 +142,6 @@ class ToolCallingWrapper:
                 tool_calls_message = self.call_interpreter.parse(tool_calls)
                 conversation[-1].update(tool_calls_message)
 
-                ## TODO(sanyamk): refactor to not rely on hardcoded dict keys.
                 tool_calls_output_messages = await self._execute_tool_calls(
                     tool_calls_message["tool_calls"], request_id=request_id
                 )
