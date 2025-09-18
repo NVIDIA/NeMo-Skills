@@ -39,13 +39,9 @@ class MathEvaluatorConfig:
 
 
 def eval_math(cfg):
-    eval_config = MathEvaluatorConfig(**cfg.eval_config)
-
-    eval_config = asdict(eval_config)
-    batch_evaluate_results(
-        input_files=cfg.input_files,
-        **eval_config,
-    )
+    """Legacy function - delegates to MathEvaluator class."""
+    evaluator = MathEvaluator(cfg.eval_config)
+    asyncio.run(evaluator.eval_full(cfg.input_files))
 
 
 @nested_dataclass(kw_only=True)
@@ -60,33 +56,15 @@ class LeanEvaluatorConfig:
 
 
 def eval_lean4_proof(cfg):
-    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
-
-    sandbox = get_sandbox(**eval_config.sandbox)
-    eval_config_dict = asdict(eval_config)
-    eval_config_dict.pop("sandbox")
-    asyncio.run(
-        sandbox.batch_evaluate_results(
-            input_files=cfg.input_files,
-            answer_format="lean4-proof",
-            **eval_config_dict,
-        )
-    )
+    """Legacy function - delegates to Lean4ProofEvaluator class."""
+    evaluator = Lean4ProofEvaluator(cfg.eval_config)
+    asyncio.run(evaluator.eval_full(cfg.input_files))
 
 
 def eval_lean4_statement(cfg):
-    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
-
-    sandbox = get_sandbox(**eval_config.sandbox)
-    eval_config_dict = asdict(eval_config)
-    eval_config_dict.pop("sandbox")
-    asyncio.run(
-        sandbox.batch_evaluate_results(
-            input_files=cfg.input_files,
-            answer_format="lean4-statement",
-            **eval_config_dict,
-        )
-    )
+    """Legacy function - delegates to Lean4StatementEvaluator class."""
+    evaluator = Lean4StatementEvaluator(cfg.eval_config)
+    asyncio.run(evaluator.eval_full(cfg.input_files))
 
 
 # Evaluator Classes

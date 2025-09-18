@@ -29,10 +29,17 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def parse_eval_args(eval_args: str) -> tuple[str | None, dict]:
-    """Parse eval_args string to extract eval_type and eval_config."""
+    """Parse eval_args string to extract eval_type and eval_config.
+
+    Handles Hydra argument formats:
+    - ++eval_type=value (override)
+    - +eval_type=value (new)
+    - eval_type=value (config)
+    """
     if not eval_args:
         return None, {}
 
+    import re
     import shlex
 
     eval_type = None
@@ -41,11 +48,16 @@ def parse_eval_args(eval_args: str) -> tuple[str | None, dict]:
     # Parse eval_args to extract eval_type and eval_config
     eval_arg_parts = shlex.split(eval_args)
     for part in eval_arg_parts:
-        if part.startswith("++eval_type="):
-            eval_type = part.split("=", 1)[1]
-        elif part.startswith("++eval_config."):
-            # Parse eval_config parameters like ++eval_config.timeout=30
-            config_part = part[14:]  # Remove "++eval_config."
+        # Match eval_type with any Hydra prefix
+        eval_type_match = re.match(r"^(\+{0,2})eval_type=(.+)$", part)
+        if eval_type_match:
+            eval_type = eval_type_match.group(2)
+            continue
+
+        # Match eval_config with any Hydra prefix
+        eval_config_match = re.match(r"^(\+{0,2})eval_config\.(.+)$", part)
+        if eval_config_match:
+            config_part = eval_config_match.group(2)
             if "=" in config_part:
                 key, value = config_part.split("=", 1)
                 # Handle nested keys like sandbox.timeout

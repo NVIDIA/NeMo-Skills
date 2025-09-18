@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 from typing import Any, Callable, Dict
 
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator
@@ -44,14 +45,12 @@ def dummy_eval(cfg):
 
 
 EVALUATOR_MAP = {
-    "math": eval_math,
+    # Function-based evaluators (batch-only)
     "evalplus": eval_evalplus,
     "if": eval_if,
     "ifbench": eval_ifbench,
     "bfcl": eval_bfcl,
     "no-op": dummy_eval,
-    "lean4-proof": eval_lean4_proof,
-    "lean4-statement": eval_lean4_statement,
     "multichoice": eval_mcq,
     "ruler": eval_ruler,
     "livecodebench": eval_livecodebench,
@@ -70,9 +69,20 @@ EVALUATOR_CLASS_MAP = {
     # Other evaluators can be added here as they're converted to classes
 }
 
+# Validation: Ensure no overlap between class and function maps
+_class_types = set(EVALUATOR_CLASS_MAP.keys())
+_function_types = set(EVALUATOR_MAP.keys())
+_overlap = _class_types.intersection(_function_types)
+if _overlap:
+    raise ValueError(
+        f"Evaluator types cannot be in both EVALUATOR_CLASS_MAP and EVALUATOR_MAP: {_overlap}. "
+        f"Each eval_type must be in exactly one map."
+    )
+
 
 def is_evaluator_registered(eval_type: str):
-    return eval_type in EVALUATOR_MAP
+    """Check if evaluator is registered in either class or function map."""
+    return eval_type in EVALUATOR_CLASS_MAP or eval_type in EVALUATOR_MAP
 
 
 def register_evaluator(eval_type: str, eval_fn: Callable[[Dict[str, Any]], None]):
@@ -105,8 +115,18 @@ def supports_single_eval(eval_type: str, config: Dict[str, Any]) -> bool:
 
 
 def evaluate(cfg):
-    if cfg.eval_type not in EVALUATOR_MAP:
-        raise ValueError(
-            f"Evaluator not found for type: {cfg.eval_type}.\nSupported types: {str(EVALUATOR_MAP.keys())}"
-        )
-    return EVALUATOR_MAP[cfg.eval_type](cfg)
+    """Main evaluation function that handles both class-based and function-based evaluators."""
+    eval_type = cfg.eval_type
+
+    # Check if it's a class-based evaluator first
+    if eval_type in EVALUATOR_CLASS_MAP:
+        evaluator = get_evaluator(eval_type, cfg.eval_config)
+        return asyncio.run(evaluator.eval_full(cfg.input_files))
+
+    # Fall back to function-based evaluator
+    if eval_type in EVALUATOR_MAP:
+        return EVALUATOR_MAP[eval_type](cfg)
+
+    # Not found in either map
+    all_types = list(EVALUATOR_CLASS_MAP.keys()) + list(EVALUATOR_MAP.keys())
+    raise ValueError(f"Evaluator not found for type: {eval_type}.\nSupported types: {sorted(all_types)}")
