@@ -430,8 +430,12 @@ class SweBenchGenerationTask(GenerationTask):
         )
 
         # Execute OpenHands command
-        search_path = os.path.join(self.output_dir / "trajectories", "**", data_point["instance_id"], "output.jsonl")
+        search_path = os.path.join(self.output_dir / "trajectories", data_point["instance_id"], "output.jsonl")
         out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
+
+        if self.cfg.no_dedicated_environments:
+            # No need to make output_for_eval.jsonl in this case
+            return None
 
         with open(out_file, "r") as f:
             out_dict = json.loads(f.read().strip())
@@ -481,6 +485,18 @@ class SweBenchGenerationTask(GenerationTask):
                 f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
             )
 
+        if self.cfg.no_dedicated_environments:
+            # Can't run evaluation in this case, so return a dummy object
+            return {
+                "swe-bench-metrics": {
+                    "resolved": None,
+                    "patch_exists": None,
+                    "patch_successfully_applied": None,
+                },
+                "swe-bench-outputs": {},
+                "generation": "",
+            }
+
         pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount")
         with open(pred_file, "r") as f:
             trajectory_dict = json.loads(f.read())
@@ -488,16 +504,7 @@ class SweBenchGenerationTask(GenerationTask):
         # Check if the trajectory has an empty patch before running evaluation
         has_patch = trajectory_dict["model_patch"] is not None
 
-        if self.cfg.no_dedicated_environments:
-            # Can't run evaluation in this case
-            report_json = {
-                data_point["instance_id"]: {
-                    "resolved": None,
-                    "patch_exists": has_patch,
-                    "patch_successfully_applied": None,
-                }
-            }
-        elif not has_patch:
+        if not has_patch:
             report_json = {
                 data_point["instance_id"]: {
                     "resolved": False,
