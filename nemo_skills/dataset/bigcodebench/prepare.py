@@ -97,5 +97,6 @@ if __name__ == "__main__":
         for problem in data:
             # somehow models like tabs more than spaces
             problem["question"] = problem["question"].replace("    ", "\t")
+            problem["split"] = args.split
             json.dump(problem, f)
             f.write("\n")

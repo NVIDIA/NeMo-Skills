@@ -228,12 +228,6 @@ def install_or_upgrade_package(package_name):
         print(f"An error occurred while installing/upgrading {package_name}: {e}")
 
 
-# TODO: use sandbox
-@nested_dataclass(kw_only=True)
-class BigCodeBenchEvaluatorConfig:
-    split: str = "hard"
-
-
 def eval_bigcodebench(cfg):
     try:
         from bigcodebench.evaluate import evaluate
@@ -248,8 +242,7 @@ def eval_bigcodebench(cfg):
             LOG.error("Failed to install 'bigcodebench'. Please install it manually.")
             raise
 
-    eval_config = BigCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
-
+    data_split = None
     for jsonl_file in unroll_files(cfg.input_files):
         samples = []
         with open(jsonl_file) as f:
@@ -260,6 +253,12 @@ def eval_bigcodebench(cfg):
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
+                if data_split is None:
+                    data_split = sample["split"]
+                if data_split != sample["release_version"]:
+                    raise ValueError(
+                        f"All samples should have the same split, but got {data_split} and {sample['split']}"
+                    )
 
         # https://github.com/bigcode-project/bigcodebench/blob/main/bigcodebench/evaluate.py#L117
         # if the input filename is "output.jsonl"
@@ -268,7 +267,7 @@ def eval_bigcodebench(cfg):
         # "output_pass_at_k.json"
         evaluate(
             "instruct",
-            eval_config.split,  # full, hard
+            data_split,  # full, hard
             samples=jsonl_file,
             execution="local",
             pass_k="1",
