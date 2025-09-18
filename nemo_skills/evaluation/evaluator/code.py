@@ -32,9 +32,10 @@ BIGCODEBENCH_REQUIREMENTS_URL = (
 )
 
 
-def preprocess_code(generation_dict: dict, language="python"):
+def preprocess_code(generation_dict: dict, language="python", strip_whitespace=True):
     completion = generation_dict["generation"]
-    completion = completion.strip()
+    if strip_whitespace:
+        completion = completion.strip()
     completion = completion.replace("\r", "")
 
     ##### To handle code generation by reasoning models
@@ -57,25 +58,33 @@ def preprocess_code(generation_dict: dict, language="python"):
 
     if start_with_lang_tag in completion:
         def_line = completion.index(start_with_lang_tag) + len(start_with_lang_tag)
-        completion = completion[def_line:].strip()
+        completion = completion[def_line:]
+        if strip_whitespace:
+            completion = completion.strip()
         try:
             next_line = completion.index(generic_start_end_tag)
-            completion = completion[:next_line].strip()
+            completion = completion[:next_line]
+            if strip_whitespace:
+                completion = completion.strip()
         except Exception:
             print(completion)
             print("================\n")
 
     elif generic_start_end_tag in completion:
         def_line = completion.index(generic_start_end_tag) + len(generic_start_end_tag)
-        completion = completion[def_line:].strip()
+        completion = completion[def_line:]
+        if strip_whitespace:
+            completion = completion.strip()
         try:
             next_line = completion.index(generic_start_end_tag)
-            completion = completion[:next_line].strip()
+            completion = completion[:next_line]
+            if strip_whitespace:
+                completion = completion.strip()
         except Exception:
             print(completion)
             print("================\n")
 
-    if completion.startswith(" "):
+    if completion.startswith(" ") and strip_whitespace:
         completion = completion.strip()
 
     generation_dict["completion"] = completion
@@ -232,15 +241,21 @@ def eval_livebench_coding(cfg):
             raise
 
     for jsonl_file in unroll_files(cfg.input_files):
+        samples = []
         with open(jsonl_file) as f:
-            samples = [preprocess_code(json.loads(line)) for line in f]
-            for sample in samples:
+            for line in f:
+                sample = json.loads(line)
                 if sample["task"] == "coding_completion":
                     assert len(sample["partial_solution"]) > 0
+                    sample = preprocess_code(sample, strip_whitespace=False)
+                    sample["completion"] = sample["completion"].replace("\t", "    ")
                     full_solution = sample["partial_solution"] + "\n" + sample["completion"]
                     sample["code_list"] = [full_solution]
                 else:
+                    sample = preprocess_code(sample, strip_whitespace=True)
                     sample["code_list"] = [sample["completion"]]
+
+                samples.append(sample)
 
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in samples:
