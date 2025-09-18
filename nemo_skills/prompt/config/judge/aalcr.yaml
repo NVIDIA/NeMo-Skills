@@ -2,7 +2,6 @@
 # from https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR
 # Based on the official AA-LCR scoring approach using Qwen3 235B A22B 2507 Non-reasoning
 
-system: ""
 
 user: |-
     Assess whether the following CANDIDATE ANSWER is CORRECT or INCORRECT. For the CANDIDATE ANSWER to be correct, it must be consistent with the OFFICIAL ANSWER.
