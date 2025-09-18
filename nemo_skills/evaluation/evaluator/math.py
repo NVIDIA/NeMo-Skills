@@ -16,8 +16,12 @@ import asyncio
 import logging
 from dataclasses import asdict, field
 
-from nemo_skills.code_execution.sandbox import extract_proof_only, get_sandbox
-from nemo_skills.code_execution.utils import clean_formal_generation
+from nemo_skills.code_execution.proof_utils import (
+    ProofBuildConfig,
+    build_lean4_proof,
+    determine_proof_status,
+)
+from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator
 from nemo_skills.evaluation.math_grader import batch_evaluate_results
 from nemo_skills.utils import get_logger_name, nested_dataclass
@@ -103,19 +107,19 @@ class Lean4ProofEvaluator(BaseEvaluator):
         eval_config = LeanEvaluatorConfig(**self.config)
         sandbox = get_sandbox(**eval_config.sandbox)
 
-        # Prepare predicted_proof (replicating batch_evaluate_results logic)
+        # Prepare predicted_proof using shared utility
         generation = data_point["generation"]
 
-        # Clean the generation and extract the formal proof
-        cleaned_generation = clean_formal_generation(
-            generation, final_answer_key=eval_config.final_answer_key, extract_code_mode=eval_config.extract_code_mode
+        config = ProofBuildConfig(
+            final_answer_key=eval_config.final_answer_key,
+            extract_code_mode=eval_config.extract_code_mode,
+            restate_formal_statement=eval_config.restate_formal_statement,
+            strip_theorem_from_proof=True,  # Default behavior for proofs
         )
 
-        # Combine header + formal_statement + proof
-        header = data_point.get("header", "")
-        formal_statement = data_point.get("formal_statement", "") if eval_config.restate_formal_statement else ""
-        proof_part = extract_proof_only(cleaned_generation)
-        predicted_proof = header + formal_statement + proof_part
+        predicted_proof = build_lean4_proof(
+            generation=generation, data_point=data_point, config=config, answer_format="lean4-proof"
+        )
 
         # Execute proof and get compiler output
         try:
@@ -125,8 +129,8 @@ class Lean4ProofEvaluator(BaseEvaluator):
                 timeout=eval_config.timeout,
             )
 
-            # Determine proof status (replicating sandbox.is_proof_correct logic)
-            proof_status = self._determine_proof_status(output)
+            # Determine proof status using shared utility
+            proof_status = determine_proof_status(output)
 
             return {
                 "predicted_proof": predicted_proof,
@@ -145,29 +149,6 @@ class Lean4ProofEvaluator(BaseEvaluator):
                     "timeout": eval_config.timeout,
                 },
             }
-
-    def _determine_proof_status(self, compiler_output):
-        """Determine proof status from compiler output."""
-        import re
-
-        process_status = compiler_output.get("process_status", "unknown")
-
-        if process_status == "timeout":
-            return "timeout"
-        elif process_status != "completed":
-            return process_status
-
-        # Check stdout and stderr for proof status indicators
-        stdout = compiler_output.get("stdout", "").lower()
-        stderr = compiler_output.get("stderr", "").lower()
-        combined = stdout + "\n" + stderr
-
-        # Check for sorry (incomplete proof)
-        if re.search(r"\bsorry\b", combined) is not None:
-            return "has_sorry"
-
-        # If process completed without errors, consider it successful
-        return "completed"
 
 
 class Lean4StatementEvaluator(BaseEvaluator):
