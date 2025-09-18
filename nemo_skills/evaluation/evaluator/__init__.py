@@ -17,6 +17,7 @@ from typing import Any, Callable, Dict
 from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import (
     eval_evalplus,
+    eval_livebench_coding,
     eval_livecodebench,
     eval_livecodebench_pro,
 )
