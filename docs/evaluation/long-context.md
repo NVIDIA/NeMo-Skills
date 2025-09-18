@@ -16,7 +16,7 @@ More details are coming soon!
 
 ### aalcr
 - Benchmark is defined in [`nemo_skills/dataset/aalcr/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/aalcr/__init__.py)
-- Original benchmark source is [here] (https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR) and the reported scores by AA is here [here] (https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning).
+- Original benchmark source is [here](https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR) and the reported scores by AA is here [here](https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning).
 
 #### Data preparation.
 ```bash
@@ -30,7 +30,7 @@ You can also prepare a subset of the data with limited context window.
     --max_context_window 100000 --setup test_100k
 ```
 #### Running evaluation.
-It follows official AA-LCR implementation. Qwen3-235B-A22B-Instruct-2507 is served as judge and evaluation is conducted four time.
+This setup follows the official AA-LCR implementation. The judge model is Qwen3-235B-A22B-Instruct-2507, and the evaluation is repeated four times.
 ```bash
 model=Qwen2.5-7B-Instruct-1M
 ns eval \
@@ -41,7 +41,12 @@ ns eval \
     --model=/hf_models/$model \
     --benchmarks=aalcr:4 \
     --output_dir=/workspace/aalcr/$split/$model \
-    --judge_pipeline_args='model=/hf_models/Qwen3-235B-A22B-Instruct-2507 server_type=sglang server_gpus=8 ' \
-    --judget_args='++prompt_config=judge/aalcr ++generation_key=judgement ++add_generation_stats=False ' \
+    --judge_model='/hf_models/Qwen3-235B-A22B-Instruct-2507' \
+    --judge_server_type='sglang' \
+    --judge_server_gpus=8 \
     --server_args='--disable-cuda-graph' \
+```
+The results, including per-category scores, are stored in metrics.json. Detailed breakdowns by category and sequence length are also available via
+```
+ns summarize_results --cluster=<cluster_config> <folder_of_output_json>
 ```
