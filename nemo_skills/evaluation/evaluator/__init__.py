@@ -18,6 +18,7 @@ from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import (
     eval_bigcodebench,
     eval_evalplus,
+    eval_livebench_coding,
     eval_livecodebench,
     eval_livecodebench_pro,
 )
@@ -52,6 +53,7 @@ EVALUATOR_MAP = {
     "ruler": eval_ruler,
     "ruler2": eval_ruler2,
     "livecodebench": eval_livecodebench,
+    "livebench_coding": eval_livebench_coding,
     "livecodebench_pro": eval_livecodebench_pro,
     "scicode": eval_scicode,
     "mrcr": eval_mrcr,
