@@ -20,7 +20,6 @@ EVAL_ARGS = "++eval_type=no-op"  # using judgement directly in metrics, no need 
 GENERATION_ARGS = ""
 
 JUDGE_PIPELINE_ARGS = {
-    "generation_type": "math_judge",
     "model": "gpt-4.1",
     "server_type": "openai",
     "server_address": "https://api.openai.com/v1",
