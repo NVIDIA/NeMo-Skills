@@ -42,6 +42,7 @@ METRICS_MAP = {
     "ioi": IOIMetrics,
     "multichoice": MathMetrics,
     "ruler": RulerMetrics,
+    "ruler2": RulerMetrics,
     "livecodebench": LiveCodeBenchMetrics,
     "swe-bench": SweBenchMetrics,
     "scicode": SciCodeMetrics,
