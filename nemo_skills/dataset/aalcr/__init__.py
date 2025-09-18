@@ -15,8 +15,8 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "long-context"
-METRICS_TYPE = "answer-judgement"
-EVAL_ARGS = "++eval_type=math"
+METRICS_TYPE = "aalcr"
+EVAL_ARGS = "++eval_type=no-op"  # using judgement directly in metrics, no need for special evaluation
 GENERATION_ARGS = ""
 JUDGE_PIPELINE_ARGS = {
     "model": "/hf_models/Qwen3-235B-A22B-Instruct-2507",
