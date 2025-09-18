@@ -18,9 +18,17 @@ DATASET_GROUP = "long-context"
 METRICS_TYPE = "aalcr"
 EVAL_ARGS = "++eval_type=no-op"  # using judgement directly in metrics, no need for special evaluation
 GENERATION_ARGS = ""
+
 JUDGE_PIPELINE_ARGS = {
-    "model": "/hf_models/Qwen3-235B-A22B-Instruct-2507",
-    "server_type": "sglang",
-    "server_gpus": 8,
+    "generation_type": "math_judge",
+    "model": "gpt-4.1",
+    "server_type": "openai",
+    "server_address": "https://api.openai.com/v1",
 }
-JUDGE_ARGS = "++prompt_config=judge/aalcr ++generation_key=judgement ++add_generation_stats=False"
+# AA-LCR official judge model.
+# JUDGE_PIPELINE_ARGS = {
+#     "model": "/hf_models/Qwen3-235B-A22B-Instruct-2507",
+#     "server_type": "sglang",
+#     "server_gpus": 8,
+# }
+# JUDGE_ARGS = "++prompt_config=judge/aalcr ++generation_key=judgement ++add_generation_stats=False"

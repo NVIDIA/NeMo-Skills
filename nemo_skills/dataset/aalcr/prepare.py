@@ -213,10 +213,6 @@ def get_aalcr_data(max_context_window, setup, tokenizer_name):
             "https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR/resolve/main/extracted_text/AA-LCR_extracted-text.zip"
         )
         zipfile.ZipFile("AA-LCR_extracted-text.zip").extractall(Path(__file__).absolute().parent)
-
-        # Note: Files are extracted with encoding artifacts in filenames
-        # This matches what the dataset metadata expects, so we leave them as-is
-
         os.remove("AA-LCR_extracted-text.zip")
 
     txt_file_folder = Path(__file__).absolute().parent / "lcr"
