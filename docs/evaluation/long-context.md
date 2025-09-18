@@ -14,25 +14,23 @@ More details are coming soon!
 - Benchmark is defined in [`nemo_skills/dataset/mrcr/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/mrcr/__init__.py)
 - Original benchmark source is [here](https://huggingface.co/datasets/openai/mrcr).
 
-### [aalcr](https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR)
+### aalcr
 - Benchmark is defined in [`nemo_skills/dataset/aalcr/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/aalcr/__init__.py)
-- Original benchmark source is [here](https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning).
+- Original benchmark source is [here] (https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR) and the reported scores by AA is here [here] (https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning).
 
-Data preparation. You will need to get txt files using data_source_url or consult with AA.
+#### Data preparation.
 ```bash
 ns prepare_data \
     --data_dir=/workspace/ns-data \
     --cluster=<cluster_config> \
-    aalcr --txt_file_folder=/workspace/do_not_share_data/lcr
+    aalcr
 ```
-
 You can also prepare a subset of the data with limited context window.
 ```bash
-    --max_context_window 100000 --setup aalcr_100k
+    --max_context_window 100000 --setup test_100k
 ```
-
-Example command for running evaluation. It follows official AA-LCR implementation. Qwen3-235B-A22B-Instruct-2507 is served as judge.
-
+#### Running evaluation.
+It follows official AA-LCR implementation. Qwen3-235B-A22B-Instruct-2507 is served as judge and evaluation is conducted four time.
 ```bash
 model=Qwen2.5-7B-Instruct-1M
 ns eval \
@@ -41,8 +39,9 @@ ns eval \
     --server_gpus=8 \
     --server_type=sglang \
     --model=/hf_models/$model \
-    --benchmarks=aalcr:0 \
-    --split=aalcr \
+    --benchmarks=aalcr:4 \
     --output_dir=/workspace/aalcr/$split/$model \
-    (--server_args='--disable-cuda-graph')
+    --judge_pipeline_args='model=/hf_models/Qwen3-235B-A22B-Instruct-2507 server_type=sglang server_gpus=8 ' \
+    --judget_args='++prompt_config=judge/aalcr ++generation_key=judgement ++add_generation_stats=False ' \
+    --server_args='--disable-cuda-graph' \
 ```
