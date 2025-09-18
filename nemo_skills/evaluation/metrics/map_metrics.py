@@ -50,6 +50,7 @@ METRICS_MAP = {
     "bigcodebench": BigCodeBenchMetrics,
     "mrcr": MRCRMetrics,
     "aalcr": AALCRMetrics,
+    "livebench_coding": LiveCodeBenchMetrics,
 }
 
 
