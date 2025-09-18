@@ -16,7 +16,9 @@ import asyncio
 import logging
 from dataclasses import asdict, field
 
-from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.code_execution.sandbox import extract_proof_only, get_sandbox
+from nemo_skills.code_execution.utils import clean_formal_generation
+from nemo_skills.evaluation.evaluator.base import BaseEvaluator
 from nemo_skills.evaluation.math_grader import batch_evaluate_results
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
@@ -85,3 +87,122 @@ def eval_lean4_statement(cfg):
             **eval_config_dict,
         )
     )
+
+
+# Evaluator Classes
+
+
+class MathEvaluator(BaseEvaluator):
+    """Math evaluator - only supports batch evaluation."""
+
+    async def eval_full(self, input_files: list[str], **kwargs) -> None:
+        """Batch evaluate math problems."""
+        eval_config = MathEvaluatorConfig(**self.config)
+        eval_config_dict = asdict(eval_config)
+        batch_evaluate_results(
+            input_files=input_files,
+            **eval_config_dict,
+        )
+
+
+class Lean4ProofEvaluator(BaseEvaluator):
+    """Lean4 proof evaluator - supports both single and batch evaluation."""
+
+    async def eval_full(self, input_files: list[str], **kwargs) -> None:
+        """Batch evaluate Lean4 proofs."""
+        eval_config = LeanEvaluatorConfig(**self.config)
+        sandbox = get_sandbox(**eval_config.sandbox)
+        eval_config_dict = asdict(eval_config)
+        eval_config_dict.pop("sandbox")
+        await sandbox.batch_evaluate_results(
+            input_files=input_files,
+            answer_format="lean4-proof",
+            **eval_config_dict,
+        )
+
+    async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
+        """Evaluate single Lean4 proof during generation."""
+        eval_config = LeanEvaluatorConfig(**self.config)
+        sandbox = get_sandbox(**eval_config.sandbox)
+
+        # Prepare predicted_proof (replicating batch_evaluate_results logic)
+        generation = data_point["generation"]
+
+        # Clean the generation and extract the formal proof
+        cleaned_generation = clean_formal_generation(
+            generation, final_answer_key=eval_config.final_answer_key, extract_code_mode=eval_config.extract_code_mode
+        )
+
+        # Combine header + formal_statement + proof
+        header = data_point.get("header", "")
+        formal_statement = data_point.get("formal_statement", "") if eval_config.restate_formal_statement else ""
+        proof_part = extract_proof_only(cleaned_generation)
+        predicted_proof = header + formal_statement + proof_part
+
+        # Execute proof and get compiler output
+        try:
+            output, _ = await sandbox.execute_code(
+                generated_code=predicted_proof,
+                language="lean4",
+                timeout=eval_config.timeout,
+            )
+
+            # Determine proof status (replicating sandbox.is_proof_correct logic)
+            proof_status = self._determine_proof_status(output)
+
+            return {
+                "predicted_proof": predicted_proof,
+                "proof_status": proof_status,
+                "lean_evaluation": {**output, "timeout": eval_config.timeout},
+            }
+
+        except Exception as e:
+            return {
+                "predicted_proof": predicted_proof,
+                "proof_status": "error",
+                "lean_evaluation": {
+                    "process_status": "error",
+                    "stdout": "",
+                    "stderr": f"Error during evaluation: {str(e)}",
+                    "timeout": eval_config.timeout,
+                },
+            }
+
+    def _determine_proof_status(self, compiler_output):
+        """Determine proof status from compiler output."""
+        import re
+
+        process_status = compiler_output.get("process_status", "unknown")
+
+        if process_status == "timeout":
+            return "timeout"
+        elif process_status != "completed":
+            return process_status
+
+        # Check stdout and stderr for proof status indicators
+        stdout = compiler_output.get("stdout", "").lower()
+        stderr = compiler_output.get("stderr", "").lower()
+        combined = stdout + "\n" + stderr
+
+        # Check for sorry (incomplete proof)
+        if re.search(r"\bsorry\b", combined) is not None:
+            return "has_sorry"
+
+        # If process completed without errors, consider it successful
+        return "completed"
+
+
+class Lean4StatementEvaluator(BaseEvaluator):
+    """Lean4 statement evaluator - only supports batch evaluation."""
+
+    async def eval_full(self, input_files: list[str], **kwargs) -> None:
+        """Batch evaluate Lean4 statements."""
+        eval_config = LeanEvaluatorConfig(**self.config)
+        sandbox = get_sandbox(**eval_config.sandbox)
+        eval_config_dict = asdict(eval_config)
+        eval_config_dict.pop("sandbox")
+        await sandbox.batch_evaluate_results(
+            input_files=input_files,
+            answer_format="lean4-statement",
+            **eval_config_dict,
+        )

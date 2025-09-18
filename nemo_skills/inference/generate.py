@@ -166,6 +166,10 @@ class GenerateSolutionsConfig:
     # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
     enable_litellm_cache: bool = False
 
+    # Evaluation during generation
+    eval_type: str | None = None  # "lean4-proof", "math", etc.
+    eval_config: dict = field(default_factory=dict)  # Config for the evaluator
+
     def __post_init__(self):
         self._post_init_validate_data()
         self._post_init_validate_server()
@@ -283,6 +287,19 @@ class GenerationTask:
             self.extra_generate_params = self.prompt.get_code_execution_args()
         else:
             self.extra_generate_params = {}
+
+        # Setup evaluator if specified
+        self.evaluator = None
+        if self.cfg.eval_type:
+            from nemo_skills.evaluation.evaluator import get_evaluator, supports_single_eval
+
+            if not supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
+                raise ValueError(
+                    f"Evaluator '{self.cfg.eval_type}' does not support single evaluation during generation. "
+                    f"Use the evaluation pipeline instead."
+                )
+
+            self.evaluator = get_evaluator(self.cfg.eval_type, self.cfg.eval_config)
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
@@ -502,7 +519,14 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        return await self.llm.generate_async(**generation_params)
+        result = await self.llm.generate_async(**generation_params)
+
+        # Apply evaluation hook if configured
+        if self.evaluator:
+            eval_results = await self.evaluator.eval_single({**data_point, **result})
+            result.update(eval_results)
+
+        return result
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point with semaphore control."""

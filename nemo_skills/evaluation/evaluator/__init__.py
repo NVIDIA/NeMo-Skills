@@ -14,6 +14,7 @@
 
 from typing import Any, Callable, Dict
 
+from nemo_skills.evaluation.evaluator.base import BaseEvaluator
 from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import (
     eval_bigcodebench,
@@ -25,6 +26,9 @@ from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
 from nemo_skills.evaluation.evaluator.ioi import eval_ioi
 from nemo_skills.evaluation.evaluator.math import (
+    Lean4ProofEvaluator,
+    Lean4StatementEvaluator,
+    MathEvaluator,
     eval_lean4_proof,
     eval_lean4_statement,
     eval_math,
@@ -58,6 +62,14 @@ EVALUATOR_MAP = {
     "bigcodebench": eval_bigcodebench,
 }
 
+# Evaluator class mapping
+EVALUATOR_CLASS_MAP = {
+    "math": MathEvaluator,
+    "lean4-proof": Lean4ProofEvaluator,
+    "lean4-statement": Lean4StatementEvaluator,
+    # Other evaluators can be added here as they're converted to classes
+}
+
 
 def is_evaluator_registered(eval_type: str):
     return eval_type in EVALUATOR_MAP
@@ -68,6 +80,28 @@ def register_evaluator(eval_type: str, eval_fn: Callable[[Dict[str, Any]], None]
         raise ValueError(f"Evaluator for {eval_type} already registered")
 
     EVALUATOR_MAP[eval_type] = eval_fn
+
+
+def get_evaluator(eval_type: str, config: Dict[str, Any]) -> BaseEvaluator:
+    """Get evaluator instance by type."""
+    if eval_type not in EVALUATOR_CLASS_MAP:
+        raise ValueError(
+            f"Evaluator class not found for type: {eval_type}.\n"
+            f"Available types with class support: {list(EVALUATOR_CLASS_MAP.keys())}\n"
+            f"All supported types: {list(EVALUATOR_MAP.keys())}"
+        )
+
+    evaluator_class = EVALUATOR_CLASS_MAP[eval_type]
+    return evaluator_class(config)
+
+
+def supports_single_eval(eval_type: str, config: Dict[str, Any]) -> bool:
+    """Check if evaluator supports single evaluation during generation."""
+    if eval_type not in EVALUATOR_CLASS_MAP:
+        return False  # Only class-based evaluators support single eval
+
+    evaluator = get_evaluator(eval_type, config)
+    return evaluator.supports_single_eval()
 
 
 def evaluate(cfg):
