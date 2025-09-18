@@ -51,6 +51,7 @@ EVALUATOR_MAP = {
     "multichoice": eval_mcq,
     "ruler": eval_ruler,
     "livecodebench": eval_livecodebench,
+    "livebench_coding": eval_livebench_coding,
     "livecodebench_pro": eval_livecodebench_pro,
     "scicode": eval_scicode,
     "mrcr": eval_mrcr,

@@ -48,7 +48,6 @@ def clean_data(dataset):
         "livebench_removal_date",
         "remainder",
         "solution",
-        "partial_solution",
     ]
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
