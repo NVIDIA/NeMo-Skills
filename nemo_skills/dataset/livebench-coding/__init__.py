@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# Default evaluation and generation settings for the minif2f dataset
-DATASET_GROUP = "lean4"
-METRICS_TYPE = "lean4-proof"
-EVAL_ARGS = "++eval_type=lean4-proof"
-GENERATION_ARGS = "++prompt_config=lean4/formal-proof-deepseek-prover-v2"
-REQUIRES_SANDBOX = True
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+DATASET_GROUP = "code"
+METRICS_TYPE = "livecodebench"
+EVAL_SPLIT = "test"
+EVAL_ARGS = "++eval_type=livebench_coding"
+GENERATION_ARGS = "++prompt_config=generic/default"
