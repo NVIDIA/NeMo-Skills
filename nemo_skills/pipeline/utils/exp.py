@@ -443,9 +443,15 @@ def add_task(
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
     if server_config is not None and int(server_config["num_gpus"]) > 0:
+        _total_gpus_per_node = int(server_config["num_gpus"])
         if with_search_server:
             ## FIXME(sanyamk): hardcoded for now.
-            search_server_gpus = 2
+            _search_server_num_gpus = 2
+            _total_gpus_per_node += _search_server_num_gpus
+
+        ## NOTE(sanyamk): Cap max gpus per node to 8.
+        _total_gpus_per_node = min(8, _total_gpus_per_node)
+        _cuda_visible_devices = [str(i) for i in range(_total_gpus_per_node)]
 
         # do not pass container into the command builder
         server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
@@ -455,15 +461,7 @@ def add_task(
             cluster_config,
             {
                 ## NOTE(sanyamk): Isolating GPUs hack.
-                "CUDA_VISIBLE_DEVICES": ",".join(
-                    [
-                        str(i)
-                        for i in range(
-                            int(server_config["num_gpus"]) + (search_server_gpus if with_search_server else 0)
-                        )
-                        if i < int(server_config["num_gpus"])
-                    ]
-                ),
+                "CUDA_VISIBLE_DEVICES": ",".join(_cuda_visible_devices[: int(server_config["num_gpus"])]),
             },
         ):
             server_executor = get_executor(
@@ -471,7 +469,7 @@ def add_task(
                 container=server_container,
                 num_nodes=server_config["num_nodes"],
                 tasks_per_node=num_server_tasks,
-                gpus_per_node=int(server_config["num_gpus"]) + (search_server_gpus if with_search_server else 0),
+                gpus_per_node=_total_gpus_per_node,
                 partition=partition,
                 time_min=time_min,
                 dependencies=dependencies,
@@ -499,13 +497,7 @@ def add_task(
                 cluster_config,
                 {
                     ## NOTE(sanyamk): Isolating GPUs hack.
-                    "CUDA_VISIBLE_DEVICES": ",".join(
-                        [
-                            str(i)
-                            for i in range(int(server_config["num_gpus"]) + search_server_gpus)
-                            if i >= int(server_config["num_gpus"])
-                        ]
-                    ),
+                    "CUDA_VISIBLE_DEVICES": ",".join(_cuda_visible_devices[-_search_server_num_gpus:]),
                     "SEARCH_SERVER_PORT": search_server_port,
                 },
             ):
@@ -515,7 +507,7 @@ def add_task(
                     container=cluster_config["containers"]["search"],
                     num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
                     tasks_per_node=1,
-                    gpus_per_node=int(server_config["num_gpus"]) + search_server_gpus,
+                    gpus_per_node=_total_gpus_per_node,
                     partition=partition,
                     time_min=time_min,
                     dependencies=dependencies,
