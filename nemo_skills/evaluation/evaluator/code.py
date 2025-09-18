@@ -27,9 +27,6 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-LIVEBENCH_CODING_REQUIREMENTS_URL = (
-    "https://raw.githubusercontent.com/LiveBench/LiveBench/main/livebench/code_runner/requirements_eval.txt"
-)
 BIGCODEBENCH_REQUIREMENTS_URL = (
     "https://raw.githubusercontent.com/bigcode-project/bigcodebench/main/Requirements/requirements-eval.txt"
 )
@@ -228,7 +225,6 @@ def eval_livebench_coding(cfg):
     except ImportError:
         LOG.info("Package 'livecodebench' not found. Attempting to install...")
         install_from_git("git+https://github.com/wasiahmad/livecodebench.git@livebench")
-        install_requirements(LIVEBENCH_CODING_REQUIREMENTS_URL)
         try:
             from livecodebench.evaluate import evaluate
         except ImportError:
