@@ -21,7 +21,7 @@ import tiktoken
 from datasets import load_dataset
 from tqdm import tqdm
 
-from nemo_skills.utils import get_logger_name
+from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -223,7 +223,7 @@ def prepare_aalcr_data(max_context_window, setup, tokenizer_name):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Prepare MRCR dataset.")
+    parser = argparse.ArgumentParser(description="Prepare AALCR dataset.")
     parser.add_argument(
         "--max_context_window",
         type=int,
@@ -249,8 +249,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    if args.debug:
-        LOG.setLevel(logging.DEBUG)
+
+    # Setup logging
+    setup_logging(log_level=logging.DEBUG if args.debug else logging.INFO)
 
     LOG.info(f"Preparing AA-LCR dataset with additional arguments: {args}")
     prepare_aalcr_data(args.max_context_window, args.setup, args.tokenizer_name)
