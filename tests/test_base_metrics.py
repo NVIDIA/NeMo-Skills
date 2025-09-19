@@ -174,13 +174,13 @@ def test_base_metrics_add_std_metrics(
             ],
             85.0,
             25.0,
-            {"correct": [[1.0, 0.0]], "reasoning_tokens": [[80, 90]], "answer_tokens": [[20, 30]]},
+            {"reasoning_tokens": [[80, 90]], "answer_tokens": [[20, 30]]},
         ),
         (
             [{"num_generated_tokens": 50, "is_correct": True}, {"num_generated_tokens": 60, "is_correct": False}],
             0.0,
             55.0,
-            {"correct": [[1.0, 0.0]], "reasoning_tokens": [[0, 0]], "answer_tokens": [[50, 60]]},
+            {"reasoning_tokens": [[0, 0]], "answer_tokens": [[50, 60]]},
         ),
         (
             [
@@ -189,11 +189,12 @@ def test_base_metrics_add_std_metrics(
             ],
             50.0,
             60.0,
-            {"correct": [[1.0, 0.0]], "reasoning_tokens": [[100, 0]], "answer_tokens": [[40, 80]]},
+            {"reasoning_tokens": [[100, 0]], "answer_tokens": [[40, 80]]},
         ),
     ],
 )
 def test_base_metrics_update(predictions, expected_avg_reasoning, expected_avg_answer, expected_all_scores):
+    """Test the base update method's token handling (scores are handled by subclasses)."""
     metrics = MockMetrics()
     metrics.update(predictions)
     assert metrics.avg_reasoning_tokens == expected_avg_reasoning

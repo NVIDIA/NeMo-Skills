@@ -159,12 +159,6 @@ class BaseMetrics(abc.ABC):
             pred["num_generated_tokens"] for pred in predictions if "num_generated_tokens" in pred
         ) / len(predictions)
 
-        # Handle score data
-        score_dicts = [self._get_score_dict(pred) for pred in predictions]
-        for score_method in score_dicts[0].keys():
-            scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
-            self.all_scores[score_method].append(scores_list)
-
         # Handle token data
         reasoning_tokens = []
         answer_tokens = []
