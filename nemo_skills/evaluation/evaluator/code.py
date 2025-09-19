@@ -20,9 +20,11 @@ import shutil
 import subprocess
 import sys
 from argparse import Namespace
+from dataclasses import field
 
 from omegaconf import OmegaConf
 
+from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -99,28 +101,20 @@ def install_from_git(git_url):
         print(f"Error during installation: {e}")
 
 
-# TODO: use sandbox
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
+    sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
     language: str = "python"  # "cpp" is another option now
     test_file: str = None
+    interpreter: str = "python"  # use either "python" or pypy3
+    timeout: float = 6.0
 
 
 def eval_livecodebench(cfg):
-    try:
-        from livecodebench.evaluate import evaluate
-    except ImportError:
-        LOG.info("Package 'livecodebench' not found. Attempting to install...")
-        # install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
-        install_from_git("git+https://github.com/wasiahmad/livecodebench.git@f285640c20aaf18df1ee5917621a596af4630b5e")
-        try:
-            from livecodebench.evaluate import evaluate
-        except ImportError:
-            LOG.info("Failed to install 'livecodebench'. Please install it manually.")
-            raise
-
     eval_config = LiveCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
     assert eval_config.language in ["python", "cpp"]
+    if eval_config.language == "python":
+        assert eval_config.interpreter in ["python", "pypy3"]
     if eval_config.language == "cpp":
         assert eval_config.test_file is not None
 
@@ -129,7 +123,6 @@ def eval_livecodebench(cfg):
         with open(jsonl_file) as f:
             samples = [preprocess_code(json.loads(line), eval_config.language) for line in f]
             for sample in samples:
-                sample["question_id"] = sample["task_id"]
                 sample["code_list"] = [sample["completion"]]
                 if release_version is None:
                     release_version = sample["release_version"]
@@ -143,16 +136,84 @@ def eval_livecodebench(cfg):
             for sample in samples:
                 f.write(json.dumps(sample) + "\n")
 
-        # https://github.com/wasiahmad/livecodebench/blob/main/livecodebench/evaluate.py#L10
-        evaluate(
-            custom_output_file=jsonl_file,
-            release_version=f"release_{release_version}",
-            k_list=[1],
-            language=eval_config.language,
-            test_file=None if eval_config.language == "python" else eval_config.test_file,
-            num_process_evaluate=12,
-            timeout=6 if eval_config.language == "python" else 30,
-        )
+        if eval_config.interpreter == "python":
+            try:
+                from livecodebench.evaluate import evaluate
+            except ImportError:
+                LOG.info("Package 'livecodebench' not found. Attempting to install...")
+                install_from_git(
+                    "git+https://github.com/wasiahmad/livecodebench.git@f285640c20aaf18df1ee5917621a596af4630b5e"
+                )
+                try:
+                    from livecodebench.evaluate import evaluate
+                except ImportError:
+                    LOG.info("Failed to install 'livecodebench'. Please install it manually.")
+                    raise
+
+            # https://github.com/wasiahmad/livecodebench/blob/main/livecodebench/evaluate.py#L10
+            evaluate(
+                custom_output_file=jsonl_file,
+                release_version=f"release_{release_version}",
+                k_list=[1],
+                language=eval_config.language,
+                test_file=None if eval_config.language == "python" else eval_config.test_file,
+                num_process_evaluate=12,
+                timeout=eval_config.timeout,
+            )
+        else:
+            commands = []
+            commands.append(
+                """
+import sys
+import subprocess
+"""
+            )
+
+            commands.append(
+                """
+def install_from_git(git_url):
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", git_url])
+        print("Package installed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during installation: {e}")
+"""
+            )
+
+            commands.append(
+                """
+try:
+    from livecodebench.evaluate import evaluate
+except ImportError:
+    print("Package 'livecodebench' not found. Attempting to install...")
+    install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
+    try:
+        from livecodebench.evaluate import evaluate
+    except ImportError:
+        print("Failed to install 'livecodebench'. Please install it manually.")
+        raise
+"""
+            )
+
+            commands.append(
+                f"""
+evaluate(
+    custom_output_file={jsonl_file},
+    release_version=f"release_{release_version}",
+    test_file=None if eval_config.language == "python" else {eval_config.test_file},
+    k_list=[1],
+    language={eval_config.language},
+    num_process_evaluate=12,
+    timeout={eval_config.timeout},
+)
+"""
+            )
+
+            code = "\n".join(commands)
+            sandbox = get_sandbox(**eval_config.sandbox)
+            output_dict, _ = sandbox.execute_code(
+                code, timeout=eval_config.timeout * len(samples), max_output_characters=100000
+            )
 
         with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
             eval_grades = json.load(fin)

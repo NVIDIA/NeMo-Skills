@@ -135,7 +135,6 @@ DEFAULT_SPLITS = [
     ("v6", "2024-08", "2025-05"),  # current default in lb
 ]
 
-
 if __name__ == "__main__":
     # Write an argparse to a json file, read it in and parse it
     parser = argparse.ArgumentParser()
