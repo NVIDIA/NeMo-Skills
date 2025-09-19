@@ -16,7 +16,7 @@ import logging
 from enum import Enum
 
 from nemo_skills.pipeline.utils.mounts import check_if_mounted
-from nemo_skills.utils import get_logger_name
+from nemo_skills.utils import get_logger_name, get_server_wait_cmd
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -35,6 +35,7 @@ class SupportedServers(str, Enum):
     megatron = "megatron"
     openai = "openai"
     azureopenai = "azureopenai"
+    gemini = "gemini"
 
 
 def get_free_port(exclude: list[int] | None = None, strategy: int | str = 5000) -> int:
@@ -60,18 +61,18 @@ def should_get_random_port(server_gpus, exclusive, server_type):
     return server_gpus != 8 and not exclusive and server_type != "megatron"
 
 
-def wait_for_server(server_address, generation_commands):
-    cmd = (
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"cd /nemo_run/code && "
-        # might be required if we are not hosting server ourselves
-        # this will try to handshake in a loop and unblock when the server responds
-        f"echo 'Waiting for the server to start at {server_address}' && "
-        f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done && "
-        # will run in a single task always (no need to check mpi env vars)
-        f"{generation_commands}"
-    )
-    return cmd
+def wrap_python_path(cmd):
+    return "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
+
+
+def set_python_path_and_wait_for_server(server_address, generation_commands):
+    if server_address is not None:
+        cmd = get_server_wait_cmd(server_address) + " && "
+    else:
+        cmd = ""
+    # will run in a single task always (no need to check mpi env vars)
+    cmd += f"{generation_commands}"
+    return wrap_python_path(cmd)
 
 
 def get_ray_server_cmd(start_cmd):
@@ -87,7 +88,7 @@ def get_ray_server_cmd(start_cmd):
     )
 
     ray_start_cmd = (
-        "if [ \"${SLURM_PROCID:-0}\" = 0 ]; then "
+        'if [ "${SLURM_PROCID:-0}" = 0 ]; then '
         "    echo 'Starting head node' && "
         "    export RAY_raylet_start_wait_time_s=120 && "
         "    ray start "
@@ -98,7 +99,7 @@ def get_ray_server_cmd(start_cmd):
         "else "
         "    echo 'Starting worker node' && "
         "    export RAY_raylet_start_wait_time_s=120 && "
-        "    echo \"Connecting to head node at $SLURM_MASTER_NODE\" && "
+        '    echo "Connecting to head node at $SLURM_MASTER_NODE" && '
         "    ray start "
         "        --block "
         "        --address=$SLURM_MASTER_NODE:6379 "
@@ -120,8 +121,8 @@ def get_server_command(
 ):
     num_tasks = num_gpus
 
-    # check if the model path is mounted if not vllm;
-    # vllm can also pass model name as "model_path" so we need special processing
+    # check if the model path is mounted if not vllm, sglang, or trtllm;
+    # vllm, sglang, and trtllm can also pass model name as "model_path" so we need special processing
     if server_type not in ["vllm", "sglang", "trtllm"]:
         check_if_mounted(cluster_config, model_path)
 
@@ -129,7 +130,7 @@ def get_server_command(
     elif model_path.startswith("/"):
         check_if_mounted(cluster_config, model_path)
 
-    if server_type == 'megatron':
+    if server_type == "megatron":
         if cluster_config["executor"] != "slurm":
             num_tasks = 1
             prefix = f"torchrun --nproc_per_node {num_gpus}"
@@ -151,12 +152,13 @@ def get_server_command(
             f"    --micro-batch-size 1 "  # that's a training argument, ignored here, but required to specify..
             f"    {server_args} "
         )
-    elif server_type == 'vllm':
+    elif server_type == "vllm":
         server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_vllm"
         start_vllm_cmd = (
             f"python3 {server_entrypoint} "
             f"    --model {model_path} "
             f"    --num_gpus {num_gpus} "
+            f"    --num_nodes {num_nodes} "
             f"    --port {server_port} "
             f"    {server_args} "
         )
@@ -165,9 +167,9 @@ def get_server_command(
         else:
             server_start_cmd = start_vllm_cmd
         num_tasks = 1
-    elif server_type == 'sglang':
+    elif server_type == "sglang":
         if num_nodes > 1:
-            multinode_args = f" --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
+            multinode_args = " --dist_init_addr $SLURM_MASTER_NODE --node_rank $SLURM_PROCID "
         else:
             multinode_args = ""
         server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_sglang"
@@ -181,7 +183,7 @@ def get_server_command(
             f"    {server_args} "
         )
         num_tasks = 1
-    elif server_type == 'trtllm':
+    elif server_type == "trtllm":
         server_entrypoint = server_entrypoint or "trtllm-serve"
         if num_nodes > 1 and server_entrypoint == "trtllm":
             server_entrypoint = f"trtllm-llmapi-launch {server_entrypoint}"
@@ -202,9 +204,6 @@ def get_server_command(
         raise ValueError(f"Server type '{server_type}' not supported for model inference.")
 
     server_cmd = (
-        f"nvidia-smi && "
-        f"cd /nemo_run/code && "
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"{server_start_cmd} "
+        f"nvidia-smi && cd /nemo_run/code && export PYTHONPATH=$PYTHONPATH:/nemo_run/code && {server_start_cmd} "
     )
     return server_cmd, num_tasks

@@ -93,13 +93,13 @@ def read_csv_files_from_tar(tar_file_path, split):
     # Define the column names
     column_names = ["question", "A", "B", "C", "D", "expected_answer"]
 
-    with tarfile.open(tar_file_path, 'r') as tar:
+    with tarfile.open(tar_file_path, "r") as tar:
         # List all members of the tar file
         members = tar.getmembers()
 
         # Filter for CSV files in the 'data/test' directory
         csv_files = [
-            member for member in members if member.name.startswith(f'data/{split}/') and member.name.endswith('.csv')
+            member for member in members if member.name.startswith(f"data/{split}/") and member.name.endswith(".csv")
         ]
 
         for csv_file in csv_files:
@@ -110,7 +110,7 @@ def read_csv_files_from_tar(tar_file_path, split):
             file_content = tar.extractfile(csv_file)
             if file_content is not None:
                 # Decode bytes to string
-                content_str = io.TextIOWrapper(file_content, encoding='utf-8')
+                content_str = io.TextIOWrapper(file_content, encoding="utf-8")
 
                 # Use csv to read the CSV content without a header
                 csv_reader = csv.reader(content_str)
@@ -124,14 +124,14 @@ def read_csv_files_from_tar(tar_file_path, split):
                         print(f"Warning: Skipping row in {file_name} due to incorrect number of columns")
 
                 # Add to result dictionary
-                result[file_name.rsplit('_', 1)[0]] = csv_data
+                result[file_name.rsplit("_", 1)[0]] = csv_data
 
     return result
 
 
 def save_data(split):
     data_dir = Path(__file__).absolute().parent
-    data_file = str(data_dir / f"data.tar")
+    data_file = str(data_dir / "data.tar")
     data_dir.mkdir(exist_ok=True)
     output_file = str(data_dir / f"{split}.jsonl")
 
@@ -142,13 +142,13 @@ def save_data(split):
     for subject, questions in original_data.items():
         for question in questions:
             new_entry = question
-            new_entry['subtopic'] = subject
+            new_entry["subtopic"] = subject
             new_entry.update(
-                get_mcq_fields(new_entry.pop('question'), [new_entry[chr(ord('A') + i)] for i in range(4)])
+                get_mcq_fields(new_entry.pop("question"), [new_entry[chr(ord("A") + i)] for i in range(4)])
             )
 
-            new_entry['subset_for_metrics'] = subcategories[subject][0]
-            new_entry['examples_type'] = f'mmlu_few_shot_{new_entry["subtopic"]}'
+            new_entry["subset_for_metrics"] = subcategories[subject][0]
+            new_entry["examples_type"] = f"mmlu_few_shot_{new_entry['subtopic']}"
             data.append(new_entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:

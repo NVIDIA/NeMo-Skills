@@ -83,15 +83,15 @@ class FewShotExamplesConfig:
 @nested_dataclass(kw_only=True)
 class CodeTags:
     # used to execute code within these tags
-    code_begin: str = '```python\n'
-    code_end: str = '```\n'
+    code_begin: str = "```python\n"
+    code_end: str = "```\n"
 
     # used to extract the code output
-    code_output_begin: str = '```output\n'
-    code_output_end: str = '```\n'
+    code_output_begin: str = "```output\n"
+    code_output_end: str = "```\n"
 
     # used to post-process code output
-    code_output_format: str = 'qwen'
+    code_output_format: str = "qwen"
 
 
 @nested_dataclass(kw_only=True)
@@ -118,7 +118,7 @@ class Prompt:
 
         # replacing code/code-output separators in the examples if present
         example_dict = example_dict.copy()
-        if 'solution' in example_dict and self.config.code_tags:
+        if "solution" in example_dict and self.config.code_tags:
 
             def replace_code_output(match):
                 code_output = match.group(2)
@@ -130,7 +130,7 @@ class Prompt:
                 )
                 return formatted_output
 
-            pattern = r'({code_output_begin}\n)(.*?)({code_output_end})'
+            pattern = r"({code_output_begin}\n)(.*?)({code_output_end})"
             example_dict["solution"] = re.sub(pattern, replace_code_output, example_dict["solution"], flags=re.DOTALL)
 
             example_dict["solution"] = example_dict["solution"].replace(
@@ -189,8 +189,8 @@ class Prompt:
             examples = ""
         else:
             examples = f"{self.config.few_shot_examples.prefix}{filled_examples}{self.config.few_shot_examples.suffix}"
-        user = self.config.user.format(examples=examples, **input_dict)
-        return user
+        user_message = self.config.user.format(examples=examples, **input_dict)
+        return user_message
 
     def get_code_execution_args(self):
         """Returns the code execution arguments."""
@@ -206,21 +206,35 @@ class Prompt:
             "code_output_format": self.config.code_tags.code_output_format,
         }
 
-    def add_assistant_end_suffix(self, assistant_response: str) -> str:
-        """Adds special tokens to the end of assistant response."""
+    def format_assistant_response(
+        self, content: str, thinking: str | None = None, chat_template_kwargs: dict | None = None
+    ) -> str:
+        """Adds special tokens to the end of assistant response and formats thinking if provided"""
         if self.tokenizer is None:
             raise ValueError("Tokenizer is not set.")
 
-        messages = [{'role': 'user', 'content': ''}]
+        messages = [{"role": "user", "content": ""}]
 
-        user_string = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        chat_template_kwargs = chat_template_kwargs or {}
+        user_string = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True, **chat_template_kwargs
+        )
 
-        messages.append({'role': 'assistant', 'content': assistant_response})
-        assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False)
+        messages.append({"role": "assistant", "content": content})
+        if thinking is not None:
+            messages[-1]["thinking"] = thinking
+        assistant_string = self.tokenizer.apply_chat_template(messages, tokenize=False, **chat_template_kwargs)
 
         assert assistant_string.startswith(user_string), f"Something is wrong\n{user_string}\n||\n{assistant_string}"
 
         formatted_response = assistant_string[len(user_string) :]
+        if thinking is not None:
+            # Check that thinking is part of the assistant string
+            # If not, the thinking string should be added to the "content" field during preprocessing
+            # Tokenizers for models like Qwen3-4B don't add thinking to the assistant string by themselves
+            assert thinking in assistant_string, (
+                f"The thinking content is not part of the assistant string. We suggest you add the thinking string to the 'content' field during preprocessing.\n\nThinking string:{thinking}\n\nAssistant string:{formatted_response}"
+            )
 
         return formatted_response
 
@@ -228,6 +242,7 @@ class Prompt:
         self,
         input_dict: Dict[str, str],
         start_assistant_response_key: str | None = None,
+        chat_template_kwargs: dict | None = None,
     ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
@@ -238,6 +253,7 @@ class Prompt:
         Args:
             input_dict: The input dictionary to fill the prompt with.
             start_assistant_response_key: Whether to append the value of this key to the beginning of assistant response.
+            chat_template_kwargs: Any extra parameters to pass to the tokenizer's apply_chat_template method.
 
         Returns:
             The filled prompt - either a string or a list of dictionaries.
@@ -259,24 +275,30 @@ class Prompt:
             )
 
         if self.tokenizer is not None:
+            chat_template_kwargs = chat_template_kwargs or {}
             try:
                 messages_string = self.tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    **chat_template_kwargs,
                 )
             except ValueError as e:
                 if "Cannot use chat template functions because tokenizer.chat_template is not set" in str(e):
                     # assuming that's a base model and we just need to add bos
-                    if len(messages) != 1 or messages[0]['role'] != 'user':
+                    if len(messages) != 1 or messages[0]["role"] != "user":
                         raise ValueError(
                             "The model doesn't support chat template, can't format messages which contain non-user values"
                         )
-                    if hasattr(self.tokenizer, 'bos_token'):
-                        messages_string = self.tokenizer.bos_token + messages[0]['content']
+                    if hasattr(self.tokenizer, "bos_token"):
+                        messages_string = self.tokenizer.bos_token + messages[0]["content"]
                     else:
-                        messages_string = messages[0]['content']
+                        messages_string = messages[0]["content"]
             if start_assistant_response_key:
                 messages_string += input_dict[start_assistant_response_key]
             return messages_string
+        elif chat_template_kwargs:
+            raise ValueError("chat_template_kwargs can only be used when tokenizer was provided!")
 
         return messages
 
@@ -286,7 +308,7 @@ class Prompt:
 
 def get_config_path(config: str, config_dir: str | None = None, config_extension: str = "yaml") -> Path:
     if config_dir is None:
-        config_dir = str(Path(__file__).parent.absolute() / 'config')
+        config_dir = str(Path(__file__).parent.absolute() / "config")
 
     if config.endswith(f".{config_extension}"):
         config_path = Path(config).absolute()
@@ -323,16 +345,20 @@ def get_prompt(
     tokenizer: Any | None = None,
     code_tags: str | dict | None = None,
     examples_type: str | None = None,
+    system_message: str | None = None,
     config_dir: str | None = None,
     code_tags_dir: str | None = None,
 ) -> Prompt:
     if code_tags_dir is None:
-        code_tags_dir = Path(__file__).parent.absolute() / 'code_tags'
+        code_tags_dir = Path(__file__).parent.absolute() / "code_tags"
 
     if isinstance(prompt_config, str):
         config = load_config(prompt_config, config_dir)
     else:
         config = prompt_config
+
+    if system_message is not None:
+        config["system"] = system_message
 
     code_tags_obj = None
     if code_tags is not None:

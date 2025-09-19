@@ -24,8 +24,8 @@ URL = "https://raw.githubusercontent.com/chaochun/nlu-asdiv-dataset/master/datas
 if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    original_file = str(data_dir / f"original_test.xml")
-    output_file = str(data_dir / f"test.jsonl")
+    original_file = str(data_dir / "original_test.xml")
+    output_file = str(data_dir / "test.jsonl")
 
     if not os.path.exists(original_file):
         urllib.request.urlretrieve(URL, original_file)
@@ -36,15 +36,15 @@ if __name__ == "__main__":
     with open(output_file, "wt", encoding="utf-8") as fout:
         for key, problem in enumerate(root.iter("Problem")):
             new_entry = dict(
-                problem=problem.find("Body").text.strip() + ' ' + problem.find("Question").text.strip(),
-                expected_answer=problem.find("Answer").text.split('(')[0].strip(),
+                problem=problem.find("Body").text.strip() + " " + problem.find("Question").text.strip(),
+                expected_answer=problem.find("Answer").text.split("(")[0].strip(),
                 type=problem.find("Solution-Type").text,
             )
             # converting to int if able to for cleaner text representation
             try:
                 if int(new_entry["expected_answer"]) == new_entry["expected_answer"]:
                     new_entry["expected_answer"] = int(new_entry["expected_answer"])
-            except:
+            except Exception:
                 pass
 
             fout.write(json.dumps(new_entry) + "\n")

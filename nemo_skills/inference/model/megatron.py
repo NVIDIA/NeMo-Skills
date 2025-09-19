@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import openai
+
 from .base import BaseModel
 
 
@@ -48,7 +50,7 @@ class MegatronModel(BaseModel):
             raise NotImplementedError("Megatron server does not support repetition_penalty parameter.")
         if top_k != -1:
             raise NotImplementedError("Megatron server does not support top_k parameter.")
-        assert kwargs.get('tools') is None, "Megatron server does not support tools parameter."
+        assert kwargs.get("tools") is None, "Megatron server does not support tools parameter."
 
         return {
             "prompt": prompt,
@@ -68,7 +70,11 @@ class MegatronModel(BaseModel):
         }
 
     def _parse_completion_response(
-        self, response: "openai.types.Completion", include_response: bool = False, top_logprobs: int | None = None, **kwargs
+        self,
+        response: "openai.types.Completion",
+        include_response: bool = False,
+        top_logprobs: int | None = None,
+        **kwargs,
     ) -> dict | list[dict]:
         """Parse OpenAI response to extract the generated text and other metadata.
 
@@ -88,14 +94,13 @@ class MegatronModel(BaseModel):
             if hasattr(choice, "matched_stop") and isinstance(choice.matched_stop, str):
                 output += choice.matched_stop
 
-        result = {'generation': output, 'num_generated_tokens': -1}
+        result = {"generation": output, "num_generated_tokens": -1}
         if choice.logprobs and choice.logprobs.tokens:  # logprobs is always populated, but empty if not requested
             if top_logprobs is not None and top_logprobs != 0:
-                result['logprobs'] = choice.logprobs.token_logprobs
-                result['tokens'] = choice.logprobs.tokens
-                result['top_logprobs'] = choice.logprobs.top_logprobs
-            result['num_generated_tokens'] = len(choice.logprobs.tokens)
+                result["logprobs"] = choice.logprobs.token_logprobs
+                result["tokens"] = choice.logprobs.tokens
+                result["top_logprobs"] = choice.logprobs.top_logprobs
+            result["num_generated_tokens"] = len(choice.logprobs.tokens)
         if include_response:
-            result['response'] = response
+            result["response"] = response
         return result
-

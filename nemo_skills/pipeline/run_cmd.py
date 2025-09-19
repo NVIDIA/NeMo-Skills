@@ -66,6 +66,9 @@ def run_cmd(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
+    ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
@@ -99,6 +102,10 @@ def run_cmd(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
@@ -107,7 +114,7 @@ def run_cmd(
 ):
     """Run a pre-defined module or script in the NeMo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
 
     # Assert that either command or extra_arguments is provided, not both
     if command and extra_arguments:
@@ -153,6 +160,7 @@ def run_cmd(
                 server_nodes=server_nodes,
                 server_args=server_args,
                 server_entrypoint=server_entrypoint,
+                server_container=server_container,
                 extra_arguments=extra_arguments,  # this is empty string by design
                 get_random_port=get_random_port,
             )
@@ -161,7 +169,7 @@ def run_cmd(
 
         # Wrap command with generation command if model is provided
         if model is not None and server_config is not None:
-            commands = [pipeline_utils.wait_for_server(server_address, cmd) for cmd in commands]
+            commands = [pipeline_utils.set_python_path_and_wait_for_server(server_address, cmd) for cmd in commands]
 
         prev_tasks = _task_dependencies
         for _ in range(dependent_jobs + 1):
@@ -186,6 +194,7 @@ def run_cmd(
                 num_tasks=[1] * len(commands),
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
             prev_tasks = [new_task]
         run_exp(exp, cluster_config, dry_run=dry_run)

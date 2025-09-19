@@ -7,7 +7,7 @@ hide:
 
 # Reproducing Llama-Nemotron-Super-49B-V1.5 Evals
 
-In this tutorial, we will reproduce the evals for the Llama-3.3-Nemotron-Super-49B-v1.5 model using NeMo-Skills.
+In this tutorial, we will reproduce the evals for the [Llama-3.3-Nemotron-Super-49B-v1.5](https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5){target="_blank"} model using NeMo-Skills.
 For an introduction to the NeMo-Skills framework, we recommend going over [our introductory tutorial](../../basics/index.md).
 
 
@@ -21,7 +21,7 @@ executing all commands from that folder locally. Change all commands accordingly
 Get the model from HF.
 ```bash
 pip install -U "huggingface_hub[cli]"
-huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
+hf download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
 ```
 
 !!!note
@@ -48,13 +48,26 @@ We will evaluate the model on the following:
 - Tool-calling:
     - BFCL v3
 
+- Long-context:
+    - RULER
 
-Here is the command to prepare these datasets using NeMo-Skills:
+Here are the commands to prepare these datasets using NeMo-Skills:
 
 ```bash
 ns prepare_data gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25
 ```
 
+For RULER we need to provide extra arguments when preparing the data. If using Slurm cluster,
+make sure to use an appropriate `--cluster` parameter here to ensure the data is being prepared on the cluster itself
+as ruler test files are very large and we want to avoid copying them from your local machine.
+
+```bash
+ns prepare_data --cluster=local ruler \
+    --setup nemotron_super_128k \
+    --tokenizer_path nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --max_seq_length 131072 \
+    --data_dir /workspace/ns-data
+```
 
 ## Evaluation commands
 
@@ -63,7 +76,8 @@ We detail the evaluation commands and results for both the modes.
 Note that you might not get exactly the same numbers as reported here because of the stochastic nature of LLM generations.
 
 !!! note
-    The commands provided here assume you're working with a local machine where benchmarks/subsets are evaluated sequentially which will take a very long time. If running on slurm, by default we will run each benchmark and their random seeds as an independent job.
+    The commands provided here assume you're working with a local machine where benchmarks/subsets are evaluated sequentially which will take a very long time. If running on slurm, by default we will run each benchmark and their random seeds as an independent job. You can control the number of parallel
+    jobs with `--num_jobs` parameter.
 
 
 
@@ -150,7 +164,7 @@ Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills sup
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_gpus=2 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_tool_calling/ \
@@ -164,7 +178,25 @@ ns eval \
                     --enable-auto-tool-choice"
 ```
 
+#### Command for RULER Eval (Reasoning on)
 
+For RULER we need to use the same `data_dir` in the evaluation command as we used in the data preparation. We also
+need to use the data preparation `setup` as part of the benchmark name. Finally it's important not to specify
+`++inference.tokens_to_generate` as RULER has a fixed value of this parameter for each task.
+
+```bash hl_lines="6-7"
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_ruler/ \
+    --benchmarks=ruler.nemotron_super_128k \
+    --data_dir=/workspace/ns-data \
+    --server_gpus=2 \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++system_message=''
+```
 
 ### Reasoning-on Results
 
@@ -193,15 +225,12 @@ pass@1[avg-of-16] | 12032       | 4879       | 12516       | 81.44%           | 
 majority@16       | 12032       | 4879       | 12516       | 83.05%           | 0.00%
 pass@16           | 12032       | 4879       | 12516       | 91.32%           | 0.00%
 
--------------------------------------------------- hle --------------------------------------------------
-evaluation_mode   | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct | no_answer
-pass@1[avg-of-16] | 2158        | 12111      | 7782        | 7.75%         | 2.40%            | 64.13%
-majority@16       | 2158        | 12111      | 7782        | 4.31%         | 3.43%            | 49.91%
-pass@16           | 2158        | 12111      | 7782        | 27.80%        | 10.10%           | 49.91%
+-------------------------------------------- hle --------------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | judge_correct | symbolic_correct
+pass@1[avg-of-16] | 2158        | 12111      | 7782        | 7.75%         | 2.40%
+majority@16       | 2158        | 12111      | 7782        | 7.61%         | 2.34%
+pass@16           | 2158        | 12111      | 7782        | 27.80%        | 10.10%
 ```
-
-!!!note
-    The `majority` metric for most reasoning benchmarks typically improves over the corresponding `pass@1` numbers. For HLE, the `majority` number is lower than `pass@1` which can be counterintuitive but it has to with our metric calculation logic. For HLE, the final answer is contained in the generated solution but it is not easily extractable by rule-based systems as in the case of math where the model is instructed to put the final answer in \boxed{}. Thus, for certain questions the `predicted_answer` field is null but the LLM-as-a-judge is still able to evaluate the generated solution. The majority metric performs clustering over `predicted_answer` which currently incorrectly removes from consideration some of the correct solutions for which the `predicted_answer` is None.
 
 
 #### Results for Code Reasoning benchmarks (Reasoning on)
@@ -214,8 +243,8 @@ pass@16           | 166         | 18881      | 1552        | 87.35%
 
 --------------------------------------------------- scicode ----------------------------------------------------
 evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-16] | 43481      | 69963       | 3.08%            | 28.91%           | 65           | 288
-pass@16           | 43481      | 69963       | 7.69%            | 40.97%           | 65           | 288
+pass@1[avg-of-16] | 35418      | 4271        | 13.59%           | 37.83%           | 80           | 338
+pass@16           | 35418      | 4271        | 25.00%           | 52.07%           | 80           | 338
 ```
 
 #### Results for Math Reasoning benchmarks (Reasoning on)
@@ -243,7 +272,7 @@ pass@16           | 30          | 23366      | 832         | 93.33%           | 
 ```
 
 
-#### Results for Tool Calling  (Reasoning on)
+#### Results for Tool Calling (Reasoning on)
 
 ```
 ----------------------- bfcl_v3 ------------------------
@@ -262,8 +291,28 @@ pass@16           | 30          | 23366      | 832         | 93.33%           | 
 ```
 
 !!! note
-    Currently `summarize_results` doesn't support benchmarks like BFCL v3 which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json`.
+    Currently `summarize_results` doesn't support benchmarks like BFCL v3 or RULER which have their specific logic of combining subset scores to arrive at the overall score. This table was created by formatting the `metrics.json` file from `/workspace/llama_nemotron_49b_1_5_tool_calling/bfcl_v3/metrics.json`.
 
+#### Results for RULER (Reasoning on)
+
+```
+| Task                                | Accuracy |
+|-------------------------------------|----------|
+| ruler.nemotron_128k                 | 66.7     |
+| ruler.nemotron_128k.niah_single_1   | 100.0    |
+| ruler.nemotron_128k.niah_single_2   | 96.4     |
+| ruler.nemotron_128k.niah_single_3   | 99.6     |
+| ruler.nemotron_128k.niah_multikey_1 | 72.8     |
+| ruler.nemotron_128k.niah_multikey_2 | 57.6     |
+| ruler.nemotron_128k.niah_multikey_3 | 21.8     |
+| ruler.nemotron_128k.niah_multivalue | 94.4     |
+| ruler.nemotron_128k.niah_multiquery | 90.5     |
+| ruler.nemotron_128k.vt              | 56.8     |
+| ruler.nemotron_128k.cwe             | 0.8      |
+| ruler.nemotron_128k.fwe             | 87.7     |
+| ruler.nemotron_128k.qa_1            | 46.6     |
+| ruler.nemotron_128k.qa_2            | 41.6     |
+```
 
 
 ### Reasoning-off Evals
@@ -336,7 +385,7 @@ ns eval \
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_gpus=2 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off_tool_calling/ \
@@ -350,6 +399,21 @@ ns eval \
                    --enable-auto-tool-choice"
 ```
 
+#### Command for RULER Eval (Reasoning off)
+
+```bash
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5__reasoning_off_ruler/ \
+    --benchmarks=ruler.nemotron_super_128k \
+    --data_dir=/workspace/ns-data \
+    --server_gpus=2 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
 
 ### Reasoning-off Results
 
@@ -394,8 +458,8 @@ pass@16           | 166         | 609        | 1156        | 33.73%
 
 --------------------------------------------------- scicode ----------------------------------------------------
 evaluation_mode   | avg_tokens | gen_seconds | problem_accuracy | subtask_accuracy | num_problems | num_subtasks
-pass@1[avg-of-16] | 3067       | 66547       | 0.00%            | 19.44%           | 65           | 288
-pass@16           | 3067       | 66547       | 0.00%            | 29.51%           | 65           | 288
+pass@1[avg-of-16] | 2762       | 673         | 7.66%            | 24.69%           | 80           | 338
+pass@16           | 2762       | 673         | 11.25%           | 36.39%           | 80           | 338
 ```
 
 #### Results for Math Reasoning benchmarks (Reasoning off)
@@ -420,7 +484,7 @@ majority@16       | 30          | 1720       | 1149        | 6.67%            | 
 pass@16           | 30          | 1720       | 1149        | 10.00%           | 0.00%
 ```
 
-#### Results for Tool Calling  (Reasoning off)
+#### Results for Tool Calling (Reasoning off)
 
 
 ```
@@ -437,5 +501,27 @@ pass@16           | 30          | 1720       | 1149        | 10.00%           | 
 | live_relevance              | 18          | 55.56%   |
 | overall_multi_turn          | 800         | 36.13%   |
 ```
+
+#### Results for RULER (Reasoning off)
+
+```
+| Task                                | Accuracy |
+|-------------------------------------|----------|
+| ruler.nemotron_128k                 | 66.1     |
+| ruler.nemotron_128k.niah_single_1   | 100.0    |
+| ruler.nemotron_128k.niah_single_2   | 94.0     |
+| ruler.nemotron_128k.niah_single_3   | 99.2     |
+| ruler.nemotron_128k.niah_multikey_1 | 67.2     |
+| ruler.nemotron_128k.niah_multikey_2 | 52.2     |
+| ruler.nemotron_128k.niah_multikey_3 | 18.8     |
+| ruler.nemotron_128k.niah_multivalue | 84.9     |
+| ruler.nemotron_128k.niah_multiquery | 85.5     |
+| ruler.nemotron_128k.vt              | 79.3     |
+| ruler.nemotron_128k.cwe             | 1.0      |
+| ruler.nemotron_128k.fwe             | 87.4     |
+| ruler.nemotron_128k.qa_1            | 47.8     |
+| ruler.nemotron_128k.qa_2            | 42.6     |
+```
+
 
 The reasoning-on vs reasoning-off comparison shows inference-time scaling's impact: higher accuracy at the cost of more tokens and longer generation times.

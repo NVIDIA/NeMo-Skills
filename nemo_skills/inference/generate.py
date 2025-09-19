@@ -16,23 +16,27 @@ import asyncio
 import json
 import logging
 import random
+import shutil
+import subprocess
 import sys
 import time
 from copy import deepcopy
-from dataclasses import asdict, field
+from dataclasses import asdict, field, is_dataclass
 from pathlib import Path
 from typing import Any
 
 import hydra
+import litellm
 from omegaconf import ListConfig
 from tqdm import tqdm
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
-    OnlineGenSelectConfig,
+    ParallelThinkingConfig,
     get_code_execution_model,
     get_model,
-    get_online_genselect_model,
+    get_parallel_thinking_model,
+    get_tool_calling_model,
     server_params,
 )
 from nemo_skills.prompt.utils import get_prompt
@@ -40,6 +44,7 @@ from nemo_skills.utils import (
     chunk_data,
     get_help_message,
     get_logger_name,
+    get_server_wait_cmd,
     nested_dataclass,
     remove_thinking,
     setup_logging,
@@ -55,9 +60,10 @@ class InferenceConfig:
     top_p: float = 0.95
     min_p: float = 0.0
     random_seed: int = 0
-    tokens_to_generate: int = 2048
+    tokens_to_generate: int | None = None
     repetition_penalty: float = 1.0
     top_logprobs: int | None = None
+    timeout: int | None = 14400  # Timeout for each individual LLM call in seconds
 
     extra_body: dict = field(default_factory=dict)  # Any other extra params passed with extra_body argument
 
@@ -75,6 +81,8 @@ class GenerateSolutionsConfig:
     use_completions_api: bool = False
     # path or name of the tokenizer to use for completions API. By default uses server.model
     tokenizer: str | None = None
+    # extra parameters to pass to the tokenizer's apply_chat_template method
+    chat_template_kwargs: dict = field(default_factory=dict)
     # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
@@ -126,15 +134,38 @@ class GenerateSolutionsConfig:
 
     # stop phrase for llms
     stop_phrase: str | None = None  # if None, will not add any extra stop phrase
-    # set to True if online genselect is used
-    online_genselect: bool = False
-    # genselect config
-    online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
+
+    # parallel_thinking config
+    parallel_thinking: ParallelThinkingConfig = field(default_factory=ParallelThinkingConfig)
+
+    # Module-based tool configuration
+    #   List of tool provider locators using double-colon syntax for the tool class.
+    #   Each item should be of the form:
+    #     - Module class:  module.path.to.provider::ClassName
+    #     - File class:    /abs/or/rel/path/to/provider.py::ClassName
+    #
+    #   Examples:
+    #     - ++tool_modules=["nemo_skills.mcp.servers.python_tool::PythonTool"]
+    #     - ++tool_modules=["/nemo_run/code/mcp/example_tool.py::ExampleTool","nemo_skills.mcp.servers.exa_tool::ExaTool"]
+    tool_modules: list[str] | None = None
+    #
+    #   Per-tool overrides keyed by the Tool class name (the same ClassName used above).
+    #   Use dotted keys to set nested values (e.g., client_params.base_url).
+    #
+    #   Common patterns:
+    #     - Set PythonTool timeout knob:
+    #         ++tool_overrides.PythonTool.exec_timeout_s=30
+    #     - Set an ExampleTool server-only arg:
+    #         ++tool_overrides.ExampleTool.foo_argument='[TEST] '
+    tool_overrides: dict | None = field(default_factory=dict)
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
+
+    # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
+    enable_litellm_cache: bool = False
 
     def __post_init__(self):
         self._post_init_validate_data()
@@ -160,7 +191,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.use_completions_api = True
+            self.cfg.use_completions_api = True
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -220,8 +251,34 @@ class GenerationTask:
         """
         self.cfg = cfg
 
-        self.llm = self.setup_llm()
+        # chat template kwargs goes either into extra body of inference or as a prompt parameter
+        if self.cfg.chat_template_kwargs:
+            if not self.cfg.use_completions_api:
+                if "chat_template_kwargs" in self.cfg.inference.extra_body:
+                    raise ValueError(
+                        "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
+                        "You can only use one of them!"
+                    )
+                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
+                self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
+                self.cfg.chat_template_kwargs = None
+
+        # Setup tokenizer
+        if self.cfg.use_completions_api or self.cfg.server.get("enable_soft_fail", False):
+            # These are the only cases where we need a tokenizer
+            self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
+        else:
+            self.tokenizer = None
+
+        # Setup litellm cache
+        self.setup_litellm_cache()
+
+        if self.cfg.use_completions_api and self.cfg.inference.tokens_to_generate is None:
+            raise ValueError("When using completions API, tokens_to_generate must be specified!")
+
+        # Setup prompt formatter and LLM
         self.prompt = self.setup_prompt()
+        self.llm = self.setup_llm()
 
         if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
@@ -235,10 +292,10 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        if self.cfg.online_genselect:
+        if self.cfg.parallel_thinking.mode is not None:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
             self.semaphore = asyncio.Semaphore(
-                self.cfg.max_concurrent_requests // self.cfg.online_genselect_config.max_concurrent_requests
+                self.cfg.max_concurrent_requests // self.llm.cfg.max_concurrent_requests
             )
         else:
             self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
@@ -246,43 +303,51 @@ class GenerationTask:
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
-    def setup_llm(self):
-        if self.cfg.code_execution:
-            sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-            llm = get_code_execution_model(**self.cfg.server, sandbox=sandbox)
-        elif self.cfg.online_genselect:
-            # Use the same prompt template for genselect as the one used for generation
-            self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
-            self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
-            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
-            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
-            llm = get_online_genselect_model(
-                **self.cfg.server, online_genselect_config=self.cfg.online_genselect_config
-            )
-        else:
-            llm = get_model(**self.cfg.server)
-
-        return llm
-
     def setup_prompt(self):
         if self.cfg.prompt_format == "openai":
             return None
 
-        if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer or self.cfg.server['model']
-        else:
-            tokenizer = None
-
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
-            tokenizer=tokenizer,
+            tokenizer=self.tokenizer if self.cfg.use_completions_api else None,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
+            system_message=self.cfg.system_message,
         )
-        if self.cfg.system_message is not None:
-            prompt.config.system = self.cfg.system_message
         LOG.info("Prompt used: %s", prompt)
         return prompt
+
+    def setup_llm(self):
+        self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
+
+        if self.cfg.code_execution:
+            llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
+        elif self.cfg.tool_modules is not None:
+            llm = get_tool_calling_model(
+                **self.cfg.server,
+                tool_modules=self.cfg.tool_modules,
+                tool_overrides=self.cfg.tool_overrides,
+                tokenizer=self.tokenizer,
+                additional_config={"sandbox": self.cfg.sandbox},
+            )
+        else:
+            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
+
+        if self.cfg.parallel_thinking.mode is not None:
+            # We don't want to override these key variables which overlap with self.cfg
+            inference_override_config = {
+                "remove_thinking": self.cfg.parallel_thinking.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
+            }
+
+            llm = get_parallel_thinking_model(
+                model=llm,
+                orig_prompt_filler=self.fill_prompt,  # Needed for prompt fillling
+                parallel_thinking=self.cfg.parallel_thinking,
+                main_config=self.cfg,
+                inference_override_config=inference_override_config,
+            )
+
+        return llm
 
     def log_example_prompt(self, data):
         data_point = deepcopy(data[0])
@@ -333,7 +398,7 @@ class GenerationTask:
                     LOG.warning(f"File `{base_output_file}` exists, skipping generation")
                     return []
             try:
-                with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+                with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
                     for line in fin:
                         filled_positions.add(int(json.loads(line)[self.cfg.async_position_key]))
             except FileNotFoundError:
@@ -369,15 +434,16 @@ class GenerationTask:
             if isinstance(total_code_executions_in_prompt, (list, tuple)):
                 min_val, max_val = total_code_executions_in_prompt
                 total_code_executions_in_prompt = random.randint(min_val, max_val)
-            data_point['total_code_executions'] = total_code_executions_in_prompt
+            data_point["total_code_executions"] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
         filled_prompt = self.prompt.fill(
             data_point,
             start_assistant_response_key=self.cfg.start_assistant_response_key,
+            chat_template_kwargs=self.cfg.chat_template_kwargs,
         )
         if self.cfg.prompt_suffix:
             if isinstance(filled_prompt, list):
-                filled_prompt[-1]['content'] += self.cfg.prompt_suffix
+                filled_prompt[-1]["content"] += self.cfg.prompt_suffix
             else:
                 filled_prompt += self.cfg.prompt_suffix
         return filled_prompt
@@ -390,21 +456,21 @@ class GenerationTask:
 
             # calculating total generation time
             if self.cfg.add_generation_stats:
-                output['generation_end_time'] = time.time()
+                output["generation_end_time"] = time.time()
                 # TODO: start time is saved in data_point, not output, need to fix that
-                output['generation_time'] = (
-                    output['generation_end_time'] - original_data_point['generation_start_time']
+                output["generation_time"] = (
+                    output["generation_end_time"] - original_data_point["generation_start_time"]
                 )
             else:
                 # generation_start_time was overriden, so restoring it from end and total
                 # TODO: this is a bit hacky, need a rewrite
-                if 'generation_end_time' in original_data_point and 'generation_time' in original_data_point:
-                    output['generation_start_time'] = (
-                        original_data_point['generation_end_time'] - original_data_point['generation_time']
+                if "generation_end_time" in original_data_point and "generation_time" in original_data_point:
+                    output["generation_start_time"] = (
+                        original_data_point["generation_end_time"] - original_data_point["generation_time"]
                     )
                 else:
-                    output.pop('generation_start_time', None)
-                output.pop('num_generated_tokens', None)
+                    output.pop("generation_start_time", None)
+                output.pop("num_generated_tokens", None)
 
             for key in output:
                 original_data_point.pop(key, None)
@@ -419,16 +485,23 @@ class GenerationTask:
         return None
 
     async def process_single_datapoint(self, data_point, all_data):
+        # Handle inference config - check if it's a dataclass or already a dict
+        if is_dataclass(self.cfg.inference):
+            inference_params = asdict(self.cfg.inference)
+        else:
+            # Already a dict from Hydra
+            inference_params = dict(self.cfg.inference)
+
         generation_params = {
+            **inference_params,
+            **self.extra_generate_params,
             "prompt": self.fill_prompt(data_point, all_data),
             "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
-            **asdict(self.cfg.inference),
-            **self.extra_generate_params,
         }
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
-                generation_params['max_code_executions'] = data_point['total_code_executions']
+                generation_params["max_code_executions"] = data_point["total_code_executions"]
 
         return await self.llm.generate_async(**generation_params)
 
@@ -436,7 +509,7 @@ class GenerationTask:
         """Process a single data point with semaphore control."""
         async with self.semaphore:
             # registering current time to calculate total generation time
-            data_point['generation_start_time'] = time.time()
+            data_point["generation_start_time"] = time.time()
 
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
@@ -489,7 +562,7 @@ class GenerationTask:
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
-        with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
+        with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
             generations = [json.loads(line) for line in fin]
 
         ordered_generations = [None] * len(generations)
@@ -501,7 +574,29 @@ class GenerationTask:
             for gen_dict in ordered_generations:
                 fout.write(json.dumps(gen_dict) + "\n")
 
-        Path(self.cfg.output_file + '-async').unlink()
+        Path(self.cfg.output_file + "-async").unlink()
+        self.cleanup_litellm_cache()
+
+    def wait_for_server(self):
+        server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
+        if not server_address:
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
+        server_start_cmd = get_server_wait_cmd(server_address)
+        subprocess.run(server_start_cmd, shell=True, check=True)
+
+    def setup_litellm_cache(self):
+        if self.cfg.enable_litellm_cache:
+            # One cache per (output_file_name, chunk_id) pair
+            output_file_name = Path(self.cfg.output_file).name
+            self.litellm_cache_dir = (
+                Path(self.cfg.output_file).parent / "litellm_cache" / f"{output_file_name}_{self.cfg.chunk_id or 0}"
+            )
+            litellm.cache = litellm.Cache(type="disk", disk_cache_dir=self.litellm_cache_dir)
+
+    def cleanup_litellm_cache(self):
+        if self.cfg.enable_litellm_cache:
+            shutil.rmtree(self.litellm_cache_dir)
 
     def generate(self):
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
@@ -527,6 +622,7 @@ class GenerationTask:
                 if output_path.exists():
                     output_path.unlink()
 
+        self.wait_for_server()
         asyncio.run(self.async_loop(data))
 
         self.postprocess()
@@ -536,7 +632,7 @@ GENERATION_TASK_CLASS = GenerationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_generation_config')
+@hydra.main(version_base=None, config_name="base_generation_config")
 def generate(cfg: GenerateSolutionsConfig):
     cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -553,7 +649,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

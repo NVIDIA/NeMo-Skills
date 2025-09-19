@@ -12,8 +12,7 @@ user: |-
   Critique:
   {generation}
 
-  
+
   Now write a clean version of the final critique without all the exploration. Make sure to put in:
   - The details related to arriving at the final judgment.
-  - Clearly writing the final judgment at the end via "Judgment: " followed by the index of the best solution. 
-  
+  - Clearly writing the final judgment at the end via "Judgment: " followed by the index of the best solution.

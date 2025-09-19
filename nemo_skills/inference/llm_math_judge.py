@@ -73,7 +73,7 @@ GENERATION_TASK_CLASS = LLMMathJudgeTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_llm_math_judge_config')
+@hydra.main(version_base=None, config_name="base_llm_math_judge_config")
 def generate(cfg: LlmMathJudgeConfig):
     cfg = LlmMathJudgeConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -89,7 +89,7 @@ HELP_MESSAGE = get_help_message(
 
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

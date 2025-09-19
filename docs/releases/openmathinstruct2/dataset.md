@@ -5,8 +5,7 @@ We assume you have `/workspace` defined in your [cluster config](../../basics/cl
 all commands on a slurm cluster. Change the commands accordingly if running locally
 (but it's going to take a lot of time).
 We also assume you have the [Llama3.1 405B](https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct)
-on that cluster inside `/trt_models/llama-3.1-405b-instruct` (should be mounted in your config)
-that's been [converted](../../pipelines/checkpoint-conversion.md) to TensorRT-LLM format.
+on that cluster inside `/hf_models/Llama-3.1-405B-Instruct` (should be mounted in your config).
 See [generation docs](../../pipelines/generation.md) for how you can change the below commands to instead
 run inference through Nvidia NIM API.
 
@@ -25,7 +24,7 @@ MATH dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=512 \
@@ -45,7 +44,7 @@ GSM8K dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=64 \
@@ -68,7 +67,7 @@ MATH dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=80 \
@@ -88,7 +87,7 @@ GSM8K dataset.
 ns generate \
     --cluster=slurm \
     --server_type=trtllm \
-    --model=/trt_models/llama-3.1-405b-instruct \
+    --model=/hf_models/Llama-3.1-405B-Instruct \
     --server_gpus=8 \
     --server_nodes=2 \
     --num_random_seeds=10 \
@@ -120,7 +119,7 @@ for i in range(80):
     generate(
         cluster="slurm",
         server_type="trtllm",
-        model="/trt_models/llama-3.1-405b-instruct",
+        model="/hf_models/Llama-3.1-405B-Instruct",
         server_gpus=8,
         server_nodes=2,
         num_random_seeds=32,
@@ -147,7 +146,7 @@ for i in range(10):
     generate(
         cluster="slurm",
         server_type="trtllm",
-        model="/trt_models/llama-3.1-405b-instruct",
+        model="/hf_models/Llama-3.1-405B-Instruct",
         server_gpus=8,
         server_nodes=2,
         num_random_seeds=32,
@@ -272,6 +271,7 @@ python -m nemo_skills.training.prepare_data \
     ++input_files=\'/workspace/solution-augmentation/**/output-rs*.jsonl,/workspace/new-problems-solution-augmentation/**/output-rs*.jsonl\' \
     ++output_path=/workspace/sft_data.jsonl \
     ++filters.remove_len_outlier_problems=true \
+    ++filters.trim_solutions=true \
     ++max_problem_length=1024 \
     ++filters.remove_len_outlier_solutions=true \
     ++use_chars_for_min_length=true \

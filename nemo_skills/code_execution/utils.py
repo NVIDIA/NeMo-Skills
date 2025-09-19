@@ -25,7 +25,7 @@ def format_code_output(
     execution_dict,
     code_output_begin: str,
     code_output_end: str,
-    code_output_format: str = 'llama',
+    code_output_format: str = "llama",
     remaining_code_executions: int | None = None,
 ):
     """Formatting code output to be displayed as an llm expects it."""
@@ -41,26 +41,24 @@ def format_code_output(
             )
         else:
             remaining_ce_string = (
-                f"```system\n"
-                f"You have run out of code executions! You can no longer write or execute code. "
-                f"Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.\n"
-                f"```\n"
+                "```system\n"
+                "You have run out of code executions! You can no longer write or execute code. "
+                "Now you should continue solving the problem by relying on your mathematical reasoning and analytical skills.\n"
+                "```\n"
             )
-    if code_output_format == 'llama':
+    if code_output_format == "llama":
         output = execution_dict["process_status"]
-        if execution_dict['stdout']:
+        if execution_dict["stdout"]:
             output += f"\n[stdout]\n{execution_dict['stdout']}[/stdout]"
-        if execution_dict['stderr']:
+        if execution_dict["stderr"]:
             output += f"\n[stderr]\n{execution_dict['stderr']}[/stderr]"
         output = f"{code_output_begin}\n\n{output}{remaining_ce_string}{code_output_end}\n\n"
-    elif code_output_format == 'qwen':
+    elif code_output_format == "qwen":
         output = ""
-        if execution_dict['stdout']:
+        if execution_dict["stdout"]:
             output += f"{execution_dict['stdout']}"
-        if execution_dict['stderr']:
+        if execution_dict["stderr"]:
             output += f"{execution_dict['stderr']}"
-        if execution_dict['stderr'] and execution_dict['stdout']:
-            LOG.warning("Both stdout and stderr are not empty. This shouldn't normally happen! %s", execution_dict)
         output = f"{code_output_begin}{output}{code_output_end}{remaining_ce_string}"
     else:
         raise ValueError(f"Unknown code_output_format: {code_output_format}")
@@ -76,7 +74,7 @@ def _extract_between_separators(generation: str, separators: Tuple[str, str], ex
     """
     if extract_all:
         separators = [re.escape(sp) for sp in separators]
-        pattern = f'{separators[0]}(.*?){separators[1]}'
+        pattern = f"{separators[0]}(.*?){separators[1]}"
         return re.findall(pattern, generation, re.DOTALL)
     return generation.split(separators[0])[-1].split(separators[1])[0]
 
@@ -89,23 +87,28 @@ def extract_code_output(generation: str, code_output_begin: str, code_output_end
     return _extract_between_separators(generation, [code_output_begin, code_output_end], extract_all)
 
 
-def extract_code_block(text: str, languages=None) -> str:
+def extract_code_block(text: str, languages=None, extract_code_mode: str = "last") -> str:
     if languages is None:
         languages = [""]
     for language in languages:
-        match = re.search(rf"```{language}\s*\n?(.*?)\n?```", text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        matches = re.findall(rf"```{language}\s*\n?(.*?)\n?```", text, re.DOTALL)
+        if matches:
+            idx = 0 if extract_code_mode == "first" else -1
+            return matches[idx].strip()
     return ""
 
 
-def clean_formal_generation(generation: str, final_answer_key: str = "**FINAL ANSWER**") -> str:
+def clean_formal_generation(
+    generation: str,
+    final_answer_key: str = "**FINAL ANSWER**",
+    extract_code_mode: str = "last",
+) -> str:
     # Extract part after **FINAL ANSWER** if present
     if final_answer_key in generation:
         generation = generation.split(final_answer_key, 1)[1].strip()
 
     languages = ["lean4", "lean3", "lean", ""]
-    extracted_code = extract_code_block(generation, languages)
+    extracted_code = extract_code_block(generation, languages, extract_code_mode=extract_code_mode)
     if extracted_code:
         return extracted_code
 

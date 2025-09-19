@@ -3,6 +3,7 @@ site_url: https://nvidia.github.io/NeMo-Skills
 extra_css:
   - css/extra.css
 plugins:
+  - search
   - blog:
       blog_dir: tutorials
       post_dir: tutorials/posts
@@ -10,6 +11,7 @@ plugins:
       redirect_maps:
         'openmathinstruct2/index.md': 'releases/openmathinstruct2/index.md'
         'openmathreasoning1/index.md': 'releases/openmathreasoning/index.md'
+        'openmathreasoning1/dataset.md': 'releases/openmathreasoning/dataset.md'
 theme:
   name: material
   logo: favicon.ico
@@ -69,6 +71,20 @@ nav:
     - Training (NeMo-Aligner): pipelines/training.md
     - Training (verl, OpenRLHF): pipelines/training-verl-openrlhf.md
     - Arbitrary commands: pipelines/run-cmd.md
+  - Evaluation:
+    - evaluation/index.md
+    - evaluation/natural-math.md
+    - evaluation/formal-math.md
+    - evaluation/code.md
+    - evaluation/scientific-knowledge.md
+    - evaluation/instruction-following.md
+    - evaluation/long-context.md
+    - evaluation/tool-calling.md
+    - evaluation/multilingual.md
+    - evaluation/other-benchmarks.md
+  - Agentic Inference:
+    - agentic_inference/parallel_thinking.md
+    - agentic_inference/tool_calling.md
   - Tutorials:
     - tutorials/index.md
   - Papers & Releases:

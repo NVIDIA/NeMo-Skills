@@ -32,29 +32,29 @@ def main():
         if args.dist_init_addr is None:
             raise ValueError("dist_init_addr must be specified for multi-node setup")
 
-    extra_arguments = f'{" ".join(unknown)}'
+    extra_arguments = f"{' '.join(unknown)}"
 
     print(f"Deploying model {args.model}")
     print("Starting OpenAI Server")
 
     multinode_paramaters = (
-        f'    --nnodes={args.num_nodes} '
-        f'    --node-rank={args.node_rank} '
+        f"    --nnodes={args.num_nodes} "
+        f"    --node-rank={args.node_rank} "
         f'    --dist-init-addr="{args.dist_init_addr}:20000" '
         if args.num_nodes > 1
         else ""
     )
 
     cmd = (
-        f'python3 -m sglang.launch_server '
+        f"python3 -m sglang.launch_server "
         f'    --model="{args.model}" '
         f'    --served-model-name="{args.model}"'
-        f'    --trust-remote-code '
+        f"    --trust-remote-code "
         f'    --host="0.0.0.0" '
-        f'    --port={args.port} '
-        f'    --tensor-parallel-size={args.num_gpus * args.num_nodes} '  # TODO: is this a good default for multinode setup?
-        f'    {multinode_paramaters} '
-        f'    {extra_arguments} '
+        f"    --port={args.port} "
+        f"    --tensor-parallel-size={args.num_gpus * args.num_nodes} "  # TODO: is this a good default for multinode setup?
+        f"    {multinode_paramaters} "
+        f"    {extra_arguments} "
     )
 
     subprocess.run(cmd, shell=True, check=True)

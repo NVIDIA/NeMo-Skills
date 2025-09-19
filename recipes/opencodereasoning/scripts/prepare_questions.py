@@ -17,14 +17,14 @@ import copy
 import json
 import os
 
-from tqdm import tqdm
 from datasets import load_dataset
+from tqdm import tqdm
 
 hf_datasets = {
     "taco": load_dataset("BAAI/TACO", trust_remote_code=True),
     "apps": load_dataset("codeparrot/apps", trust_remote_code=True),
     "code_contests": load_dataset("deepmind/code_contests"),
-    "open-r1/codeforces": load_dataset("open-r1/codeforces")
+    "open-r1/codeforces": load_dataset("open-r1/codeforces"),
 }
 
 
@@ -56,7 +56,6 @@ def get_question(ds_name, split, index):
         return question
 
     return None
-
 
 
 if __name__ == "__main__":
@@ -102,5 +101,3 @@ if __name__ == "__main__":
             f.write(json.dumps(item) + "\n")
 
     print(f"Prepared questions saved to {output_filepath}")
-
-

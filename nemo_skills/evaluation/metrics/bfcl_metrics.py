@@ -22,7 +22,7 @@ class BFCLMetrics(BaseMetrics):
     # report something similar to the final score in the BFCL leaderboard.
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
-        return {"accuracy": prediction['is_correct']}
+        return {"accuracy": prediction["is_correct"]}
 
     def update(self, predictions):
         super().update(predictions)

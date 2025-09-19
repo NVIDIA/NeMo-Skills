@@ -56,6 +56,5 @@ BENCHMARKS = {
         "EVAL_SPLIT": "test",
         "NUM_SAMPLES": 5,
     },
-
     # TODO: Add AA-LCR https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR
 }

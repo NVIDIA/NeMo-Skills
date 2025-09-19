@@ -15,7 +15,7 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 import typer
 
@@ -23,16 +23,17 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.nemo_rl import nemo_rl_app
 from nemo_skills.pipeline.utils import (
     add_task,
+    check_if_mounted,
     check_mounts,
     get_cluster_config,
     get_env_variables,
     get_exp,
     get_mounted_path,
+    get_nsight_cmd,
     get_timeout,
     resolve_mount_paths,
     run_exp,
     temporary_env_update,
-    get_nsight_cmd,
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -80,7 +81,9 @@ class NemoRLTask:
         return cmd
 
     def format_data_args(self):
-        cmd = f"+data.train_data_path={self.prompt_data} " f"+data.val_data_path={self.eval_data} "
+        cmd = f"+data.train_data_path={self.prompt_data} "
+        if self.eval_data is not None:
+            cmd += f"+data.val_data_path={self.eval_data} "
         return cmd
 
     def format_wandb_args(self):
@@ -110,7 +113,6 @@ class NemoRLTask:
             f"{self.logging_params} {self.extra_arguments}"
         )
         return cmd
-
 
 
 def get_training_cmd(
@@ -157,11 +159,7 @@ def get_training_cmd(
 
 
 def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
-    cmd = (
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"export UV_PROJECT=/opt/NeMo-RL && "
-        f"cd /nemo_run/code && "
-    )
+    cmd = "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && export UV_PROJECT=/opt/NeMo-RL && cd /nemo_run/code && "
     if backend == "fsdp":
         cmd += "uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
     elif backend == "megatron":
@@ -178,7 +176,7 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
     return cmd
 
 
-@nemo_rl_app.command(name='sft', context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@nemo_rl_app.command(name="sft", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def sft_nemo_rl(
     ctx: typer.Context,
@@ -196,7 +194,7 @@ def sft_nemo_rl(
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     training_data: str = typer.Option(None, help="Path to the training data"),
-    validation_data: str = typer.Option(None, help="Path to the validation data"),
+    validation_data: Optional[str] = typer.Option(None, help="Path to the validation data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
@@ -205,17 +203,19 @@ def sft_nemo_rl(
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     profile_step_range: str = typer.Option(
-        None, 
+        None,
         help="Controls which training steps the nsys profiler captures. "
         "Format: START:STOP (1-indexed, STOP exclusive, same as slice syntax arr[start:stop]). "
-        "Example: '3:5' profiles steps 3 and 4 only. NOTE: START must be ≥ 1, so '0:10' is invalid."
+        "Example: '3:5' profiles steps 3 and 4 only. NOTE: START must be ≥ 1, so '0:10' is invalid.",
     ),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     backend: SupportedBackends = typer.Option(
-        ..., "--backend", help="Choose backend. Supported options: fsdp, megatron"  # Required
+        ...,
+        "--backend",
+        help="Choose backend. Supported options: fsdp, megatron",  # Required
     ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -245,6 +245,10 @@ def sft_nemo_rl(
     ),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -262,7 +266,7 @@ def sft_nemo_rl(
     All extra arguments are passed directly to the NeMo-RL SFT script.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -272,12 +276,15 @@ def sft_nemo_rl(
     if log_dir is None:
         log_dir = output_dir
 
-    hf_model, output_dir, log_dir = check_mounts(
+    output_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={hf_model: None, output_dir: None},
+        mount_map={output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
+
+    if hf_model.startswith("/"):  # could ask to download from HF
+        check_if_mounted(cluster_config, hf_model)
     env_variables = get_env_variables(cluster_config)
 
     if backend == "megatron":
@@ -292,9 +299,7 @@ def sft_nemo_rl(
             raise ValueError("training_data is required when num_training_jobs > 0")
         if training_data.startswith("/"):  # could ask to download from HF
             training_data = get_mounted_path(cluster_config, training_data)
-        if validation_data is None:
-            validation_data = training_data
-        else:
+        if validation_data is not None:
             validation_data = get_mounted_path(cluster_config, validation_data)
 
     train_cmd = get_training_cmd(
@@ -326,7 +331,7 @@ def sft_nemo_rl(
                 prev_task = add_task(
                     exp,
                     cmd=train_cmd,
-                    task_name=f'{expname}-sft-{job_id}',
+                    task_name=f"{expname}-sft-{job_id}",
                     log_dir=f"{log_dir}/training-logs",
                     container=cluster_config["containers"]["nemo-rl"],
                     num_gpus=num_gpus,
@@ -344,6 +349,7 @@ def sft_nemo_rl(
                     with_sandbox=False,
                     with_ray=True,
                     installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
                 )
 
         prev_task = add_task(
@@ -356,7 +362,7 @@ def sft_nemo_rl(
             ),
             task_name=f"{expname}-convert-final-ckpt",
             log_dir=f"{log_dir}/convert-final-ckpt",
-            container=cluster_config["containers"]['nemo-rl'],
+            container=cluster_config["containers"]["nemo-rl"],
             cluster_config=cluster_config,
             partition=partition,
             time_min=time_min,
@@ -369,6 +375,7 @@ def sft_nemo_rl(
             task_dependencies=[prev_task] if prev_task is not None else None,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
+            skip_hf_home_check=skip_hf_home_check,
         )
 
         # explicitly setting sequential to False since we set dependencies directly

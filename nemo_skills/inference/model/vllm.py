@@ -13,16 +13,13 @@
 # limitations under the License.
 
 import logging
-import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import openai
 import requests
-from openai import BadRequestError
 
 from nemo_skills.utils import get_logger_name
 
 from .base import BaseModel
+from .utils import ServerTokenizer
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -30,6 +27,23 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+    def _get_tokenizer_endpoint(self):
+        """
+        Returns the tokenizer endpoint if available, otherwise returns None.
+        """
+        tokenize_url = self.base_url.replace("/v1", "/tokenize")
+        payload = {"prompt": "Test prompt"}
+
+        try:
+            response = requests.post(tokenize_url, json=payload)
+            if response.status_code == 200:
+                LOG.info(f"Tokenize endpoint is available! - {tokenize_url}")
+                return ServerTokenizer(tokenize_url)
+            else:
+                return None
+        except requests.exceptions.RequestException:
+            return None
 
     def _build_request_body(self, top_k, min_p, repetition_penalty, extra_body: dict = None):
         full_extra_body = {

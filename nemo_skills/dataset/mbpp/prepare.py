@@ -19,15 +19,15 @@ from evalplus.data import get_mbpp_plus
 
 if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
-    output_file = str(data_dir / f"test.jsonl")
+    output_file = str(data_dir / "test.jsonl")
 
     problems = get_mbpp_plus()
 
     with open(output_file, "wt", encoding="utf-8") as fout:
         for problem in problems.values():
             # somehow models like tabs more than spaces
-            problem['question'] = problem['prompt'].replace('    ', '\t')
+            problem["question"] = problem["prompt"].replace("    ", "\t")
             # dropping inputs which are large and are not needed, since they are re-downloaded during eval anyway
-            del problem['base_input']
-            del problem['plus_input']
+            del problem["base_input"]
+            del problem["plus_input"]
             fout.write(json.dumps(problem) + "\n")
