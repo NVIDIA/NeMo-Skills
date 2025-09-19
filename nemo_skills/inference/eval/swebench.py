@@ -104,7 +104,7 @@ class SweBenchGenerationConfig:
 
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
-    no_dedicated_environments: bool = False
+    generic_inference_container: str | None = None
     openhands_preinstalled: bool = False
     evaluate: bool = True
 
@@ -177,11 +177,9 @@ class SweBenchGenerationTask(GenerationTask):
 
     async def _execute_container_command(self, data_point, command, expected_file_pattern, mode, timeout=100000):
         """Execute a command in an Apptainer container with retry logic."""
-        container_name = data_point["container_formatter"].format(
-            instance_id=data_point["instance_id"].replace("__", "_1776_")
-        )
-
-        if self.cfg.no_dedicated_environments:
+        if self.cfg.generic_inference_container is not None and mode == "agent":
+            container_name = self.cfg.generic_inference_container
+            # If the container is generic, we have to clone the repo inside of it before running the agent
             command = (
                 f"rm -rf /testbed && "
                 f"git clone -o origin https://github.com/{data_point['repo']} /testbed && "
@@ -190,6 +188,11 @@ class SweBenchGenerationTask(GenerationTask):
                 f"git reset --hard {data_point['base_commit']} && "
                 f"git remote remove origin && "
                 f"{command}"
+            )
+        else:
+            # In this case, we expect that the correct repo will already be cloned in /testbed
+            container_name = data_point["container_formatter"].format(
+                instance_id=data_point["instance_id"].replace("__", "_1776_")
             )
 
         # Create logs directory if it doesn't exist
