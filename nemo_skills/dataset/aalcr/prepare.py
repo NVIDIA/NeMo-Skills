@@ -55,6 +55,8 @@ START QUESTION
 
 END QUESTION
 """
+
+
 URL = "https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR/resolve/main/extracted_text/AA-LCR_extracted-text.zip"
 
 
@@ -79,14 +81,10 @@ def find_actual_file(base_path, target_filename):
 
     """Find the actual file by trying different encoding variations."""
 
-    # Debug output for problematic files (disabled)
-    debug = False
-
     # Try the exact filename first
     full_path = os.path.join(base_path, target_filename)
     if os.path.exists(full_path):
-        if debug:
-            LOG.debug("DEBUG find_actual_file: found exact match")
+        LOG.debug("DEBUG find_actual_file: found exact match")
         return target_filename
 
     # Try with encoding artifacts (dataset expects clean, files have artifacts)
@@ -103,27 +101,25 @@ def find_actual_file(base_path, target_filename):
     for clean, artifact in replacements:
         filename_with_artifacts = filename_with_artifacts.replace(clean, artifact)
 
-    if debug:
-        LOG.debug(f"DEBUG find_actual_file: converted to {repr(filename_with_artifacts)}")
-        if filename_with_artifacts == target_filename:
-            LOG.debug("DEBUG find_actual_file: NO CONVERSION HAPPENED!")
-            # Show ALL non-alphanumeric characters
-            LOG.debug("DEBUG: All special characters in filename:")
-            for i, char in enumerate(target_filename):
-                if not (char.isalnum() or char in [" ", "_", ".", "-"]):
-                    LOG.debug(f"DEBUG: pos {i}: {repr(char)} (ord: {ord(char)})")
-        else:
-            LOG.debug("DEBUG find_actual_file: conversion successful")
+    LOG.debug(f"find_actual_file: converted to {repr(filename_with_artifacts)}")
+    if filename_with_artifacts == target_filename:
+        LOG.debug("find_actual_file: NO CONVERSION HAPPENED!")
+        # Show ALL non-alphanumeric characters
+        LOG.debug("All special characters in filename:")
+        for i, char in enumerate(target_filename):
+            if not (char.isalnum() or char in [" ", "_", ".", "-"]):
+                LOG.debug(f"pos {i}: {repr(char)} (ord: {ord(char)})")
+    else:
+        LOG.debug("find_actual_file: conversion successful")
 
     # Only try artifact version if it's different from original
     if filename_with_artifacts != target_filename:
         artifact_path = os.path.join(base_path, filename_with_artifacts)
         if os.path.exists(artifact_path):
-            if debug:
-                LOG.debug("DEBUG find_actual_file: found artifact match")
+            LOG.debug("find_actual_file: found artifact match")
             return filename_with_artifacts
-        elif debug:
-            LOG.debug("DEBUG find_actual_file: artifact version doesn't exist")
+
+        LOG.debug("find_actual_file: artifact version doesn't exist")
 
     # If still not found, try listing directory and matching by normalization
     try:
@@ -142,14 +138,12 @@ def find_actual_file(base_path, target_filename):
 
             # Check if they match after normalization
             if normalized_target == actual_file or target_filename == normalized_actual:
-                if debug:
-                    LOG.debug(f"DEBUG find_actual_file: found directory match {repr(actual_file)}")
+                LOG.debug(f"DEBUG find_actual_file: found directory match {repr(actual_file)}")
                 return actual_file
     except OSError:
         pass
 
-    if debug:
-        LOG.debug("DEBUG find_actual_file: no match found, returning original")
+    LOG.debug("DEBUG find_actual_file: no match found, returning original")
     return target_filename  # Return original if nothing found
 
 
@@ -248,8 +242,15 @@ if __name__ == "__main__":
         default="cl100k_base",
         help="tokenizer name",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Debug mode",
+    )
 
     args = parser.parse_args()
+    if args.debug:
+        LOG.setLevel(logging.DEBUG)
 
     LOG.info(f"Preparing AA-LCR dataset with additional arguments: {args}")
     prepare_aalcr_data(args.max_context_window, args.setup, args.tokenizer_name)
