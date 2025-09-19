@@ -434,7 +434,7 @@ class SweBenchGenerationTask(GenerationTask):
             # run the agent
             f"./evaluation/benchmarks/swe_bench/scripts/run_infer.sh "
             f"    llm.model "  # name of llm config section in config.toml
-            f"    {self.cfg.agent_framework_commit} "  # openhands commit
+            f"    HEAD "  # openhands commit (HEAD = self.cfg.agent_framework_commit, because we checked it out earlier)
             f"    CodeActAgent "  # agent
             f"    1 "  # number of instances
             f"    {self.cfg.agent_max_turns} "  # max agent iterations
