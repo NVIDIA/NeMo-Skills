@@ -196,8 +196,7 @@ def write_data_to_file(output_file, data, txt_file_folder, max_context_window, t
             # remove unused columns
             entry.pop("data_source_urls")
 
-            json.dump(entry, fout)
-            fout.write("\n")
+            fout.write(json.dumps(entry) + "\n")
 
 
 def get_aalcr_data(max_context_window, setup, tokenizer_name):
