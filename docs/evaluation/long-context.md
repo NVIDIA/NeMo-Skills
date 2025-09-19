@@ -40,7 +40,7 @@ ns eval \
     --server_type=sglang \
     --model=/hf_models/$model \
     --benchmarks=aalcr:4 \
-    --output_dir=/workspace/aalcr/$split/$model \
+    --output_dir=/workspace/aalcr/$model \
     --judge_model='/hf_models/Qwen3-235B-A22B-Instruct-2507' \
     --judge_server_type='sglang' \
     --judge_server_gpus=8 \

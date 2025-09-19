@@ -13,12 +13,17 @@
 # limitations under the License.
 import argparse
 import json
+import logging
 import os
 from pathlib import Path
 
 import tiktoken
 from datasets import load_dataset
 from tqdm import tqdm
+
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 """
 Usage
@@ -50,6 +55,7 @@ START QUESTION
 
 END QUESTION
 """
+URL = "https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR/resolve/main/extracted_text/AA-LCR_extracted-text.zip"
 
 
 def construct_prompt(docs, question, prompt_template=prompt_template):
@@ -80,7 +86,7 @@ def find_actual_file(base_path, target_filename):
     full_path = os.path.join(base_path, target_filename)
     if os.path.exists(full_path):
         if debug:
-            print("DEBUG find_actual_file: found exact match")
+            LOG.debug("DEBUG find_actual_file: found exact match")
         return target_filename
 
     # Try with encoding artifacts (dataset expects clean, files have artifacts)
@@ -98,26 +104,26 @@ def find_actual_file(base_path, target_filename):
         filename_with_artifacts = filename_with_artifacts.replace(clean, artifact)
 
     if debug:
-        print(f"DEBUG find_actual_file: converted to {repr(filename_with_artifacts)}")
+        LOG.debug(f"DEBUG find_actual_file: converted to {repr(filename_with_artifacts)}")
         if filename_with_artifacts == target_filename:
-            print("DEBUG find_actual_file: NO CONVERSION HAPPENED!")
+            LOG.debug("DEBUG find_actual_file: NO CONVERSION HAPPENED!")
             # Show ALL non-alphanumeric characters
-            print("DEBUG: All special characters in filename:")
+            LOG.debug("DEBUG: All special characters in filename:")
             for i, char in enumerate(target_filename):
                 if not (char.isalnum() or char in [" ", "_", ".", "-"]):
-                    print(f"DEBUG: pos {i}: {repr(char)} (ord: {ord(char)})")
+                    LOG.debug(f"DEBUG: pos {i}: {repr(char)} (ord: {ord(char)})")
         else:
-            print("DEBUG find_actual_file: conversion successful")
+            LOG.debug("DEBUG find_actual_file: conversion successful")
 
     # Only try artifact version if it's different from original
     if filename_with_artifacts != target_filename:
         artifact_path = os.path.join(base_path, filename_with_artifacts)
         if os.path.exists(artifact_path):
             if debug:
-                print("DEBUG find_actual_file: found artifact match")
+                LOG.debug("DEBUG find_actual_file: found artifact match")
             return filename_with_artifacts
         elif debug:
-            print("DEBUG find_actual_file: artifact version doesn't exist")
+            LOG.debug("DEBUG find_actual_file: artifact version doesn't exist")
 
     # If still not found, try listing directory and matching by normalization
     try:
@@ -137,13 +143,13 @@ def find_actual_file(base_path, target_filename):
             # Check if they match after normalization
             if normalized_target == actual_file or target_filename == normalized_actual:
                 if debug:
-                    print(f"DEBUG find_actual_file: found directory match {repr(actual_file)}")
+                    LOG.debug(f"DEBUG find_actual_file: found directory match {repr(actual_file)}")
                 return actual_file
     except OSError:
         pass
 
     if debug:
-        print("DEBUG find_actual_file: no match found, returning original")
+        LOG.debug("DEBUG find_actual_file: no match found, returning original")
     return target_filename  # Return original if nothing found
 
 
@@ -173,7 +179,7 @@ def write_data_to_file(output_file, data, txt_file_folder, max_context_window, t
                         documents.append(document)
                 except FileNotFoundError:
                     if actual_filename != data_source_filename:
-                        print(f"File {base_path}/{data_source_filename} is missing")
+                        LOG.debug(f"File {base_path}/{data_source_filename} is missing")
 
             # Use construct_prompt to format the question with documents
             question_text = entry.pop("question")
@@ -183,7 +189,7 @@ def write_data_to_file(output_file, data, txt_file_folder, max_context_window, t
             n_tokens = count_n_tokens(question, tokenizer_name)
             if max_context_window is not None:
                 if n_tokens > max_context_window:
-                    print(f"Skipping {idx} because it has {n_tokens} tokens")
+                    LOG.warning(f"Skipping {idx} because it has {n_tokens} tokens")
                     continue
 
             if n_tokens != entry["input_tokens"]:  # check if the n_tokens exactly match the input_tokens in the entry
@@ -199,7 +205,7 @@ def write_data_to_file(output_file, data, txt_file_folder, max_context_window, t
             fout.write(json.dumps(entry) + "\n")
 
 
-def get_aalcr_data(max_context_window, setup, tokenizer_name):
+def prepare_aalcr_data(max_context_window, setup, tokenizer_name):
     # download the provied extracted text files
     # https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR/resolve/main/extracted_text/AA-LCR_extracted-text.zip
 
@@ -208,9 +214,7 @@ def get_aalcr_data(max_context_window, setup, tokenizer_name):
 
         import wget
 
-        wget.download(
-            "https://huggingface.co/datasets/ArtificialAnalysis/AA-LCR/resolve/main/extracted_text/AA-LCR_extracted-text.zip"
-        )
+        wget.download(URL)
         zipfile.ZipFile("AA-LCR_extracted-text.zip").extractall(Path(__file__).absolute().parent)
         os.remove("AA-LCR_extracted-text.zip")
 
@@ -247,6 +251,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    print(f"Preparing AA-LCR dataset with additional arguments: {args}")
-    get_aalcr_data(args.max_context_window, args.setup, args.tokenizer_name)
-    print(f"AA-LCR dataset preparation with setup {args.setup} completed. Use --split=${args.setup} to evaluate!")
+    LOG.info(f"Preparing AA-LCR dataset with additional arguments: {args}")
+    prepare_aalcr_data(args.max_context_window, args.setup, args.tokenizer_name)
+    LOG.info(f"AA-LCR dataset preparation with setup {args.setup} completed. Use --split=${args.setup} to evaluate!")
