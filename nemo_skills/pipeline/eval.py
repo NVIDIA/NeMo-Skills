@@ -171,6 +171,7 @@ def eval(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    with_search_server: bool = typer.Option(False, help="If True, will start a search container alongside this job"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     log_samples: bool = typer.Option(
         False,
@@ -339,6 +340,7 @@ def eval(
                     server_config=job_server_config,
                     with_sandbox=job_needs_sandbox or with_sandbox,
                     sandbox_port=None if get_random_port else 6000,
+                    with_search_server=with_search_server,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,
