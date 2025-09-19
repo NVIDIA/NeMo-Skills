@@ -104,8 +104,12 @@ class SweBenchGenerationConfig:
 
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
+    # If specified, will override container_formatter during inference and run all instances in this container instead,
+    # cloning the repo to /testbed before running the agent.
+    # This does not affect evaluation. If it is enabled, it still runs in the container_formatter containers.
     generic_inference_container: str | None = None
-    openhands_preinstalled: bool = False
+
+    # Whether to run evaluation. If False, will only run inference (trajectory/patch generation).
     evaluate: bool = True
 
     apptainer_max_retries: int = 3
@@ -391,24 +395,6 @@ class SweBenchGenerationTask(GenerationTask):
         # because OpenHands has internal checks for substrings like "swe-bench-live" in the name (case-insensitive)
         data_dir = "/root/" + data_point["dataset_name"].replace("/", "__")
 
-        if self.cfg.openhands_preinstalled:
-            openhands_install_cmd = "cd /root/OpenHands"
-        else:
-            openhands_install_cmd = (
-                "cd /root && "
-                'curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && '
-                "bash Miniforge3-$(uname)-$(uname -m).sh -b && "
-                'eval "$(/root/miniforge3/bin/conda shell.bash hook)" && '
-                "mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
-                "mkdir OpenHands && "
-                "cd OpenHands && "
-                f"git clone {self.cfg.agent_framework_repo} . && "
-                f"git checkout {self.cfg.agent_framework_commit} && "
-                "export INSTALL_DOCKER=0 && "
-                "make build && "
-                "poetry run python -m pip install datasets"
-            )
-
         openhands_cmd = (
             # make sure /workspace isn't mounted as a safety precaution
             # (mounting it in the nemo-skills cluster config is ok, just not inside of apptainer specifically)
@@ -418,8 +404,23 @@ class SweBenchGenerationTask(GenerationTask):
             "    echo 'This is because OpenHands DELETES EVERYTHING in the /workspace folder if it exists.' && "
             "    exit 1; "
             "fi && "
-            # install openhands repo + dependencies if needed
-            f"{openhands_install_cmd} && "
+            # install openhands repo + dependencies, or skip if it's already installed
+            "if [ -d /root/OpenHands ]; then "
+            "    cd /root/OpenHands; "
+            "else "
+            "    cd /root && "
+            '    curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && '
+            "    bash Miniforge3-$(uname)-$(uname -m).sh -b && "
+            '    eval "$(/root/miniforge3/bin/conda shell.bash hook)" && '
+            "    mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
+            "    mkdir OpenHands && "
+            "    cd OpenHands && "
+            f"   git clone {self.cfg.agent_framework_repo} . && "
+            f"   git checkout {self.cfg.agent_framework_commit} && "
+            "    export INSTALL_DOCKER=0 && "
+            "    make build && "
+            "    poetry run python -m pip install datasets; "
+            "fi && "
             # copy dataset
             f"mkdir {data_dir} && "
             f"cp {self.cfg.input_file} {data_dir} && "
