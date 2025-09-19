@@ -40,7 +40,7 @@ if __name__ == "__main__":
             "reversing_operation",
         ],
     )
-    parser.add_argument("--no_rounding_instructions", action='store_true')
+    parser.add_argument("--no_rounding_instructions", action="store_true")
     parser.add_argument("--cleaning", choices=["none", "light", "hard"], default="none")
     args = parser.parse_args()
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     file_rounded = None
     if not args.no_rounding_instructions:
         output_file_rounded = str(data_dir / f"{split}_rounded.jsonl")
-        file_rounded = open(output_file_rounded, 'w')
+        file_rounded = open(output_file_rounded, "w")
 
     with open(os.path.join(pathlib.Path(__file__).parent, "cleaned_indexes.json")) as f:
         cleaning_options = json.load(f)
@@ -64,10 +64,10 @@ if __name__ == "__main__":
 
     with open(original_file, "rt") as original, open(output_file, "w") as test_full:
         original_data = [json.loads(line) for line in original.readlines()]
-        cleaning_options['none'] = set(range(len(original_data)))
+        cleaning_options["none"] = set(range(len(original_data)))
         for i, original_entry in enumerate(original_data):
             if (
-                original_entry["perturbation_type"].replace(' ', '_') in args.categories
+                original_entry["perturbation_type"].replace(" ", "_") in args.categories
                 and i in cleaning_options[args.cleaning]
             ):
                 # original entries
@@ -75,7 +75,7 @@ if __name__ == "__main__":
                     "reference_solution", None
                 )
                 expected_answer = original_entry.get("answer", None) or original_entry.get("expected_answer", None)
-                expected_answer = expected_answer if expected_answer != 'None' else 'insufficient'
+                expected_answer = expected_answer if expected_answer != "None" else "insufficient"
                 entry = dict(
                     problem=original_entry["question"],
                     reference_solution=reference_solution,
@@ -94,7 +94,7 @@ if __name__ == "__main__":
                     },
                 )
                 # converting to int if able to for cleaner text representation
-                if str(entry["expected_answer"]).replace('.', "", 1).replace('-', "", 1).isdigit():
+                if str(entry["expected_answer"]).replace(".", "", 1).replace("-", "", 1).isdigit():
                     entry["expected_answer"] = float(entry["expected_answer"])
                     if int(entry["expected_answer"]) == entry["expected_answer"]:
                         entry["expected_answer"] = int(entry["expected_answer"])

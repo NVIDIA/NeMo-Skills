@@ -27,9 +27,17 @@ from nemo_run.core.execution.local import LocalExecutor
 from nemo_run.core.execution.slurm import SlurmJobDetails, get_packaging_job_key
 from torchx.specs.api import AppState
 
-from nemo_skills.pipeline.utils.cluster import get_env_variables, get_tunnel, temporary_env_update, tunnel_hash
-from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path
-from nemo_skills.pipeline.utils.packager import get_packager, get_registered_external_repo
+from nemo_skills.pipeline.utils.cluster import (
+    get_env_variables,
+    get_tunnel,
+    temporary_env_update,
+    tunnel_hash,
+)
+from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path, is_mounted_filepath
+from nemo_skills.pipeline.utils.packager import (
+    get_packager,
+    get_registered_external_repo,
+)
 from nemo_skills.pipeline.utils.server import get_free_port, get_server_command
 from nemo_skills.utils import get_logger_name, remove_handlers
 
@@ -63,7 +71,7 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
         assert status_dict, f"No status found for experiment {exp._id}"
         for _, status_info in status_dict.items():
             if not ignore_finished or (
-                status_info['status']
+                status_info["status"]
                 in [
                     AppState.RUNNING,
                     AppState.PENDING,
@@ -71,7 +79,7 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
                     AppState.UNKNOWN,
                 ]
             ):
-                handles.append(status_info['handle'])
+                handles.append(status_info["handle"])
                 continue
         return handles
 
@@ -94,9 +102,9 @@ def get_exp_handles(expname: str, ignore_finished=True, ignore_exp_not_exists=Tr
 
 
 def get_sandbox_command(cluster_config):
-    if cluster_config['executor'] == 'none':
+    if cluster_config["executor"] == "none":
         return "python -m nemo_skills.code_execution.local_sandbox.local_sandbox_server"
-    return "/entrypoint.sh && /start.sh"
+    return "/start-with-nginx.sh"
 
 
 @dataclass(kw_only=True)
@@ -187,7 +195,7 @@ def get_executor(
             ipc_mode="host",
             volumes=mounts,
             ntasks_per_node=1,
-            privileged=bool(os.getenv('NEMO_SKILLS_PRIVILEGED_DOCKER', 0)),
+            privileged=bool(os.getenv("NEMO_SKILLS_PRIVILEGED_DOCKER", 0)),
             # locally we are always asking for all GPUs to be able to select a subset with CUDA_VISIBLE_DEVICES
             num_gpus=-1 if gpus_per_node is not None else None,
             network="host",
@@ -219,20 +227,20 @@ def get_executor(
                 slurm_kwargs = {}
             slurm_kwargs["exclusive"] = True
 
-    if 'timeouts' not in cluster_config:
+    if "timeouts" not in cluster_config:
         timeout = "10000:00:00:00"
     else:
         timeout = cluster_config["timeouts"][partition]
 
-    additional_parameters = {'time_min': time_min} if time_min is not None else {}
-    if cluster_config.get('mail_type') is not None:
-        additional_parameters['mail_type'] = cluster_config['mail_type']
-    if cluster_config.get('mail_user') is not None:
-        additional_parameters['mail_user'] = cluster_config['mail_user']
+    additional_parameters = {"time_min": time_min} if time_min is not None else {}
+    if cluster_config.get("mail_type") is not None:
+        additional_parameters["mail_type"] = cluster_config["mail_type"]
+    if cluster_config.get("mail_user") is not None:
+        additional_parameters["mail_user"] = cluster_config["mail_user"]
     srun_args = [
         "--no-container-mount-home",
         "--mpi=pmix",
-        '--wait=10',
+        "--wait=10",
         # we need to be explicit about this in srun as commands might need to run in parallel
         f"--ntasks-per-node={tasks_per_node}",
         f"--nodes={num_nodes}",
@@ -263,8 +271,8 @@ def get_executor(
         job_details=job_details_class(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
             folder=get_unmounted_path(cluster_config, log_dir),
-            srun_prefix=log_prefix + '_' + job_name + '_',
-            sbatch_prefix=job_name + '_',
+            srun_prefix=log_prefix + "_" + job_name + "_",
+            sbatch_prefix=job_name + "_",
         ),
         wait_time_for_group_job=0.01,
         monitor_group_job_wait_time=20,
@@ -304,8 +312,8 @@ def install_packages_wrap(cmd, installation_command: str | None = None):
             f"fi; "
             f"else "
             f"echo 'Waiting for package installation to complete (UUID: {job_uuid})'; "
-            f"while [ ! -f {lock_file} ] || [ \"$(cat {lock_file} 2>/dev/null)\" != \"done\" ]; do "
-            f"if [ -f {lock_file} ] && [ \"$(cat {lock_file} 2>/dev/null)\" = \"failed\" ]; then "
+            f'while [ ! -f {lock_file} ] || [ "$(cat {lock_file} 2>/dev/null)" != "done" ]; do '
+            f'if [ -f {lock_file} ] && [ "$(cat {lock_file} 2>/dev/null)" = "failed" ]; then '
             f"echo 'Package installation failed in another process'; "
             f"exit 1; "
             f"fi; "
@@ -349,6 +357,7 @@ def add_task(
     heterogeneous: bool = False,
     with_ray: bool = False,
     installation_command: str | None = None,
+    skip_hf_home_check: bool = False,
     dry_run: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
@@ -374,6 +383,12 @@ def add_task(
 
     installation_command argument only affects "main" task, not server or sandbox.
     """
+    MAX_TASK_NAME_LEN = 100
+    if len(task_name) > MAX_TASK_NAME_LEN:
+        task_name_cut = f"{task_name[:MAX_TASK_NAME_LEN]}-name-cut"
+        LOG.warning("task_name '%s' is too long (%d). Truncated to '%s'", task_name, len(task_name), task_name_cut)
+        task_name = task_name_cut
+
     if run_after is not None and cluster_config["executor"] == "slurm":
         if isinstance(run_after, (str, run.Experiment)):
             run_after = [run_after]
@@ -390,12 +405,23 @@ def add_task(
     else:
         dependencies = None
 
-    if server_config is None and num_gpus is None and cluster_config['executor'] == "slurm":
-        if not cluster_config.get('cpu_partition'):
+    if server_config is None and num_gpus is None and cluster_config["executor"] == "slurm":
+        if not cluster_config.get("cpu_partition"):
             num_gpus = 1
 
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
+
+    env_vars = get_env_variables(cluster_config)
+    if cluster_config["executor"] != "none" and not skip_hf_home_check:
+        if "HF_HOME" not in env_vars:
+            raise RuntimeError(
+                "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
+                f"Current env_vars: {cluster_config.get('env_vars', [])}\n"
+                "Please add a new variable: HF_HOME=/mounted/path/to/your/hf_home"
+            )
+        if not is_mounted_filepath(cluster_config, env_vars["HF_HOME"]):
+            raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
 
     het_group = 0
     het_group_indices = []
@@ -406,16 +432,17 @@ def add_task(
     commands = []
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
-    if server_config is not None:
+    if server_config is not None and int(server_config["num_gpus"]) > 0:
+        # do not pass container into the command builder
+        server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
-        if 'container' not in server_config:
-            server_container = cluster_config["containers"][server_config['server_type']]
+
         server_executor = get_executor(
             cluster_config=cluster_config,
             container=server_container,
-            num_nodes=server_config['num_nodes'],
+            num_nodes=server_config["num_nodes"],
             tasks_per_node=num_server_tasks,
-            gpus_per_node=server_config['num_gpus'],
+            gpus_per_node=server_config["num_gpus"],
             partition=partition,
             time_min=time_min,
             dependencies=dependencies,
@@ -481,7 +508,10 @@ def add_task(
 
     # finally a sandbox if needed
     if with_sandbox:
-        sandbox_env_updates = {"LISTEN_PORT": sandbox_port}
+        sandbox_env_updates = {
+            "LISTEN_PORT": sandbox_port,
+            "NGINX_PORT": sandbox_port,
+        }
         current_env_vars = cluster_config.get("env_vars", []).copy()
         for override in current_env_vars:
             if "PYTHONPATH" in override:
@@ -549,9 +579,9 @@ def add_task(
 
         for idx in range(len(commands)):
             commands[idx] = commands[idx].replace(
-                '/nemo_run/code/nemo_skills', str(get_registered_external_repo('nemo_skills').path)
+                "/nemo_run/code/nemo_skills", str(get_registered_external_repo("nemo_skills").path)
             )
-            commands[idx] = commands[idx].replace('/nemo_run/code', './')
+            commands[idx] = commands[idx].replace("/nemo_run/code", "./")
 
     if with_ray and cluster_config["executor"] == "slurm":
         metadata = {"use_with_ray_cluster": True}
@@ -591,13 +621,13 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
     if dry_run:
         LOG.info("Dry run mode is enabled, not running the experiment.")
         return
-    if cluster_config['executor'] != 'slurm':
+    if cluster_config["executor"] != "slurm":
         exp.run(detach=False, tail_logs=True, sequential=sequential)
     else:
         try:
             exp.run(detach=True, sequential=sequential)
         except RuntimeError as e:
-            if 'Your repo has uncommitted changes.' in str(e):
+            if "Your repo has uncommitted changes." in str(e):
                 raise RuntimeError(
                     "You're running ns commands from a git repo - in this case we "
                     "always try to package it and upload to the cluster "
@@ -623,21 +653,21 @@ def get_exp(expname, cluster_config, _reuse_exp=None):
         return contextlib.nullcontext(_reuse_exp)
     # nemo-run redefines the handlers, so removing ours to avoid duplicate logs
     remove_handlers()
-    if cluster_config['executor'] == 'slurm':
+    if cluster_config["executor"] == "slurm":
         return run.Experiment(
             expname,
             skip_status_at_exit=True,
             serialize_metadata_for_scripts=False,
-            threadpool_workers=cluster_config.get('num_workers', 4),
+            threadpool_workers=cluster_config.get("num_workers", 4),
         )
     # hiding all nemo-run logs otherwise as they are not useful locally
-    if cluster_config['executor'] == 'local':
+    if cluster_config["executor"] == "local":
         return run.Experiment(expname, clean_mode=True)
     return run.Experiment(expname, clean_mode=True, log_level="WARN")
 
 
 def get_nsight_cmd(profile_step_range):
-    cmd = ''
+    cmd = ""
     if profile_step_range is not None:
         cmd = (
             f'export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/lib:/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/lib/x86_64-linux-gnu" && '

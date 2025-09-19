@@ -93,7 +93,7 @@ class SweBenchGenerationConfig:
     agent_framework: SupportedAgentFrameworks  # Which agentic framework to use
 
     # URL of the SWE-agent/OpenHands repo to pass to git clone. If None, will use the official repo
-    agent_framework_repo: str | None = None  
+    agent_framework_repo: str | None = None
     agent_framework_commit: str = "HEAD"  # Which commit to use when cloning the SWE-agent/OpenHands repo
 
     # SWE-agent/OpenHands configuration file path. Can be specified in the same way as ns prompt configs
@@ -160,19 +160,23 @@ class SweBenchGenerationTask(GenerationTask):
     def setup_llm(self):
         return
 
+    def setup_litellm_cache(self):
+        return
+
+    def cleanup_litellm_cache(self):
+        return
+
     async def _execute_container_command(
         self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
     ):
         """Execute a command in an Apptainer container with retry logic."""
         container_name = data_point["container_formatter"].format(
-            instance_id=data_point['instance_id'].replace('__', '_1776_')
+            instance_id=data_point["instance_id"].replace("__", "_1776_")
         )
 
         # Create logs directory if it doesn't exist
         logs_dir = self.output_dir / "apptainer_logs"
         logs_dir.mkdir(exist_ok=True)
-        log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}.log"
-        LOG.info("Starting execution of an apptainer command. Logs are available at %s", log_file_path)
 
         # Fix localhost URLs not working sometimes
         command = f"echo '127.0.0.1 localhost' >/etc/hosts && {command}"
@@ -187,9 +191,17 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Retry apptainer command up to max_retries times
         for attempt in range(max_retries):
+            log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}_attempt{attempt + 1}.log"
+            LOG.info(
+                "Starting execution of an apptainer command (attempt %d of %d). Logs are available at %s",
+                attempt + 1,
+                max_retries,
+                log_file_path,
+            )
+
             try:
                 # Stream output to log file as it appears
-                with open(log_file_path, 'w') as log_file:
+                with open(log_file_path, "w") as log_file:
                     try:
                         # Create async subprocess
                         process = await asyncio.create_subprocess_shell(
@@ -220,16 +232,16 @@ class SweBenchGenerationTask(GenerationTask):
                         f"Expected exactly one file matching {expected_file_pattern} for {data_point['instance_id']}, "
                         f"found {len(pred_files)}."
                     )
-            except Exception as e:
+            except Exception:
                 if attempt < max_retries - 1:
                     LOG.warning(
                         "Attempt %d failed for instance %s. Retrying...",
                         attempt + 1,
-                        data_point['instance_id'],
+                        data_point["instance_id"],
                     )
                     continue
                 else:
-                    LOG.error("All %d attempts failed for instance %s", max_retries, data_point['instance_id'])
+                    LOG.error("All %d attempts failed for instance %s", max_retries, data_point["instance_id"])
                     LOG.error("Apptainer command failed. Check logs at: %s", log_file_path)
                     raise ValueError(
                         f"Job failed for {data_point['instance_id']}. Check logs at: {log_file_path}. "
@@ -290,12 +302,12 @@ class SweBenchGenerationTask(GenerationTask):
         search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
         pred_file = await self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
 
-        with open(pred_file, 'r') as f:
+        with open(pred_file, "r") as f:
             trajectory_dict = json.loads(f.read().strip())
 
         # need to rename .pred to .jsonl
-        pred_jsonl_file = pred_file.replace('.pred', '.jsonl')
-        with open(pred_jsonl_file, 'w') as f:
+        pred_jsonl_file = pred_file.replace(".pred", ".jsonl")
+        with open(pred_jsonl_file, "w") as f:
             f.write(json.dumps(trajectory_dict))
 
         # TODO: get num_generated_tokens and other stats from .traj file
@@ -339,6 +351,11 @@ class SweBenchGenerationTask(GenerationTask):
 
         config_str = tomlkit.dumps(config)
 
+        # Folder to copy the dataset into.
+        # It's important that the name includes the original HF dataset name,
+        # because OpenHands has internal checks for substrings like "swe-bench-live" in the name (case-insensitive)
+        data_dir = "/root/" + data_point["dataset_name"].replace("/", "__")
+
         openhands_cmd = (
             # make sure /workspace isn't mounted as a safety precaution
             # (mounting it in the nemo-skills cluster config is ok, just not inside of apptainer specifically)
@@ -350,9 +367,9 @@ class SweBenchGenerationTask(GenerationTask):
             "fi && "
             # install openhands repo + dependencies
             "cd /root && "
-            "curl -L -O \"https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh\" && "
+            'curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && '
             "bash Miniforge3-$(uname)-$(uname -m).sh -b && "
-            "eval \"$(/root/miniforge3/bin/conda shell.bash hook)\" && "
+            'eval "$(/root/miniforge3/bin/conda shell.bash hook)" && '
             "mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
             "mkdir OpenHands && "
             "cd OpenHands && "
@@ -361,6 +378,9 @@ class SweBenchGenerationTask(GenerationTask):
             "export INSTALL_DOCKER=0 && "
             "make build && "
             "poetry run python -m pip install datasets && "
+            # copy dataset
+            f"mkdir {data_dir} && "
+            f"cp {self.cfg.input_file} {data_dir} && "
             # set up config files
             f"echo {shlex.quote(config_str)} >config.toml && "
             f"echo \"selected_ids = ['{data_point['instance_id']}']\" >evaluation/benchmarks/swe_bench/config.toml && "
@@ -376,15 +396,15 @@ class SweBenchGenerationTask(GenerationTask):
             f"    1 "  # number of instances
             f"    {self.cfg.agent_max_turns} "  # max agent iterations
             f"    1 "  # number of workers
-            f"    {data_point['dataset_name']} "  # dataset name
-            f"    {data_point['split']} && "  # dataset split
+            f"    {data_dir} "  # dataset path
+            f"    train && "  # dataset split (always "train" for local datasets)
             # move outputs to the mounted directory
             f"mkdir -p /trajectories_mount/trajectories && "
             f"cp -r evaluation/evaluation_outputs/outputs/*/*/* /trajectories_mount/trajectories/{data_point['instance_id']}"
         )
 
         # Execute OpenHands command
-        search_path = os.path.join(self.output_dir / "trajectories", "**", data_point['instance_id'], "output.jsonl")
+        search_path = os.path.join(self.output_dir / "trajectories", "**", data_point["instance_id"], "output.jsonl")
         out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
 
         with open(out_file, "r") as f:
@@ -393,6 +413,8 @@ class SweBenchGenerationTask(GenerationTask):
         patch = out_dict["test_result"]["git_patch"]
         if not patch:
             patch = None
+        elif not patch.endswith("\n"):
+            patch += "\n"
 
         # Create file in the SWE-bench evaluation format
         pred_file = out_file.replace("output.jsonl", "output_for_eval.jsonl")
@@ -411,11 +433,14 @@ class SweBenchGenerationTask(GenerationTask):
     async def process_single_datapoint(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
         self.output_dir = Path(self.cfg.output_file).parent
+        if self.cfg.inference.random_seed is not None:
+            self.output_dir = self.output_dir / f"rs{self.cfg.inference.random_seed}"
+            self.output_dir.mkdir(exist_ok=True)
 
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
         # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
 
-        if 'base_url' in self.cfg.server:
+        if "base_url" in self.cfg.server:
             api_base = self.cfg.server.base_url
         else:
             api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
@@ -435,11 +460,11 @@ class SweBenchGenerationTask(GenerationTask):
             trajectory_dict = json.loads(f.read())
 
         # Check if the trajectory has an empty patch before running evaluation
-        has_patch = trajectory_dict['model_patch'] is not None
+        has_patch = trajectory_dict["model_patch"] is not None
 
         if not has_patch:
             report_json = {
-                data_point['instance_id']: {
+                data_point["instance_id"]: {
                     "resolved": False,
                     "patch_exists": False,
                     "patch_successfully_applied": False,
@@ -482,9 +507,9 @@ class SweBenchGenerationTask(GenerationTask):
                     timeout=self.cfg.swebench_tests_timeout + 120,
                 )
             except ValueError:
-                LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point['instance_id'])
+                LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point["instance_id"])
                 report_json = {
-                    data_point['instance_id']: {
+                    data_point["instance_id"]: {
                         "resolved": False,
                         "patch_exists": True,
                         "patch_successfully_applied": False,
@@ -493,11 +518,11 @@ class SweBenchGenerationTask(GenerationTask):
                 report_file = None
 
             if report_file is not None:
-                with open(report_file, 'r') as f:
+                with open(report_file, "r") as f:
                     report_json = json.loads(f.read().strip())
 
         output_dict = {
-            "swe-bench-metrics": report_json[data_point['instance_id']],
+            "swe-bench-metrics": report_json[data_point["instance_id"]],
             "swe-bench-outputs": trajectory_dict,
             "generation": "",  # required TODO: we should fix this
         }
@@ -509,7 +534,7 @@ GENERATION_TASK_CLASS = SweBenchGenerationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_swebench_generation_config')
+@hydra.main(version_base=None, config_name="base_swebench_generation_config")
 def swebench_generation(cfg: SweBenchGenerationConfig):
     cfg = SweBenchGenerationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -524,7 +549,7 @@ HELP_MESSAGE = get_help_message(
 )
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

@@ -26,7 +26,6 @@ from nemo_skills.pipeline.utils import (
     check_mounts,
     get_cluster_config,
     get_exp,
-    get_free_port,
     get_mounted_path,
     get_timeout,
     resolve_mount_paths,
@@ -97,12 +96,15 @@ configs = {
     TrainingAlgo.rm: "rm_config",
 }
 
-rl_extra_args_fn = lambda params: (
-    f" ++model.data.data_prefix.train='[{params.training_data}]' "
-    f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
-    f" ++model.data.data_prefix.test='[{params.validation_data}]' "
-    f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
-)
+
+def rl_extra_args_fn(params):
+    return (
+        f" ++model.data.data_prefix.train='[{params.training_data}]' "
+        f" ++model.data.data_prefix.validation='[{params.validation_data}]' "
+        f" ++model.data.data_prefix.test='[{params.validation_data}]' "
+        f" pretrained_checkpoint.restore_from_path={params.nemo_model} " + params.extra_arguments
+    )
+
 
 get_extra_arguments: dict[TrainingAlgo, Callable[[TrainingParams], str]] = {
     TrainingAlgo.sft: lambda params: (
@@ -172,7 +174,7 @@ def get_training_cmd(
 
 def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
     if not disable_wandb:
-        if os.getenv('WANDB_API_KEY') is None:
+        if os.getenv("WANDB_API_KEY") is None:
             raise ValueError("WANDB_API_KEY is not set. Use --disable_wandb to disable wandb logging")
         wandb_id = expname + ("-" + wandb_group if wandb_group else "") + "-" + wandb_project
         logging_params = (
@@ -191,9 +193,9 @@ def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
 
 def get_checkpoint_cmd(nemo_model, output_dir, final_nemo_path, average_steps):
     if average_steps is not None:
-        average_steps = f"--steps {' '.join(average_steps.split(','))} " if average_steps != 'all' else ''
+        average_steps = f"--steps {' '.join(average_steps.split(','))} " if average_steps != "all" else ""
         entrypoint = "nemo_skills.training.average_checkpoints"
-        name = "model" + ("-".join(average_steps[len('--steps ') :].split()) if average_steps else '') + "-averaged"
+        name = "model" + ("-".join(average_steps[len("--steps ") :].split()) if average_steps else "") + "-averaged"
     else:
         entrypoint = "nemo_skills.training.copy_checkpoint"
         name = "model-last"
@@ -233,7 +235,7 @@ def train(
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     training_algo: TrainingAlgo = typer.Option(TrainingAlgo.sft, help="Training algorithm"),
     config_name: str = typer.Option(None, help="Config name"),
-    config_path: str = typer.Option('/nemo_run/code/nemo_skills/training/', help="Config path"),
+    config_path: str = typer.Option("/nemo_run/code/nemo_skills/training/", help="Config path"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -241,9 +243,8 @@ def train(
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     average_steps: str = typer.Option(
-        'all',
-        help="List of commas separated checkpoint steps to average. E.g 1000,5000. "
-        "If None, skip prepare eval stage.",
+        "all",
+        help="List of commas separated checkpoint steps to average. E.g 1000,5000. If None, skip prepare eval stage.",
     ),
     save_last_ckpt: bool = typer.Option(
         False,
@@ -276,6 +277,10 @@ def train(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
@@ -288,7 +293,7 @@ def train(
     (need to be prefixed with ++, since NeMo uses Hydra).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -355,7 +360,7 @@ def train(
             prev_task = add_task(
                 exp,
                 cmd=train_cmd,
-                task_name=f'{expname}-{training_algo}-{job_id}',
+                task_name=f"{expname}-{training_algo}-{job_id}",
                 log_dir=f"{log_dir}/training-logs",
                 container=container,
                 num_gpus=num_gpus,
@@ -371,6 +376,7 @@ def train(
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
 
         if average_steps or save_last_ckpt:
@@ -386,7 +392,7 @@ def train(
                 cmd=cmd,
                 task_name=f"{expname}-prepare-eval",
                 log_dir=f"{log_dir}/prepare-eval-logs",
-                container=cluster_config["containers"]['nemo'],
+                container=cluster_config["containers"]["nemo"],
                 cluster_config=cluster_config,
                 partition=partition,
                 time_min=time_min,
@@ -399,6 +405,7 @@ def train(
                 task_dependencies=[prev_task] if prev_task is not None else None,
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
             )
 
         # explicitly setting sequential to False since we set dependencies directly

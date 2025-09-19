@@ -85,10 +85,10 @@ subcategories = {
 
 # dataset preparing strategy adapted from ZeroEval (https://github.com/WildEval/ZeroEval/blob/main/data_prep/mmlu-redux.py)
 def format_entry(entry, category):
-    if entry['error_type'] == "ok":
-        final_answer = chr(65 + entry['answer'])
-    elif entry['error_type'] == "wrong_groundtruth" and entry['correct_answer'] in list("ABCD"):
-        final_answer = 'correct_answer'
+    if entry["error_type"] == "ok":
+        final_answer = chr(65 + entry["answer"])
+    elif entry["error_type"] == "wrong_groundtruth" and entry["correct_answer"] in list("ABCD"):
+        final_answer = "correct_answer"
     else:
         # bad_question_clarity, bad_options_clarity, no_correct_answer,
         # multiple_correct_answers, expert and wrong_groundtruth with no labels
@@ -97,7 +97,7 @@ def format_entry(entry, category):
         "expected_answer": final_answer,
         "subset_for_metrics": subcategories[category][0],
         "subcategory": category,
-        "source": entry['source'],
+        "source": entry["source"],
         **get_mcq_fields(entry["question"], entry["choices"]),
     }
 
@@ -123,7 +123,7 @@ def main(args):
 
     # Load the dataset and write it to the output
     for category in tqdm(subcategories):
-        dataset = load_dataset("edinburgh-dawg/mmlu-redux-2.0", name=category, split='test')
+        dataset = load_dataset("edinburgh-dawg/mmlu-redux-2.0", name=category, split="test")
         write_data_to_file(output_file, dataset, category)
 
 

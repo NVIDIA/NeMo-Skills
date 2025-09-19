@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import logging
 import sys
-import time
-import asyncio
-from collections import defaultdict
 from dataclasses import field
 
 import hydra
-from tqdm import tqdm
 
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
@@ -75,17 +72,17 @@ class CheckContaminationTask(GenerationTask):
 
         # Adjust the batch size to account for the number of similar items
         if self.cfg.top_k is None:
-            self.cfg.top_k = len(data[0]['similar_items'])
+            self.cfg.top_k = len(data[0]["similar_items"])
 
         return data
 
     def log_example_prompt(self, data):
         data_point = data[0]
         query_item = data_point[self.cfg.retrieve_key]
-        similar_item = data_point['similar_items'][0]
+        similar_item = data_point["similar_items"][0]
         first_element = {
-            f'{self.cfg.retrieve_key}1': query_item,
-            f'{self.cfg.retrieve_key}2': similar_item,
+            f"{self.cfg.retrieve_key}1": query_item,
+            f"{self.cfg.retrieve_key}2": similar_item,
         }
         LOG.info(
             "Example prompt:\nData dictionary: %s\nPrompt: %s",
@@ -96,19 +93,19 @@ class CheckContaminationTask(GenerationTask):
     def _create_query_data(self, data_point):
         """Create query instances given the original instance"""
         query_data = []
-        for similar_item in data_point['similar_items'][: self.cfg.top_k]:
+        for similar_item in data_point["similar_items"][: self.cfg.top_k]:
             query_data.append(
                 {
-                    f'{self.cfg.retrieve_key}1': data_point[self.cfg.retrieve_key],
-                    f'{self.cfg.retrieve_key}2': similar_item,
+                    f"{self.cfg.retrieve_key}1": data_point[self.cfg.retrieve_key],
+                    f"{self.cfg.retrieve_key}2": similar_item,
                 }
             )
 
             if self.cfg.check_both_ways:
                 query_data.append(
                     {
-                        f'{self.cfg.retrieve_key}2': data_point[self.cfg.retrieve_key],
-                        f'{self.cfg.retrieve_key}1': similar_item,
+                        f"{self.cfg.retrieve_key}2": data_point[self.cfg.retrieve_key],
+                        f"{self.cfg.retrieve_key}1": similar_item,
                     }
                 )
 
@@ -116,7 +113,7 @@ class CheckContaminationTask(GenerationTask):
 
     def prefill_generation(self, data_point):
         """Prefill contamination if there is a string match between the problem and the similar items"""
-        for similar_item in data_point['similar_items']:
+        for similar_item in data_point["similar_items"]:
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
                 return {"generation": True}
         return None
@@ -124,27 +121,24 @@ class CheckContaminationTask(GenerationTask):
     async def process_single_datapoint(self, data_point, all_data):
         """Process a single data point by running contamination checks on all similar items."""
         query_data = self._create_query_data(data_point)
-        
+
         # Create tasks for all queries using super().process_single_datapoint
         tasks = []
         for query_point in query_data:
             tasks.append(super().process_single_datapoint(query_point, all_data))
-        
+
         query_results = await asyncio.gather(*tasks)
-        
+
         # Process results to determine if contaminated
         all_generations = []
         contaminated = False
         for result in query_results:
-            generation = result['generation']
+            generation = result["generation"]
             all_generations.append(generation)
             if generation.strip() == "True":
                 contaminated = True
-        
-        return {
-            "all_generations": all_generations,
-            "generation": contaminated
-        }
+
+        return {"all_generations": all_generations, "generation": contaminated}
 
     def postprocess(self):
         """Postprocess the output file to calculate the contamination portion."""
@@ -164,7 +158,7 @@ GENERATION_TASK_CLASS = CheckContaminationTask
 
 
 # Update the hydra main to use the class method
-@hydra.main(version_base=None, config_name='base_check_contamination_config')
+@hydra.main(version_base=None, config_name="base_check_contamination_config")
 def check_contamination(cfg: CheckContaminationConfig):
     cfg = CheckContaminationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
@@ -179,7 +173,7 @@ HELP_MESSAGE = get_help_message(
 )
 
 if __name__ == "__main__":
-    if '--help' in sys.argv or '-h' in sys.argv:
+    if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
         setup_logging()

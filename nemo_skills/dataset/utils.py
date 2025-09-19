@@ -42,16 +42,16 @@ def add_to_path(p):
 
 def add_rounding_instruction(data: Dict) -> Dict:
     try:
-        float(data['expected_answer'])
+        float(data["expected_answer"])
         number_of_values = 0
-        if '.' in str(data['expected_answer']):
-            number_of_values = len(str(data['expected_answer']).split('.')[1])
+        if "." in str(data["expected_answer"]):
+            number_of_values = len(str(data["expected_answer"]).split(".")[1])
         if number_of_values == 0:
-            data['problem'] += ' Express the answer as an integer.'
+            data["problem"] += " Express the answer as an integer."
         elif number_of_values == 1:
-            data['problem'] += ' Round the answer to one decimal place.'
+            data["problem"] += " Round the answer to one decimal place."
         else:
-            data['problem'] += f' Round the answer to {number_of_values} decimal places.'
+            data["problem"] += f" Round the answer to {number_of_values} decimal places."
     except ValueError:
         pass
     return data
@@ -75,7 +75,7 @@ class ExtraDatasetType(str, Enum):
 def _get_dataset_module_from_cluster(cluster_config, mounted_path):
     # getting tmp path to download init.py
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = str(Path(tmpdir) / f"init.py")
+        tmp_path = str(Path(tmpdir) / "init.py")
         cluster_dataset_path = get_unmounted_path(cluster_config, mounted_path)
         try:
             cluster_download_file(cluster_config, cluster_dataset_path, tmp_path)
@@ -90,20 +90,20 @@ def _get_dataset_module_from_cluster(cluster_config, mounted_path):
 def get_default_dataset_module(dataset, data_dir=None, cluster_config=None):
     is_on_cluster = False
     if data_dir is None:
-        data_path = '/nemo_run/code/nemo_skills/dataset'
+        data_path = "/nemo_run/code/nemo_skills/dataset"
         dataset_module = importlib.import_module(f"nemo_skills.dataset.{dataset}")
     else:
         data_path = data_dir
-        if cluster_config is None or cluster_config['executor'] == 'none':
+        if cluster_config is None or cluster_config["executor"] == "none":
             with add_to_path(data_dir):
                 dataset_module = importlib.import_module(dataset)
         else:
-            if cluster_config['executor'] == 'local':
+            if cluster_config["executor"] == "local":
                 with add_to_path(get_unmounted_path(cluster_config, data_dir)):
                     dataset_module = importlib.import_module(dataset)
             else:
-                dataset = dataset.replace('.', '/')
-                dataset_module = _get_dataset_module_from_cluster(cluster_config, f'{data_dir}/{dataset}/__init__.py')
+                dataset = dataset.replace(".", "/")
+                dataset_module = _get_dataset_module_from_cluster(cluster_config, f"{data_dir}/{dataset}/__init__.py")
                 is_on_cluster = True
     return dataset_module, data_path, is_on_cluster
 
@@ -126,7 +126,7 @@ def get_dataset_module(dataset, data_dir=None, cluster_config=None, extra_datase
         dataset_module, data_path, is_on_cluster = get_default_dataset_module(dataset, data_dir, cluster_config)
     except ModuleNotFoundError:
         try:
-            dataset = dataset.replace('.', '/')
+            dataset = dataset.replace(".", "/")
             extra_datasets = extra_datasets or os.environ.get("NEMO_SKILLS_EXTRA_DATASETS")
             is_on_cluster = False
             data_path = extra_datasets
@@ -227,7 +227,7 @@ def save_data_from_qwen(dataset, split="test"):
 
 
 def get_mcq_fields(question, choices):
-    options_dict = {chr(ord('A') + i): option for i, option in enumerate(choices)}
+    options_dict = {chr(ord("A") + i): option for i, option in enumerate(choices)}
     options_text = "\n".join(f"{letter}. {option}" for letter, option in options_dict.items())
     return {
         "problem": f"{question}\n{options_text}",

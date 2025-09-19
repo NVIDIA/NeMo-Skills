@@ -15,9 +15,10 @@
 
 # Derived from https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/model_handler/utils.py
 
-import json
 import copy
+import json
 import re
+
 from nemo_skills.dataset.bfcl_v3.constants import GORILLA_TO_OPENAPI
 
 
@@ -53,28 +54,24 @@ def func_doc_language_specific_pre_processing(function, test_category):
     if len(function) == 0:
         return function
 
-    assert type(function) == list
+    assert isinstance(function, list)
     for item in function:
         # Add language specific hints to the function description
-        item["description"] = item["description"] + _get_language_specific_hint(
-            test_category
-        )
+        item["description"] = item["description"] + _get_language_specific_hint(test_category)
         # Process the parameters
         properties = item["parameters"]["properties"]
         if test_category == "java":
             for key, value in properties.items():
                 if value["type"] == "any":
-                    properties[key][
-                        "description"
-                    ] += " This parameter can be of any type of Java object in string representation."
+                    properties[key]["description"] += (
+                        " This parameter can be of any type of Java object in string representation."
+                    )
                 else:
-                    value[
-                        "description"
-                    ] += f" This is Java {value['type']} type parameter in string representation."
+                    value["description"] += f" This is Java {value['type']} type parameter in string representation."
                 if value["type"] == "ArrayList" or value["type"] == "Array":
-                    value[
-                        "description"
-                    ] += f" The list elements are of type {value['items']['type']}; they are not in string representation."
+                    value["description"] += (
+                        f" The list elements are of type {value['items']['type']}; they are not in string representation."
+                    )
                     del value["items"]
 
                 value["type"] = "string"
@@ -82,24 +79,24 @@ def func_doc_language_specific_pre_processing(function, test_category):
         elif test_category == "javascript":
             for key, value in properties.items():
                 if value["type"] == "any":
-                    properties[key][
-                        "description"
-                    ] += " This parameter can be of any type of JavaScript object in string representation."
+                    properties[key]["description"] += (
+                        " This parameter can be of any type of JavaScript object in string representation."
+                    )
                 else:
-                    value[
-                        "description"
-                    ] += f" This is JavaScript {value['type']} type parameter in string representation."
+                    value["description"] += (
+                        f" This is JavaScript {value['type']} type parameter in string representation."
+                    )
                 if value["type"] == "array":
-                    value[
-                        "description"
-                    ] += f" The list elements are of type {value['items']['type']}; they are not in string representation."
+                    value["description"] += (
+                        f" The list elements are of type {value['items']['type']}; they are not in string representation."
+                    )
                     del value["items"]
 
                 if value["type"] == "dict":
                     if "properties" in value:  # not every dict has properties
-                        value[
-                            "description"
-                        ] += f" The dictionary entries have the following schema; they are not in string representation. {json.dumps(value['properties'])}"
+                        value["description"] += (
+                            f" The dictionary entries have the following schema; they are not in string representation. {json.dumps(value['properties'])}"
+                        )
                         del value["properties"]
 
                 value["type"] = "string"
@@ -130,22 +127,12 @@ def _cast_to_openai_type(properties, mapping):
 
         if properties[key]["type"] == "array" or properties[key]["type"] == "object":
             if "properties" in properties[key]:
-                properties[key]["properties"] = _cast_to_openai_type(
-                    properties[key]["properties"], mapping
-                )
+                properties[key]["properties"] = _cast_to_openai_type(properties[key]["properties"], mapping)
             elif "items" in properties[key]:
                 properties[key]["items"]["type"] = mapping[properties[key]["items"]["type"]]
-                if (
-                    properties[key]["items"]["type"] == "array"
-                    and "items" in properties[key]["items"]
-                ):
-                    properties[key]["items"]["items"]["type"] = mapping[
-                        properties[key]["items"]["items"]["type"]
-                    ]
-                elif (
-                    properties[key]["items"]["type"] == "object"
-                    and "properties" in properties[key]["items"]
-                ):
+                if properties[key]["items"]["type"] == "array" and "items" in properties[key]["items"]:
+                    properties[key]["items"]["items"]["type"] = mapping[properties[key]["items"]["items"]["type"]]
+                elif properties[key]["items"]["type"] == "object" and "properties" in properties[key]["items"]:
                     properties[key]["items"]["properties"] = _cast_to_openai_type(
                         properties[key]["items"]["properties"], mapping
                     )
@@ -160,10 +147,8 @@ def convert_to_tool(functions):
         item["name"] = re.sub(r"\.", "_", item["name"])
 
         item["parameters"]["type"] = "object"
-        item["parameters"]["properties"] = _cast_to_openai_type(
-            item["parameters"]["properties"], GORILLA_TO_OPENAPI
-        )
+        item["parameters"]["properties"] = _cast_to_openai_type(item["parameters"]["properties"], GORILLA_TO_OPENAPI)
 
         oai_tool.append({"type": "function", "function": item})
-        
+
     return oai_tool

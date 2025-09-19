@@ -21,9 +21,9 @@ URL = "https://raw.githubusercontent.com/google-research/google-research/master/
 
 if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
-    original_file = str(data_dir / f"input_data.jsonl")
+    original_file = str(data_dir / "input_data.jsonl")
     data_dir.mkdir(exist_ok=True)
-    output_file = str(data_dir / f"test.jsonl")
+    output_file = str(data_dir / "test.jsonl")
 
     urllib.request.urlretrieve(URL, original_file)
 

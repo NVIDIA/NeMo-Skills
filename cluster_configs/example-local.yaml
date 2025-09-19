@@ -16,11 +16,11 @@ executor: local
 
 containers:
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
-  vllm: igitman/nemo-skills-vllm:0.7.0
+  vllm: vllm/vllm-openai:v0.10.1.1
   sglang: igitman/nemo-skills-sglang:0.7.0
   nemo: igitman/nemo-skills-nemo:0.7.0
   megatron: igitman/nemo-skills-megatron:0.7.0
-  sandbox: igitman/nemo-skills-sandbox:0.7.0
+  sandbox: igitman/nemo-skills-sandbox:0.7.1
   nemo-skills: igitman/nemo-skills:0.7.0
   verl: igitman/nemo-skills-verl:0.7.0
   nemo-rl: igitman/nemo-skills-nemo-rl:0.7.0
@@ -36,3 +36,7 @@ containers:
 #   - /home/<username>/workspace:/workspace
 #   you can also override container libraries by directly mounting over them. E.g. to override NeMo-Aligner do
 #   - <...>/NeMo-Aligner:/opt/NeMo-Aligner
+
+# define any environment variables. Note that HF_HOME is required by default and needs to be a mounted path!
+# env_vars:
+#   - HF_HOME=/models/hf-cache

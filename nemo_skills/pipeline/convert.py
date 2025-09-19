@@ -73,7 +73,7 @@ def get_hf_to_trtllm_cmd(
 
     tmp_engine_dir = f"{output_model}-tmp-ckpt"
 
-    setup_cmd = f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
+    setup_cmd = "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && "
 
     if dtype == "fp8":
         hf_to_trtllm_cmd = (
@@ -236,6 +236,10 @@ def convert(
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
+    skip_hf_home_check: bool = typer.Option(
+        False,
+        help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
     installation_command: str | None = typer.Option(
         None,
         help="An installation command to run before main job. Only affects main task (not server or sandbox). "
@@ -253,7 +257,7 @@ def convert(
     All extra arguments are passed directly to the underlying conversion script (see their docs).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
-    extra_arguments = f'{" ".join(ctx.args)}'
+    extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting conversion job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
@@ -294,12 +298,22 @@ def convert(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    input_model, output_model, log_dir = check_mounts(
-        cluster_config,
-        log_dir=log_dir,
-        mount_map={input_model: '/input_model', output_model: '/output_model'},
-        check_mounted_paths=check_mounted_paths,
-    )
+    if convert_from == "hf" and not input_model.startswith("/"):
+        # For HF, we don't need to check the input_model path if the huggingface model name is used
+        output_model, log_dir = check_mounts(
+            cluster_config,
+            log_dir=log_dir,
+            mount_map={output_model: "/output_model"},
+            check_mounted_paths=check_mounted_paths,
+        )
+
+    else:
+        input_model, output_model, log_dir = check_mounts(
+            cluster_config,
+            log_dir=log_dir,
+            mount_map={input_model: "/input_model", output_model: "/output_model"},
+            check_mounted_paths=check_mounted_paths,
+        )
 
     if log_dir is None:
         log_dir = str(Path(output_model) / "conversion-logs")
@@ -352,6 +366,7 @@ def convert(
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
             installation_command=installation_command,
             task_dependencies=_task_dependencies,
+            skip_hf_home_check=skip_hf_home_check,
         )
         run_exp(exp, cluster_config, dry_run=dry_run)
 

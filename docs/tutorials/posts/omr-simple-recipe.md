@@ -50,21 +50,18 @@ To start, let's first evaluate the original model to see where it stands. We wil
 In this case let's use vllm as an inference library.
 
 ```shell
-# download the model
-ns run_cmd --expname=download-14b --log_dir=/workspace/Qwen2.5-14B-Instruct --cluster=local \
-    huggingface-cli download Qwen/Qwen2.5-14B-Instruct --local-dir /workspace/Qwen2.5-14B-Instruct
 # prepare benchmark data
 ns prepare_data aime24 aime25
 # launch evaluation
 ns eval \
     --cluster=local \
     --expname=baseline-eval \
-    --run_after=download-14b \
-    --model=/workspace/Qwen2.5-14B-Instruct \
+    --model=Qwen/Qwen2.5-14B-Instruct \
     --server_type=vllm \
     --server_gpus=8 \
     --benchmarks=aime24:8,aime25:8 \
-    --output_dir=/workspace/evals/baseline
+    --output_dir=/workspace/evals/baseline \
+    --num_jobs=1
 # summarize results, after the evaluation job is done
 ns summarize_results --cluster=local /workspace/evals/baseline --wandb_name=baseline-evals
 ```
@@ -133,8 +130,8 @@ generate(
     output_dir="/workspace/sdg/problems",
     postprocess_cmd=postprocess_cmd,
     expname="problem-extraction",
-    run_after=["prepare-data", "download-14b"],
-    model="/workspace/Qwen2.5-14B-Instruct",
+    run_after=["prepare-data"],
+    model="Qwen/Qwen2.5-14B-Instruct",
     server_type="vllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging
@@ -159,7 +156,7 @@ generate(
     output_dir="/workspace/sdg/solutions",
     expname="solution-generation",
     run_after="problem-extraction",
-    model="/workspace/QwQ-32B",
+    model="Qwen/QwQ-32B",
     server_type="trtllm",
     server_gpus=num_gpus,
     # remove these parameters to disable wandb logging
@@ -191,8 +188,7 @@ ns run_cmd --log_dir=/workspace/prepare-sft-data --expname=prepare-sft-data --ru
       ++tokenizer=Qwen/Qwen2.5-32B-Instruct \
       ++filters.remove_contaminated=false \
       ++add_unlabeled=true \
-      ++filters.remove_no_think_tags=true \
-      ++filters.trim_solutions=false'
+      ++filters.remove_no_think_tags=true
 ```
 
 Next, [convert the model](https://nvidia.github.io/NeMo-Skills/pipelines/checkpoint-conversion/) to NeMo format. You can skip this step for NeMo-RL training.
@@ -201,8 +197,7 @@ Next, [convert the model](https://nvidia.github.io/NeMo-Skills/pipelines/checkpo
 ns convert \
     --cluster=local \
     --expname=convert-14b-nemo \
-    --run_after=download-14b \
-    --input_model=/workspace/Qwen2.5-14B-Instruct \
+    --input_model=Qwen/Qwen2.5-14B-Instruct \
     --output_model=/workspace/qwen2.5-14b-instruct-nemo \
     --convert_from=hf \
     --convert_to=nemo \
@@ -238,22 +233,20 @@ For the NeMo-RL backend, use the following training command. Add `--disable_wand
 ns nemo_rl sft \
     --cluster=local \
     --expname=training \
-    --run_after=download-14b \
     --run_after=prepare-sft-data \
     --output_dir=/workspace/training \
     --hf_model=/workspace/Qwen2.5-14B-Instruct \
     --num_nodes=1 \
     --num_gpus=8 \
     --training_data=/workspace/sft-data.jsonl \
-    --backend=fsdp \
+    --backend=megatron \
     --final_hf_path=/workspace/training/qwen2.5-14b-improved-hf \
-    ++sft.max_num_epochs=4 \
-    ++policy.dtensor_cfg.tensor_parallel_size=8 \
     ++policy.max_total_sequence_length=8192 \
     ++policy.train_global_batch_size=32 \
-    ++policy.optimizer.kwargs.lr=1e-5 \
-    ++policy.dtensor_cfg.sequence_parallel=true \
-    ++policy.dtensor_cfg.activation_checkpointing=true
+    ++policy.megatron_cfg.tensor_model_parallel_size=4 \
+    ++policy.megatron_cfg.context_parallel_size=2 \
+    ++policy.lr=1e-5 \
+    ++sft.max_num_epochs=2
 ```
 
 To learn more about SFT configuration, see the [NeMo-Skills training](https://nvidia.github.io/NeMo-Skills/pipelines/training/) documentation. If you have W\&B logging enabled, you can inspect the training metrics there.
@@ -288,6 +281,7 @@ ns eval \
     --server_gpus=8 \
     --benchmarks=aime24:8,aime25:8 \
     --output_dir=/workspace/evals/after-training \
+    --num_jobs=1 \
     ++inference.tokens_to_generate=16384
 # summarize results, after the evaluation job is done
 ns summarize_results --cluster=local /workspace/evals/after-training --wandb_name=after-training-evals
@@ -318,4 +312,4 @@ You can also see it in the W&B dashboard. Switch to the Runs panel and click on 
 
 With NeMo-Skills, you can easily build sophisticated pipelines by connecting the various stages needed to improve LLM abilities. This enables you to seamlessly switch between different training and inference frameworks. All the commands used in this tutorial can be combined into a [single script](https://github.com/NVIDIA/NeMo-Skills/blob/main/recipes/openmathreasoning/scripts/simplified_recipe.py) that schedules the entire job. With just one line change, you can transition from quick prototyping on your local workstation to large-scale experiments on a Slurm cluster.
 
-As an exercise, try adding the extra filtering steps mentioned in the [OpenMathReasoning documentation](https://nvidia.github.io/NeMo-Skills/openmathreasoning1/dataset/). You can also try generating multiple solutions per problem and check how this affects final evaluation results. As you will see, having a single script that runs everything—from data generation to model training to evaluation—makes it very easy to iterate on changes to any part of the pipeline.
+As an exercise, try adding the extra filtering steps mentioned in the [OpenMathReasoning documentation](https://nvidia.github.io/NeMo-Skills/releases/openmathreasoning/dataset/). You can also try generating multiple solutions per problem and check how this affects final evaluation results. As you will see, having a single script that runs everything—from data generation to model training to evaluation—makes it very easy to iterate on changes to any part of the pipeline.

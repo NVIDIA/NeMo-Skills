@@ -14,22 +14,18 @@
 
 
 # copied from https://github.com/NVIDIA-NeMo/RL/blob/main/examples/converters/convert_megatron_to_hf.py
-# and added logic to figure out max step automatically 
+# and added logic to figure out max step automatically
 import argparse
 import os
 import re
 
 import yaml
-
 from nemo_rl.models.megatron.community_import import export_model_from_megatron
-
 
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Convert Torch DCP checkpoint to HF checkpoint"
-    )
+    parser = argparse.ArgumentParser(description="Convert Torch DCP checkpoint to HF checkpoint")
     parser.add_argument(
         "--config",
         type=str,
@@ -42,9 +38,7 @@ def parse_args():
         default=None,
         help="Path to Megatron checkpoint",
     )
-    parser.add_argument(
-        "--hf-ckpt-path", type=str, default=None, help="Path to save HF checkpoint"
-    )
+    parser.add_argument("--hf-ckpt-path", type=str, default=None, help="Path to save HF checkpoint")
 
     parser.add_argument(
         "--training-folder", type=str, default=None, help="Path to training folder containing step_X subfolders"
@@ -57,7 +51,6 @@ def parse_args():
     args = parser.parse_args()
 
     return args
-
 
 
 def find_max_step_folder(training_folder, step_override=None):
@@ -87,13 +80,9 @@ def find_max_step_folder(training_folder, step_override=None):
     return os.path.join(training_folder, f"step_{chosen_step}")
 
 
-
-
-
 def main():
     """Main entry point."""
     args = parse_args()
-
 
     if args.megatron_ckpt_path and args.training_folder:
         raise ValueError("Specify only one of --megatron-ckpt-path or --training-folder, not both.")
@@ -111,8 +100,6 @@ def main():
     else:
         megatron_ckpt_path = args.megatron_ckpt_path
         config_path = args.config
-
-
 
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)

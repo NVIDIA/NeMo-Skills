@@ -86,8 +86,8 @@ def test_get_mounted_path(mount_source, mount_dest, input_path, expected):
     and input paths, including trailing slashes and already-mounted paths.
     """
     cluster_config = {
-        'mounts': [f'{mount_source}:{mount_dest}'],
-        'executor': 'slurm',
+        "mounts": [f"{mount_source}:{mount_dest}"],
+        "executor": "slurm",
     }
 
     result = get_mounted_path(cluster_config, input_path)

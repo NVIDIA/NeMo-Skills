@@ -22,7 +22,7 @@ import tqdm
 from latex2sympy2_extended import NormalizationConfig, normalize_latex
 from math_verify import LatexExtractionConfig, StringExtractionConfig, parse, verify
 
-from nemo_skills.utils import get_logger_name, unroll_files
+from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -56,7 +56,7 @@ def math_equal(gt_answer, predicted_answer, take_modulo: int | None = None, **kw
         gt_answer = int(gt_answer) % take_modulo
         try:
             predicted_answer = int(predicted_answer) % take_modulo
-        except:
+        except Exception:
             predicted_answer = None
         # no need to simpy call in this case
         return predicted_answer == gt_answer

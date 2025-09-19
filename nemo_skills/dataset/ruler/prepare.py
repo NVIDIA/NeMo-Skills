@@ -29,11 +29,13 @@ EVAL_ARGS = "++eval_type=ruler ++eval_config.match_type={match_type}"
 GENERATION_ARGS = (
     "++prompt_config=generic/default "
     "++inference.tokens_to_generate={tokens_to_generate} "
+    # ruler is adding prefix for assistant response, so it has to go through completions api
     "++start_assistant_response_key=generation "
+    "++use_completions_api=True "
 )
 """
-TOKENS_TO_GENERATE = {'niah': 128, 'vt': 30, 'cwe': 120, 'fwe': 50, 'qa': 32}
-MATCH_TYPE = {'niah': 'all', 'vt': 'all', 'cwe': 'all', 'fwe': 'all', 'qa': 'part'}
+TOKENS_TO_GENERATE = {"niah": 128, "vt": 30, "cwe": 120, "fwe": 50, "qa": 32}
+MATCH_TYPE = {"niah": "all", "vt": "all", "cwe": "all", "fwe": "all", "qa": "part"}
 
 
 def prepare_task_for_ns(task, data_dir, setup):
@@ -49,12 +51,12 @@ def prepare_task_for_ns(task, data_dir, setup):
                 "question": original_entry["input"],
                 "expected_answer": original_entry["outputs"],
                 "length": original_entry["length"],
-                "generation": original_entry['answer_prefix'],
+                "generation": original_entry["answer_prefix"].strip(),
             }
             fout.write(json.dumps(new_entry) + "\n")
 
     with open(new_path.parent / "__init__.py", "w", encoding="utf-8") as init_file:
-        short_name = task.split('_')[0]
+        short_name = task.split("_")[0]
         init_file.write(
             DEFAULT_SETTINGS.format(
                 match_type=MATCH_TYPE[short_name],
@@ -64,7 +66,7 @@ def prepare_task_for_ns(task, data_dir, setup):
 
 
 def get_ruler_data(tasks, setup, template_tokens, max_seq_length, ruler_prepare_args, tmp_data_dir=None):
-    if 'cwe' in tasks:
+    if "cwe" in tasks:
         # checking if git-lfs is installed
         try:
             subprocess.run(
@@ -175,10 +177,10 @@ if __name__ == "__main__":
         help="Sequence length to check with RULER.",
     )
     parser.add_argument(
-        '--template_tokens',
+        "--template_tokens",
         type=int,
-        default=10,
-        help='Number of tokens in chat template (will be subtracted from max_seq_length to not exceed max context)',
+        default=50,
+        help="Number of tokens in chat template (will be subtracted from max_seq_length to not exceed max context)",
     )
     parser.add_argument(
         "--tmp_data_dir",

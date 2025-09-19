@@ -14,9 +14,11 @@
 
 import json
 import logging
-from tqdm import tqdm
-from nemo_skills.utils import get_logger_name,  unroll_files
 from difflib import SequenceMatcher
+
+from tqdm import tqdm
+
+from nemo_skills.utils import get_logger_name, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -33,16 +35,12 @@ def eval_mrcr(cfg):
         answer = answer.removeprefix(random_string_to_prepend)
         return float(SequenceMatcher(None, response, answer).ratio())
 
-
-
     for file in unroll_files(cfg.input_files):
-        with open(file, 'rt', encoding='utf-8') as fin:
+        with open(file, "rt", encoding="utf-8") as fin:
             data = [json.loads(line) for line in fin]
-        with open(file, 'wt', encoding='utf-8') as fout:
+        with open(file, "wt", encoding="utf-8") as fout:
             for sample in tqdm(data):
-                sample['seq_match_ratio'] = grade(
-                    sample['generation'], 
-                    sample['expected_answer'], 
-                    sample['random_string_to_prepend']
-                    )
+                sample["seq_match_ratio"] = grade(
+                    sample["generation"], sample["expected_answer"], sample["random_string_to_prepend"]
+                )
                 fout.write(json.dumps(sample) + "\n")

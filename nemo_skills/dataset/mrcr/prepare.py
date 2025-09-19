@@ -13,7 +13,6 @@
 # limitations under the License.
 import argparse
 import json
-import subprocess
 from pathlib import Path
 
 import tiktoken
@@ -45,7 +44,7 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset):
         for idx, entry in tqdm(enumerate(data), desc=f"Writing {output_file.name}"):
             messages = json.loads(entry.pop("prompt"))
 
-            if entry['n_needles'] not in needles_subset:
+            if entry["n_needles"] not in needles_subset:
                 print(f"Skipping {idx} because it has {entry['n_needles']} needle")
                 continue
 
@@ -55,16 +54,16 @@ def write_data_to_file(output_file, data, max_context_window, needles_subset):
                 if n_tokens > max_context_window:
                     print(f"Skipping {idx} because it has {n_tokens} tokens")
                     continue
-                
-            entry['messages'] = messages
-            entry['expected_answer'] = entry.pop('answer')
-            entry['n_tokens'] = n_tokens
+
+            entry["messages"] = messages
+            entry["expected_answer"] = entry.pop("answer")
+            entry["n_tokens"] = n_tokens
             json.dump(entry, fout)
             fout.write("\n")
 
 
 def get_mrcr_data(needles_subset, setup, max_context_window):
-    dataset = load_dataset("openai/mrcr")['train']
+    dataset = load_dataset("openai/mrcr")["train"]
     data_dir = Path(__file__).absolute().parent
 
     output_file = data_dir / f"{setup}.jsonl"

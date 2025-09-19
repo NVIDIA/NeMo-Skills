@@ -17,9 +17,9 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics
 
 class MRCRMetrics(BaseMetrics):
     """Metrics for MRCR (Multi-Round Coreference) evaluation."""
-    
+
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
-        return {"accuracy": prediction['seq_match_ratio']}
+        return {"accuracy": prediction["seq_match_ratio"]}
 
     def update(self, predictions):
         super().update(predictions)

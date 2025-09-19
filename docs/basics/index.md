@@ -98,32 +98,28 @@ config might look like
 executor: local
 
 containers:
-  trtllm: igitman/nemo-skills-trtllm:0.7.0
-  vllm: igitman/nemo-skills-vllm:0.7.0
+  trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
+  vllm: vllm/vllm-openai:v0.10.1.1
   nemo: igitman/nemo-skills-nemo:0.7.0
   # ... there are some more containers defined here
 
 env_vars:
-  - HUGGINGFACE_HUB_CACHE=/hf_models
+  - HF_HOME=/models
 
 mounts:
-  - /mnt/datadrive/hf_models:/hf_models
-  - /mnt/datadrive/trt_models:/trt_models
-  - /mnt/datadrive/nemo_models:/nemo_models
+  - /mnt/datadrive/models:/models
   - /home/igitman/workspace:/workspace
 ```
 
 To generate one for you, run `ns setup` and follow
 the prompts to define your configuration. Choose `local` for the config type/name and define some mount for your `/workspace`
-and another mount[^1] for `/hf_models`, e.g.
+and another mount[^1] for `/models`, e.g.
 
 ```bash
-/home/<username>:/workspace,/home/<username>/models/hf_models:/hf_models
+/home/<username>:/workspace,/home/<username>/models:/models
 ```
 
 [^1]: Of course you can use a single mount if you'd like or define more than 2 mounts
-
-Also add `HUGGINGFACE_HUB_CACHE=/hf_models` when asked to add environment variables.
 
 !!! note
 
@@ -230,7 +226,7 @@ output_dir = f"/workspace/{expname}"
 run_cmd( # (1)!
     ctx=wrap_arguments(
         f'pip install -U "huggingface_hub[cli]" && '
-        f'huggingface-cli download Qwen/QwQ-32B --local-dir {output_dir}/QwQ-32B'
+        f'hf download Qwen/QwQ-32B --local-dir {output_dir}/QwQ-32B'
     ),
     cluster=cluster,
     expname=f"{expname}-download-hf",
@@ -243,7 +239,7 @@ eval(
         "++inference.temperature=0.6"
     ),
     cluster=cluster,
-    model=f"{output_dir}/qwq-32b-trtllm",
+    model=f"{output_dir}/QwQ-32B",
     server_type="trtllm",
     output_dir=f"{output_dir}/results/",
     run_after=f"{expname}-download-hf", # (3)!

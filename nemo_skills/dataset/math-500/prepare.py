@@ -36,7 +36,7 @@ if __name__ == "__main__":
         for index, line in enumerate(fin):
             entry = json.loads(line)
             entry["expected_answer"] = entry.pop("answer")
-            entry['reference_solution'] = entry.pop('solution')
+            entry["reference_solution"] = entry.pop("solution")
             data.append(entry)
 
     with open(output_file, "wt", encoding="utf-8") as fout:

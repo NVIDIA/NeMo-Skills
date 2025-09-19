@@ -1,0 +1,17 @@
+# Prompt for synthesizing a new solution from a list of candidate solutions
+# TODO:
+
+user: |-
+  You will be given a problem followed by {num_solutions} candidate solutions. Synthesize a new, improved solution by combining the best elements from these candidates.
+
+  Problem: {problem}
+
+  Solutions:
+  {solutions}
+
+  End your response with exactly:
+  <NEW_SOLUTION>
+  [your complete solution here]
+  </NEW_SOLUTION>
+
+  CRITICAL: Your solution inside the tags MUST follow the exact format requirements specified in the problem description above. Do NOT write anything after the closing </NEW_SOLUTION> tag.

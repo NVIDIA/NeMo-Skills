@@ -37,7 +37,7 @@ def format_entry(entry):
 def write_data_to_file(output_file, data, split):
     with open(output_file, "wt", encoding="utf-8") as fout:
         for entry in tqdm(data, desc=f"Writing {output_file.name}"):
-            if split == 'math' and entry["category"] != "Math":
+            if split == "math" and entry["category"] != "Math":
                 continue
             if entry["image"]:
                 continue
@@ -56,22 +56,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
     dataset = load_dataset("cais/hle", split="test")
     columns_to_keep = [
-        'id',
-        'question',
-        'answer',
-        'answer_type',
-        'rationale',
-        'raw_subject',
-        'category',
-        'author_name',
-        'canary',
-        'image',
+        "id",
+        "question",
+        "answer",
+        "answer_type",
+        "rationale",
+        "raw_subject",
+        "category",
+        "author_name",
+        "canary",
+        "image",
     ]
     dataset = dataset.remove_columns([col for col in dataset.column_names if col not in columns_to_keep])
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    if args.split == 'all':
-        for split in ['text', 'math']:
+    if args.split == "all":
+        for split in ["text", "math"]:
             output_file = data_dir / f"{split}.jsonl"
             write_data_to_file(output_file, dataset, split)
     else:

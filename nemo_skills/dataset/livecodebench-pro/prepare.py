@@ -17,15 +17,15 @@ from pathlib import Path
 
 from datasets import load_dataset
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
-    output_file = str(data_dir / f"test.jsonl")
+    output_file = str(data_dir / "test.jsonl")
 
     dataset = load_dataset("anonymous1926/anonymous_dataset")
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         for split_name, split in dataset.items():
             for row in split:
-                row['task_id'] = row.pop('problem_id')
-                row['question'] = row.pop('problem_statement')
-                row['split'] = split_name
-                f.write(json.dumps(row) + '\n')
+                row["task_id"] = row.pop("problem_id")
+                row["question"] = row.pop("problem_statement")
+                row["split"] = split_name
+                f.write(json.dumps(row) + "\n")

@@ -14,22 +14,23 @@
 
 import abc
 import math
-import random
 from collections import Counter, defaultdict
+
+import numpy as np
 
 
 # Base class for metrics computation
 class BaseMetrics(abc.ABC):
-
-    def __init__(self):
+    def __init__(self, compute_no_answer: bool = True):
+        self.compute_no_answer = compute_no_answer
         self.reset()
 
     def update_common_metrics(self, agg_dict):
         agg_dict["num_entries"] = self.total
         if self.avg_tokens > 0:
-            agg_dict['avg_tokens'] = int(self.avg_tokens / self.total)
-        if self.max_end_time > float('-inf') and self.min_start_time < float('inf'):
-            agg_dict['gen_seconds'] = int(self.max_end_time - self.min_start_time)
+            agg_dict["avg_tokens"] = int(self.avg_tokens / self.total)
+        if self.max_end_time > float("-inf") and self.min_start_time < float("inf"):
+            agg_dict["gen_seconds"] = int(self.max_end_time - self.min_start_time)
 
     def get_metrics(self):
         metrics_dict = {}
@@ -42,7 +43,83 @@ class BaseMetrics(abc.ABC):
                     metrics_dict[agg_mode][metric_key] = 100.0 * metric_value / self.total
                 else:
                     metrics_dict[agg_mode][metric_key] = metric_value
+        self._add_std_metrics(metrics_dict)
         return metrics_dict
+
+    def _add_std_metrics(self, metrics_dict):
+        """Add average, standard deviation and standard error metrics.
+
+        Only processes data when self.max_k > 1 and sample data is available in self.all_scores.
+
+        Adds four statistical metrics:
+        - {score_method}_avg: Average of metric values
+        - {score_method}_std_dev_across_runs: Standard deviation of average metric values across runs
+        - {score_method}_std_err_across_runs: Standard error of average metric values across runs
+        - {score_method}_avg_sample_std_dev: Average of per-sample standard deviations
+
+        Computes two complementary variance measures:
+
+        1. std_dev_across_runs: Standard deviation of average metric values across runs
+           - Each "run" uses attempt i from each sample (transpose of data)
+           - Measures: "How much does the average metric value vary between different runs?"
+           - std_err_across_runs: std_dev_across_runs / sqrt(k) where k is number of runs
+
+        2. avg_sample_std_dev: Average of per-sample standard deviations
+           - For each sample, calculates standard deviation across its k attempts, then averages
+           - Measures: "What's the average within-sample variance?"
+
+        Only adds columns to pass@1[avg-of-{k}] that must exist in the passed metrics_dict.
+
+        Example (max_k=4):
+            3 samples × 4 attempts = [[1,0,1,0], [1,1,0,0], [0,1,1,1]]
+
+            Standard deviation and error of average metric values across runs (transpose):
+            - Run 1: [1,1,0] → avg 0.6667
+            - Run 2: [0,1,1] → avg 0.6667
+            - Run 3: [1,0,1] → avg 0.6667
+            - Run 4: [0,0,1] → avg 0.3333
+            → std_dev_across_runs = stdev([0.6667, 0.6667, 0.6667, 0.3333]) ≈ 0.1925
+            → std_err_across_runs = 0.1925 / sqrt(4) ≈ 0.096
+
+            Average of per-sample standard deviations:
+            - Sample 1: stdev([1,0,1,0]) ≈ 0.5773
+            - Sample 2: stdev([1,1,0,0]) ≈ 0.5773
+            - Sample 3: stdev([0,1,1,1]) ≈ 0.5000
+            → avg_sample_std_dev = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
+        """
+        for score_method, scores_list in self.all_scores.items():
+            for scores in scores_list:
+                assert len(scores) == self.max_k, f"Sample has {len(scores)} scores but expected {self.max_k}"
+
+            for k in range(2, self.max_k + 1):
+                # Average of metric values across runs
+                avg = np.mean([np.mean(scores[:k]) for scores in scores_list])
+
+                # Standard deviation and error of average metric values across runs
+                run_scores = [[] for _ in range(k)]
+                for scores in scores_list:
+                    for i, score in enumerate(scores[:k]):
+                        run_scores[i].append(score)
+                run_averages = [np.mean(scores) for scores in run_scores]
+                std_dev_across_runs = np.std(run_averages, ddof=1)
+                std_err_across_runs = std_dev_across_runs / math.sqrt(k)
+
+                # Average of per-sample standard deviations
+                sample_std_devs = []
+                for scores in scores_list:
+                    sample_std_devs.append(np.std(scores[:k], ddof=1))
+                avg_sample_std_dev = sum(sample_std_devs) / len(sample_std_devs)
+
+                # Update metrics dictionary
+                std_metrics = {
+                    f"{score_method}_statistics": {
+                        "avg": avg,
+                        "std_dev_across_runs": std_dev_across_runs,
+                        "avg_sample_std_dev": avg_sample_std_dev,
+                        "std_err_across_runs": std_err_across_runs,
+                    },
+                }
+                metrics_dict[f"pass@1[avg-of-{k}]"].update(std_metrics)
 
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         """
@@ -75,16 +152,38 @@ class BaseMetrics(abc.ABC):
         if self.max_k == 0:
             self.max_k = len(predictions)
         self.avg_tokens += sum(
-            pred['num_generated_tokens'] for pred in predictions if 'num_generated_tokens' in pred
+            pred["num_generated_tokens"] for pred in predictions if "num_generated_tokens" in pred
         ) / len(predictions)
+
+        # Handle token data
+        reasoning_tokens = []
+        answer_tokens = []
+
+        for pred in predictions:
+            reasoning_count = pred.get("num_reasoning_tokens", 0)
+            answer_count = pred.get("num_answer_tokens", 0)
+
+            # Fallback: if no separate breakdown available, count all as answer tokens
+            if reasoning_count == 0 and answer_count == 0 and "num_generated_tokens" in pred:
+                answer_count = pred["num_generated_tokens"]
+
+            reasoning_tokens.append(reasoning_count)
+            answer_tokens.append(answer_count)
+
+        if reasoning_tokens:
+            self.all_scores["reasoning_tokens"].append(reasoning_tokens)
+
+        if answer_tokens:
+            self.all_scores["answer_tokens"].append(answer_tokens)
+
         try:
             self.min_start_time = min(
                 self.min_start_time,
-                min(pred['generation_start_time'] for pred in predictions if 'generation_start_time' in pred),
+                min(pred["generation_start_time"] for pred in predictions if "generation_start_time" in pred),
             )
             self.max_end_time = max(
                 self.max_end_time,
-                max(pred['generation_end_time'] for pred in predictions if 'generation_end_time' in pred),
+                max(pred["generation_end_time"] for pred in predictions if "generation_end_time" in pred),
             )
         except ValueError:  # min of empty sequence
             pass
@@ -93,18 +192,18 @@ class BaseMetrics(abc.ABC):
         self.total = 0
         self.max_k = 0
         self.avg_tokens = 0
-        self.min_start_time = float('inf')
-        self.max_end_time = float('-inf')
+        self.min_start_time = float("inf")
+        self.max_end_time = float("-inf")
         self.eval_dict = defaultdict(lambda: defaultdict(float))
+        self.all_scores: dict[str, list[list[bool | int | float]]] = defaultdict(list)
 
-    @classmethod
-    def get_incorrect_sample(cls, predictions: list[dict]) -> list[dict]:
+    def get_incorrect_sample(self, predictions: list[dict]) -> list[dict]:
         """Needs to replace predictions with something that evaluates as incorrect.
 
         This is used in filtering based on length, where we want to automatically grade
         all solutions longer than a specified threshold as incorrect.
         """
-        raise NotImplementedError(f"Needs to be implemented in metrics class to support filtering on length.")
+        raise NotImplementedError("Needs to be implemented in metrics class to support filtering on length.")
 
     def _update_score_metrics_for_majority(
         self,
@@ -203,8 +302,9 @@ class BaseMetrics(abc.ABC):
                     predictions=predictions,
                     predicted_answers=predicted_answers,
                 )
+            if self.compute_no_answer:
+                eval_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
 
-            eval_dict[f"majority@{k}"]["no_answer"] += all(answer is None for answer in predicted_answers[:k])
             self._update_metrics_for_majority(
                 eval_dict=eval_dict,
                 k=k,
@@ -268,13 +368,14 @@ class BaseMetrics(abc.ABC):
 
         for score_method in score_dicts[0].keys():
             scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
+            self.all_scores[score_method].append(scores_list)
 
             # Check if the task/instance has binary scores
             # For tasks like IF, the probabilistic logic for pass@k is not applicable
-            is_binary_score = (max(scores_list) == 1) and (min(scores_list) == 0)
+            is_binary_score = all([score in (0, 1, True, False) for score in scores_list])
 
             if is_binary_score:
-                total_correct = sum(scores_list)
+                total_correct = int(sum(scores_list))
                 total = len(scores_list)
                 total_incorrect = total - total_correct
 
@@ -309,7 +410,7 @@ class BaseMetrics(abc.ABC):
                     predicted_answers=predicted_answers,
                 )
 
-                if predicted_answers is not None:
+                if predicted_answers is not None and self.compute_no_answer:
                     no_answer_list = [pred_answer is None for pred_answer in predicted_answers[:k]]
                     eval_dict[f"pass@{k}"]["no_answer"] += all(no_answer_list)
                     eval_dict[f"pass@1[avg-of-{k}]"]["no_answer"] += sum(no_answer_list) / k
@@ -330,23 +431,31 @@ class BaseMetrics(abc.ABC):
 
     def evaluations_to_print(self):
         """We will log all pass/pass@1[avg-of-k] up to k, but only report the kth one."""
-        return [f'pass@1[avg-of-{self.max_k}]', f'majority@{self.max_k}', f'pass@{self.max_k}']
+        return [f"pass@1[avg-of-{self.max_k}]", f"majority@{self.max_k}", f"pass@{self.max_k}"]
 
 
-def as_percentage(metric_value):
+def as_percentage(metric_key: str, metric_value: float, all_metrics: dict):
+    if (metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs")) is not None:
+        return f"{metric_value:.2f}% ± {(100.0 * metric_std):.2f}%"
     return f"{metric_value:.2f}%"
 
 
-def as_int(metric_value):
+def as_int(metric_key: str, metric_value: float, all_metrics: dict):
+    if (metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs")) is not None:
+        return f"{int(metric_value)} ± {metric_std:.2f}"
     return f"{int(metric_value)}"
 
 
-def as_float(metric_value):
+def as_float(metric_key: str, metric_value: float, all_metrics: dict):
+    if (metric_std := all_metrics.get(f"{metric_key}_statistics", {}).get("std_dev_across_runs")) is not None:
+        return f"{float(metric_value):.2f} ± {metric_std:.2f}"
     return f"{float(metric_value):.2f}"
 
 
-def default_formatting(metric_value):
-    """Assumes floats are percentage and rest without changes."""
+def default_formatting(metric_key: str, metric_value, all_metrics: dict) -> str | None:
+    """Assumes floats are percentage, dicts shouldn't be printed and rest without changes."""
     if isinstance(metric_value, float):
-        return as_percentage(metric_value)
+        return as_percentage(metric_key, metric_value, all_metrics)
+    if isinstance(metric_value, dict):
+        return None
     return str(metric_value)
