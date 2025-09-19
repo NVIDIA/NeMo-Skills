@@ -404,9 +404,10 @@ class SweBenchGenerationTask(GenerationTask):
             "    echo 'This is because OpenHands DELETES EVERYTHING in the /workspace folder if it exists.' && "
             "    exit 1; "
             "fi && "
-            # install openhands repo + dependencies, or skip if it's already installed
+            # install openhands repo + dependencies, or skip if it's already installed (assuming with miniforge)
             "if [ -d /root/OpenHands ]; then "
-            "    cd /root/OpenHands; "
+            "    cd /root/OpenHands && "
+            '    eval "$(/root/miniforge3/bin/conda shell.bash hook); '
             "else "
             "    cd /root && "
             '    curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && '
