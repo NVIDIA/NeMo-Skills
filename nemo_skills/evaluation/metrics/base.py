@@ -29,6 +29,10 @@ class BaseMetrics(abc.ABC):
         agg_dict["num_entries"] = self.total
         if self.avg_tokens > 0:
             agg_dict["avg_tokens"] = int(self.avg_tokens / self.total)
+        if self.avg_reasoning_tokens > 0:
+            agg_dict["avg_reasoning_tokens"] = int(self.avg_reasoning_tokens / self.total)
+        if self.avg_answer_tokens > 0:
+            agg_dict["avg_answer_tokens"] = int(self.avg_answer_tokens / self.total)
         if self.max_end_time > float("-inf") and self.min_start_time < float("inf"):
             agg_dict["gen_seconds"] = int(self.max_end_time - self.min_start_time)
 
@@ -154,6 +158,36 @@ class BaseMetrics(abc.ABC):
         self.avg_tokens += sum(
             pred["num_generated_tokens"] for pred in predictions if "num_generated_tokens" in pred
         ) / len(predictions)
+
+        # Handle score data
+        score_dicts = [self._get_score_dict(pred) for pred in predictions]
+        for score_method in score_dicts[0].keys():
+            scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
+            self.all_scores[score_method].append(scores_list)
+
+        # Handle token data
+        reasoning_tokens = []
+        answer_tokens = []
+
+        for pred in predictions:
+            reasoning_count = pred.get("num_reasoning_tokens", 0)
+            answer_count = pred.get("num_answer_tokens", 0)
+
+            # Fallback: if no separate breakdown available, count all as answer tokens
+            if reasoning_count == 0 and answer_count == 0 and "num_generated_tokens" in pred:
+                answer_count = pred["num_generated_tokens"]
+
+            reasoning_tokens.append(reasoning_count)
+            answer_tokens.append(answer_count)
+
+        if reasoning_tokens:
+            self.avg_reasoning_tokens += sum(reasoning_tokens) / len(predictions)
+            self.all_scores["reasoning_tokens"].append(reasoning_tokens)
+
+        if answer_tokens:
+            self.avg_answer_tokens += sum(answer_tokens) / len(predictions)
+            self.all_scores["answer_tokens"].append(answer_tokens)
+
         try:
             self.min_start_time = min(
                 self.min_start_time,
@@ -170,6 +204,8 @@ class BaseMetrics(abc.ABC):
         self.total = 0
         self.max_k = 0
         self.avg_tokens = 0
+        self.avg_reasoning_tokens = 0
+        self.avg_answer_tokens = 0
         self.min_start_time = float("inf")
         self.max_end_time = float("-inf")
         self.eval_dict = defaultdict(lambda: defaultdict(float))
