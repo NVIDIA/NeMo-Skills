@@ -27,8 +27,7 @@ def compute_score(metrics: dict):
 
     ifbench = metrics["ifbench"]["pass@1[avg-of-5]"]["average_score"]
 
-    # TODO: Add AA-LCR Score. Currently using a placeholder value
-    aalcr = 0.0
+    aalcr = metrics["aalcr"]["pass@1[avg-of-3]"]["judge_correct"]
 
     math_score = aime25
     code_score = (scicode + livecodebench) / 2
