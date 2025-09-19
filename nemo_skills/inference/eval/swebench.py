@@ -106,6 +106,7 @@ class SweBenchGenerationConfig:
 
     no_dedicated_environments: bool = False
     openhands_preinstalled: bool = False
+    evaluate: bool = True
 
     apptainer_max_retries: int = 3
     apptainer_min_retry_interval: int = 0
@@ -329,6 +330,10 @@ class SweBenchGenerationTask(GenerationTask):
         search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
         pred_file = await self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
 
+        if not self.cfg.evaluate:
+            # No need to make pred_jsonl_file in this case
+            return None
+
         with open(pred_file, "r") as f:
             trajectory_dict = json.loads(f.read().strip())
 
@@ -441,7 +446,7 @@ class SweBenchGenerationTask(GenerationTask):
         search_path = os.path.join(self.output_dir / "trajectories", data_point["instance_id"], "output.jsonl")
         out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
 
-        if self.cfg.no_dedicated_environments:
+        if not self.cfg.evaluate:
             # No need to make output_for_eval.jsonl in this case
             return None
 
@@ -493,8 +498,8 @@ class SweBenchGenerationTask(GenerationTask):
                 f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
             )
 
-        if self.cfg.no_dedicated_environments:
-            # Can't run evaluation in this case, so return a dummy object
+        if not self.cfg.evaluate:
+            # Return a dummy object
             return {
                 "swe-bench-metrics": {
                     "resolved": None,
