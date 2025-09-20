@@ -41,14 +41,14 @@ class GenSelectSpecificConfig:
 @nested_dataclass(kw_only=True)
 class GenSynthesisSpecificConfig:
     prompt_config: str = "generic/gensynthesis"
-    regex: str = r"<NEW_SOLUTION>(.*?)</NEW_SOLUTION>"
+    regex: str = r"<SYNTHESIZED_SOLUTION>\s*(.*)"
 
 
 @nested_dataclass(kw_only=True)
 class GenHybridSpecificConfig:
     prompt_config: str = "generic/genhybrid"
     genselect_regex: str = r"Judg[e]?ment: (\d+)"
-    gensynthesis_regex: str = r"<SYNTHESIZED_SOLUTION>(.*?)</SYNTHESIZED_SOLUTION>"
+    gensynthesis_regex: str = r"<SYNTHESIZED_SOLUTION>\s*(.*)"
 
 
 @nested_dataclass(kw_only=True)
