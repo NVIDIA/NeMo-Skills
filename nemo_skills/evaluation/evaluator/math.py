@@ -16,7 +16,13 @@ import asyncio
 import logging
 from dataclasses import asdict, field
 
+from nemo_skills.code_execution.proof_utils import (
+    ProofBuildConfig,
+    build_lean4_proof,
+    determine_proof_status,
+)
 from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.evaluation.evaluator.base import BaseEvaluator
 from nemo_skills.evaluation.math_grader import batch_evaluate_results
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
@@ -37,13 +43,9 @@ class MathEvaluatorConfig:
 
 
 def eval_math(cfg):
-    eval_config = MathEvaluatorConfig(**cfg.eval_config)
-
-    eval_config = asdict(eval_config)
-    batch_evaluate_results(
-        input_files=cfg.input_files,
-        **eval_config,
-    )
+    """Legacy function - delegates to MathEvaluator class."""
+    evaluator = MathEvaluator(cfg.eval_config)
+    asyncio.run(evaluator.eval_full(cfg.input_files))
 
 
 @nested_dataclass(kw_only=True)
@@ -58,30 +60,108 @@ class LeanEvaluatorConfig:
 
 
 def eval_lean4_proof(cfg):
-    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
-
-    sandbox = get_sandbox(**eval_config.sandbox)
-    eval_config_dict = asdict(eval_config)
-    eval_config_dict.pop("sandbox")
-    asyncio.run(
-        sandbox.batch_evaluate_results(
-            input_files=cfg.input_files,
-            answer_format="lean4-proof",
-            **eval_config_dict,
-        )
-    )
+    """Legacy function - delegates to Lean4ProofEvaluator class."""
+    evaluator = Lean4ProofEvaluator(cfg.eval_config)
+    asyncio.run(evaluator.eval_full(cfg.input_files))
 
 
 def eval_lean4_statement(cfg):
-    eval_config = LeanEvaluatorConfig(**cfg.eval_config)
+    """Legacy function - delegates to Lean4StatementEvaluator class."""
+    evaluator = Lean4StatementEvaluator(cfg.eval_config)
+    asyncio.run(evaluator.eval_full(cfg.input_files))
 
-    sandbox = get_sandbox(**eval_config.sandbox)
-    eval_config_dict = asdict(eval_config)
-    eval_config_dict.pop("sandbox")
-    asyncio.run(
-        sandbox.batch_evaluate_results(
-            input_files=cfg.input_files,
+
+# Evaluator Classes
+
+
+class MathEvaluator(BaseEvaluator):
+    """Math evaluator - only supports batch evaluation."""
+
+    async def eval_full(self, input_files: list[str], **kwargs) -> None:
+        """Batch evaluate math problems."""
+        eval_config = MathEvaluatorConfig(**self.config)
+        eval_config_dict = asdict(eval_config)
+        batch_evaluate_results(
+            input_files=input_files,
+            **eval_config_dict,
+        )
+
+
+class Lean4ProofEvaluator(BaseEvaluator):
+    """Lean4 proof evaluator - supports both single and batch evaluation."""
+
+    async def eval_full(self, input_files: list[str], **kwargs) -> None:
+        """Batch evaluate Lean4 proofs."""
+        eval_config = LeanEvaluatorConfig(**self.config)
+        sandbox = get_sandbox(**eval_config.sandbox)
+        eval_config_dict = asdict(eval_config)
+        eval_config_dict.pop("sandbox")
+        await sandbox.batch_evaluate_results(
+            input_files=input_files,
+            answer_format="lean4-proof",
+            **eval_config_dict,
+        )
+
+    async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
+        """Evaluate single Lean4 proof during generation."""
+        eval_config = LeanEvaluatorConfig(**self.config)
+        sandbox = get_sandbox(**eval_config.sandbox)
+
+        # Prepare predicted_proof using shared utility
+        generation = data_point["generation"]
+
+        config = ProofBuildConfig(
+            final_answer_key=eval_config.final_answer_key,
+            extract_code_mode=eval_config.extract_code_mode,
+            restate_formal_statement=eval_config.restate_formal_statement,
+            strip_theorem_from_proof=True,  # Default behavior for proofs
+        )
+
+        predicted_proof = build_lean4_proof(
+            generation=generation, data_point=data_point, config=config, answer_format="lean4-proof"
+        )
+
+        # Execute proof and get compiler output
+        try:
+            output, _ = await sandbox.execute_code(
+                generated_code=predicted_proof,
+                language="lean4",
+                timeout=eval_config.timeout,
+            )
+
+            # Determine proof status using shared utility
+            proof_status = determine_proof_status(output)
+
+            return {
+                "predicted_proof": predicted_proof,
+                "proof_status": proof_status,
+                "lean_evaluation": {**output, "timeout": eval_config.timeout},
+            }
+
+        except Exception as e:
+            return {
+                "predicted_proof": predicted_proof,
+                "proof_status": "error",
+                "lean_evaluation": {
+                    "process_status": "error",
+                    "stdout": "",
+                    "stderr": f"Error during evaluation: {str(e)}",
+                    "timeout": eval_config.timeout,
+                },
+            }
+
+
+class Lean4StatementEvaluator(BaseEvaluator):
+    """Lean4 statement evaluator - only supports batch evaluation."""
+
+    async def eval_full(self, input_files: list[str], **kwargs) -> None:
+        """Batch evaluate Lean4 statements."""
+        eval_config = LeanEvaluatorConfig(**self.config)
+        sandbox = get_sandbox(**eval_config.sandbox)
+        eval_config_dict = asdict(eval_config)
+        eval_config_dict.pop("sandbox")
+        await sandbox.batch_evaluate_results(
+            input_files=input_files,
             answer_format="lean4-statement",
             **eval_config_dict,
         )
-    )
