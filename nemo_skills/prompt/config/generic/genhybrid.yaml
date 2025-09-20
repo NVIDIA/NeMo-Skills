@@ -1,22 +1,25 @@
 # Prompt for selecting or synthesizing a new solution from a list of candidate solutions
 
 user: |-
-  You will be given a problem followed by {num_solutions} candidate solutions. Your task is to either select the best existing solution or synthesize a new, improved one.
+  You will be given a problem followed by {num_solutions} candidate solutions. Your task is to either select an existing solution or synthesize a new, improved one.
 
   Problem: {problem}
 
   Solutions:
   {solutions}
 
-  Selection Criteria: Choose an existing solution ONLY if it:
-  - Fully addresses all aspects of the problem
-  - Is clearly superior to other candidates
-  - Requires no significant improvements
+  Selection Criteria: Choose an existing solution if it:
+  - Adequately addresses the problem requirements
+  - Works as a practical solution
+  - You don't need to overthink which one is "best" - any working solution is acceptable
 
-  Synthesis Requirements: If no single solution meets the selection criteria, you MUST synthesize by:
+  Synthesis Requirements: If no single solution adequately addresses the problem, you MUST synthesize by:
   - Identifying specific strengths/weaknesses in each candidate
   - Combining the best approaches from multiple solutions
   - Creating something demonstrably different from any individual candidate
+
+  <SYNTHESIZED_SOLUTION>
+  [Use this tag to mark the start of your synthesized solution]
 
   CRITICAL FORMAT REQUIREMENT:
   Your response MUST end with exactly one of these two formats:
@@ -25,4 +28,4 @@ user: |-
   "Judgment: [IDX]" (where IDX is 0-{max_idx})
 
   For synthesis:
-  Provide your synthesized solution at the end. If the problem specifies format requirements, follow them exactly.
+  End with your synthesized solution after the <SYNTHESIZED_SOLUTION> tag. If the problem specifies format requirements, follow them exactly.

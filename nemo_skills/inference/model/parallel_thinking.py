@@ -41,12 +41,14 @@ class GenSelectSpecificConfig:
 @nested_dataclass(kw_only=True)
 class GenSynthesisSpecificConfig:
     prompt_config: str = "generic/gensynthesis"
+    regex: str = r"<NEW_SOLUTION>(.*?)</NEW_SOLUTION>"
 
 
 @nested_dataclass(kw_only=True)
 class GenHybridSpecificConfig:
     prompt_config: str = "generic/genhybrid"
     genselect_regex: str = r"Judg[e]?ment: (\d+)"
+    gensynthesis_regex: str = r"<SYNTHESIZED_SOLUTION>(.*?)</SYNTHESIZED_SOLUTION>"
 
 
 @nested_dataclass(kw_only=True)
@@ -244,17 +246,22 @@ class ParallelThinkingTask:
 
         return solution_idx
 
-    def _extract_synthesized_solution(self, generation: str) -> str:
+    def _extract_synthesized_solution(self, generation: str, regex: str) -> str:
         """Extract the synthesized solution from the GenSynthesis result."""
+        matches = re.findall(regex, generation, re.DOTALL)
+        if matches:
+            return matches[-1].strip()  # Remove any trailing newlines
+        else:
+            return None
         # Remove the thinking part from the gensynthesis result
-        solution = {"generation": generation}
-        remove_thinking(
-            solution,
-            generation_key="generation",
-            thinking_begin=self.cfg.thinking_begin,
-            thinking_end=self.cfg.thinking_end,
-        )
-        return solution["generation"]
+        # solution = {"generation": generation}
+        # remove_thinking(
+        #     solution,
+        #     generation_key="generation",
+        #     thinking_begin=self.cfg.thinking_begin,
+        #     thinking_end=self.cfg.thinking_end,
+        # )
+        # return solution["generation"]
 
     async def _run_genselect(
         self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs
@@ -289,7 +296,9 @@ class ParallelThinkingTask:
         )
 
         # Extract the synthesized solution from the GenSynthesis result
-        synthesized_solution = self._extract_synthesized_solution(gensynthesis_result["generation"])
+        synthesized_solution = self._extract_synthesized_solution(
+            gensynthesis_result["generation"], self.cfg.gensynthesis.regex
+        )
         if synthesized_solution is None:
             LOG.warning("GenSynthesis failed to produce valid solution, falling back to random selection")
             synthesized_solution = local_random.choice(solutions)[self.cfg.solution_key]
@@ -317,12 +326,17 @@ class ParallelThinkingTask:
             genhybrid_result["selection_successful"] = False
         else:
             genhybrid_result["selection_successful"] = True
+            genhybrid_result["selection_idx"] = sel_solution_idx
+            genhybrid_result["synthesis_successful"] = None
+
             return {
                 self.cfg.solution_key: solutions[sel_solution_idx][self.cfg.solution_key],
                 "parallel_thinking_result": genhybrid_result,
             }
 
-        synthesized_solution = self._extract_synthesized_solution(genhybrid_result["generation"])
+        synthesized_solution = self._extract_synthesized_solution(
+            genhybrid_result["generation"], regex=self.cfg.genhybrid.gensynthesis_regex
+        )
         if synthesized_solution is None:
             LOG.warning(
                 "GenHybrid failed to produce valid solution or select an existing solution, falling back to random selection"
