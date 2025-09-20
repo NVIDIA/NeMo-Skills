@@ -18,7 +18,6 @@ import glob
 import json
 import logging
 import os
-import re
 import traceback
 import uuid
 from collections import defaultdict
@@ -27,8 +26,11 @@ from typing import Dict, List, Optional, Tuple
 import httpx
 import tqdm
 
-from nemo_skills.code_execution.utils import clean_formal_generation
-from nemo_skills.dataset.utils import get_lean4_header
+from nemo_skills.code_execution.proof_utils import (
+    ProofBuildConfig,
+    determine_proof_status,
+    prepare_predicted_proof_from_line_dict,
+)
 from nemo_skills.utils import get_logger_name, python_doc_to_cmd_help
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -38,54 +40,6 @@ def unroll_files(input_files):
     for manifest_pattern in input_files:
         for manifest in sorted(glob.glob(manifest_pattern, recursive=True)):
             yield manifest
-
-
-def extract_proof_only(lean_code: str) -> str:
-    lines = lean_code.strip().splitlines()
-    if not lines:
-        return ""
-
-    header_start_pattern = re.compile(r"^\s*(theorem|example)\b")
-    header_start_idx = None
-
-    # 1. Find where the theorem starts
-    for i, line in enumerate(lines):
-        if header_start_pattern.match(line):
-            header_start_idx = i
-            break
-
-    if header_start_idx is None:
-        return lean_code.strip()
-
-    # 2. Find where ':=' occurs, starting from the header
-    header_end_idx = None
-    for i in range(header_start_idx, len(lines)):
-        if ":=" in lines[i]:
-            header_end_idx = i
-            break
-
-    if header_end_idx is None:
-        return lean_code.strip()
-
-    # 3. Extract the line after ':='
-    header_line, after = lines[header_end_idx].split(":=", 1)
-    proof_first_line = after.strip()
-
-    # 4. Collect proof lines
-    if proof_first_line:
-        proof_lines = [proof_first_line] + lines[header_end_idx + 1 :]
-    else:
-        proof_lines = lines[header_end_idx + 1 :]
-
-    # 5. Remove leading 'by' (with or without indentation)
-    if proof_lines:
-        first = proof_lines[0].lstrip()
-        if first == "by":
-            proof_lines = proof_lines[1:]
-        elif first.startswith("by "):
-            proof_lines[0] = first[3:]  # Strip 'by '
-
-    return "\n".join(proof_lines).rstrip()
 
 
 class Sandbox(abc.ABC):
@@ -118,9 +72,7 @@ class Sandbox(abc.ABC):
         )
         self.ssh_server = os.getenv("NEMO_SKILLS_SSH_SERVER", ssh_server)
         self.ssh_key_path = os.getenv("NEMO_SKILLS_SSH_KEY_PATH", ssh_key_path)
-        self.session_histories = defaultdict(
-            list
-        )  # session_id -> list of generated_code
+        self.session_histories = defaultdict(list)  # session_id -> list of generated_code
 
     async def close(self):
         """Close the HTTP session."""
@@ -137,9 +89,7 @@ class Sandbox(abc.ABC):
             import sshtunnel_requests
 
             def ssh_request():
-                sshtunnel_request = sshtunnel_requests.from_url(
-                    f"ssh://{self.ssh_server}:22", self.ssh_key_path
-                )
+                sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
                 return sshtunnel_request.post(
                     url=self._get_execute_url(),
                     data=json.dumps(request),
@@ -207,24 +157,17 @@ class Sandbox(abc.ABC):
         traceback_verbosity="plain",  # could be plain, context, verbose, or minimal
     ) -> Tuple[Dict, str]:
         traceback_verbosity = traceback_verbosity.capitalize()
-        if (
-            language in ["python", "pypy3", "python3", "lean4", "shell"]
-            and session_id is not None
-        ):
+        if language in ["python", "pypy3", "python3", "lean4", "shell"] and session_id is not None:
             raise RuntimeError(
                 f"Stateful execution for {language} is not supported. session_id is {session_id} but should be None"
             )
         if language not in ["ipython", "python", "pypy3", "python3", "lean4", "shell"]:
             raise ValueError(f"Unsupported language: {language}")
         if language != "ipython" and traceback_verbosity != "Plain":
-            raise ValueError(
-                "Configurable traceback_verbosity is only supported for ipython"
-            )
+            raise ValueError("Configurable traceback_verbosity is only supported for ipython")
 
         request_session_id = session_id
-        if (
-            request_session_id is None and language == "ipython"
-        ):  # creating a new session with empty state
+        if request_session_id is None and language == "ipython":  # creating a new session with empty state
             request_session_id = uuid.uuid4()
 
         TO_EXECUTE = generated_code
@@ -236,11 +179,7 @@ class Sandbox(abc.ABC):
             max_output_characters,
             traceback_verbosity,
         )
-        request["session_id"] = (
-            request_session_id
-            if request_session_id is None
-            else str(request_session_id)
-        )
+        request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
         try:
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
@@ -257,9 +196,7 @@ class Sandbox(abc.ABC):
             # and the execution of the concatenation may not be the same as the execution of the respective cells
             # see details in this thread: https://github.com/NVIDIA/NeMo-Skills/pull/803#discussion_r2338240505
             history = self.session_histories.get(session_id, [])
-            combined_code = (
-                "\n".join(history) + ("\n" if history else "") + generated_code
-            )
+            combined_code = "\n".join(history) + ("\n" if history else "") + generated_code
             request = self._prepare_request(
                 combined_code,
                 timeout,
@@ -268,11 +205,7 @@ class Sandbox(abc.ABC):
                 max_output_characters,
                 traceback_verbosity,
             )
-            request["session_id"] = (
-                request_session_id
-                if request_session_id is None
-                else str(request_session_id)
-            )
+            request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
             try:
                 output = await self._send_request(request, timeout)
             except httpx.TimeoutException:
@@ -298,14 +231,7 @@ class Sandbox(abc.ABC):
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
             return "timeout"
-        if output["process_status"] == "completed":
-            stdout = output["stdout"].lower()
-            stderr = output["stderr"].lower()
-            combined = stdout + "\n" + stderr
-            if re.search(r"\bsorry\b", combined) is not None:
-                return "has_sorry"
-            return "completed"
-        return output["process_status"]
+        return determine_proof_status(output)
 
     async def batch_evaluate_results(
         self,
@@ -332,52 +258,24 @@ class Sandbox(abc.ABC):
             if not line_dict:
                 return line_data
 
-            # Prepare predicted_proof based on format
-            if answer_format == "lean4-proof":
-                if not use_predicted_proof_key:
-                    generation = clean_formal_generation(
-                        line_dict["generation"],
-                        final_answer_key=final_answer_key,
-                        extract_code_mode=extract_code_mode,
-                    )
-                    line_dict["predicted_proof"] = (
-                        line_dict["header"]
-                        + (
-                            line_dict["formal_statement"]
-                            if restate_formal_statement
-                            else ""
-                        )
-                        + extract_proof_only(generation)
-                        if strip_theorem_from_proof
-                        else generation
-                    )
-                else:
-                    if "predicted_proof" not in line_dict:
-                        raise ValueError(
-                            "predicted_proof key not found in the line_dict. "
-                            "Set use_predicted_proof_key=False to re-combine"
-                        )
-            elif answer_format == "lean4-statement":
-                if not use_predicted_proof_key:
-                    generation = clean_formal_generation(
-                        line_dict["generation"], extract_code_mode=extract_code_mode
-                    )
-                    header = get_lean4_header()
-                    line_dict["predicted_proof"] = header + generation + "\n sorry"
-                else:
-                    if "predicted_proof" not in line_dict:
-                        raise ValueError(
-                            "predicted_proof key not found in the line_dict. "
-                            "Set use_predicted_proof_key=False to re-combine"
-                        )
-            else:
-                raise ValueError(f"Unknown answer_format: {answer_format}")
+            # Prepare predicted_proof using shared utility
+            config = ProofBuildConfig(
+                final_answer_key=final_answer_key,
+                extract_code_mode=extract_code_mode,
+                restate_formal_statement=restate_formal_statement,
+                strip_theorem_from_proof=strip_theorem_from_proof,
+            )
+
+            line_dict["predicted_proof"] = prepare_predicted_proof_from_line_dict(
+                line_dict=line_dict,
+                config=config,
+                answer_format=answer_format,
+                use_predicted_proof_key=use_predicted_proof_key,
+            )
 
             # Evaluate proof with concurrency control
             async with semaphore:
-                proof_status = await self.is_proof_correct(
-                    line_dict["predicted_proof"], timeout=timeout
-                )
+                proof_status = await self.is_proof_correct(line_dict["predicted_proof"], timeout=timeout)
                 line_dict["proof_status"] = proof_status
 
             return json.dumps(line_dict)
@@ -453,9 +351,7 @@ class LocalSandbox(Sandbox):
                         del self.session_histories[session_id]
                     return
                 if response.status_code == 404:  # We were routed to a different worker
-                    LOG.warning(
-                        f"Session {session_id} not found (already deleted?). Treating as success."
-                    )
+                    LOG.warning(f"Session {session_id} not found (already deleted?). Treating as success.")
                     if session_id in self.session_histories:
                         del self.session_histories[session_id]
                     return
@@ -477,9 +373,7 @@ class LocalSandbox(Sandbox):
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
                 else:
-                    LOG.warning(
-                        f"Failed to delete session {session_id} after {max_retries} attempts. "
-                    )
+                    LOG.warning(f"Failed to delete session {session_id} after {max_retries} attempts. ")
             except Exception as e:
                 LOG.warning(
                     "Failed to delete session %s: %s (type: %s, repr: %r)\nTraceback:\n%s",
@@ -505,7 +399,5 @@ def get_sandbox(sandbox_type: str = "local", **kwargs):
 
 def sandbox_params():
     """Returns sandbox documentation (to include in cmd help)."""
-    prefix = (
-        f"\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}"
-    )
+    prefix = f"\n        sandbox_type: str = MISSING - Choices: {list(sandboxes.keys())}"
     return python_doc_to_cmd_help(Sandbox, docs_prefix=prefix, arg_prefix="sandbox.")
