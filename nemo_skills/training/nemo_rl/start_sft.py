@@ -152,6 +152,17 @@ def sft_preprocessor(
         add_generation_prompt=add_generation_prompt,
     )
 
+    # ==================== START: BLOCK FOR DEBUGGING ====================
+    if idx < 3:  # Only print for the first 3 samples
+        print(f"\n--- 🐛 Debugging message_log for sample idx: {idx} ---")
+        # Loop through up to the first 3 messages in the log
+        for i, message in enumerate(message_log[:3]):
+            print(f"  Message [{i}]:")
+            print(f"    Role    : {message['role']}")
+            print(f"    Content : {message['content']}")
+        print("----------------------------------------------------\n")
+    # ===================== END: BLOCK FOR DEBUGGING =====================
+
     length = sum(len(m["token_ids"]) for m in message_log)
 
     loss_multiplier = 1.0
