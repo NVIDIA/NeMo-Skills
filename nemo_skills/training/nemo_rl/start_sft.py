@@ -37,6 +37,7 @@ from transformers import AutoTokenizer
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 TokenizerType = PreTrainedTokenizerBase
+_call_counter = 0
 
 
 class PromptResponseDataset:
@@ -153,14 +154,16 @@ def sft_preprocessor(
     )
 
     # ==================== START: BLOCK FOR DEBUGGING ====================
-    # if idx < 3:  # Only print for the first 3 samples
-    print(f"\n--- 🐛 Debugging message_log for sample idx: {idx} ---")
-    # Loop through up to the first 3 messages in the log
-    for i, message in enumerate(message_log[:3]):
-        print(f"  Message [{i}]:")
-        print(f"    Role    : {message['role']}")
-        print(f"    Content : {message['content']}")
-    print("----------------------------------------------------\n")
+    global _call_counter
+    if _call_counter < 3:  # Only print for the first 3 samples
+        print(f"\n--- 🐛 Debugging invocation #{_call_counter + 1} (for original sample idx: {idx}) ---")
+        # Loop through up to the first 3 messages in the log
+        for i, message in enumerate(message_log[:3]):
+            print(f"  Message [{i}]:")
+            print(f"    Role    : {message['role']}")
+            print(f"    Content : {message['content']}")
+        print("----------------------------------------------------\n")
+        _call_counter += 1
     # ===================== END: BLOCK FOR DEBUGGING =====================
 
     length = sum(len(m["token_ids"]) for m in message_log)
