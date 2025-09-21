@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,20 +15,18 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "math"
 METRICS_TYPE = "simpleqa"
-EVAL_ARGS = "++eval_type=math "
+EVAL_ARGS = "++eval_type=simpleqa "
 GENERATION_ARGS = "++prompt_config=generic/simpleqa "
-EVAL_SPLIT = "test"
+EVAL_SPLIT = "verified"
 
 # SimpleQA requires judge model for evaluating factual accuracy
 # Setting openai judge by default, but can be overridden from command line for a locally hosted model
 # Using GPT-4 as recommended for factual evaluation tasks
 
 JUDGE_PIPELINE_ARGS = {
-    "model": "/hf_models/Qwen2.5-32B-Instruct",
-    "server_type": "sglang",
-    "server_gpus": 8,
-    "server_nodes": 1,
-    "server_args": "--context-length 8400",
+    "model": "o3-mini-20250131",
+    "server_type": "openai",
+    "server_address": "https://api.openai.com/v1",
 }
 
 
