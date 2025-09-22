@@ -407,7 +407,7 @@ class SweBenchGenerationTask(GenerationTask):
             # install openhands repo + dependencies, or skip if it's already installed (assuming with miniforge)
             "if [ -d /root/OpenHands ]; then "
             "    cd /root/OpenHands && "
-            '    eval "$(/root/miniforge3/bin/conda shell.bash hook); '
+            '    eval "$(/root/miniforge3/bin/conda shell.bash hook)"; '
             "else "
             "    cd /root && "
             '    curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && '
