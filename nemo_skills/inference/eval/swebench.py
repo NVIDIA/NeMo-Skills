@@ -501,7 +501,7 @@ class SweBenchGenerationTask(GenerationTask):
             api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
         apptainer_args = ""
-        if self.cfg.agent_framework_repo.startswith("/"):
+        if self.cfg.agent_framework_repo is not None and self.cfg.agent_framework_repo.startswith("/"):
             # Local repo path, therefore we need to mount it inside of Apptainer
             apptainer_args = f"--mount type=bind,src={self.cfg.agent_framework_repo},dst=/agent_framework_repo,ro"
             self.cfg.agent_framework_repo = "/agent_framework_repo"
