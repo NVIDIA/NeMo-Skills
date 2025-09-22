@@ -82,9 +82,9 @@ def main():
     parser.add_argument(
         "--transport",
         type=str,
-        choices=["stdio", "streamable-http"],
+        choices=["stdio", "streamable-http", "sse"],
         default="stdio",
-        help="Transport mode for the MCP server (stdio or streamable-http)",
+        help="Transport mode for the MCP server (stdio, streamable-http, or sse)",
     )
     parser.add_argument(
         "--host", type=str, default="127.0.0.1", help="Host to bind to for HTTP transport (default: 127.0.0.1)"
@@ -105,12 +105,12 @@ def main():
     # Start with transport config from file
     transport_config = getattr(cfg, "transport", {})
 
-    # Apply command-line overrides only for non-default values or when config specifies HTTP
+    # Apply command-line overrides only for non-default values or when config specifies HTTP/SSE
     if args.transport != "stdio":
         # Explicit command-line transport override
         transport_config.update({"type": args.transport, "host": args.host, "port": args.port})
-    elif transport_config.get("type") == "streamable-http":
-        # Config file specifies HTTP, only override host/port if provided
+    elif transport_config.get("type") in ["streamable-http", "sse"]:
+        # Config file specifies HTTP or SSE, only override host/port if provided
         if args.host != "127.0.0.1":
             transport_config["host"] = args.host
         if args.port != 8000:
@@ -136,6 +136,17 @@ def main():
 
         # Get the Starlette app from FastMCP and run it with uvicorn
         app = mcp.streamable_http_app()
+        uvicorn.run(app, host=host, port=port)
+    elif transport_type == "sse":
+        host = transport_config.get("host", "127.0.0.1")
+        port = transport_config.get("port", 8000)
+        logger.info(f"Starting Python tool server in SSE mode on {host}:{port}")
+
+        if uvicorn is None:
+            raise ImportError("uvicorn not available. Please install uvicorn to use SSE transport.")
+
+        # Get the SSE app from FastMCP and run it with uvicorn
+        app = mcp.sse_app()
         uvicorn.run(app, host=host, port=port)
     else:
         logger.info("Starting Python tool server in stdio mode")
@@ -163,7 +174,19 @@ class PythonTool(MCPClientTool):
                 # execution-specific default
                 "exec_timeout_s": 10,
             }
-        else:
+        # elif transport_type == "sse":
+        #     # Configuration for SSE client (using HTTP client for SSE endpoints)
+        #     base_config = {
+        #         "client": "nemo_skills.mcp.clients.MCPHttpClient",
+        #         "client_params": {
+        #             "base_url": f"http://{host}:{port}",
+        #         },
+        #         # hide args from schemas and sanitize at runtime
+        #         "hide_args": {"stateful_python_code_exec": ["session_id", "timeout"]},
+        #         # execution-specific default
+        #         "exec_timeout_s": 10,
+        #     }
+        elif transport_type == "stdio":
             # Default stdio configuration
             base_config = {
                 "client": "nemo_skills.mcp.clients.MCPStdioClient",
@@ -178,6 +201,8 @@ class PythonTool(MCPClientTool):
                 # execution-specific default
                 "exec_timeout_s": 10,
             }
+        else:
+            raise ValueError(f"Invalid transport type: {transport_type}")
 
         self.apply_config_updates(base_config)
         self.requests_to_sessions = defaultdict(lambda: None)
