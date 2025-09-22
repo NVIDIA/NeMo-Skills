@@ -179,7 +179,9 @@ class SweBenchGenerationTask(GenerationTask):
     def cleanup_litellm_cache(self):
         return
 
-    async def _execute_container_command(self, data_point, command, expected_file_pattern, mode, timeout=100000):
+    async def _execute_container_command(
+        self, data_point, command, expected_file_pattern, mode, timeout=100000, apptainer_args=""
+    ):
         """Execute a command in an Apptainer container with retry logic."""
         if self.cfg.generic_inference_container is not None and mode == "agent":
             container_name = self.cfg.generic_inference_container
@@ -211,7 +213,8 @@ class SweBenchGenerationTask(GenerationTask):
             f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
             f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
             f"--mount type=bind,src={self.output_dir},dst=/trajectories_mount "
-            f" {container_name} bash -c {shlex.quote(command)}"
+            f"{apptainer_args} "
+            f"{container_name} bash -c {shlex.quote(command)}"
         )
 
         # Retry apptainer command up to max_retries times
@@ -284,7 +287,7 @@ class SweBenchGenerationTask(GenerationTask):
                         f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}."
                     )
 
-    async def _run_swe_agent(self, data_point, api_base):
+    async def _run_swe_agent(self, data_point, api_base, apptainer_args=""):
         """
         Runs SWE-agent on one instance.
         Returns the absolute (not mounted) path to a .jsonl file in the SWE-bench evaluation format.
@@ -335,7 +338,9 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Execute SWE-agent command
         search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
-        pred_file = await self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
+        pred_file = await self._execute_container_command(
+            data_point, swe_agent_cmd, search_path, mode="agent", apptainer_args=apptainer_args
+        )
 
         if not self.cfg.evaluate:
             # No need to make pred_jsonl_file in this case
@@ -355,7 +360,7 @@ class SweBenchGenerationTask(GenerationTask):
 
         return pred_jsonl_file
 
-    async def _run_openhands(self, data_point, api_base):
+    async def _run_openhands(self, data_point, api_base, apptainer_args=""):
         """
         Runs OpenHands on one instance.
         Returns the absolute (not mounted) path to a .jsonl file in the SWE-bench evaluation format.
@@ -449,7 +454,9 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Execute OpenHands command
         search_path = os.path.join(self.output_dir / "trajectories", data_point["instance_id"], "output.jsonl")
-        out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
+        out_file = await self._execute_container_command(
+            data_point, openhands_cmd, search_path, mode="agent", apptainer_args=apptainer_args
+        )
 
         if not self.cfg.evaluate:
             # No need to make output_for_eval.jsonl in this case
@@ -493,10 +500,16 @@ class SweBenchGenerationTask(GenerationTask):
         else:
             api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
+        apptainer_args = ""
+        if self.cfg.agent_framework_repo.startswith("/"):
+            # Local repo path, therefore we need to mount it inside of Apptainer
+            apptainer_args = f"--mount type=bind,src={self.cfg.agent_framework_repo},dst=/agent_framework_repo,ro"
+            self.cfg.agent_framework_repo = "/agent_framework_repo"
+
         if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
-            pred_file = await self._run_swe_agent(data_point, api_base)
+            pred_file = await self._run_swe_agent(data_point, api_base, apptainer_args=apptainer_args)
         elif self.cfg.agent_framework == SupportedAgentFrameworks.openhands:
-            pred_file = await self._run_openhands(data_point, api_base)
+            pred_file = await self._run_openhands(data_point, api_base, apptainer_args=apptainer_args)
         else:
             raise ValueError(
                 f"Unsupported agent framework: {self.cfg.agent_framework}. "
