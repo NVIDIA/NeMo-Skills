@@ -67,13 +67,13 @@ class SimpleQAMetrics(BaseMetrics):
             "incorrect": False,
             "not_attempted": False,
         }
-        j = d.get("judgement", None)
-        if j is None:
+        judgement = d.get("judgement", None)
+        if judgement is None:
             out["not_attempted"] = True
         else:
-            is_corr = is_correct_judgement_label_matching(j, CORRECT_LABEL)
-            is_inc = is_correct_judgement_label_matching(j, INCORRECT_LABEL)
-            is_na = is_correct_judgement_label_matching(j, NOT_ATTEMPTED_LABEL)
+            is_corr = is_correct_judgement_label_matching(judgement, CORRECT_LABEL)
+            is_inc = is_correct_judgement_label_matching(judgement, INCORRECT_LABEL)
+            is_na = is_correct_judgement_label_matching(judgement, NOT_ATTEMPTED_LABEL)
             out["correct"] = bool(is_corr)
             out["incorrect"] = bool(is_inc)
             out["not_attempted"] = bool(is_na)

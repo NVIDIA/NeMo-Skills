@@ -16,7 +16,7 @@
 DATASET_GROUP = "math"
 METRICS_TYPE = "simpleqa"
 EVAL_ARGS = "++eval_type=simpleqa "
-GENERATION_ARGS = "++prompt_config=generic/simpleqa "
+GENERATION_ARGS = "++prompt_config=generic/default "
 EVAL_SPLIT = "verified"
 
 # SimpleQA requires judge model for evaluating factual accuracy
