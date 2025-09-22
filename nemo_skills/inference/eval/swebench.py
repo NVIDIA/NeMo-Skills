@@ -287,15 +287,15 @@ class SweBenchGenerationTask(GenerationTask):
                         f"found {len(pred_files) if 'pred_files' in locals() else 'unknown'}."
                     )
 
-    async def _run_swe_agent(self, data_point, api_base, apptainer_args=""):
+    async def _run_swe_agent(self, data_point, api_base, agent_framework_repo, apptainer_args):
         """
         Runs SWE-agent on one instance.
         Returns the absolute (not mounted) path to a .jsonl file in the SWE-bench evaluation format.
         """
         if self.cfg.agent_config is None:
             self.cfg.agent_config = "eval/swe-bench/swe-agent/default"
-        if self.cfg.agent_framework_repo is None:
-            self.cfg.agent_framework_repo = "https://github.com/SWE-agent/SWE-agent.git"
+        if agent_framework_repo is None:
+            agent_framework_repo = "https://github.com/SWE-agent/SWE-agent.git"
 
         completion_kwargs = {
             openai_param: getattr(self.cfg.inference, ns_param)
@@ -312,7 +312,7 @@ class SweBenchGenerationTask(GenerationTask):
             "cd /root && "
             "mkdir SWE-agent && "
             "cd SWE-agent && "
-            f"git clone {self.cfg.agent_framework_repo} . && "
+            f"git clone {agent_framework_repo} . && "
             f"git checkout {self.cfg.agent_framework_commit} && "
             "uv venv --python 3.12 venv && "
             "source venv/bin/activate && "
@@ -360,15 +360,15 @@ class SweBenchGenerationTask(GenerationTask):
 
         return pred_jsonl_file
 
-    async def _run_openhands(self, data_point, api_base, apptainer_args=""):
+    async def _run_openhands(self, data_point, api_base, agent_framework_repo, apptainer_args):
         """
         Runs OpenHands on one instance.
         Returns the absolute (not mounted) path to a .jsonl file in the SWE-bench evaluation format.
         """
         if self.cfg.agent_config is None:
             self.cfg.agent_config = "eval/swe-bench/openhands/default"
-        if self.cfg.agent_framework_repo is None:
-            self.cfg.agent_framework_repo = "https://github.com/All-Hands-AI/OpenHands.git"
+        if agent_framework_repo is None:
+            agent_framework_repo = "https://github.com/All-Hands-AI/OpenHands.git"
 
         # Add parameters to config.toml
 
@@ -421,7 +421,7 @@ class SweBenchGenerationTask(GenerationTask):
             "    mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
             "    mkdir OpenHands && "
             "    cd OpenHands && "
-            f"   git clone {self.cfg.agent_framework_repo} . && "
+            f"   git clone {agent_framework_repo} . && "
             f"   git checkout {self.cfg.agent_framework_commit} && "
             "    export INSTALL_DOCKER=0 && "
             "    make build && "
@@ -500,16 +500,17 @@ class SweBenchGenerationTask(GenerationTask):
         else:
             api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
+        agent_framework_repo = self.cfg.agent_framework_repo
         apptainer_args = ""
         if self.cfg.agent_framework_repo is not None and self.cfg.agent_framework_repo.startswith("/"):
             # Local repo path, therefore we need to mount it inside of Apptainer
             apptainer_args = f"--mount type=bind,src={self.cfg.agent_framework_repo},dst=/agent_framework_repo,ro"
-            self.cfg.agent_framework_repo = "/agent_framework_repo"
+            agent_framework_repo = "/agent_framework_repo"
 
         if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
-            pred_file = await self._run_swe_agent(data_point, api_base, apptainer_args=apptainer_args)
+            pred_file = await self._run_swe_agent(data_point, api_base, agent_framework_repo, apptainer_args)
         elif self.cfg.agent_framework == SupportedAgentFrameworks.openhands:
-            pred_file = await self._run_openhands(data_point, api_base, apptainer_args=apptainer_args)
+            pred_file = await self._run_openhands(data_point, api_base, agent_framework_repo, apptainer_args)
         else:
             raise ValueError(
                 f"Unsupported agent framework: {self.cfg.agent_framework}. "
