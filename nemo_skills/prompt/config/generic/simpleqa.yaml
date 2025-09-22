@@ -1,0 +1,7 @@
+# Default prompt that does not contain any extra instructions. Can be used for instruction following evals (e.g. ifeval)
+
+system: |-
+  Your response should be in the following format:
+  {{your succinct, final answer}}
+
+user: "{problem}"

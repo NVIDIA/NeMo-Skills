@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# Code adapted from https://www.kaggle.com/code/nanliao7/simpleqa-verified-benchmark-starter-code
 
 from nemo_skills.evaluation.metrics.base import BaseMetrics
 
@@ -36,7 +38,7 @@ def is_correct_judgement_label_matching(judgement: str, correct_label: str) -> b
 class SimpleQAMetrics(BaseMetrics):
     """Metrics for SimpleQA with F1 for pass@k and pass@1[avg-of-k]."""
 
-    def __init__(self, compute_no_answer: bool = True, answer_key: str = "predicted_answer"):
+    def __init__(self, compute_no_answer: bool = False, answer_key: str = "predicted_answer"):
         super().__init__(compute_no_answer=compute_no_answer)
         self.answer_key = answer_key
 
@@ -75,6 +77,11 @@ class SimpleQAMetrics(BaseMetrics):
             out["correct"] = bool(is_corr)
             out["incorrect"] = bool(is_inc)
             out["not_attempted"] = bool(is_na)
+            if not any([is_corr, is_inc, is_na]):
+                # Following https://www.kaggle.com/code/nanliao7/simpleqa-verified-benchmark-starter-code
+                # If the judgement is unparseable, we consider it as not attempted
+                # DEFAULT_GRADE_IF_UNPARSEABLE = "C"  # Corresponds to NOT_ATTEMPTED
+                out["not_attempted"] = True
 
         return out
 

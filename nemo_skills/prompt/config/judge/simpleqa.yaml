@@ -1,5 +1,6 @@
 # SimpleQA judge prompt for evaluating factual accuracy
-# Adapted from https://github.com/openai/simple-evals/blob/main/simpleqa_eval.py
+# Note: this is the **updated** judge prompt from Simpleqa-verified benchmark.
+# Adapted from https://www.kaggle.com/code/nanliao7/simpleqa-verified-benchmark-starter-code
 
 user: |-
     Your job is to look at a question, a gold target, and a predicted answer, and then assign a grade of either ["CORRECT", "INCORRECT", "NOT_ATTEMPTED"].
@@ -69,8 +70,8 @@ user: |-
 
     Here is a new example. Simply reply with either CORRECT, INCORRECT, NOT ATTEMPTED. Don't apologize or correct yourself if there was a mistake; we are just trying to grade the answer.
     ```
-    Question: {question}
-    Gold target: {target}
+    Question: {problem}
+    Gold target: {expected_answer}
     Predicted answer: {predicted_answer}
     ```
 

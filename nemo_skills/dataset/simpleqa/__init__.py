@@ -21,7 +21,7 @@ EVAL_SPLIT = "verified"
 
 # SimpleQA requires judge model for evaluating factual accuracy
 # Setting openai judge by default, but can be overridden from command line for a locally hosted model
-# Using GPT-4 as recommended for factual evaluation tasks
+# Using o3-mini-20250131 as recommended for factual evaluation tasks
 
 JUDGE_PIPELINE_ARGS = {
     "model": "o3-mini-20250131",
