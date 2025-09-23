@@ -107,7 +107,7 @@ class LiveCodeBenchEvaluatorConfig:
     language: str = "python"  # "cpp" is another option now
     test_file: str = None
     interpreter: str = "python"  # use either "python" or pypy3
-    timeout: float = 6.0
+    timeout: int = 6
 
 
 def eval_livecodebench(cfg):
