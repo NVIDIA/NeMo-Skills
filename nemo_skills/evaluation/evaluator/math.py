@@ -66,18 +66,6 @@ class MathEvaluator(BaseEvaluator):
 class Lean4ProofEvaluator(BaseEvaluator):
     """Lean4 proof evaluator - supports both single and batch evaluation."""
 
-    async def eval_full(self, input_files: list[str], **kwargs) -> None:
-        """Batch evaluate Lean4 proofs."""
-        eval_config = LeanEvaluatorConfig(**self.config)
-        sandbox = get_sandbox(**eval_config.sandbox)
-        eval_config_dict = asdict(eval_config)
-        eval_config_dict.pop("sandbox")
-        await sandbox.batch_evaluate_results(
-            input_files=input_files,
-            answer_format="lean4-proof",
-            **eval_config_dict,
-        )
-
     async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
         """Evaluate single Lean4 proof during generation."""
         eval_config = LeanEvaluatorConfig(**self.config)

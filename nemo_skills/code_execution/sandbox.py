@@ -264,7 +264,7 @@ class Sandbox(abc.ABC):
             processed_lines = []
             tasks = [asyncio.create_task(process_line(line.rstrip("\n"))) for line in lines]
             processed_lines = []
-            for coro in tqdm.tqdm(asyncio.as_completed(tasks), total=len(tasks)):
+            for coro in tqdm.tqdm(asyncio.gather(tasks), total=len(tasks)):
                 processed_lines.append(await coro)
 
             # Write to temp file then replace original
