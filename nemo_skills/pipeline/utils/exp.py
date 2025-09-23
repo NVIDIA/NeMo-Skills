@@ -517,7 +517,11 @@ def add_task(
             if "PYTHONPATH" in override:
                 if override.startswith("PYTHONPATH="):
                     override = override[11:]
-                sandbox_env_updates["PYTHONPATH"] = override + ":/app"
+                    sandbox_env_updates["PYTHONPATH"] = override + ":/app"
+            elif override.startswith("NEMO_SKILLS_SANDBOX_CPU_AFFINITY="):
+                sandbox_env_updates["UWSGI_CPU_AFFINITY"] = override.split("=", 1)[1]
+            elif override.startswith("NEMO_SKILLS_SANDBOX_PROCESSES="):
+                sandbox_env_updates["UWSGI_PROCESSES"] = override.split("=", 1)[1]
 
         with temporary_env_update(cluster_config, sandbox_env_updates):
             commands.append(get_sandbox_command(cluster_config))
