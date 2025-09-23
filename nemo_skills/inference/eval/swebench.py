@@ -185,14 +185,33 @@ class SweBenchGenerationTask(GenerationTask):
         """Execute a command in an Apptainer container with retry logic."""
         if self.cfg.generic_inference_container is not None and mode == "agent":
             container_name = self.cfg.generic_inference_container
-            # If the container is generic, we have to clone the repo inside of it before running the agent
+            # If the container is generic, we have to clone the repo inside of it before running the agent.
+            # This follows the procedure used for the SWE-bench environments:
+            # https://github.com/SWE-bench/SWE-bench/blob/7a6b44e4a82eece60ac06afd3042a76d8a95eec3/swebench/harness/test_spec/python.py#L274
+            # except we clone all branches because we can't always know which branch the commit is on.
             command = (
-                f"rm -rf /testbed && "
+                # Remove existing repo if present
+                "rm -rf /testbed && "
+                # Clone the repo we need
                 f"git clone -o origin https://github.com/{data_point['repo']} /testbed && "
-                f"chmod -R 777 /testbed && "
-                f"cd /testbed && "
+                "chmod -R 777 /testbed && "
+                "cd /testbed && "
                 f"git reset --hard {data_point['base_commit']} && "
-                f"git remote remove origin && "
+                # Remove the remote and tags so the agent won't see newer commits
+                "git remote remove origin && "
+                # Remove only tags pointing to commits after target timestamp
+                f"TARGET_TIMESTAMP=$(git show -s --format=%ci {data_point['base_commit']}) && "
+                'git tag -l | while read tag; do TAG_COMMIT=$(git rev-list -n 1 "$tag"); TAG_TIME=$(git show -s --format=%ci "$TAG_COMMIT"); if [[ "$TAG_TIME" > "$TARGET_TIMESTAMP" ]]; then git tag -d "$tag"; fi; done && '
+                "git reflog expire --expire=now --all && "
+                "git gc --prune=now --aggressive && "
+                # Verify future logs aren't available
+                "AFTER_TIMESTAMP=$(date -d \"$TARGET_TIMESTAMP + 1 second\" '+%Y-%m-%d %H:%M:%S') && "
+                'COMMIT_COUNT=$(git log --oneline --all --since="$AFTER_TIMESTAMP" | wc -l) && '
+                'if [ "$COMMIT_COUNT" -ne 0 ]; then '
+                "    echo 'Exiting because future logs are visible after resetting the repo to the base commit.' && "
+                "    echo 'This means something went wrong during the setup procedure.' && "
+                "    exit 1; "
+                "fi && "
                 f"{command}"
             )
         else:
