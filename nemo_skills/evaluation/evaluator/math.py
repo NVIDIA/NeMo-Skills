@@ -98,33 +98,20 @@ class Lean4ProofEvaluator(BaseEvaluator):
         )
 
         # Execute proof and get compiler output
-        try:
-            output, _ = await sandbox.execute_code(
-                generated_code=predicted_proof,
-                language="lean4",
-                timeout=eval_config.timeout,
-            )
+        output, _ = await sandbox.execute_code(
+            generated_code=predicted_proof,
+            language="lean4",
+            timeout=eval_config.timeout,
+        )
 
-            # Determine proof status using shared utility
-            proof_status = determine_proof_status(output)
+        # Determine proof status using shared utility
+        proof_status = determine_proof_status(output)
 
-            return {
-                "predicted_proof": predicted_proof,
-                "proof_status": proof_status,
-                "lean_evaluation": {**output, "timeout": eval_config.timeout},
-            }
-
-        except Exception as e:
-            return {
-                "predicted_proof": predicted_proof,
-                "proof_status": "error",
-                "lean_evaluation": {
-                    "process_status": "error",
-                    "stdout": "",
-                    "stderr": f"Error during evaluation: {str(e)}",
-                    "timeout": eval_config.timeout,
-                },
-            }
+        return {
+            "predicted_proof": predicted_proof,
+            "proof_status": proof_status,
+            "lean_evaluation": {**output, "timeout": eval_config.timeout},
+        }
 
 
 class Lean4StatementEvaluator(BaseEvaluator):
