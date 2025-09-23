@@ -42,9 +42,6 @@ class BaseEvaluator(ABC):
         semaphore = asyncio.Semaphore(self.num_parallel_requests)
         for input_file in tqdm.tqdm(unroll_files(input_files), desc="Processing files"):
             # assume that input_file is small enough to entirely fit in the memory
-            with open(input_file, "rt", encoding="utf-8") as f:
-                num_lines = sum(1 for _ in f)
-
             async def process_line(line_data):
                 # Evaluate proof with concurrency control
                 async with semaphore:
@@ -52,9 +49,7 @@ class BaseEvaluator(ABC):
 
             with open(input_file, "rt", encoding="utf-8") as fin:
                 tasks = []
-                for file_line in tqdm.tqdm(
-                    fin, total=num_lines, desc=f"Queuing Evaluation for {os.path.basename(input_file)}"
-                ):
+                for file_line in fin:
                     line_dict = json.loads(file_line)
                     task = asyncio.create_task(process_line(line_dict))
                     tasks.append(task)
