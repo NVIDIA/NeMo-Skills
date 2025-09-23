@@ -42,7 +42,6 @@ class BaseEvaluator(ABC):
         semaphore = asyncio.Semaphore(self.num_parallel_requests)
         for input_file in tqdm.tqdm(unroll_files(input_files), desc="Processing files"):
             # assume that input_file is small enough to entirely fit in the memory
-            input_data = []
             with open(input_file, "rt", encoding="utf-8") as f:
                 num_lines = sum(1 for _ in f)
 
@@ -52,20 +51,21 @@ class BaseEvaluator(ABC):
                     return await self.eval_single(line_data)
 
             with open(input_file, "rt", encoding="utf-8") as fin:
-                # TODO we could possibly make this more efficient by allowing concurrent processing, but this is an okay base impl
                 tasks = []
-                for file_line in tqdm.tqdm(fin, total=num_lines, desc=f"Evaluating {os.path.basename(input_file)}"):
+                for file_line in tqdm.tqdm(
+                    fin, total=num_lines, desc=f"Queuing Evaluation for {os.path.basename(input_file)}"
+                ):
                     line_dict = json.loads(file_line)
                     task = asyncio.create_task(process_line(line_dict))
                     tasks.append(task)
 
-                for coro in tqdm.tqdm(asyncio.gather(tasks), total=len(tasks)):
-                    input_data.append(await coro)
-
-            # Write to temp file then replace original
+            # Await tasks and write to temp file then replace original
             temp_file = input_file + "-tmp"
             with open(temp_file, "wt", encoding="utf-8") as f:
-                for line in input_data:
+                for tasks in tqdm.tqdm(
+                    tasks, total=len(tasks), desc=f"Completed Evaluation for {os.path.basename(input_file)}"
+                ):
+                    line = await task
                     f.write(json.dumps(line) + "\n")
 
             # Replace original with temp file
