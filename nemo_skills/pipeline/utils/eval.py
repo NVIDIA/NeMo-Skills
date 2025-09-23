@@ -15,12 +15,15 @@
 import importlib
 import logging
 import os
+import re
+import shlex
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import get_dataset_module, import_from_path
+from nemo_skills.evaluation.evaluator import supports_single_eval
 from nemo_skills.inference import GENERATION_MODULE_MAP
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.utils import compute_chunk_ids, get_logger_name
@@ -29,6 +32,8 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def parse_eval_args(eval_args: str) -> tuple[str | None, dict]:
+    # TODO we ideally don't want to rely on custom parsing of the command, but
+    # some major refactoring or clever ideas might be needed
     """Parse eval_args string to extract eval_type and eval_config.
 
     Handles Hydra argument formats:
@@ -38,9 +43,6 @@ def parse_eval_args(eval_args: str) -> tuple[str | None, dict]:
     """
     if not eval_args:
         return None, {}
-
-    import re
-    import shlex
 
     eval_type = None
     eval_config = {}
@@ -79,13 +81,7 @@ def should_use_single_eval(eval_args: str) -> bool:
     if not eval_type:
         return False
 
-    try:
-        from nemo_skills.evaluation.evaluator import supports_single_eval
-
-        return supports_single_eval(eval_type, eval_config)
-    except Exception:
-        # If there's any error checking, fall back to batch eval
-        return False
+    return supports_single_eval(eval_type, eval_config)
 
 
 @dataclass
