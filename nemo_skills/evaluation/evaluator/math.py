@@ -66,18 +66,23 @@ class MathEvaluator(BaseEvaluator):
 class Lean4ProofEvaluator(BaseEvaluator):
     """Lean4 proof evaluator - supports both single and batch evaluation."""
 
+    def __init__(self, config: dict, num_parallel_requests=10):
+        """Initialize Lean4ProofEvaluator with sandbox."""
+        super().__init__(config, num_parallel_requests)
+        eval_config = LeanEvaluatorConfig(**self.config)
+        self.sandbox = get_sandbox(**eval_config.sandbox)
+        self.eval_config = eval_config
+
     async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
         """Evaluate single Lean4 proof during generation."""
-        eval_config = LeanEvaluatorConfig(**self.config)
-        sandbox = get_sandbox(**eval_config.sandbox)
 
         # Prepare predicted_proof using shared utility
         generation = data_point["generation"]
 
         config = ProofBuildConfig(
-            final_answer_key=eval_config.final_answer_key,
-            extract_code_mode=eval_config.extract_code_mode,
-            restate_formal_statement=eval_config.restate_formal_statement,
+            final_answer_key=self.eval_config.final_answer_key,
+            extract_code_mode=self.eval_config.extract_code_mode,
+            restate_formal_statement=self.eval_config.restate_formal_statement,
             strip_theorem_from_proof=True,  # Default behavior for proofs
         )
 
@@ -86,10 +91,10 @@ class Lean4ProofEvaluator(BaseEvaluator):
         )
 
         # Execute proof and get compiler output
-        output, _ = await sandbox.execute_code(
+        output, _ = await self.sandbox.execute_code(
             generated_code=predicted_proof,
             language="lean4",
-            timeout=eval_config.timeout,
+            timeout=self.eval_config.timeout,
         )
 
         # Determine proof status using shared utility
@@ -98,20 +103,25 @@ class Lean4ProofEvaluator(BaseEvaluator):
         return {
             "predicted_proof": predicted_proof,
             "proof_status": proof_status,
-            "lean_evaluation": {**output, "timeout": eval_config.timeout},
+            "lean_evaluation": {**output, "timeout": self.eval_config.timeout},
         }
 
 
 class Lean4StatementEvaluator(BaseEvaluator):
     """Lean4 statement evaluator - only supports batch evaluation."""
 
+    def __init__(self, config: dict, num_parallel_requests=10):
+        """Initialize Lean4StatementEvaluator with sandbox."""
+        super().__init__(config, num_parallel_requests)
+        eval_config = LeanEvaluatorConfig(**self.config)
+        self.sandbox = get_sandbox(**eval_config.sandbox)
+        self.eval_config = eval_config
+
     async def eval_full(self, input_files: list[str], **kwargs) -> None:
         """Batch evaluate Lean4 statements."""
-        eval_config = LeanEvaluatorConfig(**self.config)
-        sandbox = get_sandbox(**eval_config.sandbox)
-        eval_config_dict = asdict(eval_config)
+        eval_config_dict = asdict(self.eval_config)
         eval_config_dict.pop("sandbox")
-        await sandbox.batch_evaluate_results(
+        await self.sandbox.batch_evaluate_results(
             input_files=input_files,
             answer_format="lean4-statement",
             **eval_config_dict,
