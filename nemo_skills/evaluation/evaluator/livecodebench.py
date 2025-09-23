@@ -54,7 +54,7 @@ async def eval_livecodebench_async(cfg):
     if eval_config.language == "cpp" and eval_config.test_file is None:
         raise ValueError("C++ evaluation requires a test_file.")
 
-    async with get_sandbox(**eval_config.sandbox) as sandbox:
+    with get_sandbox(**eval_config.sandbox) as sandbox:
         # Install dependencies only once
         if not await install_livecodebench(sandbox, eval_config.interpreter):
             return  # Stop if installation fails
