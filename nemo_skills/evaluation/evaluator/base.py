@@ -37,7 +37,6 @@ class BaseEvaluator(ABC):
 
         Args:
             input_files: List of input files to evaluate
-            **kwargs: Additional evaluation parameters
         """
         semaphore = asyncio.Semaphore(self.num_parallel_requests)
         for input_file in tqdm.tqdm(unroll_files(input_files), desc="Processing files"):
