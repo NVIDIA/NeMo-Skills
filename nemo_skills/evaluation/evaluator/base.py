@@ -43,10 +43,14 @@ class BaseEvaluator(ABC):
         for input_file in tqdm.tqdm(unroll_files(input_files), desc="Processing files"):
             # assume that input_file is small enough to entirely fit in the memory
             async def process_line(line_data):
-                # Evaluate proof with concurrency control
+                # Concurrency control and merge updates into original record
                 async with semaphore:
-                    return await self.eval_single(line_data)
-
+                    updates = await self.eval_single(line_data)
+                    if isinstance(updates, dict):
+                        merged = dict(line_data)
+                        merged.update(updates)
+                        return merged
+                    return line_data
             with open(input_file, "rt", encoding="utf-8") as fin:
                 tasks = []
                 for file_line in fin:
