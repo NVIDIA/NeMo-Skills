@@ -377,6 +377,28 @@ async def test_lean4_code_execution_failure():
 
 
 @pytest.mark.asyncio
+async def test_state_restoration():
+    sandbox = _get_sandbox()
+
+    # Build history with visible outputs
+    out1, sid = await sandbox.execute_code('print("H1"); a = 41', language="ipython")
+    assert out1["process_status"] == "completed"
+
+    out2, sid = await sandbox.execute_code('print("H2"); a += 1', session_id=sid, language="ipython")
+    assert out2["process_status"] == "completed"
+
+    # Force a new backend shell for the same session to trigger client-side restoration
+    await sandbox.delete_session(str(sid))
+
+    # Execute code that relies on restored state; stdout should be ONLY from this new execution
+    out3, sid = await sandbox.execute_code("print(a)", session_id=sid, language="ipython")
+    assert out3["process_status"] == "completed"
+    assert out3["stdout"] == "42\n"
+    assert "H1" not in out3["stdout"]
+    assert "H2" not in out3["stdout"]
+
+
+@pytest.mark.asyncio
 async def test_minif2f_deepseek_fewshots():
     sandbox = _get_sandbox()
 
