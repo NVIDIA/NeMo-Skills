@@ -108,7 +108,7 @@ def get_evaluator(eval_type: str, config: Dict[str, Any]) -> BaseEvaluator:
 
 
 def supports_single_eval(eval_type: str, config: Dict[str, Any]) -> bool:
-    """Check if evaluator supports single evaluation during generation."""
+    """Check if evaluator supports single data point evaluation during generation."""
     if eval_type not in EVALUATOR_CLASS_MAP:
         return False  # Only class-based evaluators support single eval
 
