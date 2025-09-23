@@ -522,12 +522,13 @@ class GenerationTask:
 
         result = await self.llm.generate_async(**generation_params)
 
-        # Apply evaluation hook if configured
-        if self.evaluator:
-            eval_results = await self.evaluator.eval_single({**data_point, **result})
-            result.update(eval_results)
-
         return result
+
+    async def apply_evaluation_hook(self, data_point):
+        if self.evaluator:
+            eval_results = await self.evaluator.eval_single(data_point)
+            data_point.update(eval_results)
+        return data_point
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point with semaphore control."""
@@ -537,6 +538,8 @@ class GenerationTask:
 
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
+            # Apply evaluation hook if configured
+            output = await self.apply_evaluation_hook({**data_point, **output})
 
             # Thread-safe output writing
             async with self.output_lock:
