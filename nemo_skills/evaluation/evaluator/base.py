@@ -31,7 +31,7 @@ class BaseEvaluator(ABC):
         self.config = config
         self.num_parallel_requests = num_parallel_requests
 
-    async def eval_full(self, input_files: List[str], **kwargs) -> None:
+    async def eval_full(self, input_files: List[str]) -> None:
         """
         Evaluate full dataset in batch mode.
 

@@ -120,7 +120,7 @@ class Lean4StatementEvaluator(BaseEvaluator):
         self.sandbox = get_sandbox(**eval_config.sandbox)
         self.eval_config = eval_config
 
-    async def eval_full(self, input_files: list[str], **kwargs) -> None:
+    async def eval_full(self, input_files: list[str]) -> None:
         """Batch evaluate Lean4 statements."""
         eval_config_dict = asdict(self.eval_config)
         eval_config_dict.pop("sandbox")
