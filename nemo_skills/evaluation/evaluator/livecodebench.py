@@ -12,7 +12,6 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-# Define constants for better readability and maintenance
 LIVECODEBENCH_PYTHON_GIT_URL = (
     "git+https://github.com/wasiahmad/livecodebench.git@f285640c20aaf18df1ee5917621a596af4630b5e"
 )
@@ -46,7 +45,6 @@ async def install_livecodebench(sandbox, interpreter: str):
 
 
 async def eval_livecodebench_async(cfg):
-    """Asynchronous core logic for evaluating LiveCodeBench."""
     eval_config = LiveCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
 
     if eval_config.language == "python" and eval_config.interpreter not in ["python", "pypy3"]:
