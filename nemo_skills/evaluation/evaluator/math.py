@@ -56,11 +56,14 @@ class LeanEvaluatorConfig:
 
 
 class MathEvaluator(BaseEvaluator):
+    def __init__(self, config: dict, num_parallel_requests=10):
+        super().__init__(config, num_parallel_requests)
+        self.eval_config = MathEvaluatorConfig(**self.config)
+        self.eval_config_dict = asdict(self.eval_config)
+
     async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
         """Evaluate single problem for math"""
-        eval_config = MathEvaluatorConfig(**self.config)
-        eval_config_dict = asdict(eval_config)
-        return evaluate_result(data_point, **eval_config_dict)
+        return evaluate_result(data_point, **self.eval_config_dict)
 
 
 class Lean4ProofEvaluator(BaseEvaluator):
