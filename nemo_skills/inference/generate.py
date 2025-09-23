@@ -542,6 +542,10 @@ class GenerationTask:
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
             # Apply evaluation hook if configured
+            # TODO: note that this currently only evaluates independently--if there
+            # is any post-processing that needs to be done on the full set of
+            # generations, this will not work correctly, and we might need another
+            # hook at the end of generation to make it work properly
             output = await self.apply_evaluation_hook({**data_point, **output})
 
             # Thread-safe output writing
