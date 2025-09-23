@@ -218,21 +218,41 @@ class Sandbox(abc.ABC):
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
         new_session_created = output.pop("new_session_created", False)
 
-        # Rebuild state by executing concatenated history
+        # Rebuild state by re-executing history first, then execute the new code
         if session_id is not None and new_session_created:
-            # TODO: this history restoration is not ideal, we are returning output that is not the actual output of the new code
-            # and the execution of the concatenation may not be the same as the execution of the respective cells
-            # see details in this thread: https://github.com/NVIDIA/NeMo-Skills/pull/803#discussion_r2338240505
             history = self.session_histories.get(session_id, [])
-            combined_code = "\n".join(history) + ("\n" if history else "") + generated_code
-            request = self._prepare_request(
-                combined_code, timeout, language, std_input, max_output_characters, traceback_verbosity
-            )
-            request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
-            try:
-                output = await self._send_request(request, timeout)
-            except httpx.TimeoutException:
-                output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+            restoration_failed = False
+            if history:
+                # Restore session state by executing only the history cells
+                restore_code = "\n".join(history)
+                restore_request = self._prepare_request(
+                    restore_code, timeout, language, std_input, max_output_characters, traceback_verbosity
+                )
+                restore_request["session_id"] = (
+                    request_session_id if request_session_id is None else str(request_session_id)
+                )
+                try:
+                    restore_output = await self._send_request(restore_request, timeout)
+                except httpx.TimeoutException:
+                    restore_output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+
+                # If restoration didn't complete successfully, return that result and skip executing new code
+                if restore_output.get("process_status") != "completed":
+                    output = restore_output
+                    restoration_failed = True
+
+            # Execute the new code if restoration succeeded or there was no history to restore
+            if not restoration_failed:
+                exec_request = self._prepare_request(
+                    generated_code, timeout, language, std_input, max_output_characters, traceback_verbosity
+                )
+                exec_request["session_id"] = (
+                    request_session_id if request_session_id is None else str(request_session_id)
+                )
+                try:
+                    output = await self._send_request(exec_request, timeout)
+                except httpx.TimeoutException:
+                    output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
         # Append to history if successful execution (process_status == 'completed')
         if output.get("process_status") == "completed":
