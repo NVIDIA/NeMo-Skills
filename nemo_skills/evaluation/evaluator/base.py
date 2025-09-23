@@ -51,6 +51,7 @@ class BaseEvaluator(ABC):
                         merged.update(updates)
                         return merged
                     return line_data
+
             with open(input_file, "rt", encoding="utf-8") as fin:
                 tasks = []
                 for file_line in fin:
