@@ -15,7 +15,7 @@
 import asyncio
 import json
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, Dict, List
 
 import tqdm
@@ -31,7 +31,6 @@ class BaseEvaluator(ABC):
         self.config = config
         self.num_parallel_requests = num_parallel_requests
 
-    @abstractmethod
     async def eval_full(self, input_files: List[str], **kwargs) -> None:
         """
         Evaluate full dataset in batch mode.

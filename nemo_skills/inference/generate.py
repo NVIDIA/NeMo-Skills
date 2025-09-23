@@ -292,7 +292,7 @@ class GenerationTask:
         # Setup evaluator if specified
         self.evaluator = None
         if self.cfg.eval_type:
-            from nemo_skills.evaluation.evaluator import get_evaluator, supports_single_eval
+            from nemo_skills.evaluation.evaluator import get_evaluator_class, supports_single_eval
 
             if not supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
                 raise ValueError(
@@ -300,7 +300,7 @@ class GenerationTask:
                     f"Use the evaluation pipeline instead."
                 )
 
-            self.evaluator = get_evaluator(self.cfg.eval_type, self.cfg.eval_config)
+            self.evaluator = get_evaluator_class(self.cfg.eval_type, self.cfg.eval_config)
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
