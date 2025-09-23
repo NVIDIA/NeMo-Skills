@@ -62,7 +62,7 @@ class BaseEvaluator(ABC):
             # Await tasks and write to temp file then replace original
             temp_file = input_file + "-tmp"
             with open(temp_file, "wt", encoding="utf-8") as f:
-                for tasks in tqdm.tqdm(
+                for task in tqdm.tqdm(
                     tasks, total=len(tasks), desc=f"Completed Evaluation for {os.path.basename(input_file)}"
                 ):
                     line = await task
