@@ -22,7 +22,7 @@ from nemo_skills.code_execution.proof_utils import (
 )
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator
-from nemo_skills.evaluation.math_grader import batch_evaluate_results
+from nemo_skills.evaluation.math_grader import evaluate_result
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -56,16 +56,11 @@ class LeanEvaluatorConfig:
 
 
 class MathEvaluator(BaseEvaluator):
-    """Math evaluator - only supports batch evaluation."""
-
-    async def eval_full(self, input_files: list[str], **kwargs) -> None:
-        """Batch evaluate math problems."""
+    async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
+        """Evaluate single problem for math"""
         eval_config = MathEvaluatorConfig(**self.config)
         eval_config_dict = asdict(eval_config)
-        batch_evaluate_results(
-            input_files=input_files,
-            **eval_config_dict,
-        )
+        return evaluate_result(data_point, **eval_config_dict)
 
 
 class Lean4ProofEvaluator(BaseEvaluator):

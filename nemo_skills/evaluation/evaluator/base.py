@@ -12,8 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
+
+import tqdm
+
+from nemo_skills.utils import unroll_files
 
 
 class BaseEvaluator(ABC):
@@ -32,7 +38,22 @@ class BaseEvaluator(ABC):
             input_files: List of input files to evaluate
             **kwargs: Additional evaluation parameters
         """
-        pass
+        for input_file in tqdm.tqdm(unroll_files(input_files), desc="Processing files"):
+            # assume that input_file is small enough to entirely fit in the memory
+            input_data = []
+            with open(input_file, "rt", encoding="utf-8") as f:
+                num_lines = sum(1 for _ in f)
+
+            with open(input_file, "rt", encoding="utf-8") as fin:
+                # TODO we could possibly make this more efficient by allowing concurrent processing, but this is an okay base impl
+                for file_line in tqdm.tqdm(fin, total=num_lines, desc=f"Evaluating {os.path.basename(input_file)}"):
+                    line_dict = json.loads(file_line)
+                    line_dict = await self.eval_single(line_dict)
+                    input_data.append(line_dict)
+
+            with open(input_file, "wt", encoding="utf-8", buffering=1) as fout:
+                for line_dict in input_data:
+                    fout.write(json.dumps(line_dict) + "\n")
 
     async def eval_single(self, data_point: Dict[str, Any]) -> Dict[str, Any]:
         """
