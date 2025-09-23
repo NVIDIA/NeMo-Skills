@@ -54,10 +54,11 @@ async def eval_livecodebench_async(cfg):
     if eval_config.language == "cpp" and eval_config.test_file is None:
         raise ValueError("C++ evaluation requires a test_file.")
 
-    with get_sandbox(**eval_config.sandbox) as sandbox:
-        # Install dependencies only once
+    sandbox = get_sandbox(**eval_config.sandbox)
+
+    try:
         if not await install_livecodebench(sandbox, eval_config.interpreter):
-            return  # Stop if installation fails
+            return
 
         release_version = None
         for jsonl_file_path_str in unroll_files(cfg.input_files):
@@ -132,6 +133,11 @@ async def eval_livecodebench_async(cfg):
             shutil.move(str(eval_results_file), str(saved_results_file))
             temp_eval_file.unlink()  # Remove the temporary file
             LOG.info(f"Finished processing and saved results for {jsonl_file.name}")
+
+    finally:
+        # 3. Ensure the sandbox is closed in the `finally` block
+        LOG.info("Closing sandbox...")
+        await sandbox.close()  # Make sure to check if '.close()' is the correct method name
 
 
 def eval_livecodebench(cfg):
