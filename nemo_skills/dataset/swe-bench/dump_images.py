@@ -78,7 +78,7 @@ def main():
     parser.add_argument("input_file", help="JSONL file to read container URLs from (SWE-bench format)")
     parser.add_argument("output_directory", help="Directory to save SIF files")
     parser.add_argument(
-        "--max-workers", "-j", type=int, default=20, help="Number of parallel conversions (default: 20)"
+        "--max_workers", "-j", type=int, default=20, help="Number of parallel conversions (default: 20)"
     )
 
     args = parser.parse_args()
