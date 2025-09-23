@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import logging
 from dataclasses import asdict, field
 
@@ -42,12 +41,6 @@ class MathEvaluatorConfig:
     take_modulo: int | None = None  # will take modulo of the gt and predicted answers if not None
 
 
-def eval_math(cfg):
-    """Legacy function - delegates to MathEvaluator class."""
-    evaluator = MathEvaluator(cfg.eval_config)
-    asyncio.run(evaluator.eval_full(cfg.input_files))
-
-
 @nested_dataclass(kw_only=True)
 class LeanEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
@@ -57,18 +50,6 @@ class LeanEvaluatorConfig:
     restate_formal_statement: bool = True
     # Which code block to extract when multiple are present: "first" or "last"
     extract_code_mode: str = "last"
-
-
-def eval_lean4_proof(cfg):
-    """Legacy function - delegates to Lean4ProofEvaluator class."""
-    evaluator = Lean4ProofEvaluator(cfg.eval_config)
-    asyncio.run(evaluator.eval_full(cfg.input_files))
-
-
-def eval_lean4_statement(cfg):
-    """Legacy function - delegates to Lean4StatementEvaluator class."""
-    evaluator = Lean4StatementEvaluator(cfg.eval_config)
-    asyncio.run(evaluator.eval_full(cfg.input_files))
 
 
 # Evaluator Classes
