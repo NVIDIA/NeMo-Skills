@@ -46,11 +46,9 @@ class BaseEvaluator(ABC):
                 # Concurrency control and merge updates into original record
                 async with semaphore:
                     updates = await self.eval_single(line_data)
-                    if isinstance(updates, dict):
-                        merged = dict(line_data)
-                        merged.update(updates)
-                        return merged
-                    return line_data
+                    merged = dict(line_data)
+                    merged.update(updates)
+                    return merged
 
             with open(input_file, "rt", encoding="utf-8") as fin:
                 tasks = []
