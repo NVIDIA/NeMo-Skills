@@ -65,7 +65,6 @@ class ResponsesModel(BaseModel):
             "temperature": temperature,
             "top_p": top_p,
             "stream": stream,
-            "tools": tools,
             "extra_body": {
                 "seed": random_seed,
                 "reasoning_effort": reasoning_effort,
@@ -78,6 +77,10 @@ class ResponsesModel(BaseModel):
                 **(extra_body or {}),
             },
         }
+
+        # Only include tools if they are provided
+        if tools is not None:
+            request["tools"] = tools
 
         return request
 
@@ -106,7 +109,6 @@ class ResponsesModel(BaseModel):
             "temperature": temperature,
             "top_p": top_p,
             "stream": stream,
-            "tools": tools,
             "extra_body": {
                 "seed": random_seed,
                 "reasoning_effort": reasoning_effort,
@@ -119,6 +121,10 @@ class ResponsesModel(BaseModel):
                 **(extra_body or {}),
             },
         }
+
+        # Only include tools if they are provided
+        if tools is not None:
+            request["tools"] = tools
 
         return request
 
@@ -171,10 +177,36 @@ class ResponsesModel(BaseModel):
         if hasattr(response, "status"):
             result["finish_reason"] = response.status
 
+        # Add serialized output for conversation history
+        result["serialized_output"] = self._serialize_response_output(response)
+
         if include_response:
             result["response"] = response
 
         return result
+
+    def _serialize_response_output(self, response) -> list[dict]:
+        """Serialize response output objects using model_dump() for conversation history."""
+        serialized_output = []
+
+        if hasattr(response, "output") and response.output:
+            for output_item in response.output:
+                try:
+                    # Try to use model_dump() method if available (Pydantic models)
+                    if hasattr(output_item, "model_dump"):
+                        serialized_output.append(output_item.model_dump())
+                    # Fallback to dict conversion
+                    elif hasattr(output_item, "__dict__"):
+                        serialized_output.append(output_item.__dict__)
+                    # Last resort: convert to string representation
+                    else:
+                        serialized_output.append({"content": str(output_item), "type": "unknown"})
+                except Exception as e:
+                    LOG.warning(f"Failed to serialize output item: {e}")
+                    # Fallback serialization
+                    serialized_output.append({"content": str(output_item), "type": "error", "error": str(e)})
+
+        return serialized_output
 
     @with_context_retry
     async def generate_async(
@@ -229,8 +261,8 @@ class ResponsesModel(BaseModel):
         LOG.info(f"Model name from litellm_kwargs: {self.litellm_kwargs['model']}")
         LOG.info(f"Base URL: {self.base_url}")
 
-        # Use the full model name as vLLM expects it
-        model_name = self.litellm_kwargs["model"]  # Should be openai/gpt-oss-20b
+        # Use the original model name (without litellm prefix) for OpenAI client
+        model_name = self.model_name_or_path  # Just gpt-oss-20b
         LOG.info(f"About to call responses.create with model: {model_name}")
 
         response = await self.async_client.responses.create(model=model_name, **request_params)
@@ -297,8 +329,8 @@ class ResponsesModel(BaseModel):
         LOG.info(f"Making sync responses API call with params: {request_params}")
         LOG.info(f"Model name: {self.litellm_kwargs['model']}")
 
-        # Use the full model name as vLLM expects it
-        model_name = self.litellm_kwargs["model"]  # Keep openai/gpt-oss-20b
+        # Use the original model name (without litellm prefix) for OpenAI client
+        model_name = self.model_name_or_path  # Just gpt-oss-20b
 
         response = self.client.responses.create(model=model_name, **request_params)
 

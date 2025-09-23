@@ -23,7 +23,12 @@ from typing import Dict, List
 from nemo_skills.mcp.adapters import (
     ChatCompletionCallInterpreter,
     ChatCompletionResponseFormatter,
+    CompletionConversationManager,
     OpenAISchemaAdapter,
+    ResponsesCallInterpreter,
+    ResponsesConversationManager,
+    ResponsesResponseFormatter,
+    ResponsesSchemaAdapter,
 )
 from nemo_skills.mcp.tool_manager import ToolManager
 from nemo_skills.utils import get_logger_name
@@ -59,10 +64,28 @@ class ToolCallingWrapper:
             overrides=tool_overrides or {},
             context=additional_config,
         )
-        # Use sensible defaults for adapters in module-based mode
-        self.schema_adapter = OpenAISchemaAdapter()
-        self.call_interpreter = ChatCompletionCallInterpreter()
-        self.response_formatter = ChatCompletionResponseFormatter()
+
+        # Detect model type and set up appropriate adapters
+        self._setup_adapters()
+
+    def _setup_adapters(self):
+        """Set up adapters based on model type."""
+        # Import here to avoid circular imports
+        from .responses import ResponsesModel
+
+        # Detect model type and configure adapters
+        if isinstance(self.model, ResponsesModel):
+            # Responses API model - uses flatter tool schema format
+            self.schema_adapter = ResponsesSchemaAdapter()
+            self.call_interpreter = ResponsesCallInterpreter()
+            self.response_formatter = ResponsesResponseFormatter()
+            self.conversation_manager = ResponsesConversationManager()
+        else:
+            # Chat completion model (default) - uses nested function format
+            self.schema_adapter = OpenAISchemaAdapter()
+            self.call_interpreter = ChatCompletionCallInterpreter()
+            self.response_formatter = ChatCompletionResponseFormatter()
+            self.conversation_manager = CompletionConversationManager()
 
     async def _execute_tool_call(self, tool_call, request_id: str):
         ## TODO(sanyamk): The correct key format needs to be cohesive with other formatters.
@@ -103,7 +126,7 @@ class ToolCallingWrapper:
         tokens_to_generate: int = None,
         **generation_kwargs,
     ) -> Dict:
-        assert isinstance(prompt, list), "Only use ChatCompletion API for now."
+        assert isinstance(prompt, list), "Prompt must be a list for tool calling."
 
         assert tools is None, "Do not pass 'tools'; they are derived from tool_modules."
 
@@ -133,19 +156,41 @@ class ToolCallingWrapper:
                 if k in generation:
                     result_steps[k].append(generation[k])
 
-            conversation.append({"role": "assistant", "content": generation["generation"]})
-            if "reasoning_content" in generation:
-                conversation[-1]["reasoning_content"] = generation["reasoning_content"]
+            # Use conversation manager to add assistant response
+            self.conversation_manager.add_assistant_response(conversation, generation)
 
+            # Check for tool calls (simple and direct)
             tool_calls = generation.get("tool_calls", [])
             if tool_calls:
                 tool_calls_message = self.call_interpreter.parse(tool_calls)
-                conversation[-1].update(tool_calls_message)
 
-                tool_calls_output_messages = await self._execute_tool_calls(
-                    tool_calls_message["tool_calls"], request_id=request_id
-                )
-                conversation.extend(tool_calls_output_messages)
+                # Update the last message with tool calls (for completion models)
+                if (
+                    hasattr(self.conversation_manager, "__class__")
+                    and "Completion" in self.conversation_manager.__class__.__name__
+                ):
+                    if conversation and conversation[-1].get("role") == "assistant":
+                        conversation[-1].update(tool_calls_message)
+
+                tool_results = await self._execute_tool_calls(tool_calls_message["tool_calls"], request_id=request_id)
+
+                # For completion models, the tool results are already formatted messages
+                # For responses models, we need to extract the actual results
+                if (
+                    hasattr(self.conversation_manager, "__class__")
+                    and "Responses" in self.conversation_manager.__class__.__name__
+                ):
+                    # Extract raw results for responses conversation manager
+                    raw_results = []
+                    for result_msg in tool_results:
+                        # ResponsesResponseFormatter creates {"type": "function_call_output", "call_id": "...", "output": "..."}
+                        raw_results.append(result_msg.get("output", ""))
+                    self.conversation_manager.add_tool_results(
+                        conversation, tool_calls_message["tool_calls"], raw_results
+                    )
+                else:
+                    # For completion models, add the formatted messages directly
+                    conversation.extend(tool_results)
 
                 result_steps["num_tool_calls"].append(len(tool_calls))
 
