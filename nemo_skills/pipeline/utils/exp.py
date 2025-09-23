@@ -110,7 +110,7 @@ def get_sandbox_command(cluster_config):
 def get_search_command(cluster_config):
     if cluster_config["executor"] == "none":
         return "python -m nemo_tir.services.search.server"
-    return "/entrypoint.sh"
+    return "/entrypoint"
 
 
 @dataclass(kw_only=True)
