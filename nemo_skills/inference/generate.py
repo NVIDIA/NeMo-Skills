@@ -526,7 +526,10 @@ class GenerationTask:
 
     async def apply_evaluation_hook(self, data_point):
         if self.evaluator:
+            eval_start_time = time.time()
             eval_results = await self.evaluator.eval_single(data_point)
+            eval_end_time = time.time()
+            data_point["interleaved_eval_single_time_s"] = eval_end_time - eval_start_time
             data_point.update(eval_results)
         return data_point
 
