@@ -31,9 +31,6 @@ from nemo_skills.evaluation.evaluator.math import (
     Lean4ProofEvaluator,
     Lean4StatementEvaluator,
     MathEvaluator,
-    eval_lean4_proof,
-    eval_lean4_statement,
-    eval_math,
 )
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
