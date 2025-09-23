@@ -125,6 +125,7 @@ class GenSelectPreprocessor:
                 
     def read_files(self, file_paths, single_correctness_instances_path):
         problem_to_instances = defaultdict(list)
+        print("file_paths: ", file_paths)
         for file_path in file_paths:
             problem_to_instance = self.read_file(file_path)
             for problem, instance in problem_to_instance.items():
