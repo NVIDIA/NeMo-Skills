@@ -1,0 +1,6 @@
+user: |-
+ Solve the following math problem step by step. Put your answer inside \boxed{{}}.
+
+ {problem}
+
+ Remember to put your answer inside \boxed{{}}.

@@ -14,7 +14,7 @@
 import logging
 from pathlib import Path
 import glob
-
+import yaml
 import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
@@ -27,25 +27,34 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def robust_eval(ctx: typer.Context,
-                prompts_folder: str = typer.Option(..., help="Path to the folder inside /prompt/config/ containing the prompt yaml files to run."),
+                prompt_set_config: str = typer.Option(..., help="Path to a yaml file containting list of prompts per benchmark"),
                 **ns_eval_kwargs):
-
-    benchmark_prompts = prompts_folder.split(',')
+    """Run evaluation on multiple prompts and benchmarks to measure LLM robustness against prompt.
+    Code expects a yaml file with the following structure: (example in /nemo_skills/prompt/config/robustness/prompt_set_config.yaml)
+    ```yaml
+    <benchmark_name>:
+      - <path_to_prompt_1>
+      - <path_to_prompt_2>
+      ...
+    <another_benchmark_name>:
+        - <path_to_prompt_1>
+        - <path_to_prompt_2>
+        ...
+    All other arguments are 'ns eval arguments'.
+    robust_eval will run 'ns eval' for each prompt and benchmark combination and then summarize the results in the output_dir folder.
+    """
+    prompt_set_config = yaml.safe_load(open(prompt_set_config))
     benchmarks = ns_eval_kwargs['benchmarks'].split(',')
-    if len(benchmark_prompts) != len(benchmarks):
-        raise ValueError(f"Number of benchmark names ({len(benchmarks)}) must match number of benchmark prompt folders ({len(benchmark_prompts)})")
+    if set(prompt_set_config.keys()) != set([b.split(':')[0] for b in benchmarks]):
+        raise ValueError(f"Benchmark names ({benchmarks}) must match prompt set config({prompt_set_config.keys()})")
     main_output_dir = ns_eval_kwargs['output_dir']
     main_expname = ns_eval_kwargs['expname']
-    for benchmark, prompt_folder in zip(benchmarks, benchmark_prompts):
-        prompts_dir = f"nemo_skills/prompt/config/{prompt_folder}"
-        prompts_to_run = glob.glob(f"{prompts_dir}/*.yaml")
-        if not prompts_to_run:
-            raise ValueError(f"No prompt .yaml files found in the specified directory: {prompts_dir}")
-        LOG.info(f"Found {len(prompts_to_run)} prompts to run in {prompts_dir}")
+    for benchmark in benchmarks:
         dependent_tasks = []
         ns_eval_kwargs['benchmarks'] = benchmark
         benchmark = benchmark.split(':')[0]  # Remove any :N suffix for output dir naming
-        for prompt in prompts_to_run:
+        LOG.info(f"Running {len(prompt_set_config[benchmark])} prompts on {benchmark}")
+        for prompt in prompt_set_config[benchmark]:
             LOG.info(f"Running prompt: {prompt}")
             ctx.args = [arg for arg in ctx.args if "++prompt_config" not in arg]
             ctx.args.append(f"++prompt_config={prompt}")
@@ -62,7 +71,7 @@ def robust_eval(ctx: typer.Context,
         command = (
                 f"python -m nemo_skills.pipeline.summarize_robustness {main_output_dir}"
             )
-        score_task = pipeline_utils.add_task(
+        summ_task = pipeline_utils.add_task(
             exp,
             cmd=command,
             task_name=f"summ_robust",

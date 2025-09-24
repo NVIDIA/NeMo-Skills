@@ -41,36 +41,23 @@ from nemo_skills.utils import get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def calculate_single_metric(input_file):
-    """Calculate a single metric from a given input file."""
-    metrics_calculator = ComputeMetrics(benchmark="custom", metric_type="math", max_samples=-1)
-    metrics_calculator.calculators = {'_all_': metrics_calculator.get_metrics_calculator()}
-    metrics_calculator.calculators['_all_'].setup([input_file])
-
-    with open(input_file, "rt", encoding="utf-8") as f:
-        for idx, line in enumerate(f):
-            data = read_predictions([line], idx, [f])
-            metrics_calculator.calculators['_all_'].update(data)
-
-    return metrics_calculator.calculators['_all_'].get_metrics()
-
-
 def calculate_metric_range(input_files):
     """Calculate the range of a metric across multiple input files."""
     per_file_metrics = []
-
+    no_answer = []
     for input_file in input_files:
-        metrics = calculate_single_metric(input_file)
-        per_file_metrics.append(metrics['pass@1']['symbolic_correct'])
+        metrics_calculator = ComputeMetrics(benchmark="custom", metric_type="math", max_samples=-1)
+        metrics_calculator.calculator = metrics_calculator.get_metrics_calculator()
 
-    # Compute the range for each metric
-    metric_range = { 
-        "min": np.min(per_file_metrics),
-        "max": np.max(per_file_metrics),
-        "avg": np.mean(per_file_metrics),
-        'std': np.std(per_file_metrics),
-            }
-    return metric_range
+        with open(input_file, "rt", encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                data = read_predictions([line], idx, [f])
+                metrics_calculator.calculator.update(data)
+        metrics = metrics_calculator.calculator.get_metrics()
+        per_file_metrics.append(metrics['pass@1']['symbolic_correct'])
+        no_answer.append(metrics['pass@1']['no_answer'])
+    
+    return per_file_metrics, no_answer
 
 
 def calculate_similarity(answer1: str | None, answer2:str | None) -> float:
@@ -115,11 +102,6 @@ def summarize_robustness(
         "If not specified, will assume the results are in the local filesystem.",
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
-    benchmarks: Optional[str] = typer.Option(
-        None,
-        help="Specify benchmarks to run (comma separated). "
-        "If not specified, all benchmarks in the results_dir will be used.",
-    ),
     data_dir: str = typer.Option(
         None,
         help="Path to the data directory. If not specified, will use the default nemo_skills/dataset path. "
@@ -134,14 +116,11 @@ def summarize_robustness(
     ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
 ):
-    """Summarize results of an evaluation job."""
+    """Summarize results of an evalutions on multiple benchmarks and prompts."""
+    
     setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)
 
-    if " " in str(benchmarks):
-        raise ValueError("benchmarks should be separated with commas")
-
     cluster = cluster or os.environ.get("NEMO_SKILLS_CONFIG")
-
     # copying results from the cluster if necessary
     upload_path = None
     if cluster is not None:
@@ -173,10 +152,7 @@ def summarize_robustness(
         for cand_path in glob.glob(f'{results_dir}/*')
         if 'summarize' not in os.path.basename(cand_path) and Path(cand_path).is_dir()
     ]
-    if benchmarks:
-        # Filter benchmarks_paths to only include the specified benchmarks
-        benchmarks_paths = [b for b in benchmarks_paths if Path(b).name in benchmarks.split(",")]
-
+  
     if benchmarks_paths:
         # Ascertain that the benchmarks_paths are valid
         for benchmark_path in benchmarks_paths:
@@ -192,48 +168,63 @@ def summarize_robustness(
         benchmark = str(Path(benchmark_path).name)
         if not Path(benchmark_path).is_dir():
             continue
-
-        # calculate metrics across all prompts and seeds
-        input_files = glob.glob(f'{benchmark_path}/**/output-rs*.jsonl', recursive=True)
-        metric_ranges = calculate_metric_range(input_files)
-        consistency_rate = calculate_consistency_rate(input_files)
+        
         metrics_to_print[benchmark] = dict()
-        metrics_to_print[benchmark]['aggregated'] = metric_ranges
-        metrics_to_print[benchmark]['aggregated']['CR'] = consistency_rate
-
         # calculate metrics per prompt
+        all_eval_metrics = []
         for prompt_dir in sorted(glob.glob(f'{benchmark_path}/*')):
             prompt_name = str(Path(prompt_dir).name)
             input_files = glob.glob(f'{prompt_dir}/**/output-rs*.jsonl', recursive=True)
             if not input_files:
                 continue
-            metric_ranges = calculate_metric_range(input_files)
+            per_file_metrics, no_answer = calculate_metric_range(input_files)
+            metrics_to_print[benchmark][prompt_name] = {
+                "min": np.min(per_file_metrics),
+                "max": np.max(per_file_metrics),
+                "avg": np.mean(per_file_metrics),
+                'std': np.std(per_file_metrics),
+                'no_answer': np.mean(no_answer),
+            }
+            all_eval_metrics.extend(per_file_metrics)
+            # calculate consistency rate per prompt
             consistency_rate = calculate_consistency_rate(input_files)
-            metrics_to_print[benchmark][prompt_name] = metric_ranges
             metrics_to_print[benchmark][prompt_name]['CR'] = consistency_rate
+
+        # calculate metrics across all prompts and seeds
+        metrics_to_print[benchmark]['aggregated'] = {
+                "min": np.min(all_eval_metrics),
+                "max": np.max(all_eval_metrics),
+                "avg": np.mean(all_eval_metrics),
+                'std': np.std(all_eval_metrics),
+            }
+        
+        input_files = glob.glob(f'{benchmark_path}/**/output-rs*.jsonl', recursive=True)
+        consistency_rate = calculate_consistency_rate(input_files)
+        metrics_to_print[benchmark]['aggregated']['CR'] = consistency_rate
 
     # calculate the std of prompt averages
     for benchmark, metrics in metrics_to_print.items():
         prompt_avgs = [m['avg'] for k, m in metrics.items() if k != 'aggregated']
         metrics_to_print[benchmark]['aggregated']['std_avg(pr)'] = np.std(prompt_avgs)
 
+    header_fields = ['min', 'max', 'avg', 'std', 'CR', 'std_avg(pr)']
     header = f"{'dataset':<15} | "
-    header += ' | '.join(f"{stat}".center(7) for stat in ['min', 'max', 'avg', 'std', 'CR'])
-    header += f' | std_avg(pr)'
+    header += ' | '.join(f"{stat}".center(7) for stat in header_fields)
     print(header)
     print("-" * len(header))
     # Print aggregated stats
     for benchmark in metrics_to_print.keys():
         row = f"{benchmark:<15} | "
-        row += ' | '.join(f"{agg_val:.2f}".center(7) for _, agg_val in metrics_to_print[benchmark]['aggregated'].items())
+        row += ' | '.join(f"{metrics_to_print[benchmark]['aggregated'][stat]:.2f}".center(7) for stat in header_fields)
         print(row)
     print('\n')
 
     # Print stats per prompt
+    header_fields = ['min', 'max', 'avg', 'std', 'CR', 'no_answer']
     for benchmark, metrics in metrics_to_print.items():
         print(f" {benchmark} ".center(len(header), "-"))
         header = f"{'prompt':<15} | "
-        header += ' | '.join(f"{stat}".center(7) for stat in ['min', 'max', 'avg', 'std', 'CR'])
+        header += ' | '.join(f"{stat}".center(7) for stat in header_fields)
         print(header)
         print("-" * len(header))
         sorted_prompts = sorted(metrics.items(), key=lambda x: x[1]['avg'])
@@ -241,7 +232,7 @@ def summarize_robustness(
             if prompt_name == 'aggregated':
                 continue
             row = f"{prompt_name:<15} | "
-            row += ' | '.join(f"{val:.2f}".center(7) for val in prompt_metrics.values())
+            row += ' | '.join(f"{prompt_metrics[stat]:.2f}".center(7) for stat in header_fields)
             print(row)
         print('\n')
 
@@ -262,6 +253,7 @@ def summarize_robustness(
             print("Metrics are saved to", save_metrics_path)
     except PermissionError:
         print(f"Could not save metrics.json to {save_metrics_path}. Please check the permissions.")
+
 
 if __name__ == "__main__":
     # workaround for https://github.com/fastapi/typer/issues/341
