@@ -162,6 +162,7 @@ def sft_preprocessor(
             print(f"  Message [{i}]:")
             print(f"    Role    : {message['role']}")
             print(f"    Content : {message['content']}")
+            print(f"    token-ids : {message['token_ids'].tolist()}")
         print("----------------------------------------------------\n")
         _call_counter += 1
     # ===================== END: BLOCK FOR DEBUGGING =====================
