@@ -36,6 +36,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class GenSelectSpecificConfig:
     prompt_config: str = "generic/genselect"
     regex: str = r"Judg[e]?ment: (\d+)"
+    indexing_with_one: bool = False
 
 
 @nested_dataclass(kw_only=True)
@@ -243,6 +244,9 @@ class ParallelThinkingTask:
 
         except Exception:
             return None
+
+        if self.cfg.genselect.indexing_with_one:
+            solution_idx -= 1
 
         return solution_idx
 
