@@ -144,6 +144,12 @@ def sft_preprocessor(
     add_generation_prompt: bool = False,
 ) -> DatumSpec:
     """Process a datum dictionary for SFT training."""
+    if tokenizer.chat_template is None:
+        print(
+            "⚠️ Warning: `tokenizer.chat_template` is not set. Raw messages may be formatted incorrectly, "
+            "potentially leading to poor model performance."
+        )
+
     message_log = get_formatted_message_log(
         datum_dict["messages"],
         tokenizer,
