@@ -271,7 +271,6 @@ class IOIEvaluator(BaseEvaluator):
 
         self.precompiled_cache: Dict[str, str] = {}
 
-        # Prepare worker globals for single-process runs
         init_worker(self.sandbox)
 
         self.pool = multiprocessing.Pool(
@@ -281,17 +280,18 @@ class IOIEvaluator(BaseEvaluator):
         )
 
     # Internal helper
-    def _evaluate_entry(self, entry: dict) -> dict:
+    async def _evaluate_entry(self, entry: dict) -> dict:
         completion = add_includes(extract_final_cpp_block(entry["generation"]), entry["ioi_id"])
 
         pid = entry["ioi_id"]
         if pid not in self.precompiled_cache:
-            self.precompiled_cache[pid] = _precompile_grader(
-                problem_name=pid,
-                grader_files=entry["grader_files"],
-                compile_code=entry["compile"],
-                run_code=entry["run"],
-                sandbox=self.sandbox,
+            self.precompiled_cache[pid] = await asyncio.to_thread(
+                _precompile_grader,
+                pid,
+                entry["grader_files"],
+                entry["compile"],
+                entry["run"],
+                self.sandbox,
             )
         pre_dir = self.precompiled_cache[pid]
 
@@ -330,7 +330,9 @@ class IOIEvaluator(BaseEvaluator):
                 )
 
             # map with unique worker id argument
-            results = self.pool.starmap(run_test_case, [(ta, idx) for idx, ta in enumerate(tasks)])
+            results = await asyncio.to_thread(
+                self.pool.starmap, run_test_case, [(ta, idx) for idx, ta in enumerate(tasks)]
+            )
 
             for (subtask, test_name, _), result in zip(batch, results):
                 st = subtask_state[subtask]
@@ -371,7 +373,8 @@ class IOIEvaluator(BaseEvaluator):
             with open(jsonl_file, "r", encoding="utf-8") as f:
                 all_samples = [json.loads(line) for line in f]
 
-            outputs = [self._evaluate_entry(s) for s in all_samples]
+            tasks = [self._evaluate_entry(s) for s in all_samples]
+            outputs = await asyncio.gather(*tasks)
 
             for s, o in zip(all_samples, outputs):
                 s["test_case_results"] = o["test_case_results"]
@@ -383,4 +386,4 @@ class IOIEvaluator(BaseEvaluator):
         self.pool.join()
 
     async def eval_single(self, data_point: dict):
-        return self._evaluate_entry(data_point)
+        return await self._evaluate_entry(data_point)

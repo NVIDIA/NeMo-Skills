@@ -12,12 +12,18 @@ echo "Workers: $NUM_WORKERS, Nginx port: $NGINX_PORT"
 # Override nginx config for multi-worker mode (single mode uses original config)
 echo "Configuring nginx for multi-worker load balancing..."
 
-# Force session affinity settings: 1 process per worker with minimal cheaper
-UWSGI_PROCESSES=1
-UWSGI_CHEAPER=1
-export UWSGI_PROCESSES
-export UWSGI_CHEAPER
-echo "Forced UWSGI settings for session affinity: PROCESSES=$UWSGI_PROCESSES, CHEAPER=$UWSGI_CHEAPER"
+# Respect pre-set environment variables; fall back to sane defaults
+# If the caller exported UWSGI_PROCESSES / UWSGI_CHEAPER (or the helper
+# variables used by start_local_sandbox.sh), keep those.  Otherwise pick
+# defaults that work for most cases.
+
+# shell parameter expansion with default value
+: "${UWSGI_PROCESSES:=2}"   # default to 2 processes per worker if unset
+: "${UWSGI_CHEAPER:=1}"     # default cheaper value
+
+export UWSGI_PROCESSES UWSGI_CHEAPER
+
+echo "UWSGI settings: PROCESSES=$UWSGI_PROCESSES, CHEAPER=$UWSGI_CHEAPER"
 
 # Validate and fix uwsgi configuration
 if [ -z "$UWSGI_PROCESSES" ]; then
