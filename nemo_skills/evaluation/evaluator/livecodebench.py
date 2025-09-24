@@ -1,8 +1,8 @@
 import asyncio
 import json
 import logging
-import shutil
 import textwrap
+from contextlib import asynccontextmanager
 from dataclasses import field
 from pathlib import Path
 
@@ -25,23 +25,37 @@ class LiveCodeBenchEvaluatorConfig:
     test_file: str = None
     interpreter: str = "python"  # use either "python" or pypy3
     timeout: int = 6
+    num_processes: int = 12
 
 
-async def install_livecodebench(sandbox, interpreter: str):
-    """Installs the livecodebench package once inside the provided sandbox."""
-    LOG.info(f"Installing livecodebench using {interpreter}...")
-    pip_command = "pip" if interpreter == "python" else "pypy3 -m pip"
-    GIT_URL = LIVECODEBENCH_PYTHON_GIT_URL if interpreter == "python" else LIVECODEBENCH_PYPY3_GIT_URL
-    install_command = f"{pip_command} install {GIT_URL}"
+@asynccontextmanager
+async def sandbox_context(config: dict):
+    sandbox = get_sandbox(**config)
+    try:
+        yield sandbox
+    finally:
+        LOG.info("Closing sandbox...")
+        await sandbox.close()
 
-    result, _ = await sandbox.execute_code(install_command, language="shell", timeout=300)
 
-    if result["process_status"] != "completed":
-        LOG.warning(f"Failed to install livecodebench: {result.get('stderr', 'Unknown error')}")
-        return False
+async def install_packages(eval_config: LiveCodeBenchEvaluatorConfig) -> bool:
+    """
+    Installs required packages in a temporary sandbox.
+    Returns True on success, False on failure.
+    """
+    async with sandbox_context(eval_config.sandbox) as sandbox:
+        LOG.info(f"Installing livecodebench with {eval_config.interpreter}...")
+        pip_cmd = "pip" if eval_config.interpreter == "python" else "pypy3 -m pip"
+        git_url = LIVECODEBENCH_PYTHON_GIT_URL if eval_config.interpreter == "python" else LIVECODEBENCH_PYPY3_GIT_URL
+        cmd = f"{pip_cmd} install {git_url}"
 
-    LOG.info("Successfully installed livecodebench.")
-    return True
+        result, _ = await sandbox.execute_code(cmd, language="shell", timeout=300)
+        if result.get("process_status") != "completed":
+            LOG.warning(f"Failed to install livecodebench: {result.get('stderr', 'Unknown error')}")
+            return False
+
+        LOG.info("Successfully installed livecodebench.")
+        return True
 
 
 async def eval_livecodebench_async(cfg):
@@ -52,90 +66,70 @@ async def eval_livecodebench_async(cfg):
     if eval_config.language == "cpp" and eval_config.test_file is None:
         raise ValueError("C++ evaluation requires a test_file.")
 
-    sandbox = get_sandbox(**eval_config.sandbox)
+    if not await install_packages(eval_config):
+        return
 
-    try:
-        if not await install_livecodebench(sandbox, eval_config.interpreter):
-            return
+    async with sandbox_context(eval_config.sandbox) as sandbox:
+        for jsonl_path in map(Path, unroll_files(cfg.input_files)):
+            LOG.info(f"Processing file: {jsonl_path.name}")
 
-        release_version = None
-        for jsonl_file_path_str in unroll_files(cfg.input_files):
-            jsonl_file = Path(jsonl_file_path_str)
-            LOG.info(f"Processing file: {jsonl_file.name}")
-
-            with open(jsonl_file, "r", encoding="utf-8") as f_in:
+            with jsonl_path.open("r", encoding="utf-8") as f_in:
                 samples = [preprocess_code(json.loads(line), eval_config.language) for line in f_in]
 
-            for sample in samples:
-                sample["code_list"] = [sample["completion"]]
-                current_version = sample["release_version"]
-                if release_version is None:
-                    release_version = current_version
-                elif release_version != current_version:
-                    raise ValueError(
-                        f"All samples should have the same release version. "
-                        f"Found {release_version} and {current_version}"
-                    )
+            versions = {s["release_version"] for s in samples}
+            if len(versions) > 1:
+                raise ValueError(f"All samples should have the same release version. Found: {versions}")
+            release_version = versions.pop()
 
-            # Use a temporary file for the evaluation harness to avoid overwriting source
-            temp_eval_file = jsonl_file.with_suffix(".temp.jsonl")
-            with open(temp_eval_file, "w", encoding="utf-8") as f_out:
-                for sample in samples:
-                    f_out.write(json.dumps(sample) + "\n")
+            for s in samples:
+                s["code_list"] = [s["completion"]]
 
-            # 2. Run the evaluation harness in the sandbox
-            test_file_arg = f'"{eval_config.test_file}"' if eval_config.test_file else "None"
-            python_script_to_run = textwrap.dedent(f"""
+            temp_eval = jsonl_path.with_suffix(".temp.jsonl")
+            temp_eval.write_text("\n".join(json.dumps(s) for s in samples), encoding="utf-8")
+
+            test_file_arg = repr(eval_config.test_file) if eval_config.test_file else "None"
+            eval_code = textwrap.dedent(f"""
                 from livecodebench.evaluate import evaluate
-
                 evaluate(
-                    custom_output_file='{temp_eval_file.name}',
+                    custom_output_file='{temp_eval.name}',
                     release_version='release_{release_version}',
                     test_file={test_file_arg},
                     k_list=[1],
                     language='{eval_config.language}',
-                    num_process_evaluate=12,
+                    num_process_evaluate={eval_config.num_processes},
                     timeout={eval_config.timeout},
                 )
             """)
 
-            interpreter = eval_config.interpreter
-            shell_command = f"{interpreter} -c {repr(python_script_to_run)}"
-            output_dict, _ = await sandbox.execute_code(
-                shell_command,
+            cmd = f"{eval_config.interpreter} -c {repr(eval_code)}"
+            output, _ = await sandbox.execute_code(
+                cmd,
                 language="shell",
                 timeout=eval_config.timeout * len(samples) + 60,
-                max_output_characters=100000,
+                max_output_characters=100_000,
             )
 
-            if output_dict.get("process_status") != "completed":
-                LOG.error(f"Evaluation failed for {jsonl_file.name}. Stderr: {output_dict.get('stderr')}")
+            if output.get("process_status") != "completed":
+                LOG.error(f"Evaluation failed for {jsonl_path.name}. Stderr: {output.get('stderr')}")
+                temp_eval.unlink(missing_ok=True)
                 continue
 
-            eval_results_file = temp_eval_file.with_name(f"{temp_eval_file.stem}_eval_results.json")
-            if not eval_results_file.exists():
-                LOG.warning(f"Expected results file not found: {eval_results_file}")
+            results_path = temp_eval.with_name(f"{temp_eval.stem}_eval_results.json")
+            if not results_path.exists():
+                LOG.warning(f"Results file missing: {results_path}")
+                temp_eval.unlink(missing_ok=True)
                 continue
 
-            with open(eval_results_file, "r", encoding="utf-8") as f_in:
-                eval_grades = json.load(f_in)
+            eval_grades = json.loads(results_path.read_text(encoding="utf-8"))
 
-            # Write the final, graded output back to the original file
-            with open(jsonl_file, "w", encoding="utf-8") as f_out:
-                for sample in samples:
-                    sample["graded_list"] = eval_grades["eval"][sample["task_id"]]["graded_list"]
-                    f_out.write(json.dumps(sample) + "\n")
+            with jsonl_path.open("w", encoding="utf-8") as f_out:
+                for s in samples:
+                    s["graded_list"] = eval_grades["eval"][s["task_id"]]["graded_list"]
+                    f_out.write(json.dumps(s) + "\n")
 
-            # Clean up by moving the results file
-            saved_results_file = eval_results_file.with_name(f"{jsonl_file.stem}_eval_results-saved.json")
-            shutil.move(str(eval_results_file), str(saved_results_file))
-            temp_eval_file.unlink()  # Remove the temporary file
-            LOG.info(f"Finished processing and saved results for {jsonl_file.name}")
-
-    finally:
-        # 3. Ensure the sandbox is closed in the `finally` block
-        LOG.info("Closing sandbox...")
-        await sandbox.close()  # Make sure to check if '.close()' is the correct method name
+            results_path.rename(results_path.with_name(f"{jsonl_path.stem}_eval_results-saved.json"))
+            temp_eval.unlink(missing_ok=True)
+            LOG.info(f"Finished {jsonl_path.name}, results saved.")
 
 
 def eval_livecodebench(cfg):
