@@ -40,6 +40,43 @@ TokenizerType = PreTrainedTokenizerBase
 _call_counter = 0
 
 
+def detect_data_format(data_path: str) -> str:
+    """Detect the format of the dataset by examining the first line.
+
+    Args:
+        data_path: Path to the dataset file
+
+    Returns:
+        str: "input_output" if data has input/output keys, "messages" if it has messages key,
+             "mixed" if it has both (error case)
+    """
+    try:
+        with open(data_path, "r") as f:
+            first_line = f.readline().strip()
+            if not first_line:
+                raise ValueError(f"Dataset at {data_path} is empty")
+
+            sample = json.loads(first_line)
+            has_input_output = "input" in sample and "output" in sample
+            has_messages = "messages" in sample
+
+            if has_input_output and has_messages:
+                return "mixed"
+            elif has_input_output:
+                return "input_output"
+            elif has_messages:
+                return "messages"
+            else:
+                raise ValueError(
+                    f"Dataset at {data_path} has neither 'input'/'output' keys nor 'messages' key. "
+                    f"Available keys: {list(sample.keys())}"
+                )
+    except FileNotFoundError:
+        raise ValueError(f"Dataset file not found: {data_path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in dataset file {data_path}: {e}")
+
+
 class PromptResponseDataset:
     def __init__(
         self,
@@ -260,14 +297,45 @@ def main():
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 
+    # Handle automatic chat template setting
+    tokenizer_config = config["policy"]["tokenizer"]
+    if tokenizer_config.get("chat_template") == "automatic":
+        print("Automatic chat template mode enabled - detecting data format...")
+
+        # Detect data format from training data
+        data_format = detect_data_format(config["data"]["train_data_path"])
+        print(f"Detected data format: {data_format}")
+
+        if data_format == "mixed":
+            raise ValueError(
+                "Dataset contains both 'input'/'output' and 'messages' keys. "
+                "Please use a consistent data format or manually specify the chat_template."
+            )
+        elif data_format == "input_output":
+            print("Setting chat_template to None (passthrough) for input/output format")
+            tokenizer_config["chat_template"] = None
+        elif data_format == "messages":
+            print("Setting chat_template to 'default' for messages format")
+            tokenizer_config["chat_template"] = "default"
+
+        # Check validation data format if it exists
+        if config["data"].get("val_data_path"):
+            val_data_format = detect_data_format(config["data"]["val_data_path"])
+            if val_data_format != data_format:
+                raise ValueError(
+                    f"Training data format ({data_format}) doesn't match validation data format ({val_data_format}). "
+                    "Both datasets must use the same format."
+                )
+            print(f"Validation data format matches training data: {val_data_format}")
+
     # Print config
     print("Final config:")
     pprint.pprint(config)
 
     config["logger"]["log_dir"] = get_next_experiment_dir(config["logger"]["log_dir"])
-    print(f"📊 Using log directory: {config['logger']['log_dir']}")
+    print(f"Using log directory: {config['logger']['log_dir']}")
     if config["checkpointing"]["enabled"]:
-        print(f"📊 Using checkpoint directory: {config['checkpointing']['checkpoint_dir']}")
+        print(f"Using checkpoint directory: {config['checkpointing']['checkpoint_dir']}")
     init_ray()
 
     # setup tokenizer
