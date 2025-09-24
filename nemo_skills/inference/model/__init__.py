@@ -28,6 +28,7 @@ from .gemini import GeminiModel
 from .megatron import MegatronModel
 from .openai import OpenAIModel
 from .parallel_thinking import ParallelThinkingConfig, ParallelThinkingTask
+from .responses import ResponsesModel
 
 # Tool Calling
 from .tool_call import ToolCallingWrapper
@@ -47,6 +48,7 @@ models = {
     "gemini": GeminiModel,
     "vllm": VLLMModel,
     "sglang": VLLMModel,
+    "responses": ResponsesModel,
 }
 
 

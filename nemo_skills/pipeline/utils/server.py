@@ -123,7 +123,7 @@ def get_server_command(
 
     # check if the model path is mounted if not vllm, sglang, or trtllm;
     # vllm, sglang, and trtllm can also pass model name as "model_path" so we need special processing
-    if server_type not in ["vllm", "sglang", "trtllm"]:
+    if server_type not in ["vllm", "sglang", "trtllm", "responses"]:
         check_if_mounted(cluster_config, model_path)
 
     # the model path will be mounted, so generally it will start with /
@@ -152,7 +152,7 @@ def get_server_command(
             f"    --micro-batch-size 1 "  # that's a training argument, ignored here, but required to specify..
             f"    {server_args} "
         )
-    elif server_type == "vllm":
+    elif server_type in ["vllm", "responses"]:
         server_entrypoint = server_entrypoint or "-m nemo_skills.inference.server.serve_vllm"
         start_vllm_cmd = (
             f"python3 {server_entrypoint} "
