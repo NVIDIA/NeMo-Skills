@@ -1,6 +1,6 @@
 user: |-
- Can you solve this for me?
+ The following is a math competition question. Examine and solve the question correctly.
 
  {problem}
 
- Let’s think step by step. Provide your answer in the following format: Final Answer: \boxed{{}}
+ Reflect upon this question and let’s verify step by step. Provide your answer in the following format: Final Answer: \boxed{{}}

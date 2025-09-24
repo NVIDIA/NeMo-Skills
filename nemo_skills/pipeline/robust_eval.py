@@ -49,8 +49,8 @@ def robust_eval(ctx: typer.Context,
         raise ValueError(f"Benchmark names ({benchmarks}) must match prompt set config({prompt_set_config.keys()})")
     main_output_dir = ns_eval_kwargs['output_dir']
     main_expname = ns_eval_kwargs['expname']
+    dependent_tasks = []
     for benchmark in benchmarks:
-        dependent_tasks = []
         ns_eval_kwargs['benchmarks'] = benchmark
         benchmark = benchmark.split(':')[0]  # Remove any :N suffix for output dir naming
         LOG.info(f"Running {len(prompt_set_config[benchmark])} prompts on {benchmark}")

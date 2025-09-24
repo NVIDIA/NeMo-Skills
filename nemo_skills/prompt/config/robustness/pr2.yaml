@@ -1,0 +1,7 @@
+gpqa: 
+  - nemo_skills/prompt/config/robustness/mcq_prompts_v0/1.yaml
+  - nemo_skills/prompt/config/robustness/mcq_prompts_v0/2.yaml
+
+comp-math-24-25:
+  - nemo_skills/prompt/config/robustness/math_prompts_v0/1.yaml
+  - nemo_skills/prompt/config/robustness/math_prompts_v0/2.yaml

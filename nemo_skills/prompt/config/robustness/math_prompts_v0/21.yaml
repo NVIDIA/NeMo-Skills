@@ -1,8 +1,6 @@
 user: |-
- Can you solve this for me?
+ Solve the following math problem step by step. Put your answer inside \boxed{{}}.
 
  {problem}
 
- Reflect upon this question and let’s verify step by step. Provide your answer in the following format: Final Answer: \boxed{{}}
-
- Do not provide any further information after this. This is important. If you do not provide a final answer in this format, your answer will not be scored as accurate.
+ Remember to put your answer inside \boxed{{}}.
