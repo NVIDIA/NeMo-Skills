@@ -15,8 +15,10 @@
 import argparse
 import json
 import os
+import pathlib
 import subprocess
 import sys
+import textwrap
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -69,6 +71,84 @@ def convert_to_sif(container_name, output_dir):
         return False, container_name, None
 
 
+def make_sif_with_openhands(input_sif_path, output_dir, output_suffix, openhands_repo, openhands_commit):
+    """Given an existing SIF environment, make a copy of it with OpenHands preinstalled."""
+    # Create output filenames
+    input_sif_path = pathlib.Path(input_sif_path)
+    output_dir = pathlib.Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_sif_path = output_dir / (input_sif_path.stem + output_suffix + ".sif")
+    output_def_path = output_dir / (input_sif_path.stem + output_suffix + ".def")
+
+    # Check if output SIF file already exists
+    if output_sif_path.exists():
+        print(f"✓ {input_sif_path} -> {output_sif_path} (already exists)")
+        return True
+
+    try:
+        # Build the definition file for the new container
+        def_file_text = f"""\
+            Bootstrap: localimage
+            From: {input_sif_path}
+
+            %post -c /bin/bash
+                cd /root &&
+                curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" &&
+                bash Miniforge3-$(uname)-$(uname -m).sh -b &&
+                eval "$(/root/miniforge3/bin/conda shell.bash hook)" &&
+                mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux &&
+                mkdir OpenHands &&
+                cd OpenHands &&
+                git clone {openhands_repo} . &&
+                git checkout {openhands_commit} &&
+                export INSTALL_DOCKER=0 &&
+                make build &&
+                poetry run python -m pip install datasets &&
+                if ! command -v jq >/dev/null 2>&1
+                then
+                    curl https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64 -Lo /bin/jq &&
+                    chmod +x /bin/jq
+                fi
+        """
+        output_def_path.write_text(textwrap.dedent(def_file_text))
+
+        # Use apptainer to build SIF from definition file
+        cmd = ["apptainer", "build", output_sif_path, output_def_path]
+
+        print(f"Building OpenHands env from {input_sif_path}...")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print(f"✓ {input_sif_path} -> {output_sif_path}")
+            return True
+        else:
+            print(f"✗ Failed to build OpenHands env from {input_sif_path}")
+            print(f"  Error: {result.stderr.strip()}")
+            return False
+
+    except Exception as e:
+        print(f"✗ Error building OpenHands env from {input_sif_path}: {e}")
+        return False
+
+
+def create_sifs(container_name, args):
+    success, _, sif_path = convert_to_sif(container_name, args.output_directory)
+    if success and args.make_openhands_envs:
+        short_sha = args.openhands_commit[:8]
+
+        oh_dir = args.openhands_envs_directory
+        if oh_dir is None:
+            oh_dir = os.path.join(args.output_directory, f"with-openhands-{short_sha}")
+
+        oh_suffix = args.openhands_envs_suffix
+        if oh_suffix is None:
+            oh_suffix = f"_with-openhands-{short_sha}"
+
+        return make_sif_with_openhands(sif_path, oh_dir, oh_suffix, args.openhands_repo, args.openhands_commit)
+    else:
+        return success
+
+
 def main():
     """Parse command-line arguments using argparse."""
     parser = argparse.ArgumentParser(
@@ -79,6 +159,38 @@ def main():
     parser.add_argument("output_directory", help="Directory to save SIF files")
     parser.add_argument(
         "--max_workers", "-j", type=int, default=20, help="Number of parallel conversions (default: 20)"
+    )
+
+    parser.add_argument(
+        "--make_openhands_envs",
+        action=argparse.BooleanOptionalAction,
+        help="If set, makes copies of the downloaded environments with OpenHands preinstalled.",
+    )
+    parser.add_argument(
+        "--openhands_envs_directory",
+        type=str,
+        default=None,
+        help="Directory to store the OpenHands environments. "
+        "Defaults to <output_directory>/with-openhands-<shortened_openhands_commit_sha>.",
+    )
+    parser.add_argument(
+        "--openhands_envs_suffix",
+        type=str,
+        default=None,
+        help="Suffix for the OpenHands environments that is added to the end of the original environment name. "
+        "Defaults to _with-openhands-<shortened_openhands_commit_sha>.",
+    )
+    parser.add_argument(
+        "--openhands_repo",
+        type=str,
+        default="https://github.com/All-Hands-AI/OpenHands.git",
+        help="OpenHands repo URL to download. Defaults to the official OpenHands repo.",
+    )
+    parser.add_argument(
+        "--openhands_commit",
+        type=str,
+        default="9ee704a25a331d0d2eb9a8e87a4dcff1d948855b",
+        help="OpenHands commit hash to use. Defaults to 9ee704a25a331d0d2eb9a8e87a4dcff1d948855b (v0.53.0 release).",
     )
 
     args = parser.parse_args()
@@ -108,14 +220,11 @@ def main():
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all conversion tasks
-        future_to_container = {
-            executor.submit(convert_to_sif, container_name, output_dir): container_name
-            for container_name in container_names
-        }
+        futures = [executor.submit(create_sifs, container_name, args) for container_name in container_names]
 
         # Process completed tasks
-        for future in as_completed(future_to_container):
-            success, container_name, sif_path = future.result()
+        for future in as_completed(futures):
+            success = future.result()
             if success:
                 successful += 1
             else:
