@@ -121,7 +121,8 @@ def _precompile_grader(
 def run_test_case(task_args: dict, worker_id: int) -> dict:
     global worker_sandbox
 
-    unique_dir = f"/tmp/ioi_run_{worker_id}_{os.getpid()}"
+    # Use high-resolution timestamp to guarantee uniqueness across parallel calls.
+    unique_dir = f"/tmp/ioi_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
 
     try:
         # 1. Create all necessary files in one batch command
