@@ -172,10 +172,12 @@ class Sandbox(abc.ABC):
             output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
         new_session_created = output.pop("new_session_created", False)
 
-        # Rebuild state by re-executing history first, then execute the new code
+        # Rebuild state by re-executing history first, then execute the new code.
+        # NOTE: Only cells that completed successfully are stored, so we intentionally omit re-running cells that errored
+        # or timed out. This means restoration **can diverge** from the original interactive session in those cases, but
+        # avoids re-triggering side effects from failing cells while keeping the replay simple.
         if session_id is not None and new_session_created:
             history = self.session_histories.get(session_id, [])
-            restoration_failed = False
             if history:
                 # Restore session state by executing only the history cells
                 restore_code = "\n".join(history)
@@ -190,23 +192,26 @@ class Sandbox(abc.ABC):
                 except httpx.TimeoutException:
                     restore_output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
-                # If restoration didn't complete successfully, return that result and skip executing new code
+                # If restoration didn't complete successfully, abort the execution to avoid inconsistent state
                 if restore_output.get("process_status") != "completed":
-                    output = restore_output
-                    restoration_failed = True
+                    LOG.error(
+                        "Sandbox state restoration failed for session %s with output: %s",
+                        session_id,
+                        restore_output,
+                    )
+                    raise RuntimeError(
+                        "Sandbox state restoration failed; aborting execution to avoid inconsistent state"
+                    )
 
-            # Execute the new code if restoration succeeded or there was no history to restore
-            if not restoration_failed:
-                exec_request = self._prepare_request(
-                    generated_code, timeout, language, std_input, max_output_characters, traceback_verbosity
-                )
-                exec_request["session_id"] = (
-                    request_session_id if request_session_id is None else str(request_session_id)
-                )
-                try:
-                    output = await self._send_request(exec_request, timeout)
-                except httpx.TimeoutException:
-                    output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+            # Execute the new code once restoration has succeeded (or there was no history to replay)
+            exec_request = self._prepare_request(
+                generated_code, timeout, language, std_input, max_output_characters, traceback_verbosity
+            )
+            exec_request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
+            try:
+                output = await self._send_request(exec_request, timeout)
+            except httpx.TimeoutException:
+                output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
         # Append to history if successful execution (process_status == 'completed')
         if output.get("process_status") == "completed":

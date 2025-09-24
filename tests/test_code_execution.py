@@ -387,6 +387,13 @@ async def test_state_restoration():
     out2, sid = await sandbox.execute_code('print("H2"); a += 1', session_id=sid, language="ipython")
     assert out2["process_status"] == "completed"
 
+    # Run a cell that errors after mutating state; it should not be replayed during restoration
+    err_out, sid = await sandbox.execute_code(
+        'print("ERR"); a = 0; raise ValueError()', session_id=sid, language="ipython"
+    )
+    assert err_out["process_status"] == "error"
+    assert "ValueError" in err_out["stdout"]
+
     # Force a new backend shell for the same session to trigger client-side restoration
     await sandbox.delete_session(str(sid))
 
@@ -396,6 +403,7 @@ async def test_state_restoration():
     assert out3["stdout"] == "42\n"
     assert "H1" not in out3["stdout"]
     assert "H2" not in out3["stdout"]
+    assert "ERR" not in out3["stdout"]
 
 
 @pytest.mark.asyncio
