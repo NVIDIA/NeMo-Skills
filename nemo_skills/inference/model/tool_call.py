@@ -164,33 +164,10 @@ class ToolCallingWrapper:
             if tool_calls:
                 tool_calls_message = self.call_interpreter.parse(tool_calls)
 
-                # Update the last message with tool calls (for completion models)
-                if (
-                    hasattr(self.conversation_manager, "__class__")
-                    and "Completion" in self.conversation_manager.__class__.__name__
-                ):
-                    if conversation and conversation[-1].get("role") == "assistant":
-                        conversation[-1].update(tool_calls_message)
-
                 tool_results = await self._execute_tool_calls(tool_calls_message["tool_calls"], request_id=request_id)
 
-                # For completion models, the tool results are already formatted messages
-                # For responses models, we need to extract the actual results
-                if (
-                    hasattr(self.conversation_manager, "__class__")
-                    and "Responses" in self.conversation_manager.__class__.__name__
-                ):
-                    # Extract raw results for responses conversation manager
-                    raw_results = []
-                    for result_msg in tool_results:
-                        # ResponsesResponseFormatter creates {"type": "function_call_output", "call_id": "...", "output": "..."}
-                        raw_results.append(result_msg.get("output", ""))
-                    self.conversation_manager.add_tool_results(
-                        conversation, tool_calls_message["tool_calls"], raw_results
-                    )
-                else:
-                    # For completion models, add the formatted messages directly
-                    conversation.extend(tool_results)
+                # Use conversation manager for both model types - it handles all the details
+                self.conversation_manager.add_tool_results(conversation, tool_calls_message, tool_results)
 
                 result_steps["num_tool_calls"].append(len(tool_calls))
 

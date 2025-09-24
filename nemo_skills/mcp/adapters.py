@@ -58,7 +58,10 @@ class ConversationManager(ABC):
 
     @abstractmethod
     def add_tool_results(
-        self, conversation: List[Dict[str, Any]], tool_calls: List[Dict[str, Any]], results: List[Dict[str, Any]]
+        self,
+        conversation: List[Dict[str, Any]],
+        tool_calls_message: Dict[str, Any],
+        formatted_results: List[Dict[str, Any]],
     ) -> None:
         """Add tool call results to the conversation."""
         raise NotImplementedError("Subclasses must implement this method.")
@@ -162,23 +165,18 @@ class CompletionConversationManager(ConversationManager):
         conversation.append(message)
 
     def add_tool_results(
-        self, conversation: List[Dict[str, Any]], tool_calls: List[Dict[str, Any]], results: List[Dict[str, Any]]
+        self,
+        conversation: List[Dict[str, Any]],
+        tool_calls_message: Dict[str, Any],
+        formatted_results: List[Dict[str, Any]],
     ) -> None:
         """Add tool call results to the conversation."""
-        # Update the last assistant message with tool calls
+        # Update the last assistant message with tool calls (completion models need this)
         if conversation and conversation[-1]["role"] == "assistant":
-            conversation[-1]["tool_calls"] = tool_calls
+            conversation[-1].update(tool_calls_message)
 
-        # Add tool result messages
-        for tool_call, result in zip(tool_calls, results):
-            conversation.append(
-                {
-                    "role": "tool",
-                    "name": tool_call["function"]["name"],
-                    "tool_call_id": tool_call["id"],
-                    "content": json.dumps(result) if not isinstance(result, str) else result,
-                }
-            )
+        # Add the formatted tool result messages directly - they're already in the right format
+        conversation.extend(formatted_results)
 
 
 class ResponsesConversationManager(ConversationManager):
@@ -198,18 +196,17 @@ class ResponsesConversationManager(ConversationManager):
             conversation.append({"role": "assistant", "content": response["generation"]})
 
     def add_tool_results(
-        self, conversation: List[Dict[str, Any]], tool_calls: List[Dict[str, Any]], results: List[Dict[str, Any]]
+        self,
+        conversation: List[Dict[str, Any]],
+        tool_calls_message: Dict[str, Any],
+        formatted_results: List[Dict[str, Any]],
     ) -> None:
         """Add tool call results to the conversation."""
-        # For responses API, add tool results as function_call_output items
-        for tool_call, result in zip(tool_calls, results):
-            conversation.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": tool_call.get("id", "unknown"),
-                    "output": json.dumps(result) if not isinstance(result, str) else result,
-                }
-            )
+        # For responses models, we don't need to update the last assistant message
+        # The tool calls are already part of the serialized output
+
+        # Add the formatted tool result messages directly - they're already in the right format
+        conversation.extend(formatted_results)
 
 
 # ==============================
