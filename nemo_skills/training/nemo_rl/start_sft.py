@@ -297,10 +297,10 @@ def main():
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 
-    # Handle automatic chat template setting
+    # Handle chat template inference from data format
     tokenizer_config = config["policy"]["tokenizer"]
-    if tokenizer_config.get("chat_template") == "automatic":
-        print("Automatic chat template mode enabled - detecting data format...")
+    if tokenizer_config.get("chat_template") == "infer_from_data":
+        print("Inferring chat template from data format...")
 
         # Detect data format from training data
         data_format = detect_data_format(config["data"]["train_data_path"])
