@@ -34,6 +34,7 @@ from nemo_skills.mcp.tool_manager import ToolManager
 from nemo_skills.utils import get_logger_name
 
 from .base import BaseModel
+from .responses import ResponsesModel
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -70,9 +71,6 @@ class ToolCallingWrapper:
 
     def _setup_adapters(self):
         """Set up adapters based on model type."""
-        # Import here to avoid circular imports
-        from .responses import ResponsesModel
-
         # Detect model type and configure adapters
         if isinstance(self.model, ResponsesModel):
             # Responses API model - uses flatter tool schema format
