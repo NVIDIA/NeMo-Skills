@@ -261,37 +261,45 @@ class IOIEvaluator(BaseEvaluator):
         self.precompiled_cache: Dict[str, str] = {}
         self.pool = None  # type: ignore
 
-    def _initialize_runtime(self):
-        """Create sandbox, resolve metadata path, and spawn worker pool (lazy)."""
+    async def _initialize_runtime(self):
+        """Asynchronously create sandbox and related runtime state on first use."""
         if self.sandbox is not None:
             return  # Already initialized
 
-        self.sandbox = LocalSandbox()
-        wait_for_sandbox(self.sandbox)
+        # Run blocking setup in a background thread to avoid nested event‐loop issues.
+        def _setup():
+            sbox = LocalSandbox()
+            wait_for_sandbox(sbox)
 
-        # Resolve metadata path for the current split every time we (re)initialize.
-        if not (os.path.isabs(self.eval_cfg.test_file) and os.path.exists(self.eval_cfg.test_file)):
-            fname = self.eval_cfg.test_file.format(split=self.split)
-            search_dir = self.eval_cfg.test_dir or (os.path.join(self.data_dir, "ioi24") if self.data_dir else None)
-            if search_dir is None:
-                raise ValueError("Either data_dir or eval_config.test_dir must be specified.")
-            self.eval_cfg.test_file = os.path.join(search_dir, fname)
+            # Resolve metadata path for the current split
+            if not (os.path.isabs(self.eval_cfg.test_file) and os.path.exists(self.eval_cfg.test_file)):
+                fname = self.eval_cfg.test_file.format(split=self.split)
+                search_dir = self.eval_cfg.test_dir or (
+                    os.path.join(self.data_dir, "ioi24") if self.data_dir else None
+                )
+                if search_dir is None:
+                    raise ValueError("Either data_dir or eval_config.test_dir must be specified.")
+                self.eval_cfg.test_file = os.path.join(search_dir, fname)
 
-        with open(self.eval_cfg.test_file, "r") as f:
-            self.metadata = json.load(f)
+            with open(self.eval_cfg.test_file, "r") as f:
+                metadata_local = json.load(f)
 
-        # Prepare multiprocessing pool and worker sandbox initialization.
-        init_worker(self.sandbox)
-        self.pool = multiprocessing.Pool(
-            processes=self.eval_cfg.test_batch_size,
-            initializer=init_worker,
-            initargs=(self.sandbox,),
-        )
+            # Prepare multiprocessing pool and worker sandbox initialization.
+            init_worker(sbox)
+            pool_local = multiprocessing.Pool(
+                processes=self.eval_cfg.test_batch_size,
+                initializer=init_worker,
+                initargs=(sbox,),
+            )
+
+            return sbox, metadata_local, pool_local
+
+        self.sandbox, self.metadata, self.pool = await asyncio.to_thread(_setup)
 
     # Internal helper
     async def _evaluate_entry(self, entry: dict) -> dict:
         # Ensure runtime (sandbox, metadata, pool, etc.) is ready for evaluation.
-        self._initialize_runtime()
+        await self._initialize_runtime()
         completion = add_includes(extract_final_cpp_block(entry["generation"]), entry["ioi_id"])
 
         pid = entry["ioi_id"]
