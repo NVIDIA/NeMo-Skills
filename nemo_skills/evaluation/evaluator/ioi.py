@@ -16,6 +16,7 @@ import json
 import multiprocessing
 import os
 import re
+import threading
 import time
 from typing import Dict
 
@@ -36,8 +37,8 @@ class IOIEvaluatorConfig:
     overwrite: bool = False
 
 
-# A dedicated event loop for all synchronous sandbox operations in the main process.
-_precompile_loop = None
+# Thread-local storage for per-thread precompile event loops.
+_precompile_loop_tls = threading.local()
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -48,12 +49,13 @@ def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shel
     closed" errors.  We therefore maintain a single loop for all such
     pre-compile operations.
     """
-    global _precompile_loop
-    if _precompile_loop is None:
-        _precompile_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(_precompile_loop)
+    loop = getattr(_precompile_loop_tls, "loop", None)
+    if loop is None or loop.is_closed():
+        loop = asyncio.new_event_loop()
+        _precompile_loop_tls.loop = loop
 
-    return _precompile_loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
+    # Use the loop within this thread exclusively.
+    return loop.run_until_complete(sandbox.execute_code(cmd, language=language, timeout=timeout))[0]
 
 
 def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
