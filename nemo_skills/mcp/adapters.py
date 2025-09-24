@@ -47,11 +47,6 @@ class ConversationManager(ABC):
     """Manages conversation history building for different model types."""
 
     @abstractmethod
-    def add_user_message(self, conversation: List[Dict[str, Any]], content: str) -> None:
-        """Add a user message to the conversation."""
-        raise NotImplementedError("Subclasses must implement this method.")
-
-    @abstractmethod
     def add_assistant_response(self, conversation: List[Dict[str, Any]], response: Dict[str, Any]) -> None:
         """Add an assistant response to the conversation."""
         raise NotImplementedError("Subclasses must implement this method.")
@@ -150,10 +145,6 @@ class ChatCompletionResponseFormatter(ToolResponseFormatter):
 class CompletionConversationManager(ConversationManager):
     """Manages conversation history for chat completion models."""
 
-    def add_user_message(self, conversation: List[Dict[str, Any]], content: str) -> None:
-        """Add a user message to the conversation."""
-        conversation.append({"role": "user", "content": content})
-
     def add_assistant_response(self, conversation: List[Dict[str, Any]], response: Dict[str, Any]) -> None:
         """Add an assistant response to the conversation."""
         message = {"role": "assistant", "content": response["generation"]}
@@ -181,10 +172,6 @@ class CompletionConversationManager(ConversationManager):
 
 class ResponsesConversationManager(ConversationManager):
     """Manages conversation history for responses API models."""
-
-    def add_user_message(self, conversation: List[Dict[str, Any]], content: str) -> None:
-        """Add a user message to the conversation."""
-        conversation.append({"role": "user", "content": content})
 
     def add_assistant_response(self, conversation: List[Dict[str, Any]], response: Dict[str, Any]) -> None:
         """Add an assistant response to the conversation using serialized output."""
