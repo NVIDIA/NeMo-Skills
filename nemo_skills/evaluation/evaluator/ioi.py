@@ -255,10 +255,21 @@ class IOIEvaluator(BaseEvaluator):
 
         self.eval_cfg = IOIEvaluatorConfig(_init_nested=True, **cfg_copy)
 
+        # Heavy runtime resources are lazily initialized within _evaluate_entry.
+        self.sandbox = None  # type: ignore
+        self.metadata = None  # type: ignore
+        self.precompiled_cache: Dict[str, str] = {}
+        self.pool = None  # type: ignore
+
+    def _initialize_runtime(self):
+        """Create sandbox, resolve metadata path, and spawn worker pool (lazy)."""
+        if self.sandbox is not None:
+            return  # Already initialized
+
         self.sandbox = LocalSandbox()
         wait_for_sandbox(self.sandbox)
 
-        # Resolve metadata path once
+        # Resolve metadata path for the current split every time we (re)initialize.
         if not (os.path.isabs(self.eval_cfg.test_file) and os.path.exists(self.eval_cfg.test_file)):
             fname = self.eval_cfg.test_file.format(split=self.split)
             search_dir = self.eval_cfg.test_dir or (os.path.join(self.data_dir, "ioi24") if self.data_dir else None)
@@ -269,10 +280,8 @@ class IOIEvaluator(BaseEvaluator):
         with open(self.eval_cfg.test_file, "r") as f:
             self.metadata = json.load(f)
 
-        self.precompiled_cache: Dict[str, str] = {}
-
+        # Prepare multiprocessing pool and worker sandbox initialization.
         init_worker(self.sandbox)
-
         self.pool = multiprocessing.Pool(
             processes=self.eval_cfg.test_batch_size,
             initializer=init_worker,
@@ -281,6 +290,8 @@ class IOIEvaluator(BaseEvaluator):
 
     # Internal helper
     async def _evaluate_entry(self, entry: dict) -> dict:
+        # Ensure runtime (sandbox, metadata, pool, etc.) is ready for evaluation.
+        self._initialize_runtime()
         completion = add_includes(extract_final_cpp_block(entry["generation"]), entry["ioi_id"])
 
         pid = entry["ioi_id"]
@@ -382,8 +393,9 @@ class IOIEvaluator(BaseEvaluator):
 
             jdump(all_samples, jsonl_file, mode="wt")
 
-        self.pool.close()
-        self.pool.join()
+        if self.pool is not None:
+            self.pool.close()
+            self.pool.join()
 
     async def eval_single(self, data_point: dict):
         return await self._evaluate_entry(data_point)
