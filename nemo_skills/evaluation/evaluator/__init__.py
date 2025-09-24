@@ -26,7 +26,7 @@ from nemo_skills.evaluation.evaluator.code import (
 )
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
-from nemo_skills.evaluation.evaluator.ioi import eval_ioi
+from nemo_skills.evaluation.evaluator.ioi import IOIEvaluator
 from nemo_skills.evaluation.evaluator.math import (
     Lean4ProofEvaluator,
     Lean4StatementEvaluator,
@@ -56,7 +56,6 @@ EVALUATOR_MAP = {
     "livecodebench_pro": eval_livecodebench_pro,
     "scicode": eval_scicode,
     "mrcr": eval_mrcr,
-    "ioi": eval_ioi,
     "bigcodebench": eval_bigcodebench,
 }
 
@@ -66,6 +65,7 @@ EVALUATOR_CLASS_MAP = {
     "lean4-proof": Lean4ProofEvaluator,
     "lean4-statement": Lean4StatementEvaluator,
     # Other evaluators can be added here as they're converted to classes
+    "ioi": IOIEvaluator,
 }
 
 # Validation: Ensure no overlap between class and function maps
