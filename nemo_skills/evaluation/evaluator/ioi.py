@@ -84,6 +84,12 @@ def _precompile_grader(
     problem_name: str, grader_files, compile_code: str, run_code: str, sandbox: LocalSandbox
 ) -> str:
     """Precompile checker/grader for a problem once and return the directory path."""
+    # Ensure sandbox belongs to this thread; if not, create a local one.
+    if getattr(sandbox, "_owner_tid", None) != threading.get_ident():
+        sandbox = LocalSandbox()
+        wait_for_sandbox(sandbox)
+        sandbox._owner_tid = threading.get_ident()
+
     pre_dir = f"/tmp/ioi_pre_{problem_name}_{os.getpid()}"
     # Build shell script to create files and invoke compile.sh.
     creation_cmds = [
@@ -272,6 +278,8 @@ class IOIEvaluator(BaseEvaluator):
         def _setup():
             sbox = LocalSandbox()
             wait_for_sandbox(sbox)
+            # Remember the thread id that owns this sandbox instance.
+            sbox._owner_tid = threading.get_ident()
 
             # Resolve metadata path for the current split
             if not (os.path.isabs(self.eval_cfg.test_file) and os.path.exists(self.eval_cfg.test_file)):
