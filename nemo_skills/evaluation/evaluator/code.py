@@ -344,3 +344,54 @@ def eval_bigcodebench(cfg):
 
         # moving eval file to ensure metrics are recomputed
         shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+
+
+def eval_ojbench(cfg):
+    # try:
+    #     import ojbench
+    # except ImportError:
+    #     LOG.info("Package 'ojbench' not found. Attempting to install...")
+    #     install_from_git("git+https://github.com/He-Ren/OJBench/tree/main")
+    #     try:
+    #         import ojbench
+    #     except ImportError:
+    #         LOG.info("Failed to install 'ojbench'. Please install it manually.")
+    #         raise
+
+    for jsonl_file in unroll_files(cfg.input_files):
+        samples = []
+        with open(jsonl_file) as f:
+            for line in f:
+                sample = json.loads(line)
+                if sample["task"] == "coding_completion":
+                    assert len(sample["partial_solution"]) > 0
+                    sample = preprocess_code(sample, strip_whitespace=False)
+                    sample["completion"] = sample["completion"].replace("\t", "    ")
+                    full_solution = sample["partial_solution"] + "\n" + sample["completion"]
+                    sample["code_list"] = [full_solution]
+                else:
+                    sample = preprocess_code(sample, strip_whitespace=True)
+                    sample["code_list"] = [sample["completion"]]
+
+                samples.append(sample)
+
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in samples:
+                f.write(json.dumps(sample) + "\n")
+
+        # evaluate(
+        #     custom_output_file=jsonl_file,
+        #     k_list=[1],
+        #     num_process_evaluate=12,
+        #     timeout=6,
+        # )
+
+        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+            eval_grades = json.load(fin)
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in samples:
+                sample["graded_list"] = eval_grades["eval"][sample["question_id"]]["graded_list"]
+                f.write(json.dumps(sample) + "\n")
+
+        # moving eval file to ensure metrics are recomputed
+        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")

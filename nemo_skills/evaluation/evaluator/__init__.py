@@ -23,6 +23,7 @@ from nemo_skills.evaluation.evaluator.code import (
     eval_livebench_coding,
     eval_livecodebench,
     eval_livecodebench_pro,
+    eval_ojbench,
 )
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
@@ -34,7 +35,6 @@ from nemo_skills.evaluation.evaluator.math import (
 )
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
-from nemo_skills.evaluation.evaluator.ojbench import eval_ojbench
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
 

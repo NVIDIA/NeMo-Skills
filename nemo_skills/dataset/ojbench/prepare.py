@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import shutil
 import subprocess
@@ -51,6 +52,20 @@ def clone_dataset_repo(url, destination):
             try:
                 shutil.move(source_file, target_file)
                 print("✅ File moved successfully.")
+
+                print(f"Updating keys in {target_file}...")
+                modified_data = []
+                with open(target_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        data = json.loads(line)
+                        if "prompt" in data:
+                            data["question"] = data.pop("prompt")
+                        modified_data.append(data)
+
+                with open(target_file, "w", encoding="utf-8") as f:
+                    for item in modified_data:
+                        f.write(json.dumps(item) + "\n")
+                print("✅ Successfully replaced 'prompt' key with 'question'.")
 
                 print(f"Removing directory: {prompts_dir}")
                 shutil.rmtree(prompts_dir)
