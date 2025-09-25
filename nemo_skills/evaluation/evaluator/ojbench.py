@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# settings that define how evaluation should be done by default (all can be changed from cmdline)
-DATASET_GROUP = "code"
-METRICS_TYPE = "ojbench"
-EVAL_SPLIT = "test"
-EVAL_ARGS = "++eval_type=ojbench"
-GENERATION_ARGS = "++prompt_config=generic/default"
+import logging
+from dataclasses import field
+
+from nemo_skills.utils import get_logger_name, nested_dataclass
+
+LOG = logging.getLogger(get_logger_name(__file__))
+
+
+@nested_dataclass(kw_only=True)
+class OJBenchEvaluatorConfig:
+    sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
+    timeout: float = 30.0
+    num_parallel_requests: int = 20
+
+
+def eval_ojbench(cfg):
+    pass

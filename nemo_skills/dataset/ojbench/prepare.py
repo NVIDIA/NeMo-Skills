@@ -44,14 +44,20 @@ def clone_dataset_repo(url, destination):
 
         source_file = os.path.join(destination, "prompts", "full.jsonl")
         target_file = os.path.join(destination, "test.jsonl")
+        prompts_dir = os.path.join(destination, "prompts")
 
         print(f"Moving {source_file} to {target_file}...")
         if os.path.exists(source_file):
             try:
                 shutil.move(source_file, target_file)
                 print("✅ File moved successfully.")
+
+                print(f"Removing directory: {prompts_dir}")
+                shutil.rmtree(prompts_dir)
+                print("✅ Directory removed successfully.")
+
             except OSError as e:
-                print(f"❌ Error moving file: {e}")
+                print(f"❌ Error during file/directory operations: {e}")
         else:
             print(f"❌ Source file not found: {source_file}")
     else:
