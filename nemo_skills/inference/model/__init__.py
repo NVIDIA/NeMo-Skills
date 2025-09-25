@@ -28,7 +28,6 @@ from .gemini import GeminiModel
 from .megatron import MegatronModel
 from .openai import OpenAIModel
 from .parallel_thinking import ParallelThinkingConfig, ParallelThinkingTask
-from .responses import ResponsesModel
 
 # Tool Calling
 from .tool_call import ToolCallingWrapper
@@ -48,22 +47,23 @@ models = {
     "gemini": GeminiModel,
     "vllm": VLLMModel,
     "sglang": VLLMModel,
-    "responses": ResponsesModel,
 }
 
 
-def get_model(server_type, tokenizer=None, **kwargs):
+def get_model(server_type, client_type="chat_completion", tokenizer=None, **kwargs):
     """A helper function to make it easier to set server through cmd."""
     model_class = models[server_type.lower()]
     if server_type == "trtllm" and kwargs.get("enable_soft_fail", False):
         if kwargs.get("context_limit_retry_strategy", None) is not None:
             raise ValueError("context_limit_retry_strategy is not supported for trtllm")
-    return model_class(tokenizer=tokenizer, **kwargs)
+    return model_class(client_type=client_type, tokenizer=tokenizer, **kwargs)
 
 
-def get_code_execution_model(server_type, tokenizer=None, code_execution=None, sandbox=None, **kwargs):
+def get_code_execution_model(
+    server_type, client_type="chat_completion", tokenizer=None, code_execution=None, sandbox=None, **kwargs
+):
     """A helper function to make it easier to set server through cmd."""
-    model = get_model(server_type=server_type, tokenizer=tokenizer, **kwargs)
+    model = get_model(server_type=server_type, client_type=client_type, tokenizer=tokenizer, **kwargs)
     if code_execution is None:
         code_execution = {}
     code_execution_config = CodeExecutionConfig(**code_execution)
@@ -96,6 +96,7 @@ def get_parallel_thinking_model(
 
 def get_tool_calling_model(
     model,
+    client_type="chat_completion",
     tokenizer=None,
     additional_config=None,
     tool_modules: list[str] | None = None,
@@ -103,7 +104,7 @@ def get_tool_calling_model(
     **kwargs,
 ):
     if isinstance(model, str):
-        model = get_model(model=model, tokenizer=tokenizer, **kwargs)
+        model = get_model(server_type=model, client_type=client_type, tokenizer=tokenizer, **kwargs)
     return ToolCallingWrapper(
         model,
         tool_modules=tool_modules,

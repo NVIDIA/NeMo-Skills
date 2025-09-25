@@ -17,6 +17,15 @@ import os
 import re
 
 from .base import BaseModel
+from .defaults import CHAT_COMPLETION_PARAMS
+
+# OpenAI-specific parameter restrictions
+OPENAI_REASONING_UNSUPPORTED = {"temperature", "top_p", "repetition_penalty", "top_logprobs"}
+
+OPENAI_GENERAL_UNSUPPORTED = {
+    "top_k",
+    "min_p",  # OpenAI doesn't support these
+}
 
 
 class OpenAIModel(BaseModel):
@@ -27,6 +36,7 @@ class OpenAIModel(BaseModel):
         model: str | None = None,
         base_url: str | None = None,
         max_retries: int = 3,
+        client_type: str = "chat_completion",
         **kwargs,
     ):
         model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
@@ -39,6 +49,7 @@ class OpenAIModel(BaseModel):
 
         super().__init__(
             model=model,
+            client_type=client_type,
             base_url=base_url,
             max_retries=max_retries,
             **kwargs,
@@ -60,6 +71,40 @@ class OpenAIModel(BaseModel):
 
     def _is_reasoning_model(self, model_name: str) -> bool:
         return re.match(r"^o\d", model_name)
+
+    def is_reasoning_model(self, model_name: str) -> bool:
+        """Public method to check if model is a reasoning model"""
+        return self._is_reasoning_model(model_name)
+
+    def get_supported_params(self) -> set:
+        """OpenAI-specific parameter restrictions"""
+        base_params = CHAT_COMPLETION_PARAMS.copy()
+
+        # Remove OpenAI-unsupported parameters
+        base_params -= OPENAI_GENERAL_UNSUPPORTED
+
+        # Further restrictions for reasoning models
+        if self.is_reasoning_model(self.model_name_or_path):
+            base_params -= OPENAI_REASONING_UNSUPPORTED
+
+        return base_params
+
+    def apply_model_specific_params(self, request: dict, params: dict) -> dict:
+        """Apply OpenAI-specific parameter transformations"""
+        if self.is_reasoning_model(self.model_name_or_path):
+            # Reasoning model specific handling
+            if "messages" in request:
+                request["messages"] = [
+                    {**msg, "role": "developer"} if msg.get("role") == "system" else msg for msg in request["messages"]
+                ]
+            if params.get("reasoning_effort"):
+                request["reasoning_effort"] = params["reasoning_effort"]
+        else:
+            # Standard OpenAI model handling
+            if "repetition_penalty" in params and params["repetition_penalty"] != 1.0:
+                request["presence_penalty"] = params["repetition_penalty"]
+
+        return request
 
     def _build_completion_request_params(self, **kwargs) -> dict:
         kwargs = copy.deepcopy(kwargs)

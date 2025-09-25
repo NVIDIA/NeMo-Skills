@@ -34,7 +34,6 @@ from nemo_skills.mcp.tool_manager import ToolManager
 from nemo_skills.utils import get_logger_name
 
 from .base import BaseModel
-from .responses import ResponsesModel
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -70,9 +69,9 @@ class ToolCallingWrapper:
         self._setup_adapters()
 
     def _setup_adapters(self):
-        """Set up adapters based on model type."""
-        # Detect model type and configure adapters
-        if isinstance(self.model, ResponsesModel):
+        """Set up adapters based on client type."""
+        # Use client_type instead of model instance checks
+        if self.model.client_type == "responses":
             # Responses API model - uses flatter tool schema format
             self.schema_adapter = ResponsesSchemaAdapter()
             self.call_interpreter = ResponsesCallInterpreter()
