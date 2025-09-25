@@ -47,34 +47,28 @@ def clone_dataset_repo(url, destination):
         target_file = os.path.join(destination, "test.jsonl")
         prompts_dir = os.path.join(destination, "prompts")
 
-        print(f"Moving {source_file} to {target_file}...")
-        if os.path.exists(source_file):
-            try:
-                shutil.move(source_file, target_file)
-                print("✅ File moved successfully.")
+        if not os.path.exists(source_file):
+            raise FileNotFoundError(f"Expected dataset file not found at {source_file}")
 
-                print(f"Updating keys in {target_file}...")
-                modified_data = []
-                with open(target_file, "r", encoding="utf-8") as f:
-                    for line in f:
-                        data = json.loads(line)
-                        if "prompt" in data:
-                            data["question"] = data.pop("prompt")
-                        modified_data.append(data)
+        print(f"Moving {source_file} to {target_file} and replacing 'prompt' key with 'question'")
+        try:
+            with (
+                open(source_file, "r", encoding="utf-8") as infile,
+                open(target_file, "w", encoding="utf-8") as outfile,
+            ):
+                for line in infile:
+                    data = json.loads(line)
+                    if "prompt" in data:
+                        data["question"] = data.pop("prompt")
+                    outfile.write(json.dumps(data) + "\n")
 
-                with open(target_file, "w", encoding="utf-8") as f:
-                    for item in modified_data:
-                        f.write(json.dumps(item) + "\n")
-                print("✅ Successfully replaced 'prompt' key with 'question'.")
+            print(f"Removing directory: {prompts_dir}")
+            shutil.rmtree(prompts_dir)
+            print("✅ Directory removed successfully.")
 
-                print(f"Removing directory: {prompts_dir}")
-                shutil.rmtree(prompts_dir)
-                print("✅ Directory removed successfully.")
+        except OSError as e:
+            print(f"❌ Error during file/directory operations: {e}")
 
-            except OSError as e:
-                print(f"❌ Error during file/directory operations: {e}")
-        else:
-            print(f"❌ Source file not found: {source_file}")
     else:
         print("❌ Clone failed.")
         print(f"Error Details:\n{result.stderr}")
