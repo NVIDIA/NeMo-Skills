@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import shutil
 import subprocess
 from pathlib import Path
@@ -39,9 +38,6 @@ def clone_dataset_repo(url, destination):
 
 
 if __name__ == "__main__":
-    # Write an argparse to a json file, read it in and parse it
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", type=str, default=str(Path(__file__).parent))
-    args = parser.parse_args()
-
-    clone_dataset_repo(REPO_URL, args.output_dir)
+    data_dir = Path(__file__).absolute().parent
+    data_dir.mkdir(exist_ok=True)
+    clone_dataset_repo(REPO_URL, data_dir)
