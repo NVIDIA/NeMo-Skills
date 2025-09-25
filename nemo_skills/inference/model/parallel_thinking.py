@@ -246,7 +246,8 @@ class ParallelThinkingTask:
             return None
 
         if self.cfg.genselect.indexing_with_one and solution_idx is not None:
-            solution_idx -= 1
+            if solution_idx > 0:
+                solution_idx -= 1
 
         return solution_idx
 
