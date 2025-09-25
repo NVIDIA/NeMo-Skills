@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,8 @@ def robust_eval(
         ...
     All other arguments are "ns eval" arguments.
     """
-    prompt_set_config = yaml.safe_load(open(prompt_set_config))
+    with open(prompt_set_config, "r") as f:
+        prompt_set_config = yaml.safe_load(f)
     benchmarks = ns_eval_kwargs["benchmarks"].split(",")
     if set(prompt_set_config.keys()) != set([b.split(":")[0] for b in benchmarks]):
         raise ValueError(f"Benchmark names ({benchmarks}) must match prompt set config({prompt_set_config.keys()})")

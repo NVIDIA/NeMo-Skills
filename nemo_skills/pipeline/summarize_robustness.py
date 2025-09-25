@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -109,12 +109,14 @@ def calculate_consistency_rate(input_files: List[str]) -> float:
     total_combinations = 0
 
     for response_set in responses:
-        pairs = combinations(response_set, 2)
-        num_pairs = len(response_set) * (len(response_set) - 1) / 2
-        total_combinations += num_pairs
-        for answer1, answer2 in pairs:
+        if len(response_set) < 2:
+            continue
+        for answer1, answer2 in combinations(response_set, 2):
             total_similarity += calculate_similarity(answer1, answer2)
+            total_combinations += 1
 
+    if total_combinations == 0:
+        return 100.0
     return round(total_similarity / total_combinations * 100, 2)
 
 
