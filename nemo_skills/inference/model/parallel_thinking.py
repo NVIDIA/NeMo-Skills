@@ -408,6 +408,7 @@ class ParallelThinkingTask:
         if not solutions:
             return {
                 self.cfg.solution_key: "",
+                "generation": "",
                 "solution_list": [],
                 f"{self.cfg.mode}_comparison": "",
                 f"{self.cfg.mode}_num_generated_tokens": 0,
