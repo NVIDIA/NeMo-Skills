@@ -431,12 +431,14 @@ class IOIEvaluator(BaseEvaluator):
                 if not result.get("compile_success", True):
                     print(
                         f"Compile failed for problem '{entry['name']}', test '{test_name}':\n"
+                        f"--- CODE ---\n{completion}\n"
                         f"--- STDOUT ---\n{result.get('compile_stdout', '').strip()}\n"
                         f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
                     )
                 elif float(result.get("score", 0)) == 0.0 and result.get("run_stderr"):
                     print(
                         f"Runtime error for problem '{entry['name']}', test '{test_name}':\n"
+                        f"--- CODE ---\n{completion}\n"
                         f"--- STDOUT ---\n{result.get('run_stdout', '').strip()}\n"
                         f"--- STDERR ---\n{result.get('run_stderr', '').strip()}\n"
                     )
