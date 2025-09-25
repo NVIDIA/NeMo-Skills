@@ -387,7 +387,7 @@ ns eval \
     ++inference.temperature=0.0 \
     ++inference.top_p=1.0 \
     ++system_message='/no_think'
-``` 
+```
 
 For MMLU-Pro, the command is:
 
@@ -404,7 +404,7 @@ ns eval \
     ++inference.temperature=0.0 \
     ++inference.top_p=1.0 \
     ++system_message='/no_think'
-``` 
+```
 
 For LiveCodeBench, the command is:
 
