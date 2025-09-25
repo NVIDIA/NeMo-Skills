@@ -31,9 +31,6 @@ from nemo_skills.evaluation.evaluator.math import (
     Lean4ProofEvaluator,
     Lean4StatementEvaluator,
     MathEvaluator,
-    eval_lean4_proof,
-    eval_lean4_statement,
-    eval_math,
 )
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
@@ -94,7 +91,7 @@ def register_evaluator(eval_type: str, eval_fn: Callable[[Dict[str, Any]], None]
     EVALUATOR_MAP[eval_type] = eval_fn
 
 
-def get_evaluator(eval_type: str, config: Dict[str, Any]) -> BaseEvaluator:
+def get_evaluator_class(eval_type: str, config: Dict[str, Any]) -> BaseEvaluator:
     """Get evaluator instance by type."""
     if eval_type not in EVALUATOR_CLASS_MAP:
         raise ValueError(
@@ -108,11 +105,11 @@ def get_evaluator(eval_type: str, config: Dict[str, Any]) -> BaseEvaluator:
 
 
 def supports_single_eval(eval_type: str, config: Dict[str, Any]) -> bool:
-    """Check if evaluator supports single evaluation during generation."""
+    """Check if evaluator supports single data point evaluation during generation."""
     if eval_type not in EVALUATOR_CLASS_MAP:
         return False  # Only class-based evaluators support single eval
 
-    evaluator = get_evaluator(eval_type, config)
+    evaluator = get_evaluator_class(eval_type, config)
     return evaluator.supports_single_eval()
 
 
@@ -122,7 +119,7 @@ def evaluate(cfg):
 
     # Check if it's a class-based evaluator first
     if eval_type in EVALUATOR_CLASS_MAP:
-        evaluator = get_evaluator(eval_type, cfg.eval_config)
+        evaluator = get_evaluator_class(eval_type, cfg.eval_config)
         return asyncio.run(evaluator.eval_full(cfg.input_files))
 
     # Fall back to function-based evaluator

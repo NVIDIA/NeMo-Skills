@@ -289,9 +289,10 @@ class Sandbox(abc.ABC):
             # Process lines concurrently with progress bar
             print(f"Processing {input_file}...")
             processed_lines = []
-            for line in tqdm.tqdm(lines):
-                result = await process_line(line.rstrip("\n"))
-                processed_lines.append(result)
+            tasks = [asyncio.create_task(process_line(line.rstrip("\n"))) for line in lines]
+            processed_lines = []
+            for coro in tqdm.tqdm(tasks, total=len(tasks)):
+                processed_lines.append(await coro)
 
             # Write to temp file then replace original
             temp_file = input_file + "-tmp"

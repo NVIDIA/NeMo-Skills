@@ -292,7 +292,7 @@ class GenerationTask:
         # Setup evaluator if specified
         self.evaluator = None
         if self.cfg.eval_type:
-            from nemo_skills.evaluation.evaluator import get_evaluator, supports_single_eval
+            from nemo_skills.evaluation.evaluator import get_evaluator_class, supports_single_eval
 
             if not supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
                 raise ValueError(
@@ -300,7 +300,7 @@ class GenerationTask:
                     f"Use the evaluation pipeline instead."
                 )
 
-            self.evaluator = get_evaluator(self.cfg.eval_type, self.cfg.eval_config)
+            self.evaluator = get_evaluator_class(self.cfg.eval_type, self.cfg.eval_config)
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
@@ -522,12 +522,16 @@ class GenerationTask:
 
         result = await self.llm.generate_async(**generation_params)
 
-        # Apply evaluation hook if configured
-        if self.evaluator:
-            eval_results = await self.evaluator.eval_single({**data_point, **result})
-            result.update(eval_results)
-
         return result
+
+    async def apply_evaluation_hook(self, data_point):
+        if self.evaluator:
+            eval_start_time = time.time()
+            eval_results = await self.evaluator.eval_single(data_point)
+            eval_end_time = time.time()
+            data_point["interleaved_eval_single_time_s"] = eval_end_time - eval_start_time
+            data_point.update(eval_results)
+        return data_point
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point with semaphore control."""
@@ -537,6 +541,12 @@ class GenerationTask:
 
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
+            # Apply evaluation hook if configured
+            # TODO: note that this currently only evaluates independently--if there
+            # is any post-processing that needs to be done on the full set of
+            # generations, this will not work correctly, and we might need another
+            # hook at the end of generation to make it work properly
+            output = await self.apply_evaluation_hook({**data_point, **output})
 
             # Thread-safe output writing
             async with self.output_lock:

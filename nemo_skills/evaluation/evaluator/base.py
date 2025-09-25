@@ -12,27 +12,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
+import asyncio
+import json
+import os
+from abc import ABC
 from typing import Any, Dict, List
+
+import tqdm
+
+from nemo_skills.utils import unroll_files
 
 
 class BaseEvaluator(ABC):
     """Base class for all evaluators."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], num_parallel_requests=10):
         """Initialize evaluator with configuration."""
         self.config = config
+        self.num_parallel_requests = num_parallel_requests
 
-    @abstractmethod
-    async def eval_full(self, input_files: List[str], **kwargs) -> None:
+    async def eval_full(self, input_files: List[str]) -> None:
         """
         Evaluate full dataset in batch mode.
 
         Args:
             input_files: List of input files to evaluate
-            **kwargs: Additional evaluation parameters
         """
-        pass
+        semaphore = asyncio.Semaphore(self.num_parallel_requests)
+        for input_file in tqdm.tqdm(unroll_files(input_files), desc="Processing files"):
+            # assume that input_file is small enough to entirely fit in the memory
+            async def process_line(line_data):
+                # Concurrency control and merge updates into original record
+                async with semaphore:
+                    updates = await self.eval_single(line_data)
+                    merged = dict(line_data)
+                    merged.update(updates)
+                    return merged
+
+            with open(input_file, "rt", encoding="utf-8") as fin:
+                tasks = []
+                for file_line in fin:
+                    line_dict = json.loads(file_line)
+                    task = asyncio.create_task(process_line(line_dict))
+                    tasks.append(task)
+
+            # Await tasks and write to temp file then replace original
+            temp_file = input_file + "-tmp"
+            with open(temp_file, "wt", encoding="utf-8") as f:
+                for task in tqdm.tqdm(
+                    tasks, total=len(tasks), desc=f"Completed Evaluation for {os.path.basename(input_file)}"
+                ):
+                    line = await task
+                    f.write(json.dumps(line) + "\n")
+
+            # Replace original with temp file
+            os.replace(temp_file, input_file)
 
     async def eval_single(self, data_point: Dict[str, Any]) -> Dict[str, Any]:
         """
