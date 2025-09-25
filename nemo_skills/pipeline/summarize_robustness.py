@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ from itertools import combinations
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import numpy as np
 import typer
 
@@ -41,15 +41,26 @@ from nemo_skills.utils import get_logger_name, setup_logging
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def calculate_metric_range(input_files):
-    """Calculate the range of a metric across multiple input files."""
+def get_metrics(prediction_files: List[str]) -> (List[float] | List[float]):
+    """Calculate accuracy and % of no-answer datapoints for each prediction file.
+       If input_files contains 3 files, both returned lists will have 3 elements,
+       where index i corresponds to the metrics from input_files[i].
+   
+    Args:
+        input_files: List of file paths containing predictions to evaluate
+        
+    Returns:
+        Tuple[List[float], List[float]]: A tuple containing:
+            - per_file_metrics: List of accuracy scores for each file
+            - no_answer: List of no-answer rates for each file
+    """
     per_file_metrics = []
     no_answer = []
-    for input_file in input_files:
+    for pred_file in prediction_files:
         metrics_calculator = ComputeMetrics(benchmark="custom", metric_type="math", max_samples=-1)
         metrics_calculator.calculator = metrics_calculator.get_metrics_calculator()
 
-        with open(input_file, "rt", encoding="utf-8") as f:
+        with open(pred_file, "rt", encoding="utf-8") as f:
             for idx, line in enumerate(f):
                 data = read_predictions([line], idx, [f])
                 metrics_calculator.calculator.update(data)
@@ -66,7 +77,26 @@ def calculate_similarity(answer1: str | None, answer2:str | None) -> float:
     return 1 if answer1 == answer2 else 0
 
 
-def calculate_consistency_rate(input_files):
+def calculate_consistency_rate(input_files: List[str]) -> float:
+    """Calculate the consistency rate across multiple input files.
+    Metric proposed in https://arxiv.org/abs/2403.14221 
+    
+    Args:
+        input_files: List of file paths containing predictions
+
+    Returns:
+        float: Average consistency rate as a percentage (0-100)
+
+    For each datapoint, collect all predictions, and
+    calculate similarity between all possible pairs of predictions. 
+    The consistency rate is the number of pairs of equivalent prediction pairs
+    divided by the total number of prediction pairs (N choose 2).
+
+    Example:
+        If datapoint i has predictions [A, A, C] across 3 files, it will
+        compare pairs (A,A), (A, C) and (A, C) and consistency rate will be 1/3 = 33.33%.
+    
+    """
     per_idx_preds = defaultdict(list)
     for inp_f in input_files:
         with open(inp_f, "rt", encoding="utf-8") as f:
@@ -116,7 +146,35 @@ def summarize_robustness(
     ),
     verbose: bool = typer.Option(True, help="Print download/upload progress"),
 ):
-    """Summarize results of an evalutions on multiple benchmarks and prompts."""
+    """Summarize robustness evaluation results across multiple benchmarks and prompts.
+       Calculate statistical metrics and consistency rates for model predictions. 
+       The results can be used to analyze model prediction stability and robustness against prompt variations.
+       Works for any Math and MCQ benchmark (such as AIME, comp-math-24-25, GPQA, MMLU-Pro, etc).
+    
+    Expected Directory Structure:
+        results_dir/
+        ├── benchmark1/
+        │   ├── prompt1/
+        │   │   ├── output-rs0.jsonl
+        │   │   ├── output-rs1.jsonl
+        │   │   └── ...
+        │   └── prompt2/
+        │       └── ...
+        └── benchmark2/
+            └── ...
+
+    Calculates the following both per benchmark across prompts and per prompt across random seeds:
+        - Statistical metrics: min, max, average, standard deviation
+        - Consistency Rate (CR): Agreement between different model runs
+        - No-answer rate: Proportion of questions without answers
+        - Cross-prompt standard deviation of averages
+    
+    Output:
+        - Saves formatted tables with aggregated benchmark statistics in results_dir/summarize_robustness
+        - Saves detailed per-prompt statistics for each benchmark in results_dir/summarize_robustness
+        - Saves all metrics to a JSON file (metrics.json) in results_dir
+
+    """
     
     setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)
 
@@ -177,7 +235,7 @@ def summarize_robustness(
             input_files = glob.glob(f'{prompt_dir}/**/output-rs*.jsonl', recursive=True)
             if not input_files:
                 continue
-            per_file_metrics, no_answer = calculate_metric_range(input_files)
+            per_file_metrics, no_answer = get_metrics(input_files)
             metrics_to_print[benchmark][prompt_name] = {
                 "min": np.min(per_file_metrics),
                 "max": np.max(per_file_metrics),
@@ -199,6 +257,7 @@ def summarize_robustness(
             }
         
         input_files = glob.glob(f'{benchmark_path}/**/output-rs*.jsonl', recursive=True)
+        # calculate consistency rate per benchmark
         consistency_rate = calculate_consistency_rate(input_files)
         metrics_to_print[benchmark]['aggregated']['CR'] = consistency_rate
 
@@ -237,6 +296,7 @@ def summarize_robustness(
         print('\n')
 
     try:
+        # save metrics.json
         save_metrics_path = save_metrics_path or str(Path(results_dir) / "metrics.json")
         Path(save_metrics_path).parent.mkdir(parents=True, exist_ok=True)
         with open(save_metrics_path, "wt", encoding="utf-8") as fout:

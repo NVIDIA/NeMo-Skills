@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,9 +29,13 @@ LOG = logging.getLogger(get_logger_name(__file__))
 def robust_eval(ctx: typer.Context,
                 prompt_set_config: str = typer.Option(..., help="Path to a yaml file containting list of prompts per benchmark"),
                 **ns_eval_kwargs):
-    """Run evaluation on multiple prompts and benchmarks to measure LLM robustness against prompt.
-    Code expects a yaml file with the following structure: (example in /nemo_skills/prompt/config/robustness/prompt_set_config.yaml)
-    ```yaml
+    """Run evaluation on multiple prompts and benchmarks to measure LLM robustness against changes in prompt.
+       robust_eval runs 'ns eval' for each prompt and benchmark combination, creates folders with benchmark names containing every prompt result in a separate folder.
+       Afterwards, runs summarize_robustness to aggregate the metrics across prompts for each benchmark and save in summarize_robustness folder in main output_dir.
+       Usage is the same as 'ns eval' with the addition of the --prompt_set_config argument, a yaml containing the list of prompts to use for each benchmark.
+       
+    Note: prompt_set_config should be a yaml file with the following structure: (example in /nemo_skills/prompt/config/robustness/prompt_set_config.yaml)
+    ```
     <benchmark_name>:
       - <path_to_prompt_1>
       - <path_to_prompt_2>
@@ -40,8 +44,7 @@ def robust_eval(ctx: typer.Context,
         - <path_to_prompt_1>
         - <path_to_prompt_2>
         ...
-    All other arguments are 'ns eval arguments'.
-    robust_eval will run 'ns eval' for each prompt and benchmark combination and then summarize the results in the output_dir folder.
+    All other arguments are 'ns eval' arguments.
     """
     prompt_set_config = yaml.safe_load(open(prompt_set_config))
     benchmarks = ns_eval_kwargs['benchmarks'].split(',')
