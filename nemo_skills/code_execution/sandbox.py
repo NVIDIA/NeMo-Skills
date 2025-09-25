@@ -157,15 +157,19 @@ class Sandbox(abc.ABC):
         if language != "ipython" and traceback_verbosity != "Plain":
             raise ValueError("Configurable traceback_verbosity is only supported for ipython")
 
+        session_id_str = str(session_id) if session_id is not None else None
+
         request_session_id = session_id
         if request_session_id is None and language == "ipython":  # creating a new session with empty state
             request_session_id = uuid.uuid4()
+
+        request_session_id_str = str(request_session_id) if request_session_id is not None else None
 
         TO_EXECUTE = generated_code
         request = self._prepare_request(
             TO_EXECUTE, timeout, language, std_input, max_output_characters, traceback_verbosity
         )
-        request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
+        request["session_id"] = request_session_id_str
         try:
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
@@ -177,45 +181,54 @@ class Sandbox(abc.ABC):
         # or timed out. This means restoration **can diverge** from the original interactive session in those cases, but
         # avoids re-triggering side effects from failing cells while keeping the replay simple.
         if session_id is not None and new_session_created:
-            history = self.session_histories.get(session_id, [])
-            if history:
-                # Restore session state by executing only the history cells
-                restore_code = "\n".join(history)
-                restore_request = self._prepare_request(
-                    restore_code, timeout, language, std_input, max_output_characters, traceback_verbosity
-                )
-                restore_request["session_id"] = (
-                    request_session_id if request_session_id is None else str(request_session_id)
-                )
+            history = list(self.session_histories.get(session_id_str, []))
+            if request_session_id_str is not None:
                 try:
-                    restore_output = await self._send_request(restore_request, timeout)
-                except httpx.TimeoutException:
-                    restore_output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+                    await self.delete_session(request_session_id_str)
+                except Exception as exc:
+                    LOG.warning(
+                        "Failed to delete restarted session %s before restoration: %s",
+                        request_session_id_str,
+                        exc,
+                    )
+                self.session_histories[request_session_id_str] = history
+            if history:
+                # Restore session state by executing each history cell sequentially to preserve semantics
+                for cell_index, cell_code in enumerate(history, start=1):
+                    restore_request = self._prepare_request(
+                        cell_code, timeout, language, std_input, max_output_characters, traceback_verbosity
+                    )
+                    restore_request["session_id"] = request_session_id_str
+                    try:
+                        restore_output = await self._send_request(restore_request, timeout)
+                    except httpx.TimeoutException:
+                        restore_output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
-                # If restoration didn't complete successfully, abort the execution to avoid inconsistent state
-                if restore_output.get("process_status") != "completed":
-                    LOG.error(
-                        "Sandbox state restoration failed for session %s with output: %s",
-                        session_id,
-                        restore_output,
-                    )
-                    raise RuntimeError(
-                        "Sandbox state restoration failed; aborting execution to avoid inconsistent state"
-                    )
+                    if restore_output.get("process_status") != "completed":
+                        LOG.error(
+                            "Sandbox state restoration failed for session %s while replaying cell %d/%d with output: %s",
+                            session_id,
+                            cell_index,
+                            len(history),
+                            restore_output,
+                        )
+                        raise RuntimeError(
+                            "Sandbox state restoration failed while replaying prior cell; aborting execution to avoid inconsistent state"
+                        )
 
             # Execute the new code once restoration has succeeded (or there was no history to replay)
             exec_request = self._prepare_request(
                 generated_code, timeout, language, std_input, max_output_characters, traceback_verbosity
             )
-            exec_request["session_id"] = request_session_id if request_session_id is None else str(request_session_id)
+            exec_request["session_id"] = request_session_id_str
             try:
                 output = await self._send_request(exec_request, timeout)
             except httpx.TimeoutException:
                 output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
 
         # Append to history if successful execution (process_status == 'completed')
-        if output.get("process_status") == "completed":
-            self.session_histories[request_session_id].append(generated_code)
+        if output.get("process_status") == "completed" and request_session_id_str is not None:
+            self.session_histories[request_session_id_str].append(generated_code)
 
         output.pop("new_session_created", None)
 

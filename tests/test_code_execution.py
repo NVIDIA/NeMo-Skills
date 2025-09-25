@@ -14,6 +14,7 @@
 
 import os
 import re
+from copy import deepcopy
 
 import pytest
 
@@ -394,8 +395,13 @@ async def test_state_restoration():
     assert err_out["process_status"] == "error"
     assert "ValueError" in err_out["stdout"]
 
-    # Force a new backend shell for the same session to trigger client-side restoration
+    # Force a new backend shell for the same session to trigger client-side restoration by deleting the session
+    assert str(sid) in sandbox.session_histories
+    # Make a copy of the history
+    history = deepcopy(sandbox.session_histories[str(sid)])
     await sandbox.delete_session(str(sid))
+    # Restore the history
+    sandbox.session_histories[str(sid)] = history
 
     # Execute code that relies on restored state; stdout should be ONLY from this new execution
     out3, sid = await sandbox.execute_code("print(a)", session_id=sid, language="ipython")
