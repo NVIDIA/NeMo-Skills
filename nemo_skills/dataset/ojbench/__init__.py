@@ -15,6 +15,6 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "code"
 METRICS_TYPE = "ojbench"
-EVAL_SPLIT = "test_v6_2408_2505"
-EVAL_ARGS = "++eval_type=livecodebench"
-GENERATION_ARGS = "++prompt_config=eval/livecodebench/python_codegen"
+EVAL_SPLIT = "full"
+EVAL_ARGS = "++eval_type=ojbench"
+GENERATION_ARGS = "++prompt_config=generic/default"

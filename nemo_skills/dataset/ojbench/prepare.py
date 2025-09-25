@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -23,6 +24,14 @@ def clone_dataset_repo(url, destination):
     if not shutil.which("git"):
         print("Error: Git executable not found.")
         return
+
+    if os.path.exists(destination):
+        print(f"Destination path '{destination}' already exists. Removing it.")
+        try:
+            shutil.rmtree(destination)
+        except OSError as e:
+            print(f"Error removing directory {destination}: {e}")
+            return
 
     print(f"Cloning {url} into {destination}...")
 
