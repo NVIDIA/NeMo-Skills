@@ -89,40 +89,9 @@ class ProverTask(GenerationTask):
         Args:
             cfg: GenerateSolutionsConfig object with the configuration parameters or subclass.
         """
-        self.cfg = cfg
-        # chat template kwargs goes either into extra body of inference or as a prompt parameter
-
-        if self.cfg.chat_template_kwargs:
-            if not self.cfg.use_completions_api:
-                if "chat_template_kwargs" in self.cfg.inference.extra_body:
-                    raise ValueError(
-                        "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
-                        "You can only use one of them!"
-                    )
-                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
-                self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
-                self.cfg.chat_template_kwargs = None
-
-        self.llm = self.setup_llm()
-        self.prompt = self.setup_prompt()
+        super().__init__(cfg)
         if self.cfg.refinement:
             self.setup_refine_prompt()
-
-        if self.cfg.code_execution:
-            self.extra_generate_params = self.prompt.get_code_execution_args()
-        else:
-            self.extra_generate_params = {}
-
-        LOG.info(
-            "Async loop is maintaining %d generations in parallel. "
-            "Use max_concurrent_requests to control the number of concurrent requests.",
-            self.cfg.max_concurrent_requests,
-        )
-
-        self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
-
-        # output_lock will be initialized when async_loop is called
-        self.output_lock = None
 
         if self.cfg.delete_wrong_turns:
             assert self.cfg.remove_cot, "remove_cot is required when delete_wrong_turns is enabled"
