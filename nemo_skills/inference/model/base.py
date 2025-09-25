@@ -47,6 +47,7 @@ class BaseClientHandler:
 
     def extract_and_validate_params(self, **kwargs) -> dict:
         """Public method for parameter extraction and validation"""
+        LOG.info(f"extract_and_validate_params called with kwargs: {list(kwargs.keys())}")
         supported = self.get_supported_params()
 
         # Let model filter/restrict parameters
@@ -54,17 +55,29 @@ class BaseClientHandler:
         if model_supported:
             supported = supported.intersection(model_supported)
 
-        # Check for unsupported parameters
+        # Check for unsupported parameters, but only for parameters that differ from defaults
         provided = set(kwargs.keys())
-        unsupported = provided - supported
-        if unsupported:
+        unsupported_non_default = set()
+
+        for param_name in provided:
+            if param_name not in supported:
+                # Check if this parameter is set to its default value
+                default_value = getattr(self.defaults, param_name, None)
+                provided_value = kwargs[param_name]
+
+                # Only consider it unsupported if it's not the default value
+                if default_value is None or provided_value != default_value:
+                    unsupported_non_default.add(param_name)
+
+        if unsupported_non_default:
             raise ValueError(
-                f"Unsupported parameters for {self.__class__.__name__}: {unsupported}. Supported: {sorted(supported)}"
+                f"Unsupported parameters for {self.__class__.__name__}: {unsupported_non_default}. Supported: {sorted(supported)}"
             )
 
-        # Extract with defaults
+        # Extract with defaults - include all provided parameters, even unsupported ones if they're default values
         params = {}
-        for param_name in supported:
+        all_param_names = supported.union(provided)
+        for param_name in all_param_names:
             if param_name in kwargs:
                 params[param_name] = kwargs[param_name]
             else:
@@ -142,7 +155,7 @@ class ChatCompletionHandler(BaseClientHandler):
         model_litellm = f"{self.model.MODEL_PROVIDER}/{self.model.model_name_or_path}"
         self.litellm_kwargs = dict(
             model=model_litellm,
-            max_retries=3,
+            max_retries=getattr(self.model, "max_retries", 3),
             api_key=self.model.api_key,
             base_url=self.model.base_url,
         )
@@ -153,7 +166,7 @@ class ChatCompletionHandler(BaseClientHandler):
 
     def build_chat_request_structure(self, messages: list, params: dict) -> dict:
         """Build chat completion request structure"""
-        return {
+        request = {
             "messages": messages,
             "max_tokens": params["tokens_to_generate"],
             "temperature": params["temperature"],
@@ -167,9 +180,23 @@ class ChatCompletionHandler(BaseClientHandler):
             "timeout": params["timeout"],
         }
 
+        # Add non-standard parameters to extra_body
+        extra_body = params.get("extra_body", {}).copy() if params.get("extra_body") else {}
+        if params.get("top_k", -1) != -1:
+            extra_body["top_k"] = params["top_k"]
+        if params.get("min_p", 0.0) != 0.0:
+            extra_body["min_p"] = params["min_p"]
+        if params.get("repetition_penalty", 1.0) != 1.0:
+            extra_body["repetition_penalty"] = params["repetition_penalty"]
+
+        if extra_body:
+            request["extra_body"] = extra_body
+
+        return request
+
     def build_completion_request_structure(self, prompt: str, params: dict) -> dict:
         """Build text completion request structure"""
-        return {
+        request = {
             "prompt": prompt,
             "max_tokens": params["tokens_to_generate"],
             "temperature": params["temperature"],
@@ -180,6 +207,20 @@ class ChatCompletionHandler(BaseClientHandler):
             "stream": params["stream"],
             "timeout": params["timeout"],
         }
+
+        # Add non-standard parameters to extra_body
+        extra_body = params.get("extra_body", {}).copy() if params.get("extra_body") else {}
+        if params.get("top_k", -1) != -1:
+            extra_body["top_k"] = params["top_k"]
+        if params.get("min_p", 0.0) != 0.0:
+            extra_body["min_p"] = params["min_p"]
+        if params.get("repetition_penalty", 1.0) != 1.0:
+            extra_body["repetition_penalty"] = params["repetition_penalty"]
+
+        if extra_body:
+            request["extra_body"] = extra_body
+
+        return request
 
     async def make_async_call(self, request: dict, prompt):
         """Make async API call via litellm"""
@@ -225,25 +266,46 @@ class ResponsesHandler(BaseClientHandler):
 
     def build_chat_request_structure(self, messages: list, params: dict) -> dict:
         """Build responses API request structure"""
-        return {
+        # Use proper list of dicts format for vLLM servers
+        request = {
             "input": messages,
             "max_output_tokens": params["tokens_to_generate"],
             "temperature": params["temperature"],
             "top_p": params["top_p"],
             "stream": params["stream"],
-            "tools": params["tools"],
-            "extra_body": {
-                "seed": params["random_seed"],
-                "reasoning_effort": params["reasoning_effort"],
-                "timeout": params["timeout"],
-                "stop": params["stop_phrases"],
-                "top_logprobs": params["top_logprobs"],
-                "top_k": params["top_k"],
-                "min_p": params["min_p"],
-                "repetition_penalty": params["repetition_penalty"],
-                **(params["extra_body"] or {}),
-            },
         }
+
+        # Only include tools if they are provided
+        if params["tools"] is not None:
+            request["tools"] = params["tools"]
+
+        # Add non-standard parameters to extra_body (OpenAI responses API requirement)
+        extra_body = {}
+        if params["random_seed"] is not None:
+            extra_body["seed"] = params["random_seed"]
+        if params["reasoning_effort"] is not None:
+            extra_body["reasoning_effort"] = params["reasoning_effort"]
+        if params["timeout"] is not None:
+            extra_body["timeout"] = params["timeout"]
+        if params["stop_phrases"] is not None:
+            extra_body["stop"] = params["stop_phrases"]
+        if params["top_logprobs"] is not None:
+            extra_body["top_logprobs"] = params["top_logprobs"]
+        if params["top_k"] != -1:  # Only include if not default
+            extra_body["top_k"] = params["top_k"]
+        if params["min_p"] != 0.0:  # Only include if not default
+            extra_body["min_p"] = params["min_p"]
+        if params["repetition_penalty"] != 1.0:  # Only include if not default
+            extra_body["repetition_penalty"] = params["repetition_penalty"]
+
+        # Add any additional extra_body parameters
+        if params["extra_body"]:
+            extra_body.update(params["extra_body"])
+
+        if extra_body:
+            request["extra_body"] = extra_body
+
+        return request
 
     def build_completion_request_structure(self, prompt: str, params: dict) -> dict:
         """Responses API doesn't support completion - raise error"""
@@ -396,7 +458,7 @@ class BaseModel:
         return api_key
 
     def __del__(self):
-        if self._tunnel:
+        if hasattr(self, "_tunnel") and self._tunnel:
             self._tunnel.stop()
 
     def _maybe_apply_stop_phrase_removal(
@@ -457,9 +519,24 @@ class BaseModel:
         # Move implementation from ResponsesModel here
         result = {"generation": "", "num_generated_tokens": 0}
 
-        # Get token usage
+        # Debug logging to understand response structure
+        LOG.debug(f"Responses API response type: {type(response)}")
+        LOG.debug(f"Response has usage: {hasattr(response, 'usage')}")
         if hasattr(response, "usage"):
-            result["num_generated_tokens"] = getattr(response.usage, "output_tokens", 0)
+            LOG.debug(f"Usage object: {response.usage}")
+            LOG.debug(f"Usage type: {type(response.usage)}")
+            if response.usage:
+                LOG.debug(f"Usage attributes: {dir(response.usage)}")
+
+        # Get token usage - ensure it's always an integer
+        if hasattr(response, "usage") and response.usage:
+            tokens = getattr(response.usage, "output_tokens", None)
+            if tokens is None:
+                # Try alternative field names for token usage
+                tokens = getattr(response.usage, "completion_tokens", None)
+            result["num_generated_tokens"] = tokens if tokens is not None else 0
+        else:
+            result["num_generated_tokens"] = 0
 
         # Check for tool calls in the output array
         tool_calls = []
@@ -506,6 +583,10 @@ class BaseModel:
 
         if kwargs.get("include_response", False):
             result["response"] = response
+
+        # Ensure num_generated_tokens is never None for metrics compatibility
+        if result["num_generated_tokens"] is None:
+            result["num_generated_tokens"] = 0
 
         return result
 
@@ -586,11 +667,25 @@ class BaseModel:
                 if not isinstance(tool, dict):
                     raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
 
-        # Build kwargs dict with only non-None values to avoid overriding defaults unnecessarily
-        kwargs = {}
-        for param, value in locals().items():
-            if param not in ["self", "prompt", "kwargs"] and value is not None:
-                kwargs[param] = value
+        # Build kwargs dict explicitly to avoid capturing unwanted local variables
+        kwargs = {
+            "tokens_to_generate": tokens_to_generate,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+            "min_p": min_p,
+            "repetition_penalty": repetition_penalty,
+            "random_seed": random_seed,
+            "stop_phrases": stop_phrases,
+            "top_logprobs": top_logprobs,
+            "timeout": timeout,
+            "reasoning_effort": reasoning_effort,
+            "tools": tools,
+            "extra_body": extra_body,
+            "remove_stop_phrases": remove_stop_phrases,
+            "stream": stream,
+            "include_response": include_response,
+        }
 
         # TODO: remove this after we no longer use gpt-oss or it's fixed in vllm
         max_retries = 2
@@ -655,11 +750,25 @@ class BaseModel:
                 if not isinstance(tool, dict):
                     raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
 
-        # Build kwargs dict with only non-None values to avoid overriding defaults unnecessarily
-        kwargs = {}
-        for param, value in locals().items():
-            if param not in ["self", "prompt", "kwargs"] and value is not None:
-                kwargs[param] = value
+        # Build kwargs dict explicitly to avoid capturing unwanted local variables
+        kwargs = {
+            "tokens_to_generate": tokens_to_generate,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+            "min_p": min_p,
+            "repetition_penalty": repetition_penalty,
+            "random_seed": random_seed,
+            "stop_phrases": stop_phrases,
+            "top_logprobs": top_logprobs,
+            "timeout": timeout,
+            "reasoning_effort": reasoning_effort,
+            "tools": tools,
+            "extra_body": extra_body,
+            "remove_stop_phrases": remove_stop_phrases,
+            "stream": stream,
+            "include_response": include_response,
+        }
 
         # Delegate to client handler using public API
         response = self.client_handler.call_api_sync(prompt, **kwargs)

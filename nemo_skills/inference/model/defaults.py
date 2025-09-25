@@ -54,6 +54,8 @@ CHAT_COMPLETION_PARAMS = {
     "reasoning_effort",
     "tools",
     "extra_body",
+    "remove_stop_phrases",
+    "include_response",
 }
 
 RESPONSES_PARAMS = {
@@ -71,6 +73,8 @@ RESPONSES_PARAMS = {
     "reasoning_effort",
     "tools",
     "extra_body",
+    "remove_stop_phrases",
+    "include_response",
 }
 
 COMPLETION_PARAMS = {
@@ -86,5 +90,7 @@ COMPLETION_PARAMS = {
     "timeout",
     "stream",
     "extra_body",
+    "remove_stop_phrases",
+    "include_response",
     # Note: no 'reasoning_effort' or 'tools' for completion
 }

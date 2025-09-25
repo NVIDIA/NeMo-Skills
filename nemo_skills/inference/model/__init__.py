@@ -104,7 +104,7 @@ def get_tool_calling_model(
     **kwargs,
 ):
     if isinstance(model, str):
-        model = get_model(server_type=model, client_type=client_type, tokenizer=tokenizer, **kwargs)
+        model = get_model(model=model, client_type=client_type, tokenizer=tokenizer, **kwargs)
     return ToolCallingWrapper(
         model,
         tool_modules=tool_modules,

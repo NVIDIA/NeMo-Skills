@@ -92,6 +92,8 @@ class GenerateSolutionsConfig:
 
     # Inference server configuration {server_params}
     server: dict = field(default_factory=dict)
+    # Client type for API calls (chat_completion, responses, completion)
+    client_type: str = "chat_completion"
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
     # Prompt configuration - path to yaml files
@@ -338,17 +340,20 @@ class GenerationTask:
         self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
 
         if self.cfg.code_execution:
-            llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
+            llm = get_code_execution_model(
+                **self.cfg.server, client_type=self.cfg.client_type, tokenizer=self.tokenizer, sandbox=self.sandbox
+            )
         elif self.cfg.tool_modules is not None:
             llm = get_tool_calling_model(
                 **self.cfg.server,
+                client_type=self.cfg.client_type,
                 tool_modules=self.cfg.tool_modules,
                 tool_overrides=self.cfg.tool_overrides,
                 tokenizer=self.tokenizer,
                 additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
-            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
+            llm = get_model(**self.cfg.server, client_type=self.cfg.client_type, tokenizer=self.tokenizer)
 
         if self.cfg.parallel_thinking.mode is not None:
             # We don't want to override these key variables which overlap with self.cfg
