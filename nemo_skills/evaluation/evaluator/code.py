@@ -356,7 +356,7 @@ class OJBenchConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
 
 
-def eval_ojbench(cfg):
+async def eval_ojbench_async(cfg):
     eval_config = OJBenchConfig(**cfg.eval_config)
     LOG.info("Installing required packages for ojbench evaluation...")
 
@@ -389,14 +389,12 @@ def eval_ojbench(cfg):
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             f.writelines(json.dumps(sample) + "\n" for sample in samples)
 
-        # Judge all samples at once
-        # results = ojbench.judge_jsonl_data(samples, num_workers=4)
-
         problem_dirs = [
             Path(cfg.data_dir, "ojbench/NOI"),
             Path(cfg.data_dir, "ojbench/ICPC"),
         ]
         eval_results_path = jsonl_file[:-6] + "_eval_results.jsonl"
+
         eval_code = textwrap.dedent(f"""
             import ojbench
 
@@ -410,11 +408,14 @@ def eval_ojbench(cfg):
         """)
 
         sandbox = get_sandbox(**eval_config.sandbox)
-        output, _ = await sandbox.execute_code(
-            eval_code,
-            timeout=eval_config.timeout * len(samples) + 60,
-            max_output_characters=100_000,
-        )
+        try:
+            output, _ = await sandbox.execute_code(
+                eval_code,
+                timeout=eval_config.timeout * len(samples) + 60,
+                max_output_characters=100_000,
+            )
+        finally:
+            await sandbox.close()
 
         if output.get("process_status") != "completed":
             LOG.error(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
@@ -430,3 +431,7 @@ def eval_ojbench(cfg):
                 sample["verdict"] = result["verdict"]
                 sample["is_passed"] = result["is_passed"]
                 f.write(json.dumps(sample) + "\n")
+
+
+def eval_ojbench(cfg):
+    asyncio.run(eval_ojbench_async(cfg))
