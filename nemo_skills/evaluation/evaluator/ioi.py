@@ -37,8 +37,14 @@ class IOIEvaluatorConfig:
     overwrite: bool = False
 
 
-# Thread-local storage for per-thread precompile event loops.
+# ---------------------------------------------------------------------------
+# Globals for worker-local resources
+# ---------------------------------------------------------------------------
+
 _precompile_loop_tls = threading.local()
+# A proxy to a `multiprocessing.managers.SyncManager.BoundedSemaphore` that is
+# initialised in the parent process and passed to workers via `init_worker`.
+worker_rate_sem = None  # type: ignore
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -71,13 +77,40 @@ def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
     raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
 
 
-def init_worker(sandbox_arg):
-    global worker_sandbox
-    worker_sandbox = sandbox_arg
-    # Create and set a dedicated event loop for this worker process.
+def init_worker(rate_sem):
+    """Initializer for worker processes.
+
+    Each worker receives a proxy to a multiprocessing.Manager.BoundedSemaphore
+    that is shared across *all* workers and the parent.  The worker keeps this
+    in a module-level global so it can be used inside run_test_case.
+    The worker does *not* receive a pre-constructed sandbox – those are created
+    lazily on first use so we do not share httpx sessions across fork().
+    """
+    global worker_rate_sem
+    worker_rate_sem = rate_sem  # type: ignore
+
+    # Per-process objects
+    global worker_sandbox  # lazily initialised
+    worker_sandbox = None  # type: ignore
+
     global worker_loop
     worker_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(worker_loop)
+
+
+# ---------------------------------------------------------------------------
+# Helpers used *inside* worker processes
+# ---------------------------------------------------------------------------
+
+
+def _get_worker_sandbox() -> LocalSandbox:  # type: ignore
+    """Create a LocalSandbox the first time we need it in this worker."""
+    global worker_sandbox
+    if worker_sandbox is None:
+        worker_sandbox = LocalSandbox()
+        wait_for_sandbox(worker_sandbox)
+        worker_sandbox._owner_tid = threading.get_ident()
+    return worker_sandbox
 
 
 def _precompile_grader(
@@ -119,8 +152,6 @@ def _precompile_grader(
 
 
 def run_test_case(task_args: dict, worker_id: int) -> dict:
-    global worker_sandbox
-
     # Use high-resolution timestamp to guarantee uniqueness across parallel calls.
     unique_dir = f"/tmp/ioi_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
 
@@ -145,9 +176,17 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         )
 
         setup_script = "\n".join(file_creation_commands)
-        setup_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(setup_script, language="shell", timeout=120)
-        )
+        sandbox = _get_worker_sandbox()
+        # Rate-limit outbound requests
+        if worker_rate_sem is not None:
+            worker_rate_sem.acquire()
+        try:
+            setup_result, _ = worker_loop.run_until_complete(
+                sandbox.execute_code(setup_script, language="shell", timeout=120)
+            )
+        finally:
+            if worker_rate_sem is not None:
+                worker_rate_sem.release()
         if setup_result.get("stderr"):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
@@ -161,9 +200,15 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             f'[ -e graders/stub.cpp ] && SRC="$SRC graders/stub.cpp"; '
             f"g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/{task_args['problem_id']} $SRC"
         )
-        compile_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(compile_command, language="shell", timeout=120)
-        )
+        if worker_rate_sem is not None:
+            worker_rate_sem.acquire()
+        try:
+            compile_result, _ = worker_loop.run_until_complete(
+                sandbox.execute_code(compile_command, language="shell", timeout=120)
+            )
+        finally:
+            if worker_rate_sem is not None:
+                worker_rate_sem.release()
 
         result = {
             "compile_success": not compile_result.get("stderr"),
@@ -179,9 +224,15 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
-        run_result, _ = worker_loop.run_until_complete(
-            worker_sandbox.execute_code(run_command, language="shell", timeout=120)
-        )
+        if worker_rate_sem is not None:
+            worker_rate_sem.acquire()
+        try:
+            run_result, _ = worker_loop.run_until_complete(
+                sandbox.execute_code(run_command, language="shell", timeout=120)
+            )
+        finally:
+            if worker_rate_sem is not None:
+                worker_rate_sem.release()
 
         run_stdout = run_result.get("stdout", "")
         run_stderr = run_result.get("stderr", "")
@@ -207,9 +258,8 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         # 4. Clean up the directory
         # Fire and forget; ignore return values
         try:
-            worker_loop.run_until_complete(
-                worker_sandbox.execute_code(f"rm -rf {unique_dir}", language="shell", timeout=120)
-            )
+            sandbox = _get_worker_sandbox()
+            worker_loop.run_until_complete(sandbox.execute_code(f"rm -rf {unique_dir}", language="shell", timeout=120))
         except Exception:
             pass
 
@@ -295,12 +345,17 @@ class IOIEvaluator(BaseEvaluator):
             with open(self.eval_cfg.test_file, "r") as f:
                 metadata_local = json.load(f)
 
-            # Prepare multiprocessing pool and worker sandbox initialization.
-            init_worker(sbox)
+            # ------------------------------------------------------------------
+            # Build a global rate-limit semaphore shared through multiprocessing.Manager
+            # ------------------------------------------------------------------
+            manager = multiprocessing.Manager()
+            rate_sem = manager.BoundedSemaphore(16)
+
+            # Prepare multiprocessing pool – each worker gets only the semaphore
             pool_local = multiprocessing.Pool(
                 processes=self.eval_cfg.test_batch_size,
                 initializer=init_worker,
-                initargs=(sbox,),
+                initargs=(rate_sem,),
             )
 
             return sbox, metadata_local, pool_local
