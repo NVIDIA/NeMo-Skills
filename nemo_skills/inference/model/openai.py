@@ -47,13 +47,11 @@ class OpenAIModel(BaseModel):
         if base_url is None:
             base_url = os.getenv("NEMO_SKILLS_OPENAI_BASE_URL", f"http://{host}:{port}/v1")
 
-        # Store max_retries for client handlers to use
-        self.max_retries = max_retries
-
         super().__init__(
             model=model,
             use_responses_api=use_responses_api,
             base_url=base_url,
+            max_retries=max_retries,
             **kwargs,
         )
 

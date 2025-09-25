@@ -20,6 +20,7 @@ from typing import Union
 import httpx
 import litellm
 import openai
+from openai import AsyncOpenAI, OpenAI
 
 from nemo_skills.utils import get_logger_name
 
@@ -43,11 +44,10 @@ class BaseClientHandler:
 
     def get_supported_params(self) -> set:
         """Public method to get supported parameters - override in subclasses"""
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def extract_and_validate_params(self, **kwargs) -> dict:
         """Public method for parameter extraction and validation"""
-        LOG.info(f"extract_and_validate_params called with kwargs: {list(kwargs.keys())}")
         supported = self.get_supported_params()
 
         # Let model filter/restrict parameters
@@ -94,11 +94,11 @@ class BaseClientHandler:
 
     def build_chat_request_structure(self, messages: list, params: dict) -> dict:
         """Public method for chat request structure - override in subclasses"""
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def build_completion_request_structure(self, prompt: str, params: dict) -> dict:
         """Public method for completion request structure - override in subclasses"""
-        raise NotImplementedError
+        raise NotImplementedError()
 
     async def call_api_async(self, prompt, **kwargs):
         """Public method for async API calls"""
@@ -126,15 +126,15 @@ class BaseClientHandler:
 
     async def make_async_call(self, request: dict, prompt):
         """Public method for making async API calls - override in subclasses"""
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def make_sync_call(self, request: dict, prompt):
         """Public method for making sync API calls - override in subclasses"""
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def parse_response(self, response, **kwargs) -> dict:
         """Public method for parsing responses - override in subclasses"""
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 class ChatCompletionHandler(BaseClientHandler):
@@ -259,8 +259,6 @@ class ResponsesHandler(BaseClientHandler):
 
     def setup_clients(self):
         """Setup OpenAI clients directly"""
-        from openai import AsyncOpenAI, OpenAI
-
         self.sync_client = OpenAI(base_url=self.model.base_url, api_key=self.model.api_key)
         self.async_client = AsyncOpenAI(base_url=self.model.base_url, api_key=self.model.api_key)
 
@@ -345,6 +343,7 @@ class BaseModel:
         use_v1_endpoint: bool = True - Whether to use v1 endpoint format.
         host: str = '127.0.0.1' - Host of the inference server.
         port: str = '5000' - Port of the inference server.
+        max_retries: int = 3 - Maximum number of retries for API calls.
         ssh_server: str | None = None - SSH server for tunneling requests.
             Useful if server is running on slurm cluster to which there is an ssh access
             Can also be specified through NEMO_SKILLS_SSH_SERVER env var.
@@ -369,6 +368,7 @@ class BaseModel:
         use_v1_endpoint: bool = True,
         host: str = "127.0.0.1",
         port: str = "5000",
+        max_retries: int = 3,
         ssh_server: str | None = None,
         ssh_key_path: str | None = None,
         # Context limit retry config variables
@@ -379,6 +379,7 @@ class BaseModel:
         # Common model properties
         self.model_name_or_path = model
         self.use_responses_api = use_responses_api
+        self.max_retries = max_retries
         self.server_host = host
         self.server_port = port
 
@@ -533,17 +534,7 @@ class BaseModel:
 
     def parse_responses_response(self, response, **kwargs) -> dict:
         """Public method for parsing responses API responses"""
-        # Move implementation from ResponsesModel here
         result = {"generation": "", "num_generated_tokens": 0}
-
-        # Debug logging to understand response structure
-        LOG.debug(f"Responses API response type: {type(response)}")
-        LOG.debug(f"Response has usage: {hasattr(response, 'usage')}")
-        if hasattr(response, "usage"):
-            LOG.debug(f"Usage object: {response.usage}")
-            LOG.debug(f"Usage type: {type(response.usage)}")
-            if response.usage:
-                LOG.debug(f"Usage attributes: {dir(response.usage)}")
 
         # Get token usage - ensure it's always an integer
         if hasattr(response, "usage") and response.usage:
