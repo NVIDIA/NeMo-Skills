@@ -41,6 +41,19 @@ def clone_dataset_repo(url, destination):
 
     if result.returncode == 0:
         print("✅ Clone successful.")
+
+        source_file = os.path.join(destination, "prompts", "full.jsonl")
+        target_file = os.path.join(destination, "test.jsonl")
+
+        print(f"Moving {source_file} to {target_file}...")
+        if os.path.exists(source_file):
+            try:
+                shutil.move(source_file, target_file)
+                print("✅ File moved successfully.")
+            except OSError as e:
+                print(f"❌ Error moving file: {e}")
+        else:
+            print(f"❌ Source file not found: {source_file}")
     else:
         print("❌ Clone failed.")
         print(f"Error Details:\n{result.stderr}")
