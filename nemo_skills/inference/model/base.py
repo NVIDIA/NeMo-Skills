@@ -336,14 +336,23 @@ class BaseModel:
     """Base model class for handling requests to the inference server.
 
     Args:
-        host: Optional[str] = '127.0.0.1' - Host of the inference server.
-        port: Optional[str] = '5000' - Port of the inference server.
-            Only required if handle_code_execution is True.
-        ssh_server: Optional[str] = None - SSH server for tunneling requests.
+        model: str - Model name or path to use for inference.
+        use_responses_api: bool = False - Whether to use responses API instead of chat completion API.
+        tokenizer: str | None = None - Tokenizer to use for the model.
+        api_key: str | None = None - API key for authentication.
+        api_key_env_var: str | None = None - Environment variable name containing API key.
+        base_url: str | None = None - Base URL for the API server.
+        use_v1_endpoint: bool = True - Whether to use v1 endpoint format.
+        host: str = '127.0.0.1' - Host of the inference server.
+        port: str = '5000' - Port of the inference server.
+        ssh_server: str | None = None - SSH server for tunneling requests.
             Useful if server is running on slurm cluster to which there is an ssh access
             Can also be specified through NEMO_SKILLS_SSH_SERVER env var.
-        ssh_key_path: Optional[str] = None - Path to the ssh key for tunneling.
+        ssh_key_path: str | None = None - Path to the ssh key for tunneling.
             Can also be specified through NEMO_SKILLS_SSH_KEY_PATH env var.
+        enable_soft_fail: bool = False - Enable soft failure handling.
+        context_limit_retry_strategy: str | None = None - Context limit retry strategy.
+        num_special_tokens_budget: int = 100 - Budget for special tokens.
     """
 
     # Litellm provider name
@@ -352,7 +361,7 @@ class BaseModel:
     def __init__(
         self,
         model: str,
-        client_type: str = "chat_completion",
+        use_responses_api: bool = False,
         tokenizer: str | None = None,
         api_key: str | None = None,
         api_key_env_var: str | None = None,
@@ -369,7 +378,7 @@ class BaseModel:
     ):
         # Common model properties
         self.model_name_or_path = model
-        self.client_type = client_type
+        self.use_responses_api = use_responses_api
         self.server_host = host
         self.server_port = port
 
@@ -396,10 +405,18 @@ class BaseModel:
             self.tokenizer = None
 
         # Initialize client handler LAST
-        if client_type not in CLIENT_HANDLERS:
-            raise ValueError(f"Unsupported client_type: {client_type}. Available: {list(CLIENT_HANDLERS.keys())}")
+        # Determine client type based on use_responses_api flag
+        if use_responses_api:
+            selected_client_type = "responses"
+        else:
+            selected_client_type = "chat_completion"
 
-        handler_class = CLIENT_HANDLERS[client_type]
+        if selected_client_type not in CLIENT_HANDLERS:
+            raise ValueError(
+                f"Unsupported client handler: {selected_client_type}. Available: {list(CLIENT_HANDLERS.keys())}"
+            )
+
+        handler_class = CLIENT_HANDLERS[selected_client_type]
         self.client_handler = handler_class(self)  # Public attribute
 
     def _setup_ssh_tunnel(self, ssh_server: str | None, ssh_key_path: str | None):

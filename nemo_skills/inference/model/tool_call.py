@@ -71,7 +71,7 @@ class ToolCallingWrapper:
     def _setup_adapters(self):
         """Set up adapters based on client type."""
         # Use client_type instead of model instance checks
-        if self.model.client_type == "responses":
+        if self.model.use_responses_api:
             # Responses API model - uses flatter tool schema format
             self.schema_adapter = ResponsesSchemaAdapter()
             self.call_interpreter = ResponsesCallInterpreter()

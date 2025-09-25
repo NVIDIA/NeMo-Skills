@@ -50,20 +50,36 @@ models = {
 }
 
 
-def get_model(server_type, client_type="chat_completion", tokenizer=None, **kwargs):
-    """A helper function to make it easier to set server through cmd."""
+def get_model(server_type, use_responses_api=False, tokenizer=None, **kwargs):
+    """A helper function to make it easier to set server through cmd.
+
+    Args:
+        server_type: Type of server to use (e.g., 'openai', 'vllm', etc.)
+        use_responses_api: Whether to use responses API instead of chat completion API
+        tokenizer: Tokenizer to use
+        **kwargs: Additional arguments to pass to the model
+    """
     model_class = models[server_type.lower()]
     if server_type == "trtllm" and kwargs.get("enable_soft_fail", False):
         if kwargs.get("context_limit_retry_strategy", None) is not None:
             raise ValueError("context_limit_retry_strategy is not supported for trtllm")
-    return model_class(client_type=client_type, tokenizer=tokenizer, **kwargs)
+    return model_class(use_responses_api=use_responses_api, tokenizer=tokenizer, **kwargs)
 
 
 def get_code_execution_model(
-    server_type, client_type="chat_completion", tokenizer=None, code_execution=None, sandbox=None, **kwargs
+    server_type, use_responses_api=False, tokenizer=None, code_execution=None, sandbox=None, **kwargs
 ):
-    """A helper function to make it easier to set server through cmd."""
-    model = get_model(server_type=server_type, client_type=client_type, tokenizer=tokenizer, **kwargs)
+    """A helper function to make it easier to set server through cmd.
+
+    Args:
+        server_type: Type of server to use (e.g., 'openai', 'vllm', etc.)
+        use_responses_api: Whether to use responses API instead of chat completion API
+        tokenizer: Tokenizer to use
+        code_execution: Code execution configuration
+        sandbox: Sandbox to use for code execution
+        **kwargs: Additional arguments to pass to the model
+    """
+    model = get_model(server_type=server_type, use_responses_api=use_responses_api, tokenizer=tokenizer, **kwargs)
     if code_execution is None:
         code_execution = {}
     code_execution_config = CodeExecutionConfig(**code_execution)
@@ -96,15 +112,26 @@ def get_parallel_thinking_model(
 
 def get_tool_calling_model(
     model,
-    client_type="chat_completion",
+    use_responses_api=False,
     tokenizer=None,
     additional_config=None,
     tool_modules: list[str] | None = None,
     tool_overrides: dict | None = None,
     **kwargs,
 ):
+    """A helper function to create a tool calling model.
+
+    Args:
+        model: Model name/path or model instance
+        use_responses_api: Whether to use responses API instead of chat completion API
+        tokenizer: Tokenizer to use
+        additional_config: Additional configuration
+        tool_modules: List of tool modules to use
+        tool_overrides: Tool overrides
+        **kwargs: Additional arguments to pass to the model
+    """
     if isinstance(model, str):
-        model = get_model(model=model, client_type=client_type, tokenizer=tokenizer, **kwargs)
+        model = get_model(model=model, use_responses_api=use_responses_api, tokenizer=tokenizer, **kwargs)
     return ToolCallingWrapper(
         model,
         tool_modules=tool_modules,

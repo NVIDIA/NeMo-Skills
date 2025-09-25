@@ -36,7 +36,7 @@ class OpenAIModel(BaseModel):
         model: str | None = None,
         base_url: str | None = None,
         max_retries: int = 3,
-        client_type: str = "chat_completion",
+        use_responses_api: bool = False,
         **kwargs,
     ):
         model = model or os.getenv("NEMO_SKILLS_OPENAI_MODEL")
@@ -52,7 +52,7 @@ class OpenAIModel(BaseModel):
 
         super().__init__(
             model=model,
-            client_type=client_type,
+            use_responses_api=use_responses_api,
             base_url=base_url,
             **kwargs,
         )
