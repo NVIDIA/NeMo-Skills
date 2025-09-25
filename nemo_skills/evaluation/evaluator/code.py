@@ -13,17 +13,21 @@
 # limitations under the License.
 
 
+import asyncio
 import json
 import logging
 import re
 import shutil
 import subprocess
 import sys
+import textwrap
 from argparse import Namespace
+from dataclasses import field
 from pathlib import Path
 
 from omegaconf import OmegaConf
 
+from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -347,23 +351,27 @@ def eval_bigcodebench(cfg):
         shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
 
 
-def eval_ojbench(cfg):
-    try:
-        import ojbench
-    except ImportError:
-        LOG.info("Package 'ojbench' not found. Attempting to install...")
-        install_from_git("git+https://github.com/He-Ren/OJBench/tree/main")
-        try:
-            import ojbench
-        except ImportError:
-            LOG.info("Failed to install 'ojbench'. Please install it manually.")
-            raise
+@nested_dataclass(kw_only=True)
+class OJBenchConfig:
+    sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
 
-    problem_dirs = [
-        Path(cfg.data_dir, "ojbench/NOI"),
-        Path(cfg.data_dir, "ojbench/ICPC"),
-    ]
-    ojbench.init(problem_dirs=problem_dirs)
+
+def eval_ojbench(cfg):
+    eval_config = OJBenchConfig(**cfg.eval_config)
+    LOG.info("Installing required packages for ojbench evaluation...")
+
+    async def install_packages():
+        sandbox = get_sandbox(**eval_config.sandbox)
+        cmd = "pip install git+https://github.com/He-Ren/OJBench/tree/main"
+        result, _ = await sandbox.execute_code(cmd, language="shell", timeout=300)
+        if result["process_status"] != "completed":
+            LOG.warning(f"Failed to install ojbench: {result.get('stderr', 'Unknown error')}")
+        else:
+            LOG.info("Successfully installed ojbench")
+
+        await sandbox.close()
+
+    asyncio.run(install_packages())
 
     for jsonl_file in unroll_files(cfg.input_files):
         # Read and preprocess all samples in one go
@@ -382,16 +390,43 @@ def eval_ojbench(cfg):
             f.writelines(json.dumps(sample) + "\n" for sample in samples)
 
         # Judge all samples at once
-        results = ojbench.judge_jsonl_data(samples, num_workers=4)
+        # results = ojbench.judge_jsonl_data(samples, num_workers=4)
 
-        # Update samples with results and write back in one pass
+        problem_dirs = [
+            Path(cfg.data_dir, "ojbench/NOI"),
+            Path(cfg.data_dir, "ojbench/ICPC"),
+        ]
+        eval_results_path = jsonl_file[:-6] + "_eval_results.jsonl"
+        eval_code = textwrap.dedent(f"""
+            import ojbench
+
+            ojbench.init(problem_dirs={problem_dirs})
+
+            ojbench.judge_jsonl(
+                input_path={jsonl_file},
+                output_path={eval_results_path},
+                num_workers=8
+            )
+        """)
+
+        sandbox = get_sandbox(**eval_config.sandbox)
+        output, _ = await sandbox.execute_code(
+            eval_code,
+            timeout=eval_config.timeout * len(samples) + 60,
+            max_output_characters=100_000,
+        )
+
+        if output.get("process_status") != "completed":
+            LOG.error(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
+            continue
+
+        with open(eval_results_path, "rt", encoding="utf-8") as fin:
+            results = []
+            for line in fin:
+                results.append(json.loads(line))
+
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample, result in zip(samples, results):
                 sample["verdict"] = result["verdict"]
                 sample["is_passed"] = result["is_passed"]
                 f.write(json.dumps(sample) + "\n")
-
-        # Save results to a separate eval results file
-        eval_results_path = jsonl_file[:-6] + "_eval_results.json"
-        with open(eval_results_path, "wt", encoding="utf-8") as fout:
-            json.dump(results, fout)

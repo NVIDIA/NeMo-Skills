@@ -17,4 +17,5 @@ DATASET_GROUP = "code"
 METRICS_TYPE = "ojbench"
 EVAL_SPLIT = "test"
 EVAL_ARGS = "++eval_type=ojbench"
+REQUIRES_SANDBOX = True
 GENERATION_ARGS = "++prompt_config=generic/default"
