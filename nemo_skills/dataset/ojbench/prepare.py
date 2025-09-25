@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,10 +23,6 @@ REPO_URL = "https://huggingface.co/datasets/He-Ren/OJBench_testdata"
 def clone_dataset_repo(url, destination):
     if not shutil.which("git"):
         print("Error: Git executable not found.")
-        return
-
-    if os.path.exists(destination):
-        print(f"Error: Destination path '{destination}' already exists.")
         return
 
     print(f"Cloning {url} into {destination}...")
