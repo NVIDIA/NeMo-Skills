@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 from argparse import Namespace
+from pathlib import Path
 
 from omegaconf import OmegaConf
 
@@ -347,51 +348,50 @@ def eval_bigcodebench(cfg):
 
 
 def eval_ojbench(cfg):
-    # try:
-    #     import ojbench
-    # except ImportError:
-    #     LOG.info("Package 'ojbench' not found. Attempting to install...")
-    #     install_from_git("git+https://github.com/He-Ren/OJBench/tree/main")
-    #     try:
-    #         import ojbench
-    #     except ImportError:
-    #         LOG.info("Failed to install 'ojbench'. Please install it manually.")
-    #         raise
+    try:
+        import ojbench
+    except ImportError:
+        LOG.info("Package 'ojbench' not found. Attempting to install...")
+        install_from_git("git+https://github.com/He-Ren/OJBench/tree/main")
+        try:
+            import ojbench
+        except ImportError:
+            LOG.info("Failed to install 'ojbench'. Please install it manually.")
+            raise
+
+    problem_dirs = [
+        Path(cfg.data_dir, "ojbench/NOI"),
+        Path(cfg.data_dir, "ojbench/ICPC"),
+    ]
+    ojbench.init(problem_dirs=problem_dirs)
 
     for jsonl_file in unroll_files(cfg.input_files):
-        samples = []
-        with open(jsonl_file) as f:
+        # Read and preprocess all samples in one go
+        with open(jsonl_file, encoding="utf-8") as f:
+            samples = []
             for line in f:
                 sample = json.loads(line)
-                if sample["task"] == "coding_completion":
-                    assert len(sample["partial_solution"]) > 0
-                    sample = preprocess_code(sample, strip_whitespace=False)
-                    sample["completion"] = sample["completion"].replace("\t", "    ")
-                    full_solution = sample["partial_solution"] + "\n" + sample["completion"]
-                    sample["code_list"] = [full_solution]
-                else:
-                    sample = preprocess_code(sample, strip_whitespace=True)
-                    sample["code_list"] = [sample["completion"]]
-
+                sample = preprocess_code(sample, sample["language"], strip_whitespace=True)
+                sample["prompt"] = sample.pop("question")
+                sample["content"] = f"```{sample['language']}\n{sample['completion']}\n```"
+                sample.pop("completion")
                 samples.append(sample)
 
+        # Overwrite the file with preprocessed samples
         with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
+            f.writelines(json.dumps(sample) + "\n" for sample in samples)
+
+        # Judge all samples at once
+        results = ojbench.judge_jsonl_data(samples, num_workers=4)
+
+        # Update samples with results and write back in one pass
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample, result in zip(samples, results):
+                sample["verdict"] = result["verdict"]
+                sample["is_passed"] = result["is_passed"]
                 f.write(json.dumps(sample) + "\n")
 
-        # evaluate(
-        #     custom_output_file=jsonl_file,
-        #     k_list=[1],
-        #     num_process_evaluate=12,
-        #     timeout=6,
-        # )
-
-        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
-            eval_grades = json.load(fin)
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                sample["graded_list"] = eval_grades["eval"][sample["question_id"]]["graded_list"]
-                f.write(json.dumps(sample) + "\n")
-
-        # moving eval file to ensure metrics are recomputed
-        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+        # Save results to a separate eval results file
+        eval_results_path = jsonl_file[:-6] + "_eval_results.json"
+        with open(eval_results_path, "wt", encoding="utf-8") as fout:
+            json.dump(results, fout)
