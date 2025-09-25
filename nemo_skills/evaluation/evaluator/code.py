@@ -374,7 +374,6 @@ async def eval_ojbench_async(cfg):
     asyncio.run(install_packages())
 
     for jsonl_file in unroll_files(cfg.input_files):
-        # Read and preprocess all samples in one go
         with open(jsonl_file, encoding="utf-8") as f:
             samples = []
             for line in f:
@@ -385,7 +384,6 @@ async def eval_ojbench_async(cfg):
                 sample.pop("completion")
                 samples.append(sample)
 
-        # Overwrite the file with preprocessed samples
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             f.writelines(json.dumps(sample) + "\n" for sample in samples)
 
