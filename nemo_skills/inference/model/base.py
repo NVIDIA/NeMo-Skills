@@ -61,13 +61,9 @@ class BaseClientHandler:
 
         for param_name in provided:
             if param_name not in supported:
-                # Check if this parameter is set to its default value
-                default_value = getattr(self.defaults, param_name, None)
-                provided_value = kwargs[param_name]
-
-                # Only consider it unsupported if it's not the default value
-                if default_value is None or provided_value != default_value:
-                    unsupported_non_default.add(param_name)
+                if hasattr(self.defaults, param_name) and kwargs[param_name] == getattr(self.defaults, param_name):
+                    continue  # Default value is allowed even if unsupported
+                unsupported_non_default.add(param_name)
 
         if unsupported_non_default:
             raise ValueError(
