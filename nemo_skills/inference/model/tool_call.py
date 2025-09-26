@@ -95,7 +95,7 @@ class ToolCallingWrapper:
         try:
             tool_args = json.loads(tool_args)
         except json.decoder.JSONDecodeError as e:
-            LOG.exception(e)
+            LOG.exception(f"Failed to parse tool arguments {tool_args}: {e}")
             return {"error": "Tool argument parsing failed."}
 
         ## TODO(sanyamk): Only exceptions related to tool execution here, all others must fail.
