@@ -371,7 +371,7 @@ async def eval_ojbench_async(cfg):
 
         await sandbox.close()
 
-    asyncio.run(install_packages())
+    await install_packages()
 
     for jsonl_file in unroll_files(cfg.input_files):
         with open(jsonl_file, encoding="utf-8") as f:
