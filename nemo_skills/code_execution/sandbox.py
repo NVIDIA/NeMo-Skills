@@ -224,7 +224,7 @@ class Sandbox(abc.ABC):
                                 )
 
                         stderr_parts = (
-                            "RuntimeError: Sandbox state restoration failed after the execution worker restarted."
+                            "RuntimeError: Sandbox state restoration failed after the execution worker restarted. "
                             "The interactive session history has been cleared; please re-run the last code block without relying on prior state."
                         )
                         failure_output = {
