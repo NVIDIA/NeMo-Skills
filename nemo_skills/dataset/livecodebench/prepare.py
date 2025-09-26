@@ -89,7 +89,6 @@ def clean_data(dataset, keep_test_cases=False):
         "question_id",
         "starter_code",
     ]
-    print("keep_test_cases: ", keep_test_cases)
     if not keep_test_cases:
         remove_columns.append("public_test_cases")
         remove_columns.append("private_test_cases")
@@ -120,16 +119,18 @@ def prepare(start_date, end_date, release_version, output_dir, keep_test_cases=F
         for problem in data:
             input_date = datetime.strptime(problem["contest_date"], "%Y-%m-%dT%H:%M:%S").date()
             if start_date <= input_date <= end_date:
-                json.dump(
-                    {
-                        "task_id": problem["task_id"],
-                        "question": problem["question"],
-                        "difficulty": problem["difficulty"],
-                        "subset_for_metrics": problem["difficulty"],
-                        "release_version": release_version,
-                    },
-                    f,
-                )
+                output_record = {
+                    "task_id": problem["task_id"],
+                    "question": problem["question"],
+                    "difficulty": problem["difficulty"],
+                    "subset_for_metrics": problem["difficulty"],
+                    "release_version": release_version,
+                }
+                if keep_test_cases:
+                    output_record["public_test_cases"] = problem["public_test_cases"]
+                    output_record["private_test_cases"] = problem["private_test_cases"]
+
+                json.dump(output_record, f)
                 f.write("\n")
 
 
