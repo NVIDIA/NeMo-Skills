@@ -89,7 +89,8 @@ async def eval_livecodebench_async(cfg):
             temp_eval.write_text("\n".join(json.dumps(s) for s in samples), encoding="utf-8")
 
             test_file_arg = repr(eval_config.test_file) if eval_config.test_file else "None"
-            eval_code = textwrap.dedent(f"""from livecodebench.evaluate import evaluate
+            eval_code = textwrap.dedent(f"""
+                from livecodebench.evaluate import evaluate
                 evaluate(
                     custom_output_file='{temp_eval.name}',
                     release_version='release_{release_version}',
