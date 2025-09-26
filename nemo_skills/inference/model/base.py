@@ -394,7 +394,7 @@ class BaseModel:
         self.base_url = self._setup_base_url(base_url, use_v1_endpoint)
 
         # API key resolution (general)
-        self.api_key = self._resolve_api_key(api_key, api_key_env_var, base_url)
+        self.api_key = self._resolve_api_key(api_key, api_key_env_var, self.base_url)
 
         # Context retry config (general)
         self.context_limit_retry_config = ContextLimitRetryConfig(
