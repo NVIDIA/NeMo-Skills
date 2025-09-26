@@ -29,12 +29,10 @@ from nemo_skills.pipeline.cli import wrap_arguments, robust_eval
 robust_eval(ctx=wrap_arguments(
         f"++inference.temperature=0.6 "
         f"++inference.top_p=0.95 "
-        f"++inference.tokens_to_generate=32000 "
-        f"++skip_filled=True "
     ),
-    prompt_set_config='nemo_skills/prompt/config/robustness/prompt_set_config.yaml', # should contain same keys as --benchmarks
+    prompt_set_config='robustness/prompt_set_config', # OR nemo_skills/prompt/config/robutness/prompt_set_config OR absolute path to .yaml file
     cluster=cluster_config,
-    model="/hf_models/Qwen3-8B",
+    model="Qwen/Qwen3-8B",
     server_type='vllm',
     output_dir="/workspace/robustness_eval/Qwen3-8B/",
     benchmarks="gpqa:16,comp-math-24-25:16",
