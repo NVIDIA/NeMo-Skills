@@ -269,6 +269,14 @@ class ResponsesHandler(BaseClientHandler):
             "stream": params["stream"],
         }
 
+        # Explicitly pass timeout to client, not inside extra_body
+        if params["timeout"] is not None:
+            request["timeout"] = params["timeout"]
+
+        # Temporary guard until streaming parsing for Responses is implemented
+        if params["stream"]:
+            raise ValueError("stream=True is not supported for ResponsesHandler yet.")
+
         # Only include tools if they are provided
         if params["tools"] is not None:
             request["tools"] = params["tools"]
@@ -279,8 +287,6 @@ class ResponsesHandler(BaseClientHandler):
             extra_body["seed"] = params["random_seed"]
         if params["reasoning_effort"] is not None:
             extra_body["reasoning_effort"] = params["reasoning_effort"]
-        if params["timeout"] is not None:
-            extra_body["timeout"] = params["timeout"]
         if params["stop_phrases"] is not None:
             extra_body["stop"] = params["stop_phrases"]
         if params["top_logprobs"] is not None:
@@ -298,6 +304,8 @@ class ResponsesHandler(BaseClientHandler):
 
         if extra_body:
             request["extra_body"] = extra_body
+
+        return request
 
         return request
 
