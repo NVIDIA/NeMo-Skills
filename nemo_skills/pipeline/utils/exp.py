@@ -107,6 +107,12 @@ def get_sandbox_command(cluster_config):
     return "/start-with-nginx.sh"
 
 
+def get_search_command(cluster_config):
+    if cluster_config["executor"] == "none":
+        return "python -m nemo_tir.services.search.server"
+    return "/entrypoint"
+
+
 @dataclass(kw_only=True)
 class CustomJobDetails(SlurmJobDetails):
     # we have 1 srun per sub-task (e.g. server/sandbox/main), but only a single sbatch
@@ -346,6 +352,8 @@ def add_task(
     time_min=None,
     with_sandbox=False,
     sandbox_port: int | None = None,
+    with_search_server=False,
+    search_server_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
     reuse_code: bool = True,
@@ -412,6 +420,9 @@ def add_task(
     if sandbox_port is None:
         sandbox_port = get_free_port(strategy="random")
 
+    if with_search_server:
+        search_server_port = get_free_port(strategy="random")
+
     env_vars = get_env_variables(cluster_config)
     if cluster_config["executor"] != "none" and not skip_hf_home_check:
         if "HF_HOME" not in env_vars:
@@ -425,7 +436,7 @@ def add_task(
 
     het_group = 0
     het_group_indices = []
-    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox
+    total_het_groups = (server_config is not None) + bool(cmd) + with_sandbox + with_search_server
 
     LOG.info("Adding a task with commands:")
 
@@ -433,36 +444,90 @@ def add_task(
     executors = []
     # assuming server always has the largest resources request, so it needs to go first
     if server_config is not None and int(server_config["num_gpus"]) > 0:
+        _total_gpus_per_node = int(server_config["num_gpus"])
+        if with_search_server:
+            ## FIXME(sanyamk): hardcoded for now.
+            _search_server_num_gpus = 2
+            _total_gpus_per_node += _search_server_num_gpus
+
+        ## NOTE(sanyamk): Cap max gpus per node to 8.
+        _total_gpus_per_node = min(8, _total_gpus_per_node)
+        _cuda_visible_devices = [str(i) for i in range(_total_gpus_per_node)]
+
         # do not pass container into the command builder
         server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
 
-        server_executor = get_executor(
-            cluster_config=cluster_config,
-            container=server_container,
-            num_nodes=server_config["num_nodes"],
-            tasks_per_node=num_server_tasks,
-            gpus_per_node=server_config["num_gpus"],
-            partition=partition,
-            time_min=time_min,
-            dependencies=dependencies,
-            job_name=task_name,
-            log_dir=log_dir,
-            log_prefix="server",
-            extra_package_dirs=extra_package_dirs,
-            slurm_kwargs=slurm_kwargs,
-            heterogeneous=heterogeneous,
-            het_group=het_group,
-            total_het_groups=total_het_groups,
-            with_ray=with_ray,
-        )
-        if cluster_config["executor"] != "slurm" and num_server_tasks > 1:
-            server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
-        commands.append(server_cmd)
-        executors.append(server_executor)
-        het_group_indices.append(het_group)
-        het_group += 1
-        LOG.info("Server command: %s", server_cmd)
+        with temporary_env_update(
+            cluster_config,
+            {
+                ## NOTE(sanyamk): Isolating GPUs hack.
+                "CUDA_VISIBLE_DEVICES": ",".join(_cuda_visible_devices[: int(server_config["num_gpus"])]),
+            },
+        ):
+            server_executor = get_executor(
+                cluster_config=cluster_config,
+                container=server_container,
+                num_nodes=server_config["num_nodes"],
+                tasks_per_node=num_server_tasks,
+                gpus_per_node=_total_gpus_per_node,
+                partition=partition,
+                time_min=time_min,
+                dependencies=dependencies,
+                job_name=task_name,
+                log_dir=log_dir,
+                log_prefix="server",
+                extra_package_dirs=extra_package_dirs,
+                slurm_kwargs=slurm_kwargs,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
+                with_ray=with_ray,
+            )
+            if cluster_config["executor"] != "slurm" and num_server_tasks > 1:
+                server_cmd = f"mpirun --allow-run-as-root -np {num_server_tasks} bash -c {shlex.quote(server_cmd)}"
+            commands.append(server_cmd)
+            executors.append(server_executor)
+            het_group_indices.append(het_group)
+            het_group += 1
+            LOG.info("Server command: %s", server_cmd)
+
+        # add search server.
+        if with_search_server:
+            with temporary_env_update(
+                cluster_config,
+                {
+                    ## NOTE(sanyamk): Isolating GPUs hack.
+                    "CUDA_VISIBLE_DEVICES": ",".join(_cuda_visible_devices[-_search_server_num_gpus:]),
+                    "SEARCH_SERVER_PORT": search_server_port,
+                },
+            ):
+                commands.append(get_search_command(cluster_config))
+                search_executor = get_executor(
+                    cluster_config=cluster_config,
+                    container=cluster_config["containers"]["search"],
+                    num_nodes=executors[0].nodes if cluster_config["executor"] == "slurm" else 1,
+                    tasks_per_node=1,
+                    gpus_per_node=_total_gpus_per_node,
+                    partition=partition,
+                    time_min=time_min,
+                    dependencies=dependencies,
+                    job_name=task_name,
+                    log_dir=log_dir,
+                    log_prefix="search",
+                    extra_package_dirs=extra_package_dirs,
+                    slurm_kwargs=slurm_kwargs,
+                    heterogeneous=heterogeneous,
+                    het_group=het_group,
+                    total_het_groups=total_het_groups,
+                    overlap=True,
+                    with_ray=with_ray,
+                )
+                executors.append(search_executor)
+                het_group_indices.append(het_group)
+                het_group += 1
+
+                LOG.info("Search server command: %s", commands[-1])
 
     # then goes the main task(s) unless it's empty
     if cmd:
@@ -477,7 +542,10 @@ def add_task(
         for cur_idx, (cur_cmd, cur_container, cur_tasks) in enumerate(zip(cmd, container, num_tasks)):
             if cluster_config["executor"] != "slurm" and cur_tasks > 1:
                 cur_cmd = f"mpirun --allow-run-as-root -np {cur_tasks} bash -c {shlex.quote(cur_cmd)}"
-            with temporary_env_update(cluster_config, {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port}):
+            with temporary_env_update(
+                cluster_config,
+                {"NEMO_SKILLS_SANDBOX_PORT": sandbox_port, "NEMO_SKILLS_SEARCH_SERVER_PORT": search_server_port},
+            ):
                 cur_cmd = install_packages_wrap(cur_cmd, installation_command)
                 commands.append(cur_cmd)
                 executors.append(
