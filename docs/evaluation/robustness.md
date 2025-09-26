@@ -22,7 +22,8 @@ comp-math-24-25:
 ```
 
 ### Run Command Example
-This will run `ns eval` on GPQA and comp-math-24-25 using every prompt specified in `prompt_set_config.yaml`, across 16 seeds (because of benchmark:**16**, but the random seeds can be different for every benchmark). `nemo_skills/prompt/config/robustness/prompt_set_config.yaml` already contains prompt paths for GPQA and Comp-Math-24-25.
+This will launch an `ns eval` on GPQA and comp-math-24-25 for every prompt specified in `prompt_set_config.yaml`, across 16 seeds (because of benchmark:**16**, but the random seeds can be different for every benchmark). </br> `nemo_skills/prompt/config/robustness/prompt_set_config.yaml` already contains 20 prompt paths for GPQA and Comp-Math-24-25.</br>
+Note that every prompt is a separate job, and all parameters are shared for all jobs. For example, if `num_jobs` is specified, it launch `num_jobs` jobs per prompt, not overall.
 
 ```python
 from nemo_skills.pipeline.cli import wrap_arguments, robust_eval
