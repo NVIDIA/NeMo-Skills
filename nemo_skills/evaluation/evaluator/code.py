@@ -354,81 +354,88 @@ def eval_bigcodebench(cfg):
 @nested_dataclass(kw_only=True)
 class OJBenchConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
+    timeout: int = 6
+
+
+async def _setup_and_install(sandbox):
+    """Helper to install packages inside the sandbox."""
+    LOG.info("Installing required packages for ojbench evaluation...")
+    cmd = "pip install git+https://github.com/He-Ren/OJBench/tree/main"
+    result, _ = await sandbox.execute_code(cmd, language="shell", timeout=300)
+    if result["process_status"] != "completed":
+        LOG.warning(f"Failed to install ojbench: {result.get('stderr', 'Unknown error')}")
+        return False
+    LOG.info("Successfully installed ojbench.")
+    return True
 
 
 async def eval_ojbench_async(cfg):
     eval_config = OJBenchConfig(**cfg.eval_config)
-    LOG.info("Installing required packages for ojbench evaluation...")
+    problem_dirs = [
+        Path(cfg.data_dir, "ojbench/NOI"),
+        Path(cfg.data_dir, "ojbench/ICPC"),
+    ]
 
-    async def install_packages():
-        sandbox = get_sandbox(**eval_config.sandbox)
-        cmd = "pip install git+https://github.com/He-Ren/OJBench/tree/main"
-        result, _ = await sandbox.execute_code(cmd, language="shell", timeout=300)
-        if result["process_status"] != "completed":
-            LOG.warning(f"Failed to install ojbench: {result.get('stderr', 'Unknown error')}")
-        else:
-            LOG.info("Successfully installed ojbench")
+    sandbox = get_sandbox(**eval_config.sandbox)
+    try:
+        if not await _setup_and_install(sandbox):
+            LOG.error("Setup failed. Aborting evaluation.")
+            return
 
-        await sandbox.close()
+        for jsonl_file in unroll_files(cfg.input_files):
+            with open(jsonl_file, encoding="utf-8") as f:
+                samples = []
+                for line in f:
+                    sample = json.loads(line)
+                    sample = preprocess_code(sample, sample["language"], strip_whitespace=True)
+                    sample["prompt"] = sample.pop("question")
+                    sample["content"] = f"```{sample['language']}\n{sample['completion']}\n```"
+                    sample.pop("completion")
+                    samples.append(sample)
 
-    await install_packages()
+            with open(jsonl_file, "w", encoding="utf-8") as f:
+                f.writelines(json.dumps(sample) + "\n" for sample in samples)
 
-    for jsonl_file in unroll_files(cfg.input_files):
-        with open(jsonl_file, encoding="utf-8") as f:
-            samples = []
-            for line in f:
-                sample = json.loads(line)
-                sample = preprocess_code(sample, sample["language"], strip_whitespace=True)
-                sample["prompt"] = sample.pop("question")
-                sample["content"] = f"```{sample['language']}\n{sample['completion']}\n```"
-                sample.pop("completion")
-                samples.append(sample)
+            problem_dirs = [
+                Path(cfg.data_dir, "ojbench/NOI"),
+                Path(cfg.data_dir, "ojbench/ICPC"),
+            ]
+            eval_results_path = jsonl_file[:-6] + "_eval_results.jsonl"
 
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            f.writelines(json.dumps(sample) + "\n" for sample in samples)
+            eval_code = textwrap.dedent(f"""
+                import ojbench
 
-        problem_dirs = [
-            Path(cfg.data_dir, "ojbench/NOI"),
-            Path(cfg.data_dir, "ojbench/ICPC"),
-        ]
-        eval_results_path = jsonl_file[:-6] + "_eval_results.jsonl"
+                ojbench.init(problem_dirs={problem_dirs})
+                ojbench.judge_jsonl(
+                    input_path={jsonl_file},
+                    output_path={eval_results_path},
+                    num_workers=8
+                )
+            """)
 
-        eval_code = textwrap.dedent(f"""
-            import ojbench
-
-            ojbench.init(problem_dirs={problem_dirs})
-
-            ojbench.judge_jsonl(
-                input_path={jsonl_file},
-                output_path={eval_results_path},
-                num_workers=8
-            )
-        """)
-
-        sandbox = get_sandbox(**eval_config.sandbox)
-        try:
             output, _ = await sandbox.execute_code(
                 eval_code,
                 timeout=eval_config.timeout * len(samples) + 60,
                 max_output_characters=100_000,
             )
-        finally:
-            await sandbox.close()
 
-        if output.get("process_status") != "completed":
-            LOG.error(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
-            continue
+            if output.get("process_status") != "completed":
+                LOG.error(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
+                continue
 
-        with open(eval_results_path, "rt", encoding="utf-8") as fin:
-            results = []
-            for line in fin:
-                results.append(json.loads(line))
+            with open(eval_results_path, "rt", encoding="utf-8") as fin:
+                results = [json.loads(line) for line in fin]
 
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample, result in zip(samples, results):
                 sample["verdict"] = result["verdict"]
                 sample["is_passed"] = result["is_passed"]
-                f.write(json.dumps(sample) + "\n")
+
+            with open(jsonl_file, "w", encoding="utf-8") as f:
+                for sample in samples:
+                    f.write(json.dumps(sample) + "\n")
+
+    finally:
+        await sandbox.close()
 
 
 def eval_ojbench(cfg):
