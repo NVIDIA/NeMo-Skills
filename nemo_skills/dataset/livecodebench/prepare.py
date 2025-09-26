@@ -89,6 +89,7 @@ def clean_data(dataset, keep_test_cases=False):
         "question_id",
         "starter_code",
     ]
+    print("keep_test_cases: ", keep_test_cases)
     if not keep_test_cases:
         remove_columns.append("public_test_cases")
         remove_columns.append("private_test_cases")
