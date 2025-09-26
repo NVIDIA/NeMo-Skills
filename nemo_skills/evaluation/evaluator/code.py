@@ -419,7 +419,7 @@ async def eval_ojbench_async(cfg):
                 ojbench.judge_jsonl(
                     input_path={jsonl_file},
                     output_path={eval_results_path},
-                    num_workers=8
+                    num_workers=16
                 )
             """)
 
