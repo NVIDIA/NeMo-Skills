@@ -183,13 +183,19 @@ class SweBenchGenerationTask(GenerationTask):
         self, data_point, command, expected_file_pattern, mode, timeout=100000, apptainer_args=""
     ):
         """Execute a command in an Apptainer container with retry logic."""
+        # List of commands to execute in the container in order
+        container_commands = []
+
+        # Fix localhost URLs not working sometimes
+        container_commands.append("echo '127.0.0.1 localhost' >/etc/hosts")
+
         if self.cfg.generic_inference_container is not None and mode == "agent":
             container_name = self.cfg.generic_inference_container
             # If the container is generic, we have to clone the repo inside of it before running the agent.
             # This follows the procedure used for the SWE-bench environments:
             # https://github.com/SWE-bench/SWE-bench/blob/7a6b44e4a82eece60ac06afd3042a76d8a95eec3/swebench/harness/test_spec/python.py#L274
             # except we clone all branches because we can't always know which branch the commit is on.
-            command = (
+            container_commands.append(
                 # Remove existing repo if present
                 "rm -rf /testbed && "
                 # Clone the repo we need
@@ -211,8 +217,7 @@ class SweBenchGenerationTask(GenerationTask):
                 "    echo 'Exiting because future logs are visible after resetting the repo to the base commit.' && "
                 "    echo 'This means something went wrong during the setup procedure.' && "
                 "    exit 1; "
-                "fi && "
-                f"{command}"
+                "fi"
             )
         else:
             # In this case, we expect that the correct repo will already be cloned in /testbed
@@ -220,12 +225,21 @@ class SweBenchGenerationTask(GenerationTask):
                 instance_id=data_point["instance_id"].replace("__", "_1776_")
             )
 
-        # Create logs directory if it doesn't exist
-        logs_dir = self.output_dir / "apptainer_logs"
-        logs_dir.mkdir(exist_ok=True)
+        if mode == "agent":
+            # Remove R2E-Gym test-related files. Only relevant for R2E-Gym environments.
+            # TODO: what's a good way to support different setup for different kinds of environments?
+            for root_dir in ["", "/root", "/testbed"]:
+                container_commands.append(
+                    # /r2e_tests contains evaluation tests that the agent should not see.
+                    f"rm -rf {root_dir}/r2e_tests && "
+                    # run_tests.sh launches the tests in /r2e_tests, so the agent should not see this either.
+                    # We check that it contains the substring "r2e_tests"
+                    # to avoid accidentally deleting an unrelated file with that name.
+                    f"if grep -qs r2e_tests {root_dir}/run_tests.sh; then rm -rf {root_dir}/run_tests.sh; fi"
+                )
 
-        # Fix localhost URLs not working sometimes
-        command = f"echo '127.0.0.1 localhost' >/etc/hosts && {command}"
+        container_commands.append(command)
+        combined_command = " && ".join(container_commands)
 
         # Launch Apptainer container and execute the command
         apptainer_cmd = (
@@ -233,8 +247,12 @@ class SweBenchGenerationTask(GenerationTask):
             f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
             f"--mount type=bind,src={self.output_dir},dst=/trajectories_mount "
             f"{apptainer_args} "
-            f"{container_name} bash -c {shlex.quote(command)}"
+            f"{container_name} bash -c {shlex.quote(combined_command)}"
         )
+
+        # Create logs directory if it doesn't exist
+        logs_dir = self.output_dir / "apptainer_logs"
+        logs_dir.mkdir(exist_ok=True)
 
         # Retry apptainer command up to max_retries times
         for attempt in range(self.cfg.apptainer_max_retries):
