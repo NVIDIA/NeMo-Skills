@@ -14,7 +14,7 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 LOG = logging.getLogger(get_logger_name(__file__))
 
 LIVECODEBENCH_PYTHON_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.git@temp"
-LIVECODEBENCH_PYPY3_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.git"
+# LIVECODEBENCH_PYPY3_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.git"
 
 
 @nested_dataclass(kw_only=True)
@@ -45,8 +45,8 @@ async def install_packages(eval_config: LiveCodeBenchEvaluatorConfig) -> bool:
     async with sandbox_context(eval_config.sandbox) as sandbox:
         LOG.info(f"Installing livecodebench with {eval_config.interpreter}...")
         pip_cmd = "pip" if eval_config.interpreter == "python" else "pypy3 -m pip"
-        git_url = LIVECODEBENCH_PYTHON_GIT_URL if eval_config.interpreter == "python" else LIVECODEBENCH_PYPY3_GIT_URL
-        cmd = f"{pip_cmd} install {git_url}"
+        # git_url = LIVECODEBENCH_PYTHON_GIT_URL if eval_config.interpreter == "python" else LIVECODEBENCH_PYPY3_GIT_URL
+        cmd = f"{pip_cmd} install {LIVECODEBENCH_PYTHON_GIT_URL}"
 
         result, _ = await sandbox.execute_code(cmd, language="shell", timeout=300)
         if result.get("process_status") != "completed":
