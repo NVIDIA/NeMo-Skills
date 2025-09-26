@@ -212,9 +212,28 @@ class Sandbox(abc.ABC):
                             len(history),
                             restore_output,
                         )
-                        raise RuntimeError(
-                            "Sandbox state restoration failed while replaying prior cell; aborting execution to avoid inconsistent state"
+                        # Best-effort cleanup of the remote session so the next execution starts fresh.
+                        if request_session_id_str is not None:
+                            try:
+                                await self.delete_session(request_session_id_str)
+                            except Exception as exc:
+                                LOG.warning(
+                                    "Failed to delete session %s after restoration failure: %s",
+                                    request_session_id_str,
+                                    exc,
+                                )
+
+                        stderr_parts = (
+                            "RuntimeError: Sandbox state restoration failed after the execution worker restarted."
+                            "The interactive session history has been cleared; please re-run the last code block without relying on prior state."
                         )
+                        failure_output = {
+                            "process_status": "error",
+                            "stdout": "",
+                            "stderr": stderr_parts + "\n",
+                        }
+
+                        return failure_output, request_session_id
 
             # Execute the new code once restoration has succeeded (or there was no history to replay)
             exec_request = self._prepare_request(
