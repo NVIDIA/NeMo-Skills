@@ -360,7 +360,7 @@ class OJBenchConfig:
 async def _setup_and_install(sandbox):
     """Helper to install packages inside the sandbox."""
     LOG.info("Installing required packages for ojbench evaluation...")
-    cmd = "pip install git+https://github.com/He-Ren/OJBench/tree/main"
+    cmd = "pip install git+https://github.com/He-Ren/OJBench"
     result, _ = await sandbox.execute_code(cmd, language="shell", timeout=300)
     if result["process_status"] != "completed":
         LOG.warning(f"Failed to install ojbench: {result.get('stderr', 'Unknown error')}")
