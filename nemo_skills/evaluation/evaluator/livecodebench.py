@@ -13,9 +13,7 @@ from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-LIVECODEBENCH_PYTHON_GIT_URL = (
-    "git+https://github.com/wasiahmad/livecodebench.git@f285640c20aaf18df1ee5917621a596af4630b5e"
-)
+LIVECODEBENCH_PYTHON_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.git@temp"
 LIVECODEBENCH_PYPY3_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.git"
 
 
