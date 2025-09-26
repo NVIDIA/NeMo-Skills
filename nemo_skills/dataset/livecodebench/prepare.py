@@ -18,7 +18,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from datasets import load_dataset
+from datasets import Value, load_dataset
 from dateutil.relativedelta import relativedelta
 
 
@@ -92,6 +92,9 @@ def clean_data(dataset, keep_test_cases=False):
     if not keep_test_cases:
         remove_columns.append("public_test_cases")
         remove_columns.append("private_test_cases")
+    else:
+        dataset = dataset.cast_column("public_test_cases", Value("large_string"))
+        dataset = dataset.cast_column("private_test_cases", Value("large_string"))
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
 
