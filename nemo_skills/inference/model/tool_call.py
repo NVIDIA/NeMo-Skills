@@ -23,7 +23,12 @@ from typing import Dict, List
 from nemo_skills.mcp.adapters import (
     ChatCompletionCallInterpreter,
     ChatCompletionResponseFormatter,
+    CompletionConversationManager,
     OpenAISchemaAdapter,
+    ResponsesCallInterpreter,
+    ResponsesConversationManager,
+    ResponsesResponseFormatter,
+    ResponsesSchemaAdapter,
 )
 from nemo_skills.mcp.tool_manager import ToolManager
 from nemo_skills.utils import get_logger_name
@@ -59,10 +64,25 @@ class ToolCallingWrapper:
             overrides=tool_overrides or {},
             context=additional_config,
         )
-        # Use sensible defaults for adapters in module-based mode
-        self.schema_adapter = OpenAISchemaAdapter()
-        self.call_interpreter = ChatCompletionCallInterpreter()
-        self.response_formatter = ChatCompletionResponseFormatter()
+
+        # Detect model type and set up appropriate adapters
+        self._setup_adapters()
+
+    def _setup_adapters(self):
+        """Set up adapters based on client type."""
+        # Use client_type instead of model instance checks
+        if self.model.use_responses_api:
+            # Responses API model - uses flatter tool schema format
+            self.schema_adapter = ResponsesSchemaAdapter()
+            self.call_interpreter = ResponsesCallInterpreter()
+            self.response_formatter = ResponsesResponseFormatter()
+            self.conversation_manager = ResponsesConversationManager()
+        else:
+            # Chat completion model (default) - uses nested function format
+            self.schema_adapter = OpenAISchemaAdapter()
+            self.call_interpreter = ChatCompletionCallInterpreter()
+            self.response_formatter = ChatCompletionResponseFormatter()
+            self.conversation_manager = CompletionConversationManager()
 
     async def _execute_tool_call(self, tool_call, request_id: str):
         ## TODO(sanyamk): The correct key format needs to be cohesive with other formatters.
@@ -75,7 +95,7 @@ class ToolCallingWrapper:
         try:
             tool_args = json.loads(tool_args)
         except json.decoder.JSONDecodeError as e:
-            LOG.exception(e)
+            LOG.exception(f"Failed to parse tool arguments {tool_args}: {e}")
             return {"error": "Tool argument parsing failed."}
 
         ## TODO(sanyamk): Only exceptions related to tool execution here, all others must fail.
@@ -103,7 +123,7 @@ class ToolCallingWrapper:
         tokens_to_generate: int = None,
         **generation_kwargs,
     ) -> Dict:
-        assert isinstance(prompt, list), "Only use ChatCompletion API for now."
+        assert isinstance(prompt, list), "Prompt must be a list for tool calling."
 
         assert tools is None, "Do not pass 'tools'; they are derived from tool_modules."
 
@@ -133,19 +153,18 @@ class ToolCallingWrapper:
                 if k in generation:
                     result_steps[k].append(generation[k])
 
-            conversation.append({"role": "assistant", "content": generation["generation"]})
-            if "reasoning_content" in generation:
-                conversation[-1]["reasoning_content"] = generation["reasoning_content"]
+            # Use conversation manager to add assistant response
+            self.conversation_manager.add_assistant_response(conversation, generation)
 
+            # Check for tool calls (simple and direct)
             tool_calls = generation.get("tool_calls", [])
             if tool_calls:
                 tool_calls_message = self.call_interpreter.parse(tool_calls)
-                conversation[-1].update(tool_calls_message)
 
-                tool_calls_output_messages = await self._execute_tool_calls(
-                    tool_calls_message["tool_calls"], request_id=request_id
-                )
-                conversation.extend(tool_calls_output_messages)
+                tool_results = await self._execute_tool_calls(tool_calls_message["tool_calls"], request_id=request_id)
+
+                # Use conversation manager for both model types - it handles all the details
+                self.conversation_manager.add_tool_results(conversation, tool_calls_message, tool_results)
 
                 result_steps["num_tool_calls"].append(len(tool_calls))
 
