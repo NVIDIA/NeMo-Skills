@@ -66,7 +66,7 @@ def parse_month_range(start_date, end_date):
         raise ValueError(str(e))
 
 
-def clean_data(dataset):
+def clean_data(dataset, keep_test_cases=False):
     def map_fn(data):
         question = data["question_content"] + "\n\n"
         if data["starter_code"]:
@@ -83,19 +83,20 @@ def clean_data(dataset):
     remove_columns = [
         "question_title",
         "contest_id",
-        "public_test_cases",
-        "private_test_cases",
         "metadata",
         "question_content",
         "platform",
         "question_id",
         "starter_code",
     ]
+    if not keep_test_cases:
+        remove_columns.append("public_test_cases")
+        remove_columns.append("private_test_cases")
     dataset = dataset.map(map_fn, remove_columns=remove_columns)
     return dataset
 
 
-def prepare(start_date, end_date, release_version, output_dir):
+def prepare(start_date, end_date, release_version, output_dir, keep_test_cases=False):
     start_date, end_date = parse_month_range(start_date, end_date)
     start_yymm = start_date.strftime("%y%m")
     end_yymm = end_date.strftime("%y%m")
@@ -104,7 +105,7 @@ def prepare(start_date, end_date, release_version, output_dir):
     assert release_version in ["v1", "v2", "v3", "v4", "v5", "v6"]
 
     data = parse_data(release_version=f"release_{release_version}")
-    data = clean_data(data)
+    data = clean_data(data, keep_test_cases)
     print("Len of data: ", len(data))
 
     print("Writing to file...")
@@ -142,6 +143,7 @@ if __name__ == "__main__":
     parser.add_argument("--release_version", type=str, default="all")
     parser.add_argument("--start_date", type=str, default="all", help="End date in YYYY-MM format")
     parser.add_argument("--end_date", type=str, default="all", help="End date in YYYY-MM format")
+    parser.add_argument("--keep_test_cases", type=bool, default=False, help="keep test cases in the output jsonl file")
 
     args = parser.parse_args()
 
@@ -149,14 +151,14 @@ if __name__ == "__main__":
         # Prepare all splits
         for release_version, start_date, end_date in DEFAULT_SPLITS:
             print(f"Processing data for {release_version} from {start_date} to {end_date}")
-            prepare(start_date, end_date, release_version, args.output_dir)
+            prepare(start_date, end_date, release_version, args.output_dir, args.keep_test_cases)
     else:
         if args.release_version == "all" or args.start_date == "all" or args.end_date == "all":
             raise ValueError(
                 "If preparing a custom split, you must specify all "
                 "--release_version, --start_date, and --end_date arguments."
             )
-        prepare(args.start_date, args.end_date, args.release_version, args.output_dir)
+        prepare(args.start_date, args.end_date, args.release_version, args.output_dir, args.keep_test_cases)
 
     # test_v5_2408_2502.jsonl: 279 samples
     # test_v5_2410_2502.jsonl: 166 samples
