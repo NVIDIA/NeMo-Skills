@@ -176,11 +176,7 @@ class ResponsesConversationManager(ConversationManager):
     def add_assistant_response(self, conversation: List[Dict[str, Any]], response: Dict[str, Any]) -> None:
         """Add an assistant response to the conversation using serialized output."""
         # Use the serialized output from the responses API
-        if "serialized_output" in response:
-            conversation.extend(response["serialized_output"])
-        else:
-            # Fallback to basic message format
-            conversation.append({"role": "assistant", "content": response["generation"]})
+        conversation.extend(response["serialized_output"])
 
     def add_tool_results(
         self,
