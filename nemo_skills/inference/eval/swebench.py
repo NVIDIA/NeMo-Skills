@@ -463,10 +463,10 @@ class SweBenchGenerationTask(GenerationTask):
             "    export INSTALL_DOCKER=0 && "
             "    make build && "
             "    poetry run python -m pip install datasets && "
-            "    if ! command -v jq >/dev/null 2>&1 "  # install jq if not present
+            "    if ! command -v jq >/dev/null 2>&1; "  # install jq if not present
             "    then "
             "        curl https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64 -Lo /bin/jq && "
-            "        chmod +x /bin/jq "
+            "        chmod +x /bin/jq; "
             "    fi; "
             "fi && "
             # copy dataset
