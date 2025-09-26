@@ -444,7 +444,12 @@ class SweBenchGenerationTask(GenerationTask):
             f"   git checkout {self.cfg.agent_framework_commit} && "
             "    export INSTALL_DOCKER=0 && "
             "    make build && "
-            "    poetry run python -m pip install datasets; "
+            "    poetry run python -m pip install datasets && "
+            "    if ! command -v jq >/dev/null 2>&1 "  # install jq if not present
+            "    then "
+            "        curl https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64 -Lo /bin/jq && "
+            "        chmod +x /bin/jq "
+            "    fi; "
             "fi && "
             # copy dataset
             f"mkdir {data_dir} && "
@@ -459,7 +464,7 @@ class SweBenchGenerationTask(GenerationTask):
             # run the agent
             f"./evaluation/benchmarks/swe_bench/scripts/run_infer.sh "
             f"    llm.model "  # name of llm config section in config.toml
-            f"    HEAD "  # openhands commit (HEAD = self.cfg.agent_framework_commit, because we checked it out earlier)
+            f"    HEAD "  # openhands commit (HEAD = stay in the currently checked out commit)
             f"    CodeActAgent "  # agent
             f"    1 "  # number of instances
             f"    {self.cfg.agent_max_turns} "  # max agent iterations
