@@ -2,10 +2,10 @@ import asyncio
 import json
 import logging
 import shlex
+import shutil
 import textwrap
 from contextlib import asynccontextmanager
 from dataclasses import field
-from pathlib import Path
 
 from nemo_skills.code_execution.sandbox import get_sandbox
 from nemo_skills.evaluation.evaluator.code import preprocess_code
@@ -71,10 +71,10 @@ async def eval_livecodebench_async(cfg):
         return
 
     async with sandbox_context(eval_config.sandbox) as sandbox:
-        for jsonl_path in map(Path, unroll_files(cfg.input_files)):
-            LOG.info(f"Processing file: {jsonl_path.name}")
+        for jsonl_file in unroll_files(cfg.input_files):
+            LOG.info(f"Processing file: {jsonl_file}")
 
-            with jsonl_path.open("r", encoding="utf-8") as f_in:
+            with open(jsonl_file, encoding="utf-8") as f_in:
                 samples = [preprocess_code(json.loads(line), eval_config.language) for line in f_in]
 
             versions = {s["release_version"] for s in samples}
@@ -85,14 +85,14 @@ async def eval_livecodebench_async(cfg):
             for s in samples:
                 s["code_list"] = [s["completion"]]
 
-            temp_eval = jsonl_path.with_suffix(".temp.jsonl")
-            temp_eval.write_text("\n".join(json.dumps(s) for s in samples), encoding="utf-8")
+            with open(jsonl_file, "w", encoding="utf-8") as f_out:
+                f_out.writelines(json.dumps(sample) + "\n" for sample in samples)
 
             test_file_arg = repr(eval_config.test_file) if eval_config.test_file else "None"
             eval_code = textwrap.dedent(f"""
                 from livecodebench.evaluate import evaluate
                 evaluate(
-                    custom_output_file='{temp_eval.name}',
+                    custom_output_file='{jsonl_file}',
                     release_version='release_{release_version}',
                     test_file={test_file_arg},
                     k_list=[1],
@@ -111,26 +111,19 @@ async def eval_livecodebench_async(cfg):
             )
 
             if output.get("process_status") != "completed":
-                LOG.error(f"Evaluation failed for {jsonl_path.name}. Stderr: {output.get('stderr')}")
-                temp_eval.unlink(missing_ok=True)
+                LOG.error(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
                 continue
 
-            results_path = temp_eval.with_name(f"{temp_eval.stem}_eval_results.json")
-            if not results_path.exists():
-                LOG.warning(f"Results file missing: {results_path}")
-                temp_eval.unlink(missing_ok=True)
-                continue
+            with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+                eval_grades = json.load(fin)
 
-            eval_grades = json.loads(results_path.read_text(encoding="utf-8"))
-
-            with jsonl_path.open("w", encoding="utf-8") as f_out:
+            with open(jsonl_file, "wt", encoding="utf-8") as f_out:
                 for s in samples:
                     s["graded_list"] = eval_grades["eval"][s["task_id"]]["graded_list"]
                     f_out.write(json.dumps(s) + "\n")
 
-            results_path.rename(results_path.with_name(f"{jsonl_path.stem}_eval_results-saved.json"))
-            temp_eval.unlink(missing_ok=True)
-            LOG.info(f"Finished {jsonl_path.name}, results saved.")
+            shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+            LOG.info(f"Finished processing {jsonl_file}, results saved.")
 
 
 def eval_livecodebench(cfg):
