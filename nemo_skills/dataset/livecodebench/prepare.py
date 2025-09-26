@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument("--release_version", type=str, default="all")
     parser.add_argument("--start_date", type=str, default="all", help="End date in YYYY-MM format")
     parser.add_argument("--end_date", type=str, default="all", help="End date in YYYY-MM format")
-    parser.add_argument("--keep_test_cases", type=bool, default=False, help="keep test cases in the output jsonl file")
+    parser.add_argument("--keep_test_cases", action="store_true", help="keep test cases in the output jsonl file")
 
     args = parser.parse_args()
 
