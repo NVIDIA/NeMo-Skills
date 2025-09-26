@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import shlex
 import textwrap
 from contextlib import asynccontextmanager
 from dataclasses import field
@@ -100,7 +101,7 @@ async def eval_livecodebench_async(cfg):
                 )
             """)
 
-            cmd = f"{eval_config.interpreter} -c {repr(eval_code)}"
+            cmd = f"{eval_config.interpreter} -c {shlex.quote(eval_code)}"
             output, _ = await sandbox.execute_code(
                 cmd,
                 language="shell",
