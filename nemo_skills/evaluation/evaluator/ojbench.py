@@ -104,7 +104,7 @@ async def eval_ojbench_async(cfg):
 
             output, _ = await sandbox.execute_code(
                 eval_code,
-                python="python",
+                langauge="python",
                 timeout=eval_config.timeout * len(samples) + 60,
                 max_output_characters=100_000,
             )
