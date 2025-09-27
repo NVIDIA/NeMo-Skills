@@ -93,6 +93,7 @@ async def eval_ojbench_async(cfg):
                 f_out.writelines(json.dumps(sample) + "\n" for sample in samples)
 
             eval_results_path = jsonl_file[:-6] + "_eval_results.jsonl"
+            print(jsonl_file, eval_results_path)
             eval_code = textwrap.dedent(f"""
                 import ojbench
                 ojbench.init(problem_dirs={repr([str(p) for p in problem_dirs])})
