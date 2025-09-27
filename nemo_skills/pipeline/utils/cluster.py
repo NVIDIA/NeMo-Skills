@@ -18,7 +18,7 @@ import sys
 import tarfile
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
