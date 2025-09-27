@@ -40,7 +40,10 @@ _logged_optional_env_vars = set()
 
 
 def get_timeout(cluster_config, partition):
-    default_timeout = cluster_config.get("timeouts", {}).get("default", "10000:00:00:00")
+    # Time format for SLURM: "minutes", "minutes:seconds", "hours:minutes:seconds",
+    # "days-hours", "days-hours:minutes" and "days-hours:minutes:seconds"
+    # https://slurm.schedmd.com/sbatch.html#OPT_time
+    default_timeout = cluster_config.get("timeouts", {}).get("default", "10000-00:00:00")
     try:
         timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
 
@@ -48,7 +51,7 @@ def get_timeout(cluster_config, partition):
         # the format expected by nemo is days:hours:minutes:seconds
         time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
         timeout = (
-            f"00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}"
+            f"0-{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}"
         )
     except KeyError:
         timeout = default_timeout
