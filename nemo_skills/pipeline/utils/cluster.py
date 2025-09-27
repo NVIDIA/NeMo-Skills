@@ -79,7 +79,7 @@ def get_timeout(cluster_config, partition) -> str:
     # subtracting 15 minutes to account for the time it takes to save the model
     # the format expected by nemo is days-hours:minutes:seconds
     save_delay = timedelta(minutes=15)
-    if timeout < save_delay:
+    if timeout > save_delay:
         timeout -= save_delay
     reduced_timeout_str = (
         f"{timeout.days}-{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
