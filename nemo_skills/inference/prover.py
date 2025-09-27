@@ -49,6 +49,7 @@ class ProverConfig(GenerateSolutionsConfig):
     n_pass: int = 1  # number of passes to run the prover
 
     # Lean 4 specific parameters
+    nemotron_refinement: bool = False  # whether to use nemotron for refinement
     refinement: bool = False  # whether to refine the code
     refinement_max_turns: int = 2  # maximum number of turns for refinement
     refinement_prompt_config: str | None = None  # prompt for refining the code
@@ -174,6 +175,30 @@ class ProverTask(GenerationTask):
         full_code = replace_statement_in_proof(formal_statement, code)
         return code, full_code
 
+    async def _transform_for_refinement(self, prompt_turn_list):
+        assert len(prompt_turn_list) == 3
+        new_conversation = [{'role': 'user', 'content': ''}]
+
+        lean_attempt = prompt_turn_list[1]['content']
+
+        assert 'Before producing the Lean 4 code to formally prove the given theorem, provide a detailed analysis of the error message.' in prompt_turn_list[2]['content']
+
+        new_conversation[0]['content'] = (
+            f'Here is a proof attempt for the following theorem in Lean4.\n\n{lean_attempt}\n\n' +
+            prompt_turn_list[2]['content'].replace(
+                'Before producing the Lean 4 code to formally prove the given theorem, provide a detailed analysis of the error message.',
+                (
+                    'Your task is to fix this proof. Before producing the Lean 4 code to formally prove '
+                    'the given theorem, do a detailed analysis of the error message. '
+                    'Your final answer must be a single, complete Lean 4 markdown code block containing the '
+                    'completed theorem. Do NOT include any text or explanation before or after the code block. '
+                    'Begin with ```lean4 and end with ```.'
+                )
+            )
+        )
+
+        return new_conversation
+
     async def _signle_data_point_generate(self, data_point, data):
         formal_statement = (
             (data_point["header"].strip() + "\n")
@@ -197,12 +222,16 @@ class ProverTask(GenerationTask):
         turn_idx = 0
         for turn_idx in range(self.cfg.refinement_max_turns):
             results_dict = {}  # everything will be stored in this dict
+            if turn_idx != 0 and self.cfg.nemotron_refinement:
+                prepared_conversation = await self._transform_for_refinement(prompt_turn_list)
+            else:
+                prepared_conversation = prompt_turn_list
             prefix_tokens = self.llm.tokenizer.apply_chat_template(
-                prompt_turn_list, tokenize=True, add_generation_prompt=True
+                prepared_conversation, tokenize=True, add_generation_prompt=True
             )
             num_tokens_prefix = len(prefix_tokens)
             prefix = self.llm.tokenizer.apply_chat_template(
-                prompt_turn_list, tokenize=False, add_generation_prompt=True
+                prepared_conversation, tokenize=False, add_generation_prompt=True
             )
             # We need to check if the prefix is too long, if it is, we need to break the loop
             if num_tokens_prefix > self.cfg.max_tokens:
