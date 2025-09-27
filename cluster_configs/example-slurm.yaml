@@ -62,8 +62,8 @@ job_name_prefix: "nemo_skills:"
 # can use this section to set timeouts for different partitions
 # this will be used as a slurm parameter + to signal SFT job to finish
 # before the timeout to have time to save the last checkpoint
+# default_timeout: "06:00:00"
 # timeouts:
-#   default: "06:00:00"
 #   partition_name1: "06:00:00"
 #   partition_name2: "01:30:00"
 

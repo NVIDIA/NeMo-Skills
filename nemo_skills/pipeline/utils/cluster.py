@@ -70,7 +70,7 @@ def _parse_slurm_timeout(value: str) -> timedelta:
 
 
 def get_timeout(cluster_config, partition, with_save_delay: bool = True) -> str:
-    default_timeout = cluster_config.get("timeouts", {}).get("default", "100-00:00:00")
+    default_timeout = cluster_config.get("default_timeout", "100-00:00:00")
     try:
         timeout_str = cluster_config["timeouts"][partition or cluster_config["partition"]]
     except KeyError:
