@@ -176,12 +176,12 @@ class ProverTask(GenerationTask):
         return code, full_code
 
     async def _transform_for_refinement(self, prompt_turn_list):
-        assert len(prompt_turn_list) == 3
+        assert len(prompt_turn_list) == 3, prompt_turn_list
         new_conversation = [{'role': 'user', 'content': ''}]
 
         lean_attempt = prompt_turn_list[1]['content']
 
-        assert 'Before producing the Lean 4 code to formally prove the given theorem, provide a detailed analysis of the error message.' in prompt_turn_list[2]['content']
+        assert 'Before producing the Lean 4 code to formally prove the given theorem, provide a detailed analysis of the error message.' in prompt_turn_list[2]['content'], prompt_turn_list[2]['content']
 
         new_conversation[0]['content'] = (
             f'Here is a proof attempt for the following theorem in Lean4.\n\n{lean_attempt}\n\n' +
