@@ -69,7 +69,7 @@ def _parse_slurm_timeout(value: str) -> timedelta:
     return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
-def get_timeout(cluster_config, partition) -> str:
+def get_timeout(cluster_config, partition, with_save_delay: bool = True) -> str:
     default_timeout = cluster_config.get("timeouts", {}).get("default", "100-00:00:00")
     try:
         timeout_str = cluster_config["timeouts"][partition or cluster_config["partition"]]
@@ -78,9 +78,10 @@ def get_timeout(cluster_config, partition) -> str:
     timeout = _parse_slurm_timeout(timeout_str)
     # subtracting 15 minutes to account for the time it takes to save the model
     # the format expected by nemo is days-hours:minutes:seconds
-    save_delay = timedelta(minutes=15)
-    if timeout > save_delay:
-        timeout -= save_delay
+    if with_save_delay:
+        save_delay = timedelta(minutes=15)
+        if timeout > save_delay:
+            timeout -= save_delay
     reduced_timeout_str = (
         f"{timeout.days}-{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
     )

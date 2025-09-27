@@ -228,7 +228,7 @@ def get_executor(
                 slurm_kwargs = {}
             slurm_kwargs["exclusive"] = True
 
-    timeout = get_timeout(cluster_config, partition)
+    timeout = get_timeout(cluster_config, partition, with_save_delay=False)
 
     additional_parameters = {"time_min": time_min} if time_min is not None else {}
     if cluster_config.get("mail_type") is not None:
