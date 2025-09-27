@@ -18,7 +18,7 @@ import sys
 import tarfile
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -39,22 +39,52 @@ _logged_required_env_vars = set()
 _logged_optional_env_vars = set()
 
 
-def get_timeout(cluster_config, partition):
-    # Time format for SLURM: "minutes", "minutes:seconds", "hours:minutes:seconds",
-    # "days-hours", "days-hours:minutes" and "days-hours:minutes:seconds"
-    # https://slurm.schedmd.com/sbatch.html#OPT_time
-    # timeout value passed to SBATCH
+def _parse_slurm_timeout(value: str) -> timedelta:
+    """
+    Parse a slurm timeout string into a timedelta object.
+    Time format for SLURM: "minutes", "minutes:seconds", "hours:minutes:seconds",
+    "days-hours", "days-hours:minutes" and "days-hours:minutes:seconds"
+    https://slurm.schedmd.com/sbatch.html#OPT_time
+    """
+    days, hours, minutes, seconds = 0, 0, 0, 0
+    days_in_value = "-" in value
+    if days_in_value:
+        day_part, value = value.split("-", 1)
+        days = int(day_part)
+    parts = value.split(":")
+    if len(parts) == 3:
+        hours, minutes, seconds = map(int, parts)
+    elif len(parts) == 2:
+        if days_in_value:
+            hours, minutes = map(int, parts)
+        else:
+            minutes, seconds = map(int, parts)
+    elif len(parts) == 1:
+        if days_in_value:
+            hours = int(parts[0])
+        else:
+            minutes = int(parts[0])
+    else:
+        raise ValueError(f"Unsupported Slurm time format: {value!r}")
+    return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+
+
+def get_timeout(cluster_config, partition) -> str:
     default_timeout = cluster_config.get("timeouts", {}).get("default", "100-00:00:00")
     try:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
-
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days-hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%j-%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = f"{time_diff.days}-{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}"
+        timeout_str = cluster_config["timeouts"][partition or cluster_config["partition"]]
     except KeyError:
-        timeout = default_timeout
-    return timeout
+        timeout_str = default_timeout
+    timeout = _parse_slurm_timeout(timeout_str)
+    # subtracting 15 minutes to account for the time it takes to save the model
+    # the format expected by nemo is days-hours:minutes:seconds
+    save_delay = timedelta(minutes=15)
+    if timeout < save_delay:
+        timeout -= save_delay
+    reduced_timeout_str = (
+        f"{timeout.days}-{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
+    )
+    return reduced_timeout_str
 
 
 def get_env_variables(cluster_config):
