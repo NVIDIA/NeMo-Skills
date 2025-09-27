@@ -58,8 +58,8 @@ def clone_dataset_repo(url, destination):
             ):
                 for line in infile:
                     data = json.loads(line)
-                    if "prompt" in data:
-                        data["question"] = data.pop("prompt")
+                    data["question"] = data.pop("prompt")
+                    data["subset_for_metrics"] = [data["language"], data["difficulty"]]
                     outfile.write(json.dumps(data) + "\n")
 
             print(f"Removing directory: {prompts_dir}")

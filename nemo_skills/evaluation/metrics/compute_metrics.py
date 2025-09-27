@@ -79,12 +79,13 @@ class ComputeMetrics:
                             continue
                         data[i] = self.calculators["_all_"].get_incorrect_sample(data[i])
                 # checking if we need to create a new metrics calculator
-                data_subset = data[0].get("subset_for_metrics", "_all_")
-                if data_subset not in self.calculators:
-                    self.calculators[data_subset] = self.get_metrics_calculator()
-                self.calculators["_all_"].update(data)
-                if data_subset != "_all_":
-                    self.calculators[data_subset].update(data)
+                data_subsets = data[0].get("subset_for_metrics", ["_all_"])
+                for data_subset in data_subsets:
+                    if data_subset not in self.calculators:
+                        self.calculators[data_subset] = self.get_metrics_calculator()
+                    self.calculators["_all_"].update(data)
+                    if data_subset != "_all_":
+                        self.calculators[data_subset].update(data)
 
         # collecting metrics from all calculators
         metrics = {}
