@@ -95,7 +95,7 @@ async def eval_ojbench_async(cfg):
             eval_results_path = jsonl_file[:-6] + "_eval_results.jsonl"
             eval_code = textwrap.dedent(f"""
                 import ojbench
-                ojbench.init(problem_dirs={repr(problem_dirs)})
+                ojbench.init(problem_dirs={repr([str(p) for p in problem_dirs])})
                 ojbench.judge_jsonl(
                     input_path={repr(jsonl_file)},
                     output_path={repr(eval_results_path)},
