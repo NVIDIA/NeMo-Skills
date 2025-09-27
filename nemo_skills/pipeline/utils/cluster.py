@@ -40,8 +40,9 @@ _logged_optional_env_vars = set()
 
 
 def get_timeout(cluster_config, partition):
-    default_timeout = cluster_config.get("timeouts", {}).get("default", "10000:00:00:00")
-    try:
+    if "timeouts" not in cluster_config:
+        timeout = "10000:00:00:00"
+    else:
         timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
 
         # subtracting 15 minutes to account for the time it takes to save the model
@@ -50,8 +51,6 @@ def get_timeout(cluster_config, partition):
         timeout = (
             f"00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}"
         )
-    except KeyError:
-        timeout = default_timeout
     return timeout
 
 
@@ -265,7 +264,7 @@ def update_ssh_tunnel_config(cluster_config: dict):
                 cluster_config["ssh_tunnel"][key] = os.path.expandvars(cluster_config["ssh_tunnel"][key])
                 LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
 
-    if "$" in cluster_config["ssh_tunnel"].get("identity", ""):
+    if "$" in (cluster_config["ssh_tunnel"].get("identity") or ""):
         raise ValueError(
             "SSH identity cannot be resolved from environment variables. "
             "Please provide a valid path to the identity file."
