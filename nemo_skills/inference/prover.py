@@ -176,7 +176,8 @@ class ProverTask(GenerationTask):
         return code, full_code
 
     async def _transform_for_refinement(self, prompt_turn_list):
-        assert len(prompt_turn_list) == 3, prompt_turn_list
+        if len(prompt_turn_list) != 3:
+            return prompt_turn_list
         new_conversation = [{'role': 'user', 'content': ''}]
 
         lean_attempt = prompt_turn_list[1]['content']
