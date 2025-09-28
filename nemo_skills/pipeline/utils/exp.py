@@ -29,7 +29,7 @@ from torchx.specs.api import AppState
 
 from nemo_skills.pipeline.utils.cluster import (
     get_env_variables,
-    get_timeout_str,
+    get_slurm_timeout_str,
     get_tunnel,
     temporary_env_update,
     tunnel_hash,
@@ -228,7 +228,7 @@ def get_executor(
                 slurm_kwargs = {}
             slurm_kwargs["exclusive"] = True
 
-    timeout = get_timeout_str(cluster_config, partition, with_save_delay=False)
+    timeout = get_slurm_timeout_str(cluster_config, partition, with_save_delay=False)
 
     additional_parameters = {"time_min": time_min} if time_min is not None else {}
     if cluster_config.get("mail_type") is not None:
