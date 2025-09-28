@@ -108,7 +108,7 @@ def get_env_variables(cluster_config):
         "HF_TOKEN",
     ]
     default_factories = {
-        "HF_TOKEN": lambda: str(get_token()),
+        "HF_TOKEN": lambda: str(token) if (token := get_token()) else "",
     }
     # Add optional env variables
     optional_env_vars = cluster_config.get("env_vars", [])
@@ -132,7 +132,9 @@ def get_env_variables(cluster_config):
                 LOG.info(f"Adding optional environment variable {env_var} from environment")
                 _logged_optional_env_vars.add(env_var)
         elif env_var in default_factories:
-            env_vars[env_var] = default_factories[env_var]()
+            value = default_factories[env_var]()
+            if value:
+                env_vars[env_var] = value
             if env_var not in _logged_optional_env_vars:
                 LOG.info(f"Adding optional environment variable {env_var} from environment")
                 _logged_optional_env_vars.add(env_var)
