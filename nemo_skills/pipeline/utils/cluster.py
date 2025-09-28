@@ -51,25 +51,29 @@ def _parse_slurm_timeout(value: str) -> timedelta:
     if days_in_value:
         day_part, value = value.split("-", 1)
         days = int(day_part)
-    parts = value.split(":")
-    if len(parts) == 3:
-        hours, minutes, seconds = map(int, parts)
+    parts: list[int] = list(map(int, value.split(":")))
+    if len(parts) == 4 and days == 0:
+        # this is not SLURM format, but we support it for compatibility reason
+        # since NeMo-RL uses "DD:HH:MM:SS" format
+        days, hours, minutes, seconds = parts
+    elif len(parts) == 3:
+        hours, minutes, seconds = parts
     elif len(parts) == 2:
         if days_in_value:
-            hours, minutes = map(int, parts)
+            hours, minutes = parts
         else:
-            minutes, seconds = map(int, parts)
+            minutes, seconds = parts
     elif len(parts) == 1:
         if days_in_value:
-            hours = int(parts[0])
+            hours = parts[0]
         else:
-            minutes = int(parts[0])
+            minutes = parts[0]
     else:
         raise ValueError(f"Unsupported Slurm time format: {value!r}")
     return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
-def get_timeout(cluster_config, partition, with_save_delay: bool = True) -> str:
+def _get_timeout(cluster_config, partition, with_save_delay: bool = True) -> timedelta:
     default_timeout = cluster_config.get("default_timeout", "100-00:00:00")
     try:
         timeout_str = cluster_config["timeouts"][partition or cluster_config["partition"]]
@@ -82,10 +86,23 @@ def get_timeout(cluster_config, partition, with_save_delay: bool = True) -> str:
         save_delay = timedelta(minutes=15)
         if timeout > save_delay:
             timeout -= save_delay
-    reduced_timeout_str = (
+    return timeout
+
+
+def get_slurm_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> str:
+    """Slurm format: D-HH:MM:SS"""
+    timeout = _get_timeout(cluster_config, partition, with_save_delay=with_save_delay)
+    timeout_str = (
         f"{timeout.days}-{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
     )
-    return reduced_timeout_str
+    return timeout_str
+
+
+def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> str:
+    """NeMo-RL format: DD:HH:MM:SS"""
+    timeout = _get_timeout(cluster_config, partition, with_save_delay=with_save_delay)
+    timeout_str = f"{timeout.days:02d}:{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
+    return timeout_str
 
 
 def get_env_variables(cluster_config):
