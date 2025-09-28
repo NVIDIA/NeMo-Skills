@@ -12,7 +12,6 @@ RUN apt-get update && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip install --upgrade pip setuptools
-RUN apt remove -y python3-blinker
 
 # Update package lists and install apptainer for arm64
 # https://apptainer.org/docs/admin/1.1/installation.html
@@ -39,6 +38,8 @@ RUN pip install langdetect absl-py immutabledict nltk ipython && \
 RUN git clone https://github.com/ShishirPatil/gorilla.git /opt/gorilla
 RUN cd /opt/gorilla && git checkout d2177992bbba9aa228b53c0645bf8f5613a5a7c6
 RUN cd /opt/gorilla/berkeley-function-call-leaderboard && pip install .
+
+RUN apt remove -y python3-blinker
 
 RUN mkdir -p /opt/NeMo-Skills/requirements
 COPY pyproject.toml README.md /opt/NeMo-Skills/
