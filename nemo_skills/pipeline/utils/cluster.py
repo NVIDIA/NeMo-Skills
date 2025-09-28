@@ -133,7 +133,8 @@ def get_env_variables(cluster_config):
                 _logged_optional_env_vars.add(env_var)
         elif env_var in default_factories:
             value = default_factories[env_var]()
-            if value:
+            if value and (env_var not in env_vars):
+                # value can be empty; assign empty value only if it is not present in env_vars
                 env_vars[env_var] = value
             if env_var not in _logged_optional_env_vars:
                 LOG.info(f"Adding optional environment variable {env_var} from environment")
