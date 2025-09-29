@@ -18,4 +18,5 @@ METRICS_TYPE = "ojbench"
 EVAL_SPLIT = "test"
 EVAL_ARGS = "++eval_type=ojbench"
 REQUIRES_SANDBOX = True
+KEEP_MOUNTS_FOR_SANDBOX = True
 GENERATION_ARGS = "++prompt_config=generic/default"
