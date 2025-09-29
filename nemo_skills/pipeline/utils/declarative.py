@@ -1,0 +1,557 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Truly declarative pipeline system where you instantiate components and define relationships.
+
+Example usage:
+    server = Server(model="Qwen/Qwen3-8B", server_type="vllm", gpus=2)
+    sandbox = Sandbox(port=6000)
+    generation = GenerateTask(
+        input_file="data.jsonl",
+        output_dir="results",
+        server=server,
+        sandbox=sandbox
+    )
+
+    pipeline = Pipeline(groups=[
+        HetGroup([server, sandbox, generation])
+    ])
+    pipeline.run(cluster_config)
+"""
+
+import logging
+import os
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Union
+
+from nemo_skills.pipeline.utils import get_exp, run_exp
+from nemo_skills.pipeline.utils.generation import get_chunked_rs_filename
+from nemo_skills.pipeline.utils.server import get_free_port
+from nemo_skills.pipeline.utils.task_factories import TaskFactory
+from nemo_skills.pipeline.utils.task_system import PipelineBuilder, TaskGroup
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
+
+
+# Base class for all declarative components
+class Component:
+    """Base class for all pipeline components."""
+
+    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
+        """Convert this component to a TaskDefinition."""
+        raise NotImplementedError
+
+    def to_task_definitions(self, cluster_config: Dict, hardware_config: Optional[Dict] = None) -> List:
+        """Convert this component to multiple TaskDefinitions (for components that can expand)."""
+        task_def = self.to_task_definition(cluster_config, hardware_config)
+        return [task_def] if task_def else []
+
+    def get_name(self) -> str:
+        """Get a unique name for this component."""
+        return type(self).__name__.lower()
+
+
+@dataclass
+class Server(Component):
+    """Declarative server component."""
+
+    model: str
+    server_type: str = "vllm"
+    gpus: int = 8
+    nodes: int = 1
+    args: str = ""
+    entrypoint: Optional[str] = None
+    port: Optional[int] = None
+    name: Optional[str] = None
+
+    def __post_init__(self):
+        if self.port is None:
+            self.port = get_free_port(strategy="random")
+        if self.name is None:
+            self.name = f"{self.server_type}_server"
+
+    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
+        """Convert to ServerTask."""
+        # Apply hardware config overrides
+        num_gpus = hardware_config.get("server_gpus", self.gpus) if hardware_config else self.gpus
+        num_nodes = hardware_config.get("server_nodes", self.nodes) if hardware_config else self.nodes
+        partition = hardware_config.get("partition") if hardware_config else None
+
+        return TaskFactory.create_server_task(
+            name=self.name,
+            server_type=self.server_type,
+            container=cluster_config["containers"].get(self.server_type, cluster_config["containers"]["nemo"]),
+            num_gpus=num_gpus,
+            num_nodes=num_nodes,
+            model_path=self.model,
+            server_port=self.port,
+            server_args=self.args,
+            server_entrypoint=self.entrypoint,
+            partition=partition,
+        )
+
+    def get_name(self) -> str:
+        return self.name
+
+
+@dataclass
+class Sandbox(Component):
+    """Declarative sandbox component."""
+
+    port: Optional[int] = None
+    name: str = "sandbox"
+
+    def __post_init__(self):
+        if self.port is None:
+            self.port = get_free_port(strategy="random")
+
+    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
+        """Convert to SandboxTask."""
+        return TaskFactory.create_sandbox_task(
+            name=self.name,
+            container=cluster_config["containers"]["sandbox"],
+            port=self.port,
+        )
+
+    def get_name(self) -> str:
+        return self.name
+
+
+@dataclass
+class GenerateTask(Component):
+    """Declarative generation task that can reference other components."""
+
+    input_source: str  # Can be file or directory
+    output_dir: str
+    server: Optional[Server] = None
+    sandbox: Optional[Sandbox] = None
+    extra_args: List[str] = field(default_factory=list)
+    seeds: Optional[List[int]] = None  # If None, will be [None] for single job
+    chunks: Optional[List[int]] = None  # If None, will be [None] for single job
+    rerun_done: bool = False
+    name: Optional[str] = None
+    installation_command: Optional[str] = None
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = "generate"
+        # Normalize seeds and chunks
+        if self.seeds is None:
+            self.seeds = [None]
+        if self.chunks is None:
+            self.chunks = [None]
+
+    def discover_jobs(self) -> List[Dict]:
+        """Discover what actual jobs need to run based on existing outputs."""
+        if self.rerun_done:
+            # Return all combinations
+            return [{"seed": seed, "chunk_id": chunk_id} for seed in self.seeds for chunk_id in self.chunks]
+
+        incomplete = []
+        for seed in self.seeds:
+            for chunk_id in self.chunks:
+                output_file = get_chunked_rs_filename(self.output_dir, seed, chunk_id)
+                if not os.path.exists(f"{output_file}.done"):
+                    incomplete.append({"seed": seed, "chunk_id": chunk_id})
+
+        return incomplete
+
+    def to_task_definitions(self, cluster_config: Dict, hardware_config: Optional[Dict] = None) -> List:
+        """Convert to multiple MainTask definitions based on job discovery."""
+        jobs_needed = self.discover_jobs()
+
+        if not jobs_needed:
+            LOG.info(f"GenerateTask '{self.name}': All jobs complete, nothing to run")
+            return []
+
+        LOG.info(f"GenerateTask '{self.name}': Found {len(jobs_needed)} jobs to run")
+
+        task_definitions = []
+        for job in jobs_needed:
+            seed = job["seed"]
+            chunk_id = job["chunk_id"]
+
+            # Build job-specific command
+            cmd = self._build_command_for_job(seed, chunk_id)
+
+            # Create job-specific name
+            job_name = self.name
+            if seed is not None:
+                job_name += f"_rs{seed}"
+            if chunk_id is not None:
+                job_name += f"_chunk{chunk_id}"
+
+            # Apply hardware config if provided
+            num_gpus = 0 if self.server else 1
+            if hardware_config:
+                num_gpus = hardware_config.get("num_gpus", num_gpus)
+
+            task_def = TaskFactory.create_generation_task(
+                name=job_name,
+                cmd=cmd,
+                container=cluster_config["containers"]["nemo-skills"],
+                num_gpus=num_gpus,
+                num_nodes=hardware_config.get("num_nodes", 1) if hardware_config else 1,
+                partition=hardware_config.get("partition") if hardware_config else None,
+                installation_command=self.installation_command,
+            )
+
+            # Apply additional hardware config
+            if hardware_config:
+                if hardware_config.get("exclusive"):
+                    task_def.resources.slurm_kwargs = {"exclusive": True}
+                if hardware_config.get("time_min"):
+                    task_def.resources.time_min = hardware_config["time_min"]
+
+            task_definitions.append(task_def)
+
+        return task_definitions
+
+    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
+        """Convert to MainTask - for backward compatibility."""
+        task_defs = self.to_task_definitions(cluster_config, hardware_config)
+        return task_defs[0] if task_defs else None
+
+    def _build_command_for_job(self, seed: Optional[int], chunk_id: Optional[int]) -> str:
+        """Build generation command for a specific seed/chunk job."""
+        # Determine input file for this job
+        if os.path.isfile(self.input_source):
+            input_file = self.input_source
+        elif os.path.isdir(self.input_source) and seed is not None:
+            input_file = f"{self.input_source}/output-rs{seed}.jsonl"
+        else:
+            input_file = self.input_source
+
+        output_file = get_chunked_rs_filename(self.output_dir, seed, chunk_id)
+
+        cmd_parts = [
+            "export HYDRA_FULL_ERROR=1 &&",
+            "python -m nemo_skills.inference.generate",
+            "++skip_filled=True",
+            f"++input_file={input_file}",
+            f"++output_file={output_file}",
+        ]
+
+        # Add seed-specific parameters
+        if seed is not None:
+            cmd_parts.extend(
+                [
+                    f"++inference.random_seed={seed}",
+                    "++inference.temperature=0.7",
+                    "++inference.top_k=-1",
+                    "++inference.top_p=0.95",
+                ]
+            )
+
+        # Add server config if server is referenced
+        if self.server:
+            cmd_parts.extend(
+                [
+                    f"++server.server_type={self.server.server_type}",
+                    "++server.host=127.0.0.1",
+                    f"++server.port={self.server.port}",
+                    f"++server.model={self.server.model}",
+                ]
+            )
+
+        # Add extra arguments
+        cmd_parts.extend(self.extra_args)
+
+        # Add completion marker
+        cmd_parts.extend(["&&", f"touch {output_file}.done"])
+
+        return " ".join(cmd_parts)
+
+    def get_name(self) -> str:
+        return self.name
+
+
+@dataclass
+class TrainTask(Component):
+    """Declarative training task."""
+
+    training_data: str
+    output_dir: str
+    model_config: str
+    gpus: int = 8
+    nodes: int = 1
+    name: Optional[str] = None
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = "training"
+
+    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
+        """Convert to MainTask."""
+        cmd = f"python train.py --data {self.training_data} --output {self.output_dir} --config {self.model_config}"
+
+        # Apply hardware config overrides
+        num_gpus = hardware_config.get("num_gpus", self.gpus) if hardware_config else self.gpus
+        num_nodes = hardware_config.get("num_nodes", self.nodes) if hardware_config else self.nodes
+        partition = hardware_config.get("partition") if hardware_config else None
+        exclusive = hardware_config.get("exclusive", False) if hardware_config else False
+
+        return TaskFactory.create_training_task(
+            name=self.name,
+            cmd=cmd,
+            container=cluster_config["containers"]["nemo"],
+            num_gpus=num_gpus,
+            num_nodes=num_nodes,
+            partition=partition,
+            exclusive=exclusive,
+        )
+
+    def get_name(self) -> str:
+        return self.name
+
+
+@dataclass
+class HardwareConfig:
+    """Hardware configuration for a group of tasks."""
+
+    partition: Optional[str] = None
+    time_min: Optional[str] = None
+    exclusive: bool = False
+    # Server-specific overrides
+    server_gpus: Optional[int] = None
+    server_nodes: Optional[int] = None
+    # Generation task overrides
+    num_gpus: Optional[int] = None
+    num_nodes: Optional[int] = None
+
+
+class HetGroup:
+    """Heterogeneous group where components run with different resource requirements."""
+
+    def __init__(self, components: List[Component], hardware: Optional[HardwareConfig] = None):
+        self.components = components
+        self.hardware = hardware or HardwareConfig()
+        self.dependencies: List[Union["HetGroup", str]] = []
+        self._name: Optional[str] = None
+
+    def depends_on(self, dependency: Union["HetGroup", str]) -> "HetGroup":
+        """Add dependency and return self for chaining."""
+        self.dependencies.append(dependency)
+        return self
+
+    def named(self, name: str) -> "HetGroup":
+        """Set explicit name and return self for chaining."""
+        self._name = name
+        return self
+
+    def with_hardware(self, **kwargs) -> "HetGroup":
+        """Set hardware configuration and return self for chaining."""
+        for key, value in kwargs.items():
+            setattr(self.hardware, key, value)
+        return self
+
+    def to_task_group(self, cluster_config: Dict) -> TaskGroup:
+        """Convert to actual TaskGroup."""
+        name = self._name or self._generate_name()
+        group = TaskGroup(name, heterogeneous=len(self.components) > 1)
+
+        # Convert hardware config to dict for passing to components
+        hardware_dict = {
+            "partition": self.hardware.partition,
+            "time_min": self.hardware.time_min,
+            "exclusive": self.hardware.exclusive,
+            "server_gpus": self.hardware.server_gpus,
+            "server_nodes": self.hardware.server_nodes,
+            "num_gpus": self.hardware.num_gpus,
+            "num_nodes": self.hardware.num_nodes,
+        }
+
+        for component in self.components:
+            # Components that can expand (like GenerateTask) return multiple task definitions
+            task_defs = component.to_task_definitions(cluster_config, hardware_dict)
+            for task_def in task_defs:
+                group.add_task(task_def)
+
+        for dep in self.dependencies:
+            group.add_dependency(dep)
+
+        return group
+
+    def _generate_name(self) -> str:
+        """Generate name from component types."""
+        return "_".join(comp.get_name() for comp in self.components)
+
+
+class Pipeline:
+    """Top-level pipeline that composes groups."""
+
+    def __init__(self, name: str, groups: List[HetGroup]):
+        self.name = name
+        self.groups = groups
+
+    def run(self, cluster_config: Dict, dry_run: bool = False):
+        """Execute the pipeline."""
+        if not self.groups:
+            LOG.info("No groups to execute")
+            return None
+
+        builder = PipelineBuilder(self.name, cluster_config)
+
+        # Convert all groups to task groups
+        for group in self.groups:
+            task_group = group.to_task_group(cluster_config)
+            builder.add_task_group(task_group)
+
+        # Execute
+        with get_exp(self.name, cluster_config) as exp:
+            builder.build_experiment(exp, "/tmp/logs")
+            if not dry_run:
+                run_exp(exp, cluster_config)
+            return exp
+
+
+class JobDiscovery:
+    """Smart job discovery that determines what actually needs to run."""
+
+    @staticmethod
+    def find_incomplete_jobs(
+        input_source: str,
+        output_dir: str,
+        seeds: List[Optional[int]],
+        chunks: List[Optional[int]],
+        rerun_done: bool = False,
+    ) -> List[Dict]:
+        """Find jobs that haven't been completed yet."""
+        if rerun_done:
+            # Return all combinations
+            return [
+                {"seed": seed, "chunk_id": chunk_id, "input_file": JobDiscovery._get_input_file(input_source, seed)}
+                for seed in seeds
+                for chunk_id in chunks
+            ]
+
+        incomplete = []
+        for seed in seeds:
+            for chunk_id in chunks:
+                output_file = get_chunked_rs_filename(output_dir, seed, chunk_id)
+                if not os.path.exists(f"{output_file}.done"):
+                    incomplete.append(
+                        {
+                            "seed": seed,
+                            "chunk_id": chunk_id,
+                            "input_file": JobDiscovery._get_input_file(input_source, seed),
+                        }
+                    )
+
+        return incomplete
+
+    @staticmethod
+    def _get_input_file(input_source: str, seed: Optional[int]) -> str:
+        """Get input file for a specific seed."""
+        if os.path.isfile(input_source):
+            return input_source
+        elif os.path.isdir(input_source) and seed is not None:
+            return f"{input_source}/output-rs{seed}.jsonl"
+        else:
+            raise ValueError(f"Cannot determine input file from {input_source} with seed {seed}")
+
+
+class GenerationPipeline:
+    """High-level generation pipeline with smart defaults."""
+
+    @staticmethod
+    def auto_create(
+        input_source: str,
+        output_dir: str,
+        model: str,
+        server_type: str = "vllm",
+        server_gpus: int = 2,
+        server_nodes: int = 1,
+        server_args: str = "",
+        with_sandbox: bool = False,
+        seeds: Optional[List[int]] = None,
+        chunks: Optional[List[int]] = None,
+        dependent_jobs: int = 0,
+        extra_args: List[str] = None,
+        rerun_done: bool = False,
+        cluster_config: Dict = None,
+    ) -> Pipeline:
+        """Auto-create pipeline by discovering what jobs need to run."""
+
+        # Auto-discover incomplete jobs
+        jobs_needed = JobDiscovery.find_incomplete_jobs(
+            input_source=input_source,
+            output_dir=output_dir,
+            seeds=seeds or [None],
+            chunks=chunks or [None],
+            rerun_done=rerun_done,
+        )
+
+        if not jobs_needed:
+            LOG.info("All jobs complete")
+            return Pipeline("empty", [])
+
+        LOG.info(f"Found {len(jobs_needed)} jobs that need to run")
+
+        # Create shared components (reused across jobs)
+        shared_server = None
+        shared_sandbox = None
+
+        if server_gpus and server_gpus > 0:
+            shared_server = Server(
+                model=model,
+                server_type=server_type,
+                gpus=server_gpus,
+                nodes=server_nodes,
+                args=server_args,
+            )
+
+        if with_sandbox:
+            shared_sandbox = Sandbox()
+
+        # Create groups for each job + dependent jobs
+        groups = []
+        for job in jobs_needed:
+            for dep_job_idx in range(dependent_jobs + 1):
+                components = []
+
+                # Add shared server if needed
+                if shared_server:
+                    components.append(shared_server)
+
+                # Add shared sandbox if needed
+                if shared_sandbox:
+                    components.append(shared_sandbox)
+
+                # Create generation task
+                job_name = f"generate_rs{job['seed']}" if job["seed"] is not None else "generate"
+                if job["chunk_id"] is not None:
+                    job_name += f"_chunk{job['chunk_id']}"
+                if dep_job_idx > 0:
+                    job_name += f"_job{dep_job_idx}"
+
+                generation = GenerateTask(
+                    input_file=job["input_file"],
+                    output_dir=output_dir,
+                    server=shared_server,
+                    sandbox=shared_sandbox,
+                    seed=job["seed"],
+                    chunk_id=job["chunk_id"],
+                    extra_args=extra_args or [],
+                    name=job_name,
+                )
+                components.append(generation)
+
+                # Create heterogeneous group
+                group = HetGroup(components).named(job_name)
+                groups.append(group)
+
+        return Pipeline("generation", groups)
