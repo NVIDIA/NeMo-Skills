@@ -30,7 +30,7 @@ from nemo_skills.pipeline.utils import (
     get_exp,
     get_mounted_path,
     get_nsight_cmd,
-    get_timeout,
+    get_timeout_str,
     resolve_mount_paths,
     run_exp,
     temporary_env_update,
@@ -136,7 +136,7 @@ def get_training_cmd(
     backend,
     profile_step_range,
 ):
-    timeout = get_timeout(cluster_config, partition)
+    timeout = get_timeout_str(cluster_config, partition)
 
     task = NemoRLTask(
         model=hf_model,
@@ -282,7 +282,7 @@ def grpo_nemo_rl(
     output_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={hf_model: None, output_dir: None},
+        mount_map={output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
     if hf_model.startswith("/"):  # could ask to download from HF
