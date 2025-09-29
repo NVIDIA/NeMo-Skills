@@ -232,6 +232,11 @@ def eval(
             "project": wandb_project,
             "group": wandb_group,
         }
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=wandb_name or expname,
+            wandb_group=wandb_group,
+        )
     else:
         wandb_parameters = None
 

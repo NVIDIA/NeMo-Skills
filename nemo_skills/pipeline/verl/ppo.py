@@ -124,6 +124,9 @@ class PPOVerlTask:
             cmd = f"{cmd} trainer.logger=['console'] "
         else:
             cmd = f"{cmd} trainer.logger=['console','wandb'] "
+            validate_wandb_project_name(
+                wandb_project=wandb_project,
+            )
 
         return cmd
 
@@ -311,7 +314,7 @@ def ppo_verl(
     extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
-    validate_wandb_project_name(wandb_project)
+
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
     pipeline_utils.check_if_mounted(cluster_config, output_dir)
     pipeline_utils.check_if_mounted(cluster_config, hf_model)

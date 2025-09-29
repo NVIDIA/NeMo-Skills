@@ -132,6 +132,11 @@ def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
             f" --wandb_id {expname} "
             f" --wandb_resume auto"
         )
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=expname,
+            wandb_id=expname,
+        )
     else:
         cmd = ""
 

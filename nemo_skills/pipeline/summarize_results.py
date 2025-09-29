@@ -195,7 +195,6 @@ def summarize_results(
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)
-    validate_wandb_project_name(wandb_project)
 
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")
@@ -415,6 +414,12 @@ def summarize_results(
     if wandb_name is not None:
         import wandb
 
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=wandb_name,
+            wandb_group=wandb_group,
+            wandb_id=wandb_name + ("-" + wandb_group if wandb_group else "") + "-" + wandb_project,
+        )
         run = wandb.init(
             project=wandb_project,
             name=wandb_name,
