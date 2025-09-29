@@ -38,6 +38,7 @@ class IOIEvaluatorConfig:
 
 
 _precompile_loop_tls = threading.local()
+worker_rate_sem = None  # type: ignore
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -70,9 +71,10 @@ def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
     raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
 
 
-def init_worker():
+def init_worker(sem):
     """Per-process initializer: set up an event loop for httpx/asyncio calls."""
-    global worker_sandbox, worker_loop
+    global worker_rate_sem, worker_sandbox, worker_loop
+    worker_rate_sem = sem
     worker_sandbox = None  # lazily initialised when first used
     worker_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(worker_loop)
@@ -186,9 +188,15 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
-        run_result, _ = worker_loop.run_until_complete(
-            sandbox.execute_code(run_command, language="shell", timeout=120)
-        )
+        if worker_rate_sem:
+            worker_rate_sem.acquire()
+        try:
+            run_result, _ = worker_loop.run_until_complete(
+                sandbox.execute_code(run_command, language="shell", timeout=120)
+            )
+        finally:
+            if worker_rate_sem:
+                worker_rate_sem.release()
 
         run_stdout = run_result.get("stdout", "")
         run_stderr = run_result.get("stderr", "")
@@ -295,11 +303,12 @@ class IOIEvaluator(BaseEvaluator):
 
             with open(self.eval_cfg.test_file, "r") as f:
                 metadata_local = json.load(f)
-
-            # Multiprocessing pool for parallel test execution.
+            manager = multiprocessing.Manager()
+            sem = manager.BoundedSemaphore(16)
             pool_local = multiprocessing.Pool(
                 processes=self.eval_cfg.test_batch_size,
                 initializer=init_worker,
+                initargs=(sem,),
             )
 
             return sbox, metadata_local, pool_local
