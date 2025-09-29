@@ -198,7 +198,7 @@ def validate_wandb_project_name(wandb_project):
 
     # Check maximum length (W&B enforces a safe upper limit of 128 chars)
     if len(wandb_project) > 128:
-        raise ValueError("Project name exceeds the 128-character limit.")
+        raise ValueError("Wandb project name exceeds the 128-character limit.")
 
     # Check for invalid characters (anything outside a-z, 0-9, _, -)
     if not re.fullmatch(r"[a-z0-9_-]+", wandb_project):
