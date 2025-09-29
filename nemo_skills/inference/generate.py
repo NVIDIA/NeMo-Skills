@@ -471,7 +471,6 @@ class GenerationTask:
             # all of the ground-truth data to the output file alongside the generated solutions
             output[self.cfg.generation_key] = output.pop("generation")
 
-            # calculating total generation time
             if not self.cfg.add_generation_stats:
                 output.pop("generation_start_time", None)
                 output.pop("generation_end_time", None)
