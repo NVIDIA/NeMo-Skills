@@ -126,6 +126,7 @@ class PPOVerlTask:
             cmd = f"{cmd} trainer.logger=['console','wandb'] "
             validate_wandb_project_name(
                 wandb_project=wandb_project,
+                wandb_name=expname,
             )
 
         return cmd
