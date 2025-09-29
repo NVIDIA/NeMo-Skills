@@ -319,7 +319,7 @@ class Prompt:
             return len(self.tokenizer.encode(messages, add_special_tokens=False))
         elif isinstance(messages, list):
             try:
-                return len(self.tokenizer.apply_chat_template(messages, tokenize=True))
+                return len(self.tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True))
             except Exception as e:
                 raise ValueError(f"Invalid chat message format: {e}")
         else:
