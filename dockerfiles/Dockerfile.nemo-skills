@@ -7,9 +7,11 @@ RUN apt-get update && \
     python3.10 \
     python3-pip \
     curl \
+    wget \
     git \
     git-lfs && \
-    ln -s /usr/bin/python3 /usr/bin/python
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip setuptools
 
@@ -20,7 +22,8 @@ RUN apt update && \
     add-apt-repository -y ppa:apptainer/ppa && \
     apt update && apt -y install apptainer && \
     add-apt-repository -y ppa:apptainer/ppa && \
-    apt update && apt install -y apptainer-suid
+    apt update && apt install -y apptainer-suid && \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # for ifeval benchmark
 # TODO: can we get just a single dir?
