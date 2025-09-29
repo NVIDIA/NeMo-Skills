@@ -106,8 +106,7 @@ async def eval_ojbench_async(cfg):
                 )
             """)
 
-            cmd = 'C_INCLUDE_PATH="" CPLUS_INCLUDE_PATH=""'
-            cmd += f" python -c {shlex.quote(eval_code)}"
+            cmd = f'env -i PATH="/usr/bin:/bin" python -c {shlex.quote(eval_code)}'
             # cmd = "unset C_INCLUDE_PATH CPLUS_INCLUDE_PATH"
             # cmd += f" && python -c {shlex.quote(eval_code)}"
             output, _ = await sandbox.execute_code(
