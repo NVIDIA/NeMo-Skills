@@ -171,8 +171,9 @@ def get_env_variables(cluster_config):
             else:
                 raise ValueError(f"Invalid optional environment variable format: {env_var}")
             env_vars[env_var_name] = value
-            LOG.info(f"Adding optional environment variable {env_var_name} from cluster config")
-            _logged_optional_env_vars.add(env_var_name)
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var_name} from cluster config")
+                _logged_optional_env_vars.add(env_var_name)
             # no need to request this variable later
             if env_var_name in optional_env_vars_to_add:
                 optional_env_vars_to_add.remove(env_var_name)
@@ -183,20 +184,19 @@ def get_env_variables(cluster_config):
     for env_var_name in optional_env_vars_to_add:
         if env_var_name in os.environ:
             env_vars[env_var_name] = os.environ[env_var_name]
-            LOG.info(f"Adding optional environment variable {env_var_name} from environment")
-            _logged_optional_env_vars.add(env_var_name)
-        elif env_var_name in default_factories:
-            value = default_factories[env_var_name]()
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var_name} from environment")
+                _logged_optional_env_vars.add(env_var_name)
+        elif env_var_name in default_factories and (value := default_factories[env_var_name]()):
+            # assign only non-empty value from default factory
             env_vars[env_var_name] = value
-            LOG.info(f"Adding optional environment variable {env_var_name} from default factory")
-            _logged_optional_env_vars.add(env_var_name)
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var_name} from default factory")
+                _logged_optional_env_vars.add(env_var_name)
         else:
-            LOG.info(f"Optional environment variable {env_var_name} not found in user environment; skipping.")
-            _logged_optional_env_vars.add(env_var_name)
-
-    for env_var_name, value in env_vars.items():
-        if not value:
-            LOG.info(f"Environment variable {env_var_name} was added with empty value.")
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Optional environment variable {env_var_name} not found in user environment; skipping.")
+                _logged_optional_env_vars.add(env_var_name)
     return env_vars
 
 
