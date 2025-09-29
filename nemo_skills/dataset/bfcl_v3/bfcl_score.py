@@ -72,7 +72,28 @@ def calculate_combined_accuracy(accuracy_dict_list: list[dict], weighted=False):
 
 
 def get_accuracy_dict(metrics, category):
+    # reporting aggregation for pass@1[avg-of-k] (for highest k) if available
     category_dict = metrics[f"bfcl_v3.{category}"]
+
+    # Find all keys that match "pass@1[avg-of-{k}]"
+    avg_keys = [key for key in category_dict.keys() if key.startswith("pass@1[avg-of-") and key.endswith("]")]
+
+    if avg_keys:
+        # Extract k from each key
+        ks = []
+        for key in avg_keys:
+            try:
+                k_str = key.split("pass@1[avg-of-")[1].rstrip("]")
+                k = int(k_str)
+                ks.append((k, key))
+            except ValueError:
+                continue
+        if ks:
+            # Find the one with max k
+            max_k, max_key = max(ks)
+            return category_dict[max_key]
+
+    # Fallback to original
     return category_dict["pass@1"]
 
 
