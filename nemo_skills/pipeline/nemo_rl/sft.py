@@ -97,12 +97,13 @@ class NemoRLTask:
         if self.wandb_group:
             cmd += f"++logger.wandb.group={self.wandb_group} "
 
-        validate_wandb_project_name(
-            wandb_project=self.wandb_project,
-            wandb_name=self.expname,
-            wandb_group=self.wandb_group,
-            wandb_id=wandb_id,
-        )
+        if not self.disable_wandb:
+            validate_wandb_project_name(
+                wandb_project=self.wandb_project,
+                wandb_name=self.expname,
+                wandb_group=self.wandb_group,
+                wandb_id=wandb_id,
+            )
         return cmd
 
     def get_cmd(self):
