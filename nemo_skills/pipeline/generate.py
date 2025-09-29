@@ -14,7 +14,7 @@
 import importlib
 import logging
 import os
-from typing import List
+from typing import Callable, Dict, List, Optional
 
 import typer
 
@@ -22,6 +22,8 @@ import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils.commands import sandbox_command
+from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
 from nemo_skills.utils import (
     compute_chunk_ids,
     get_logger_name,
@@ -32,6 +34,113 @@ from nemo_skills.utils import (
 LOG = logging.getLogger(get_logger_name(__file__))
 
 # TODO: add num_jobs here for consistency with eval?
+
+
+def _create_commandgroup_from_config(
+    generation_cmd: str,
+    server_config: Optional[Dict],
+    with_sandbox: bool,
+    sandbox_port: Optional[int],
+    cluster_config: Dict,
+    installation_command: Optional[str],
+    get_server_command_fn: Callable,
+    partition: Optional[str],
+    time_min: Optional[str],
+    exclusive: bool,
+    task_name: str,
+    log_dir: str,
+) -> CommandGroup:
+    """Create a CommandGroup from server_config, matching add_task logic.
+
+    This function replicates the component ordering from add_task:
+    1. Server (if server_config provided)
+    2. Main client command
+    3. Sandbox (if with_sandbox=True)
+    """
+
+    components = []
+
+    # 1. Add server if server_config is provided (matches add_task lines 433-463)
+    if server_config is not None and int(server_config["num_gpus"]) > 0:
+        # Extract server container (matches line 435)
+        server_type = server_config["server_type"]
+        server_container = server_config.pop("container", cluster_config["containers"][server_type])
+
+        # Use the EXISTING get_server_command function via lambda
+        # This ensures we use the same server command construction as add_task
+        server_config_copy = server_config.copy()
+
+        def make_server_cmd(cfg):
+            cmd, num_tasks = get_server_command_fn(**server_config_copy, cluster_config=cfg)
+            # Include log_prefix in metadata to match old add_task behavior
+            return (
+                cmd,
+                {
+                    "num_tasks": num_tasks,
+                    "gpus": server_config_copy["num_gpus"],
+                    "nodes": server_config_copy["num_nodes"],
+                    "log_prefix": "server",  # Explicitly set log prefix
+                },
+            )
+
+        server_cmd = Command(
+            command=make_server_cmd,
+            container=server_container,
+            gpus=server_config["num_gpus"],
+            nodes=server_config["num_nodes"],
+            name=task_name,  # Use base task_name, not with _server suffix
+        )
+        components.append(server_cmd)
+
+    # 2. Add main generation command (matches add_task lines 466-580)
+    client_cmd = Command(
+        command=generation_cmd,  # Already built with get_generation_cmd!
+        container=cluster_config["containers"]["nemo-skills"],
+        name=task_name,  # Use base task_name, not with _client suffix
+        installation_command=installation_command,
+        metadata={"log_prefix": "main"},  # Set log prefix to match old add_task
+    )
+    components.append(client_cmd)
+
+    # 3. Add sandbox if requested (matches add_task lines 527-565)
+    if with_sandbox:
+        # Use existing sandbox_command builder
+        # Wrap to ensure log_prefix is set in returned metadata
+        def make_sandbox_cmd(cfg):
+            # sandbox_command returns (callable, metadata), so we need to call the callable
+            cmd_builder, initial_metadata = sandbox_command(port=sandbox_port)
+            # Call the builder to get the actual command string
+            cmd_string, runtime_metadata = cmd_builder(cfg)
+            # Merge metadata
+            metadata = initial_metadata.copy()
+            metadata.update(runtime_metadata)
+            metadata["log_prefix"] = "sandbox"  # Explicitly set log prefix
+            return (cmd_string, metadata)
+
+        sandbox_cmd = Command(
+            command=make_sandbox_cmd,
+            container=cluster_config["containers"]["sandbox"],
+            name=task_name,  # Use base task_name, not with _sandbox suffix
+        )
+        components.append(sandbox_cmd)
+
+    # Find MAXIMUM GPUs needed by any component for the HardwareConfig
+    # This is critical for multi-component jobs - the job-level request must be the max
+    max_gpus = max((comp.gpus or 0) for comp in components)
+    max_nodes = max((comp.nodes or 1) for comp in components)
+
+    return CommandGroup(
+        commands=components,
+        hardware=HardwareConfig(
+            partition=partition,
+            time_min=time_min,
+            exclusive=exclusive,
+            num_gpus=max_gpus,
+            num_nodes=max_nodes,
+        ),
+        name=task_name,
+        log_dir=log_dir,
+    )
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -246,86 +355,126 @@ def generate(
         chunk_ids=chunk_ids,
         rerun_done=rerun_done,
     )
-    has_tasks = False
-    all_tasks = []
+
     if _task_dependencies is None:
         _task_dependencies = []
-    with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
-        for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
-            if wandb_parameters:
-                # no need for chunks as it will run after merging
-                wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
-                    output_dir,
-                    random_seed=seed,
-                    chunk_id=None,
-                )
-            for chunk_id in chunk_ids:
-                has_tasks = True
-                server_config, server_address, extra_arguments = pipeline_utils.configure_client(
-                    model=model,
-                    server_type=server_type,
-                    server_address=original_server_address,
-                    server_gpus=server_gpus,
-                    server_nodes=server_nodes,
-                    server_args=server_args,
-                    server_entrypoint=server_entrypoint,
-                    server_container=server_container,
-                    extra_arguments=extra_arguments_original,
-                    get_random_port=get_random_port,
-                )
-                cmd = pipeline_utils.get_generation_cmd(
-                    input_file=input_file,
-                    input_dir=input_dir,
-                    random_seed=seed,
-                    output_dir=output_dir,
-                    extra_arguments=extra_arguments,
-                    eval_args=eval_args,
-                    chunk_id=chunk_id,
-                    num_chunks=num_chunks,
-                    preprocess_cmd=preprocess_cmd,
-                    postprocess_cmd=postprocess_cmd,
-                    wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                    script=generation_module,
-                )
-                prev_tasks = _task_dependencies
-                for _ in range(dependent_jobs + 1):
-                    task_name = f"{expname}-rs{seed}" if seed is not None else expname
-                    if chunk_id is not None:
-                        task_name += f"-chunk{chunk_id}"
-                    new_task = pipeline_utils.add_task(
-                        exp,
-                        cmd=pipeline_utils.wrap_python_path(cmd=cmd),
-                        task_name=task_name,
-                        log_dir=log_dir,
-                        container=cluster_config["containers"]["nemo-skills"],
-                        cluster_config=cluster_config,
-                        partition=partition,
-                        time_min=time_min,
-                        server_config=server_config,
-                        with_sandbox=with_sandbox,
-                        sandbox_port=None if get_random_port else 6000,
-                        run_after=run_after,
-                        reuse_code=reuse_code,
-                        reuse_code_exp=reuse_code_exp,
-                        task_dependencies=(
-                            prev_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
-                        ),
-                        get_server_command=generation_task.get_server_command_fn(),
-                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                        installation_command=installation_command,
-                        skip_hf_home_check=skip_hf_home_check,
-                    )
-                    prev_tasks = [new_task]
-                    all_tasks.append(new_task)
-        if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
-            pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
-    if _reuse_exp:
-        return all_tasks
-    else:
-        if has_tasks:
-            return exp
+    # Build jobs list using declarative interface
+    jobs = []
+    all_job_names = []
+
+    for seed_idx, (seed, chunk_ids) in enumerate(remaining_jobs.items()):
+        if wandb_parameters:
+            # no need for chunks as it will run after merging
+            wandb_parameters["samples_file"] = pipeline_utils.get_chunked_rs_filename(
+                output_dir,
+                random_seed=seed,
+                chunk_id=None,
+            )
+        for chunk_id in chunk_ids:
+            # Configure client (same as before)
+            server_config, server_address, extra_arguments = pipeline_utils.configure_client(
+                model=model,
+                server_type=server_type,
+                server_address=original_server_address,
+                server_gpus=server_gpus,
+                server_nodes=server_nodes,
+                server_args=server_args,
+                server_entrypoint=server_entrypoint,
+                server_container=server_container,
+                extra_arguments=extra_arguments_original,
+                get_random_port=get_random_port,
+            )
+
+            # Build generation command (same as before)
+            cmd = pipeline_utils.get_generation_cmd(
+                input_file=input_file,
+                input_dir=input_dir,
+                random_seed=seed,
+                output_dir=output_dir,
+                extra_arguments=extra_arguments,
+                eval_args=eval_args,
+                chunk_id=chunk_id,
+                num_chunks=num_chunks,
+                preprocess_cmd=preprocess_cmd,
+                postprocess_cmd=postprocess_cmd,
+                wandb_parameters=wandb_parameters if seed_idx == 0 else None,
+                script=generation_module,
+            )
+            cmd = pipeline_utils.wrap_python_path(cmd=cmd)
+
+            # Base task name (same for all dependent jobs in chain - matches original!)
+            task_name = f"{expname}-rs{seed}" if seed is not None else expname
+            if chunk_id is not None:
+                task_name += f"-chunk{chunk_id}"
+
+            # Handle dependent_jobs chain (matching add_task behavior)
+            # Note: run_after will be handled by Stage for jobs that don't have task_dependencies
+            dependencies = _task_dependencies.copy() if _task_dependencies else []
+
+            for dep_idx in range(dependent_jobs + 1):
+                # Create CommandGroup for this task
+                cmd_group = _create_commandgroup_from_config(
+                    generation_cmd=cmd,
+                    server_config=server_config.copy() if server_config else None,
+                    with_sandbox=with_sandbox,
+                    sandbox_port=None if get_random_port else 6000,
+                    cluster_config=cluster_config,
+                    installation_command=installation_command,
+                    get_server_command_fn=generation_task.get_server_command_fn(),
+                    partition=partition,
+                    time_min=time_min,
+                    exclusive=exclusive,
+                    task_name=task_name,
+                    log_dir=log_dir,
+                )
+
+                # Use unique internal job name for dependency tracking, but same task_name
+                internal_job_name = f"{task_name}-dep{dep_idx}" if dep_idx > 0 else task_name
+
+                # Build dependencies: first job gets _task_dependencies+run_after, rest get previous in chain
+                if dep_idx == 0:
+                    # First job: add run_after if no task_dependencies (matching add_task logic)
+                    job_deps = dependencies.copy() if dependencies else []
+                    if not dependencies and run_after:
+                        run_after_list = run_after if isinstance(run_after, list) else [run_after]
+                        job_deps.extend(run_after_list)
+                    job_deps = job_deps if job_deps else None
+                else:
+                    # Subsequent jobs in chain depend on previous
+                    job_deps = [f"{task_name}-dep{dep_idx - 1}"]
+
+                jobs.append(
+                    {
+                        "name": internal_job_name,
+                        "group": cmd_group,
+                        "dependencies": job_deps,
+                    }
+                )
+
+                all_job_names.append(internal_job_name)
+
+    # If no jobs to run, return early
+    if not jobs:
         return None
+
+    # Handle _reuse_exp case
+    if _reuse_exp:
+        # For internal use: return job names for dependency tracking
+        return all_job_names
+
+    # Create and run pipeline (with performance optimizations)
+    pipeline = Pipeline(
+        name=expname,
+        cluster=cluster,
+        jobs=jobs,
+        reuse_code=reuse_code,  # PERFORMANCE: Enable code reuse
+        reuse_code_exp=reuse_code_exp,  # PERFORMANCE: Reuse from specific exp
+        skip_hf_home_check=skip_hf_home_check,  # Validation control
+    )
+
+    result = pipeline.run(cluster_config=cluster_config, dry_run=dry_run)
+    return result
 
 
 if __name__ == "__main__":
