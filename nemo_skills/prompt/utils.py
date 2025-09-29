@@ -303,13 +303,25 @@ class Prompt:
         return messages
 
     def get_token_count(self, messages: Union[str, list[dict]]) -> int:
+        """
+        Count the number of tokens in a string or chat message list.
+
+        Args:
+            messages (str | list[dict]): Input text or chat messages.
+
+        Returns:
+            int | None: Token count, or None if no tokenizer is set.
+        """
         if self.tokenizer is None:
             return None
 
         if isinstance(messages, str):
             return len(self.tokenizer.encode(messages, add_special_tokens=False))
         elif isinstance(messages, list):
-            return len(self.tokenizer.apply_chat_template(messages, tokenize=True))
+            try:
+                return len(self.tokenizer.apply_chat_template(messages, tokenize=True))
+            except Exception as e:
+                raise ValueError(f"Invalid chat message format: {e}")
         else:
             raise ValueError("messages must be a string or a list of dictionaries")
 
