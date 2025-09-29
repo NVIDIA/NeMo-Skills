@@ -32,19 +32,12 @@ class IOIEvaluatorConfig:
     test_dir: str = ""
     # Metadata file name or absolute path (default: {split}_metadata.json).
     test_file: str = "{split}_metadata.json"
-    num_workers: int = 32  # number of test workers
-    test_batch_size: int = 32  # number of tests to run concurrently
+    num_workers: int = 16  # number of test workers
+    test_batch_size: int = 16  # number of tests to run concurrently
     overwrite: bool = False
 
 
-# ---------------------------------------------------------------------------
-# Globals for worker-local resources
-# ---------------------------------------------------------------------------
-
 _precompile_loop_tls = threading.local()
-# A proxy to a `multiprocessing.managers.SyncManager.BoundedSemaphore` that is
-# initialised in the parent process and passed to workers via `init_worker`.
-worker_rate_sem = None  # type: ignore
 
 
 def _sandbox_exec_sync(sandbox: LocalSandbox, cmd: str, *, language: str = "shell", timeout: int = 120):
@@ -77,30 +70,12 @@ def wait_for_sandbox(sandbox, timeout: int = 240, poll: float = 1.0):
     raise RuntimeError(f"Sandbox not ready after waiting {timeout}s")
 
 
-def init_worker(rate_sem):
-    """Initializer for worker processes.
-
-    Each worker receives a proxy to a multiprocessing.Manager.BoundedSemaphore
-    that is shared across *all* workers and the parent.  The worker keeps this
-    in a module-level global so it can be used inside run_test_case.
-    The worker does *not* receive a pre-constructed sandbox – those are created
-    lazily on first use so we do not share httpx sessions across fork().
-    """
-    global worker_rate_sem
-    worker_rate_sem = rate_sem  # type: ignore
-
-    # Per-process objects
-    global worker_sandbox  # lazily initialised
-    worker_sandbox = None  # type: ignore
-
-    global worker_loop
+def init_worker():
+    """Per-process initializer: set up an event loop for httpx/asyncio calls."""
+    global worker_sandbox, worker_loop
+    worker_sandbox = None  # lazily initialised when first used
     worker_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(worker_loop)
-
-
-# ---------------------------------------------------------------------------
-# Helpers used *inside* worker processes
-# ---------------------------------------------------------------------------
 
 
 def _get_worker_sandbox() -> LocalSandbox:  # type: ignore
@@ -177,16 +152,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         setup_script = "\n".join(file_creation_commands)
         sandbox = _get_worker_sandbox()
-        # Rate-limit outbound requests
-        if worker_rate_sem is not None:
-            worker_rate_sem.acquire()
-        try:
-            setup_result, _ = worker_loop.run_until_complete(
-                sandbox.execute_code(setup_script, language="shell", timeout=120)
-            )
-        finally:
-            if worker_rate_sem is not None:
-                worker_rate_sem.release()
+        setup_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(setup_script, language="shell", timeout=120)
+        )
         if setup_result.get("stderr"):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
@@ -200,15 +168,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             f'[ -e graders/stub.cpp ] && SRC="$SRC graders/stub.cpp"; '
             f"g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/{task_args['problem_id']} $SRC"
         )
-        if worker_rate_sem is not None:
-            worker_rate_sem.acquire()
-        try:
-            compile_result, _ = worker_loop.run_until_complete(
-                sandbox.execute_code(compile_command, language="shell", timeout=120)
-            )
-        finally:
-            if worker_rate_sem is not None:
-                worker_rate_sem.release()
+        compile_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(compile_command, language="shell", timeout=120)
+        )
 
         result = {
             "compile_success": not compile_result.get("stderr"),
@@ -224,15 +186,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         # 3. Run the code
         run_command = f"cd {unique_dir} && ./run.sh"
-        if worker_rate_sem is not None:
-            worker_rate_sem.acquire()
-        try:
-            run_result, _ = worker_loop.run_until_complete(
-                sandbox.execute_code(run_command, language="shell", timeout=120)
-            )
-        finally:
-            if worker_rate_sem is not None:
-                worker_rate_sem.release()
+        run_result, _ = worker_loop.run_until_complete(
+            sandbox.execute_code(run_command, language="shell", timeout=120)
+        )
 
         run_stdout = run_result.get("stdout", "")
         run_stderr = run_result.get("stderr", "")
@@ -297,11 +253,6 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code + ("\n" + dummy if dummy else "")
 
 
-# ---------------------------------------------------------------------------
-# Class-based evaluator (new API)
-# ---------------------------------------------------------------------------
-
-
 class IOIEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 10):
         super().__init__(config, num_parallel_requests)
@@ -345,17 +296,10 @@ class IOIEvaluator(BaseEvaluator):
             with open(self.eval_cfg.test_file, "r") as f:
                 metadata_local = json.load(f)
 
-            # ------------------------------------------------------------------
-            # Build a global rate-limit semaphore shared through multiprocessing.Manager
-            # ------------------------------------------------------------------
-            manager = multiprocessing.Manager()
-            rate_sem = manager.BoundedSemaphore(16)
-
-            # Prepare multiprocessing pool – each worker gets only the semaphore
+            # Multiprocessing pool for parallel test execution.
             pool_local = multiprocessing.Pool(
                 processes=self.eval_cfg.test_batch_size,
                 initializer=init_worker,
-                initargs=(rate_sem,),
             )
 
             return sbox, metadata_local, pool_local
