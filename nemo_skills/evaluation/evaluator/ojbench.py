@@ -106,7 +106,8 @@ async def eval_ojbench_async(cfg):
                 )
             """)
 
-            cmd = f"python -c {shlex.quote(eval_code)}"
+            cmd = "unset C_INCLUDE_PATH CPLUS_INCLUDE_PATH"
+            cmd += f" && python -c {shlex.quote(eval_code)}"
             output, _ = await sandbox.execute_code(
                 cmd,
                 language="shell",
