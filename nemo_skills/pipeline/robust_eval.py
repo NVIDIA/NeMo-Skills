@@ -30,7 +30,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @typer_unpacker
 def robust_eval(
     ctx: typer.Context,
-    prompt_set_config: str = typer.Option(..., help="Path to a yaml file containting list of prompts per benchmark"),
+    prompt_set_config: str = typer.Option(..., help="Yaml file containing list of prompts per benchmark"),
     output_dir: str = typer.Option(..., help="Where to store evaluation results"),
     benchmarks: str = typer.Option(
         ...,
@@ -80,6 +80,7 @@ def robust_eval(
         ...
     All other arguments are "ns eval" arguments.
     """
+
     prompt_set_config = load_config(
         prompt_set_config, config_dir=Path(__file__).parents[1].absolute() / "prompt" / "config"
     )
@@ -89,6 +90,9 @@ def robust_eval(
         raise ValueError(
             f"prompt_set_config ({prompt_set_config.keys()}) must contain benchmark names ({benchmark_names})"
         )
+    for arg in ctx.args:
+        if "++prompt_config" in arg:
+            raise ValueError("only prompt_set_config should be used to specify prompts, please unset ++prompt_config")
 
     dependent_tasks = []
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
@@ -100,7 +104,6 @@ def robust_eval(
                 LOG.info(f"Running prompt: {prompt}")
                 # deepcopy ctx and ns_eval_kwargs in case smth is changes in _eval
                 prompt_context = deepcopy(ctx)
-                prompt_context.args = [arg for arg in prompt_context.args if "++prompt_config" not in arg]
                 prompt_context.args.append(f"++prompt_config={prompt}")
                 prompt_kwargs = deepcopy(ns_eval_kwargs)
                 prompt_kwargs["expname"] = expname + f"_{benchmark_name}_{Path(prompt).stem}"
@@ -119,7 +122,7 @@ def robust_eval(
         _ = pipeline_utils.add_task(
             exp,
             cmd=sum_rob_command,
-            task_name="sum_robustness",
+            task_name=f"{expname}:sum_robustness",
             log_dir=f"{output_dir}/summarize_robustness",
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
