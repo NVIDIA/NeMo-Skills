@@ -1,0 +1,738 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Simplified declarative pipeline system using only Command for all task types.
+
+Basic Example (Single job with multiple commands):
+    from nemo_skills.pipeline.utils.commands import vllm_server_command, sandbox_command
+    from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
+
+    # Commands that run together in one SLURM job
+    server = Command(command=vllm_server_command(model="Qwen/Qwen3-8B"), gpus=8, name="server")
+    sandbox = Command(command=sandbox_command(), name="sandbox")
+    client = Command(
+        command=lambda: f"curl {server.hostname_ref()}:{server.meta_ref('port')}/health",
+        name="client"
+    )
+
+    # Group them together
+    inference_group = CommandGroup(
+        commands=[server, sandbox, client],
+        hardware=HardwareConfig(partition="batch"),
+        name="inference"
+    )
+
+    # Create and run pipeline
+    pipeline = Pipeline(
+        name="my_inference",
+        cluster="local",
+        groups=[inference_group]  # Legacy mode: single job
+    )
+    pipeline.run()
+
+Advanced Example (Multiple jobs with dependencies and heterogeneous components):
+    log_dir = "/experiments/full_pipeline/logs"
+    # Job 1: Preprocessing
+    preprocess = Command(
+        command="python preprocess.py --input data.jsonl --output processed.jsonl",
+        gpus=0,
+        name="preprocess"
+    )
+    prep_group = CommandGroup(
+        commands=[preprocess],
+        hardware=HardwareConfig(partition="cpu"),
+        name="prep",
+        log_dir=log_dir
+    )
+
+    # Job 2: Two different model servers (HETEROGENEOUS SLURM job with 2 het components)
+    server_8b = Command(command=vllm_server_command(model="Qwen/Qwen3-8B"), gpus=8, name="server_8b")
+    sandbox_8b = Command(command=sandbox_command(), name="sandbox_8b")
+    eval_8b = Command(command="python eval.py --model 8b", gpus=1, name="eval_8b")
+
+    server_32b = Command(command=vllm_server_command(model="Qwen/Qwen3-32B"), gpus=8, name="server_32b")
+    sandbox_32b = Command(command=sandbox_command(), name="sandbox_32b")
+    eval_32b = Command(command="python eval.py --model 32b", gpus=1, name="eval_32b")
+
+    group_8b = CommandGroup(commands=[server_8b, sandbox_8b, eval_8b], name="eval_8b", log_dir=log_dir)
+    group_32b = CommandGroup(commands=[server_32b, sandbox_32b, eval_32b], name="eval_32b", log_dir=log_dir)
+
+    # Job 3: Report generation (depends on both evaluations)
+    report = Command(
+        command="python generate_report.py --output report.txt",
+        gpus=0,
+        name="report"
+    )
+    report_group = CommandGroup(commands=[report], name="report", log_dir=log_dir)
+
+    # Create pipeline with dependency graph
+    pipeline = Pipeline(
+        name="full_pipeline",
+        cluster="slurm",
+        jobs=[
+            {"name": "prep", "group": prep_group},
+
+            # Multi-group heterogeneous job (both eval groups in ONE SLURM job with 2 het components)
+            {"name": "evals", "groups": [group_8b, group_32b], "dependencies": ["prep"]},
+
+            # Report depends on the multi-group eval job
+            {"name": "report", "group": report_group, "dependencies": ["evals"]},
+    pipeline.run()
+"""
+
+import inspect
+import logging
+import shlex
+from contextlib import nullcontext
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Tuple, Union
+
+import nemo_run as run
+
+from nemo_skills.pipeline.utils import (
+    get_cluster_config,
+    get_env_variables,
+    get_executor,
+    get_exp,
+    get_exp_handles,
+    get_tunnel,
+    run_exp,
+    temporary_env_update,
+)
+from nemo_skills.pipeline.utils.commands import wrap_command
+from nemo_skills.pipeline.utils.exp import REUSE_CODE_EXP, get_packaging_job_key, install_packages_wrap, tunnel_hash
+from nemo_skills.pipeline.utils.mounts import is_mounted_filepath
+from nemo_skills.pipeline.utils.packager import get_registered_external_repo
+from nemo_skills.utils import get_logger_name
+
+LOG = logging.getLogger(get_logger_name(__file__))
+
+
+@dataclass
+class Command:
+    """Declarative command for running tasks in containers.
+
+    The command can be either:
+    - A string: evaluated immediately
+    - A callable (lambda): evaluated lazily when the task is prepared
+    - A tuple (command, metadata): command with metadata like port
+    - A callable returning (command, metadata): lazy evaluation with metadata
+
+    Using a lambda allows references to work correctly in heterogeneous jobs:
+        Command(command=lambda: f"curl {server.hostname_ref()}:5000")
+
+    Metadata from command builders (like port) can be referenced:
+        server = Command(command=vllm_server_command(...))
+        client = Command(command=lambda: f"curl {server.hostname_ref()}:{server.meta_ref('port')}")
+    """
+
+    command: Union[
+        str,
+        Callable[[], str],  # Lambda for cross-group refs
+        Callable[[Dict], str],  # Lambda needing cluster_config (e.g., sandbox)
+        Tuple[Optional[str], Dict],  # Command builder result
+        Callable[[], Tuple[Optional[str], Dict]],  # Lambda returning command builder result
+        None,
+    ]
+    container: str = "nemo-skills"
+    gpus: Optional[int] = None
+    nodes: int = 1
+    name: Optional[str] = None
+    working_dir: str = "/nemo_run/code"
+    env_vars: Dict[str, str] = field(default_factory=dict)
+    installation_command: Optional[str] = None
+    port: Optional[int] = None  # Can be set from metadata
+    metadata: Dict[str, any] = field(default_factory=dict)  # Stores metadata from command builders
+    het_group_index: Optional[int] = None  # Set automatically by Pipeline
+
+    def __post_init__(self):
+        # Initialize component (merged from old Component class)
+        if self.name is None:
+            self.name = "command"
+
+        # Extract metadata if command is a tuple
+        self._extract_metadata()
+
+        # Wrap plain strings with environment setup
+        if isinstance(self.command, str) and (self.env_vars or self.working_dir):
+            self.command = wrap_command(self.command, self.working_dir, self.env_vars)
+
+    def _extract_metadata(self):
+        """Extract metadata from command if it's a tuple."""
+        if not callable(self.command):
+            if isinstance(self.command, tuple):
+                cmd, self.metadata = self.command
+                self.command = cmd  # Can be None for sandbox
+
+    def hostname_ref(self) -> str:
+        """Get hostname reference for hetjob cross-component communication."""
+        if self.het_group_index is None:
+            return "127.0.0.1"  # Local fallback
+        # For heterogeneous SLURM jobs, resolve nodelist to actual hostname
+        return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
+
+    def meta_ref(self, key: str) -> str:
+        """Get metadata value (like port). Fails if key not found."""
+        if key not in self.metadata:
+            raise KeyError(
+                f"Metadata key '{key}' not found in Command '{self.name}'. "
+                f"Available keys: {list(self.metadata.keys())}"
+            )
+        return str(self.metadata[key])
+
+    def prepare_for_execution(self, cluster_config: Dict) -> Tuple[str, Dict]:
+        """Prepare command for execution.
+
+        This method:
+        1. Evaluates callables (resolves cross-group references and cluster_config-dependent commands)
+        2. Adds cross-group environment variables
+        3. Wraps with installation_command if provided
+
+        Returns:
+            Tuple of (final_command, execution_config)
+        """
+        # 1. Evaluate if callable (resolves cross-group references or cluster_config needs)
+        if callable(self.command):
+            # Check if lambda needs cluster_config (for sandbox)
+
+            sig = inspect.signature(self.command)
+            if len(sig.parameters) > 0:
+                # Lambda expects cluster_config
+                result = self.command(cluster_config)
+            else:
+                # Regular lambda (cross-group refs)
+                result = self.command()
+
+            if isinstance(result, tuple):
+                final_command, runtime_metadata = result
+                # Deep merge metadata, especially environment dict
+                for key, value in runtime_metadata.items():
+                    if key == "environment" and key in self.metadata:
+                        # Merge environment dicts instead of replacing
+                        self.metadata[key].update(value)
+                    else:
+                        self.metadata[key] = value
+            else:
+                final_command = result
+        else:
+            final_command = self.command
+
+        # 2. Wrap with installation_command if provided (matches add_task behavior)
+        if self.installation_command:
+            final_command = install_packages_wrap(final_command, self.installation_command)
+
+        # 3. Build execution config from metadata
+        execution_config = {
+            "num_tasks": self.metadata.get("num_tasks", 1),
+            "num_gpus": self.metadata.get("gpus", self.gpus or 0),
+            "num_nodes": self.metadata.get("nodes", self.nodes),
+            "environment": self.metadata.get("environment", {}),
+            "log_prefix": self.metadata.get("log_prefix", "main"),
+            "mounts": self.metadata.get("mounts"),
+            "container": self.metadata.get("container", self.container),  # Use container from metadata if available
+        }
+
+        return final_command, execution_config
+
+    def get_name(self) -> str:
+        return self.name
+
+
+@dataclass
+class HardwareConfig:
+    """Hardware configuration for a group of tasks."""
+
+    partition: Optional[str] = None
+    time_min: Optional[str] = None
+    exclusive: bool = False
+    num_gpus: Optional[int] = None
+    num_nodes: Optional[int] = None
+
+
+class CommandGroup:
+    """Command group where commands run together with shared resource requirements."""
+
+    def __init__(
+        self,
+        commands: List[Command],
+        hardware: Optional[HardwareConfig] = None,
+        name: Optional[str] = None,
+        log_dir: Optional[str] = None,
+    ):
+        self.components = commands  # Keep as self.components internally for backwards compatibility
+        self.hardware = hardware or HardwareConfig()
+        self.name = name
+        self.log_dir = log_dir
+
+
+class Pipeline:
+    """Top-level pipeline that composes command groups with dependency support.
+
+    Supports two modes:
+    1. Groups: groups=[cmdgroup1, cmdgroup2] - combines all into one job
+    2. Jobs: jobs=[{...}, {...}] - supports dependencies and multi-group jobs
+    """
+
+    def __init__(
+        self,
+        name: str,
+        cluster: Optional[str] = None,
+        groups: Optional[List[CommandGroup]] = None,  # Legacy mode
+        jobs: Optional[List[Dict]] = None,  # New mode with dependencies
+        reuse_code: bool = True,
+        reuse_code_exp: Optional[str] = None,
+        skip_hf_home_check: bool = False,
+        with_ray: bool = False,
+        run_after: Optional[Union[str, List[str]]] = None,  # Pipeline-level dependency on other experiments
+    ):
+        self.name = name
+        self.cluster = cluster
+        self.reuse_code = reuse_code
+        self.reuse_code_exp = reuse_code_exp
+        self.skip_hf_home_check = skip_hf_home_check
+        self.with_ray = with_ray
+        self.run_after = run_after
+        self._cluster_config: Optional[Dict] = None
+
+        if groups is not None and jobs is not None:
+            raise ValueError("Cannot specify both 'groups' and 'jobs'.")
+
+        if groups is not None:
+            self.jobs = [{"group": g} for g in groups]
+            self._legacy_mode = True
+        elif jobs is not None:
+            self.jobs = jobs
+            self._legacy_mode = False
+        else:
+            raise ValueError("Must specify either 'groups' or 'jobs'")
+
+        self._assign_het_group_indices()
+
+    def _assign_het_group_indices(self):
+        """Assign het_group_index to all components for cross-group references."""
+        # Collect all groups from jobs
+        all_groups = []
+        for job_spec in self.jobs:
+            if "group" in job_spec:
+                all_groups.append(job_spec["group"])
+            elif "groups" in job_spec:
+                all_groups.extend(job_spec["groups"])
+
+        # Assign indices
+        for group_idx, group in enumerate(all_groups):
+            for component in group.components:
+                component.het_group_index = group_idx
+                LOG.debug(f"Assigned het_group_index {group_idx} to {component.get_name()}")
+
+    def _get_cluster_config(self) -> Dict:
+        """Get cluster configuration, loading it if necessary."""
+        if self._cluster_config is None:
+            if self.cluster is None:
+                raise ValueError("Must specify cluster either in Pipeline() or run() method")
+
+            self._cluster_config = get_cluster_config(self.cluster)
+        return self._cluster_config
+
+    def run(
+        self,
+        cluster_config: Optional[Dict] = None,
+        cluster: Optional[str] = None,
+        dry_run: bool = False,
+        log_dir: Optional[str] = None,
+    ):
+        """Execute the pipeline by calling NeMo-Run directly.
+
+        Args:
+            cluster_config: Cluster configuration dict (optional, can use cluster name instead)
+            cluster: Cluster name to load config from (optional if cluster_config provided)
+            dry_run: If True, validate without executing
+            log_dir: Default log directory for groups that don't specify one (optional)
+        """
+        if not self.jobs:
+            LOG.info("No jobs to execute")
+            return None
+
+        # Determine cluster config to use
+        if cluster_config is not None:
+            final_cluster_config = cluster_config
+        elif cluster is not None:
+            final_cluster_config = get_cluster_config(cluster)
+        else:
+            final_cluster_config = self._get_cluster_config()
+
+        # Validate HF_HOME (matching add_task validation)
+        if final_cluster_config["executor"] != "none" and not self.skip_hf_home_check:
+            env_vars = get_env_variables(final_cluster_config)
+            if "HF_HOME" not in env_vars:
+                raise RuntimeError(
+                    "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
+                    f"Current env_vars: {final_cluster_config.get('env_vars', [])}\n"
+                    "Please add a new variable: HF_HOME=/mounted/path/to/your/hf_home"
+                )
+            if not is_mounted_filepath(final_cluster_config, env_vars["HF_HOME"]):
+                raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
+
+        # Track job name -> task handle for dependency resolution
+        job_name_to_handle = {}
+
+        with get_exp(self.name, final_cluster_config) as exp:
+            # Process each job in order
+            for job_spec in self.jobs:
+                job_name = job_spec.get("name", "unnamed")
+
+                # Resolve dependencies to task handles (matching add_task lines 390-404)
+                run_after_deps = []
+
+                # Handle dependencies from job spec
+                job_dependencies = job_spec.get("dependencies", [])
+                # Handle explicit None (when dependencies key exists but value is None)
+                if job_dependencies is None:
+                    job_dependencies = []
+
+                # If no dependencies and Pipeline has run_after, apply it (matching add_task behavior)
+                if not job_dependencies and self.run_after:
+                    run_after_list = self.run_after if isinstance(self.run_after, list) else [self.run_after]
+                    job_dependencies = run_after_list
+
+                for dep in job_dependencies:
+                    if isinstance(dep, str):
+                        # String dependency - look up by name
+                        if dep in job_name_to_handle:
+                            # Internal pipeline dependency - add the handle
+                            run_after_deps.append(job_name_to_handle[dep])
+                            LOG.info(f"Job '{job_name}' depends on '{dep}' (handle: {job_name_to_handle[dep]})")
+                        else:
+                            # External experiment name - will be resolved by get_exp_handles below
+                            if final_cluster_config["executor"] == "slurm":
+                                exp_handles = get_exp_handles(dep)
+                                if len(exp_handles) == 0:
+                                    LOG.warning(
+                                        f"No pending or running tasks found for experiment {dep}, cannot set dependencies."
+                                    )
+                                run_after_deps.extend(exp_handles)
+                                LOG.info(
+                                    f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
+                                )
+
+                # Convert empty list to None (matching add_task line 402)
+                if len(run_after_deps) == 0:
+                    run_after_deps = None
+
+                # Check if this is a multi-group job or single group
+                if "groups" in job_spec:
+                    # If only one group in list, use single group job for efficiency
+                    if len(job_spec["groups"]) == 1:
+                        task_handle = self._add_single_group_job(
+                            exp,
+                            job_spec["groups"][0],
+                            final_cluster_config,
+                            default_log_dir=log_dir,
+                            run_after=run_after_deps if run_after_deps else None,
+                        )
+                    else:
+                        # True multi-group: combine multiple groups into one heterogeneous SLURM job
+                        task_handle = self._add_multi_group_job(
+                            exp,
+                            job_spec["groups"],
+                            final_cluster_config,
+                            default_log_dir=log_dir,
+                            run_after=run_after_deps if run_after_deps else None,
+                        )
+                elif "group" in job_spec:
+                    # Single group job
+                    task_handle = self._add_single_group_job(
+                        exp,
+                        job_spec["group"],
+                        final_cluster_config,
+                        default_log_dir=log_dir,
+                        run_after=run_after_deps if run_after_deps else None,
+                    )
+                else:
+                    raise ValueError(f"Job spec must have either 'group' or 'groups': {job_spec}")
+
+                # Track task handle for this job
+                job_name_to_handle[job_name] = task_handle
+                LOG.info(f"Added job '{job_name}' with task_handle={task_handle}")
+
+            if not dry_run:
+                run_exp(exp, final_cluster_config)
+
+                # Cache experiment for code reuse in future runs (matching add_task behavior)
+                if final_cluster_config["executor"] != "none":
+                    tunnel = get_tunnel(final_cluster_config)
+                    cur_tunnel_hash = tunnel_hash(tunnel)
+                    if cur_tunnel_hash not in REUSE_CODE_EXP:
+                        REUSE_CODE_EXP[cur_tunnel_hash] = exp
+                        LOG.info("Cached experiment for future code reuse")
+
+            return exp
+
+    def _prepare_command(self, command, cluster_config: Dict) -> Tuple[str, Dict]:
+        """Prepare command and handle mpirun wrapping."""
+        final_cmd, exec_config = command.prepare_for_execution(cluster_config)
+
+        # Handle mpirun wrapping for non-SLURM executors
+        num_tasks = exec_config["num_tasks"]
+        if cluster_config["executor"] != "slurm" and num_tasks > 1:
+            final_cmd = f"mpirun --allow-run-as-root -np {num_tasks} bash -c {shlex.quote(final_cmd)}"
+
+        return final_cmd, exec_config
+
+    def _resolve_container(self, exec_config: Dict, command, cluster_config: Dict) -> str:
+        """Resolve container name to image path."""
+        container_name = exec_config.get("container", command.container)
+        if container_name in cluster_config.get("containers", {}):
+            return cluster_config["containers"][container_name]
+        return container_name
+
+    def _create_executor(
+        self,
+        command,
+        exec_config: Dict,
+        container_image: str,
+        cluster_config: Dict,
+        log_dir: str,
+        hardware: HardwareConfig,
+        heterogeneous: bool,
+        het_group: int,
+        total_het_groups: int,
+        overlap: bool,
+    ):
+        """Create executor with optional environment update."""
+        env_context = (
+            temporary_env_update(cluster_config, exec_config["environment"])
+            if exec_config.get("environment")
+            else nullcontext()
+        )
+
+        with env_context:
+            return get_executor(
+                cluster_config=cluster_config,
+                container=container_image,
+                num_nodes=exec_config["num_nodes"],
+                tasks_per_node=exec_config["num_tasks"],
+                gpus_per_node=exec_config["num_gpus"],
+                job_name=command.name,
+                log_dir=log_dir,
+                log_prefix=exec_config["log_prefix"],
+                partition=hardware.partition if hardware else None,
+                time_min=hardware.time_min if hardware else None,
+                heterogeneous=heterogeneous,
+                het_group=het_group,
+                total_het_groups=total_het_groups,
+                overlap=overlap,
+                mounts=exec_config.get("mounts"),
+                with_ray=self.with_ray,
+                slurm_kwargs={"exclusive": hardware.exclusive} if (hardware and hardware.exclusive) else None,
+            )
+
+    def _plan_and_add_job(
+        self,
+        exp,
+        groups: List[CommandGroup],
+        cluster_config: Dict,
+        default_log_dir: Optional[str] = None,
+        run_after: Optional[List] = None,
+        heterogeneous: bool = False,
+    ) -> str:
+        """Plan commands/executors for one or more groups and add to experiment.
+
+        This encapsulates shared logic between single-group and multi-group jobs. Behavior
+        differences are controlled by the 'heterogeneous' flag and the provided 'groups'.
+        """
+
+        # Dependencies are only passed through for SLURM
+        dependencies = run_after if (run_after and cluster_config["executor"] == "slurm") else None
+
+        # Resolve log directory (use first group's log_dir if present)
+        log_dir = groups[0].log_dir or default_log_dir
+        if log_dir is None:
+            raise ValueError(f"CommandGroup '{groups[0].name}' must have log_dir set, or provide it to pipeline.run()")
+
+        commands: List[str] = []
+        executors: List = []
+        het_group_indices: List[int] = []
+
+        # In heterogeneous jobs, collect environment from all commands for cross-component refs
+        shared_env_vars: Dict[str, str] = {}
+        if heterogeneous:
+            for het_idx, group in enumerate(groups):
+                for command in group.components:
+                    _, exec_config_probe = command.prepare_for_execution(cluster_config)
+                    shared_env_vars.update(exec_config_probe.get("environment", {}))
+
+        # PERFORMANCE: Track first packager to share across executors (single-group only)
+        shared_packager = None
+
+        # Build commands and executors
+        for het_idx, group in enumerate(groups):
+            has_multiple_components = len(group.components) > 1
+            total_het_groups = (
+                len(groups) if heterogeneous else (len(group.components) if has_multiple_components else 1)
+            )
+
+            # For single-group jobs with multiple components, allow job-level GPU override for sbatch allocation
+            job_level_gpus = (
+                group.hardware.num_gpus if (not heterogeneous and has_multiple_components and group.hardware) else None
+            )
+
+            for comp_idx, command in enumerate(group.components):
+                final_cmd, exec_config = self._prepare_command(command, cluster_config)
+                commands.append(final_cmd)
+
+                # Adjust GPU allocation (first component gets job-level GPUs for sbatch) for single-group jobs
+                exec_config["num_gpus"] = exec_config["num_gpus"] or 0
+                if (not heterogeneous) and (comp_idx == 0) and (job_level_gpus is not None):
+                    exec_config["num_gpus"] = job_level_gpus
+
+                # Merge shared environment for heterogeneous jobs
+                if heterogeneous and shared_env_vars:
+                    exec_config["environment"].update(shared_env_vars)
+
+                # Resolve container and create executor
+                container_image = self._resolve_container(exec_config, command, cluster_config)
+                executor = self._create_executor(
+                    command,
+                    exec_config,
+                    container_image,
+                    cluster_config,
+                    log_dir,
+                    group.hardware,
+                    heterogeneous,
+                    het_idx if heterogeneous else comp_idx,
+                    total_het_groups,
+                    (len(group.components) > 1),
+                )
+
+                # Share packager across executors for single-group jobs
+                if not heterogeneous:
+                    if comp_idx == 0 and het_idx == 0:
+                        shared_packager = executor.packager
+                    else:
+                        executor.packager = shared_packager
+
+                executors.append(executor)
+                if heterogeneous:
+                    het_group_indices.append(het_idx)
+
+        # For heterogeneous jobs, set het_group_indices on the first executor
+        if heterogeneous and executors:
+            executors[0].het_group_indices = het_group_indices
+
+        # PERFORMANCE: Handle code reuse from previous experiments (single-group only)
+        if (not heterogeneous) and cluster_config["executor"] != "none":
+            tunnel = get_tunnel(cluster_config)
+            if self.reuse_code:
+                reuse_exp = self.reuse_code_exp or REUSE_CODE_EXP.get(tunnel_hash(tunnel))
+                if reuse_exp is not None:
+                    if isinstance(reuse_exp, str):
+                        try:
+                            reuse_exp = run.Experiment.from_id(reuse_exp)
+                        except Exception:
+                            try:
+                                reuse_exp = run.Experiment.from_title(reuse_exp)
+                            except Exception:
+                                LOG.warning(f"Failed to load experiment {reuse_exp} for code reuse")
+                                reuse_exp = None
+                    if reuse_exp is not None:
+                        LOG.info(f"Trying to reuse code from experiment {reuse_exp._title}")
+                        reuse_key = get_packaging_job_key(reuse_exp._id, "nemo-run")
+                        if reuse_key in reuse_exp.tunnels[tunnel.key].packaging_jobs:
+                            reuse_dir = reuse_exp.tunnels[tunnel.key].packaging_jobs[reuse_key].dst_path
+                            for executor in executors:
+                                executor.packager.symlink_from_remote_dir = reuse_dir
+                            LOG.info(f"Successfully reused code from {reuse_key}")
+                        else:
+                            LOG.warning(f"Relevant packaging job not found for experiment {reuse_exp._title}")
+            else:
+                # If reuse_code=False, clear cache (matching original behavior)
+                REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
+
+        # Handle executor="none" path replacements (single-group only)
+        if (not heterogeneous) and cluster_config["executor"] == "none":
+            for idx in range(len(commands)):
+                commands[idx] = commands[idx].replace(
+                    "/nemo_run/code/nemo_skills", str(get_registered_external_repo("nemo_skills").path)
+                )
+                commands[idx] = commands[idx].replace("/nemo_run/code", "./")
+
+        # Ray metadata handling
+        if self.with_ray and cluster_config["executor"] == "slurm":
+            metadata = {"use_with_ray_cluster": True}
+        else:
+            metadata = None
+
+        # Add to experiment and return task ID
+        if (not heterogeneous) and len(commands) == 1:
+            task_id = exp.add(
+                run.Script(inline=commands[0], metadata=metadata),
+                executor=executors[0],
+                name="nemo-run",
+                dependencies=dependencies,
+            )
+        else:
+            task_id = exp.add(
+                [
+                    run.Script(inline=cmd, metadata=(metadata if idx == 0 else None))
+                    for idx, cmd in enumerate(commands)
+                ],
+                executor=executors,
+                name="nemo-run",
+                dependencies=dependencies,
+            )
+
+        return task_id
+
+    def _add_single_group_job(
+        self,
+        exp,
+        group: CommandGroup,
+        cluster_config: Dict,
+        default_log_dir: Optional[str] = None,
+        run_after: Optional[List] = None,
+    ) -> str:
+        """Add a single CommandGroup as one job and return its task handle."""
+
+        return self._plan_and_add_job(
+            exp=exp,
+            groups=[group],
+            cluster_config=cluster_config,
+            default_log_dir=default_log_dir,
+            run_after=run_after,
+            heterogeneous=False,
+        )
+
+    def _add_multi_group_job(
+        self,
+        exp,
+        groups: List[CommandGroup],
+        cluster_config: Dict,
+        default_log_dir: Optional[str] = None,
+        run_after: Optional[List] = None,
+    ) -> str:
+        """Add multiple CommandGroups as a single heterogeneous SLURM job and return task handle."""
+
+        return self._plan_and_add_job(
+            exp=exp,
+            groups=groups,
+            cluster_config=cluster_config,
+            default_log_dir=default_log_dir,
+            run_after=run_after,
+            heterogeneous=True,
+        )
+
+
+# Backwards compatibility alias
+Pipeline = Pipeline
