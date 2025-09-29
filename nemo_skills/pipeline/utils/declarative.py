@@ -46,6 +46,29 @@ from nemo_skills.utils import get_logger_name
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+@dataclass
+class RuntimeRef:
+    """Reference to a component that will be resolved at runtime using SLURM environment variables."""
+
+    component_name: str
+    het_group_index: int
+    attribute: str = "host"  # What to resolve (host, port, etc.)
+
+    def resolve_expression(self) -> str:
+        """Get the runtime expression to resolve this reference."""
+        if self.attribute == "host":
+            # Use SLURM environment variable to get first host in the het group
+            return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
+        elif self.attribute == "port":
+            # Use environment variable set by the component
+            return f"${{{self.component_name.upper()}_PORT_HET_GROUP_{self.het_group_index}}}"
+        else:
+            return f"${{{self.component_name.upper()}_{self.attribute.upper()}_HET_GROUP_{self.het_group_index}}}"
+
+    def __str__(self):
+        return f"RuntimeRef({self.component_name}.{self.attribute} from group {self.het_group_index})"
+
+
 # Base class for all declarative components
 class Component:
     """Base class for all pipeline components."""
@@ -131,6 +154,45 @@ class Sandbox(Component):
 
 
 @dataclass
+class CrossGroupSandbox(Component):
+    """Sandbox that runs in a separate group but can be referenced by others."""
+
+    port: Optional[int] = None
+    name: str = "sandbox"
+    het_group_index: Optional[int] = None  # Set automatically by Pipeline
+
+    def __post_init__(self):
+        if self.port is None:
+            self.port = get_free_port(strategy="random")
+
+    def get_runtime_ref(self, attribute: str = "host") -> RuntimeRef:
+        """Get a runtime reference to this component."""
+        return RuntimeRef(component_name=self.name, het_group_index=self.het_group_index, attribute=attribute)
+
+    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
+        """Convert to SandboxTask with environment variable exports."""
+        task_def = TaskFactory.create_sandbox_task(
+            name=self.name,
+            container=cluster_config["containers"]["sandbox"],
+            port=self.port,
+        )
+
+        # Add environment variable exports for other groups to use
+        if self.het_group_index is not None:
+            task_def.environment.update(
+                {
+                    f"{self.name.upper()}_HOST_HET_GROUP_{self.het_group_index}": "$(hostname)",
+                    f"{self.name.upper()}_PORT_HET_GROUP_{self.het_group_index}": str(self.port),
+                }
+            )
+
+        return task_def
+
+    def get_name(self) -> str:
+        return self.name
+
+
+@dataclass
 class GenerateTask(Component):
     """Declarative generation task that can reference other components."""
 
@@ -138,6 +200,7 @@ class GenerateTask(Component):
     output_dir: str
     server: Optional[Server] = None
     sandbox: Optional[Sandbox] = None
+    sandbox_ref: Optional[RuntimeRef] = None  # For cross-group sandbox references
     extra_args: List[str] = field(default_factory=list)
     seeds: Optional[List[int]] = None  # If None, will be [None] for single job
     chunks: Optional[List[int]] = None  # If None, will be [None] for single job
@@ -264,6 +327,28 @@ class GenerateTask(Component):
                     "++server.host=127.0.0.1",
                     f"++server.port={self.server.port}",
                     f"++server.model={self.server.model}",
+                ]
+            )
+
+        # Handle sandbox references (local or cross-group)
+        if self.sandbox_ref:
+            # Cross-group sandbox reference - resolve at runtime
+            sandbox_host = self.sandbox_ref.resolve_expression()
+            sandbox_port_ref = RuntimeRef(self.sandbox_ref.component_name, self.sandbox_ref.het_group_index, "port")
+            sandbox_port = sandbox_port_ref.resolve_expression()
+
+            cmd_parts.extend(
+                [
+                    f"++sandbox.host={sandbox_host}",
+                    f"++sandbox.port={sandbox_port}",
+                ]
+            )
+        elif self.sandbox:
+            # Local sandbox reference
+            cmd_parts.extend(
+                [
+                    "++sandbox.host=127.0.0.1",
+                    f"++sandbox.port={self.sandbox.port}",
                 ]
             )
 
@@ -396,6 +481,15 @@ class Pipeline:
     def __init__(self, name: str, groups: List[HetGroup]):
         self.name = name
         self.groups = groups
+        self._assign_het_group_indices()
+
+    def _assign_het_group_indices(self):
+        """Assign het_group_index to components that need it for cross-group references."""
+        for group_idx, group in enumerate(self.groups):
+            for component in group.components:
+                if hasattr(component, "het_group_index"):
+                    component.het_group_index = group_idx
+                    LOG.debug(f"Assigned het_group_index {group_idx} to {component.get_name()}")
 
     def run(self, cluster_config: Dict, dry_run: bool = False):
         """Execute the pipeline."""
