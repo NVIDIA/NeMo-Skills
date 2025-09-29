@@ -324,9 +324,15 @@ def eval(
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
-            cmds, job_benchmarks, job_needs_sandbox, job_server_config, job_server_address, job_server_command = (
-                job_args
-            )
+            (
+                cmds,
+                job_benchmarks,
+                job_needs_sandbox,
+                job_needs_sandbox_to_keep_mounts,
+                job_server_config,
+                job_server_address,
+                job_server_command,
+            ) = job_args
             prev_tasks = _task_dependencies
 
             for _ in range(dependent_jobs + 1):
@@ -342,7 +348,7 @@ def eval(
                     time_min=time_min,
                     server_config=job_server_config,
                     with_sandbox=job_needs_sandbox or with_sandbox,
-                    keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+                    keep_mounts_for_sandbox=job_needs_sandbox_to_keep_mounts or keep_mounts_for_sandbox,
                     sandbox_mount_paths=mount_paths,
                     sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
