@@ -18,7 +18,7 @@ import random
 import re
 from dataclasses import asdict, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from transformers import AutoTokenizer
@@ -301,6 +301,17 @@ class Prompt:
             raise ValueError("chat_template_kwargs can only be used when tokenizer was provided!")
 
         return messages
+
+    def get_token_count(self, messages: Union[str, list[dict]]) -> int:
+        if self.tokenizer is None:
+            return None
+
+        if isinstance(messages, str):
+            return len(self.tokenizer.encode(messages, add_special_tokens=False))
+        elif isinstance(messages, list):
+            return len(self.tokenizer.apply_chat_template(messages, tokenize=True))
+        else:
+            raise ValueError("messages must be a string or a list of dictionaries")
 
     def __str__(self):
         return str(self.config)

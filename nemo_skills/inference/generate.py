@@ -472,21 +472,10 @@ class GenerationTask:
             output[self.cfg.generation_key] = output.pop("generation")
 
             # calculating total generation time
-            if self.cfg.add_generation_stats:
-                output["generation_end_time"] = time.time()
-                # TODO: start time is saved in data_point, not output, need to fix that
-                output["generation_time"] = (
-                    output["generation_end_time"] - original_data_point["generation_start_time"]
-                )
-            else:
-                # generation_start_time was overriden, so restoring it from end and total
-                # TODO: this is a bit hacky, need a rewrite
-                if "generation_end_time" in original_data_point and "generation_time" in original_data_point:
-                    output["generation_start_time"] = (
-                        original_data_point["generation_end_time"] - original_data_point["generation_time"]
-                    )
-                else:
-                    output.pop("generation_start_time", None)
+            if not self.cfg.add_generation_stats:
+                output.pop("generation_start_time", None)
+                output.pop("generation_end_time", None)
+                output.pop("generation_time", None)
                 output.pop("num_generated_tokens", None)
 
             for key in output:
@@ -520,8 +509,20 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
+        # Tracking the tokens and generation time
+        input_sequence_length = self.prompt.get_token_count(generation_params["prompt"])
+        start_time = time.time()
+
         result = await self.llm.generate_async(**generation_params)
 
+        end_time = time.time()
+        # Add the generation time and input sequence length
+        if self.cfg.add_generation_stats:
+            result["generation_start_time"] = start_time
+            result["generation_end_time"] = end_time
+            result["generation_time"] = end_time - start_time
+
+        result["input_sequence_length"] = input_sequence_length
         return result
 
     async def apply_evaluation_hook(self, data_point):
@@ -536,9 +537,6 @@ class GenerationTask:
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point with semaphore control."""
         async with self.semaphore:
-            # registering current time to calculate total generation time
-            data_point["generation_start_time"] = time.time()
-
             # Generate output for this single data point
             output = await self.process_single_datapoint(data_point, all_data)
             # Apply evaluation hook if configured
