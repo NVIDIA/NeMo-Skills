@@ -71,7 +71,14 @@ class RuntimeRef:
 
 # Base class for all declarative components
 class Component:
-    """Base class for all pipeline components."""
+    """Base class for all pipeline components - all are cross-group compatible by default."""
+
+    def __init__(self):
+        self.het_group_index: Optional[int] = None  # Set automatically by Pipeline
+
+    def get_runtime_ref(self, attribute: str = "host") -> RuntimeRef:
+        """Get a runtime reference to this component for cross-group access."""
+        return RuntimeRef(component_name=self.get_name(), het_group_index=self.het_group_index, attribute=attribute)
 
     def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
         """Convert this component to a TaskDefinition."""
@@ -86,10 +93,27 @@ class Component:
         """Get a unique name for this component."""
         return type(self).__name__.lower()
 
+    def _add_cross_group_env_vars(self, task_def, attributes: List[str]):
+        """Add environment variables for cross-group access."""
+        if self.het_group_index is not None:
+            for attr in attributes:
+                if hasattr(self, attr):
+                    value = getattr(self, attr)
+                    if attr == "port":
+                        # For ports, export the value directly
+                        task_def.environment[
+                            f"{self.get_name().upper()}_{attr.upper()}_HET_GROUP_{self.het_group_index}"
+                        ] = str(value)
+                    elif attr == "host":
+                        # For hosts, export the hostname
+                        task_def.environment[
+                            f"{self.get_name().upper()}_{attr.upper()}_HET_GROUP_{self.het_group_index}"
+                        ] = "$(hostname)"
+
 
 @dataclass
 class Server(Component):
-    """Declarative server component."""
+    """Declarative server component - cross-group compatible by default."""
 
     model: str
     server_type: str = "vllm"
@@ -101,19 +125,20 @@ class Server(Component):
     name: Optional[str] = None
 
     def __post_init__(self):
+        super().__init__()  # Initialize cross-group capabilities
         if self.port is None:
             self.port = get_free_port(strategy="random")
         if self.name is None:
             self.name = f"{self.server_type}_server"
 
     def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
-        """Convert to ServerTask."""
+        """Convert to ServerTask with cross-group capabilities."""
         # Apply hardware config overrides
         num_gpus = hardware_config.get("server_gpus", self.gpus) if hardware_config else self.gpus
         num_nodes = hardware_config.get("server_nodes", self.nodes) if hardware_config else self.nodes
         partition = hardware_config.get("partition") if hardware_config else None
 
-        return TaskFactory.create_server_task(
+        task_def = TaskFactory.create_server_task(
             name=self.name,
             server_type=self.server_type,
             container=cluster_config["containers"].get(self.server_type, cluster_config["containers"]["nemo"]),
@@ -126,65 +151,37 @@ class Server(Component):
             partition=partition,
         )
 
+        # Add cross-group environment variables
+        self._add_cross_group_env_vars(task_def, ["host", "port"])
+
+        return task_def
+
     def get_name(self) -> str:
         return self.name
 
 
 @dataclass
 class Sandbox(Component):
-    """Declarative sandbox component."""
+    """Declarative sandbox component - cross-group compatible by default."""
 
     port: Optional[int] = None
     name: str = "sandbox"
 
     def __post_init__(self):
+        super().__init__()  # Initialize cross-group capabilities
         if self.port is None:
             self.port = get_free_port(strategy="random")
 
     def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
-        """Convert to SandboxTask."""
-        return TaskFactory.create_sandbox_task(
-            name=self.name,
-            container=cluster_config["containers"]["sandbox"],
-            port=self.port,
-        )
-
-    def get_name(self) -> str:
-        return self.name
-
-
-@dataclass
-class CrossGroupSandbox(Component):
-    """Sandbox that runs in a separate group but can be referenced by others."""
-
-    port: Optional[int] = None
-    name: str = "sandbox"
-    het_group_index: Optional[int] = None  # Set automatically by Pipeline
-
-    def __post_init__(self):
-        if self.port is None:
-            self.port = get_free_port(strategy="random")
-
-    def get_runtime_ref(self, attribute: str = "host") -> RuntimeRef:
-        """Get a runtime reference to this component."""
-        return RuntimeRef(component_name=self.name, het_group_index=self.het_group_index, attribute=attribute)
-
-    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
-        """Convert to SandboxTask with environment variable exports."""
+        """Convert to SandboxTask with cross-group capabilities."""
         task_def = TaskFactory.create_sandbox_task(
             name=self.name,
             container=cluster_config["containers"]["sandbox"],
             port=self.port,
         )
 
-        # Add environment variable exports for other groups to use
-        if self.het_group_index is not None:
-            task_def.environment.update(
-                {
-                    f"{self.name.upper()}_HOST_HET_GROUP_{self.het_group_index}": "$(hostname)",
-                    f"{self.name.upper()}_PORT_HET_GROUP_{self.het_group_index}": str(self.port),
-                }
-            )
+        # Add cross-group environment variables
+        self._add_cross_group_env_vars(task_def, ["host", "port"])
 
         return task_def
 
@@ -194,11 +191,12 @@ class CrossGroupSandbox(Component):
 
 @dataclass
 class GenerateTask(Component):
-    """Declarative generation task that can reference other components."""
+    """Declarative generation task that can reference other components - cross-group compatible."""
 
     input_source: str  # Can be file or directory
     output_dir: str
     server: Optional[Server] = None
+    server_ref: Optional[RuntimeRef] = None  # For cross-group server references
     sandbox: Optional[Sandbox] = None
     sandbox_ref: Optional[RuntimeRef] = None  # For cross-group sandbox references
     extra_args: List[str] = field(default_factory=list)
@@ -209,6 +207,7 @@ class GenerateTask(Component):
     installation_command: Optional[str] = None
 
     def __post_init__(self):
+        super().__init__()  # Initialize cross-group capabilities
         if self.name is None:
             self.name = "generate"
         # Normalize seeds and chunks
@@ -319,8 +318,24 @@ class GenerateTask(Component):
                 ]
             )
 
-        # Add server config if server is referenced
-        if self.server:
+        # Handle server references (local or cross-group)
+        if self.server_ref:
+            # Cross-group server reference - resolve at runtime
+            server_host = self.server_ref.resolve_expression()
+            server_port_ref = RuntimeRef(self.server_ref.component_name, self.server_ref.het_group_index, "port")
+            server_port = server_port_ref.resolve_expression()
+
+            # We need to determine server_type and model from the reference
+            # For now, we'll need to pass these as additional attributes or handle differently
+            cmd_parts.extend(
+                [
+                    f"++server.host={server_host}",
+                    f"++server.port={server_port}",
+                    # Note: server_type and model would need to be passed differently for cross-group refs
+                ]
+            )
+        elif self.server:
+            # Local server reference
             cmd_parts.extend(
                 [
                     f"++server.server_type={self.server.server_type}",
@@ -376,6 +391,7 @@ class TrainTask(Component):
     name: Optional[str] = None
 
     def __post_init__(self):
+        super().__init__()  # Initialize cross-group capabilities
         if self.name is None:
             self.name = "training"
 
@@ -484,12 +500,12 @@ class Pipeline:
         self._assign_het_group_indices()
 
     def _assign_het_group_indices(self):
-        """Assign het_group_index to components that need it for cross-group references."""
+        """Assign het_group_index to all components for cross-group references."""
         for group_idx, group in enumerate(self.groups):
             for component in group.components:
-                if hasattr(component, "het_group_index"):
-                    component.het_group_index = group_idx
-                    LOG.debug(f"Assigned het_group_index {group_idx} to {component.get_name()}")
+                # All components are now cross-group compatible
+                component.het_group_index = group_idx
+                LOG.debug(f"Assigned het_group_index {group_idx} to {component.get_name()}")
 
     def run(self, cluster_config: Dict, dry_run: bool = False):
         """Execute the pipeline."""
