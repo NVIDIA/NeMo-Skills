@@ -303,7 +303,7 @@ def train(
     extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
-    validate_wandb_project_name(wandb_project)
+
     try:
         training_algo = training_algo.value
     except AttributeError:

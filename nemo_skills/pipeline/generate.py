@@ -171,7 +171,7 @@ def generate(
     extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
-    validate_wandb_project_name(wandb_project)
+
     try:
         server_type = server_type.value
     except AttributeError:
