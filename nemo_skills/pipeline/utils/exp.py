@@ -343,6 +343,8 @@ def add_task(
     partition=None,
     time_min=None,
     with_sandbox=False,
+    keep_mounts_for_sandbox=False,
+    sandbox_mount_paths: list[str] | None = None,
     sandbox_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
@@ -527,7 +529,7 @@ def add_task(
                 gpus_per_node=0,
                 partition=partition,
                 time_min=time_min,
-                mounts=[],  # we don't want to mount anything
+                mounts=sandbox_mount_paths if keep_mounts_for_sandbox else [],
                 dependencies=dependencies,
                 job_name=task_name,
                 log_dir=log_dir,

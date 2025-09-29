@@ -32,6 +32,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class OJBenchConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
+    keep_mounts_for_sandbox: bool = True
     timeout: int = 6
 
 

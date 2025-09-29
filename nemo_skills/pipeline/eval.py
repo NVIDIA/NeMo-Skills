@@ -171,6 +171,9 @@ def eval(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False, help="If True, will keep the mounts for the sandbox container"
+    ),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     log_samples: bool = typer.Option(
         False,
@@ -303,6 +306,7 @@ def eval(
         extra_datasets_type,
         exclusive,
         with_sandbox,
+        keep_mounts_for_sandbox,
         wandb_parameters,
         extra_eval_args,
         eval_requires_judge=eval_requires_judge,
@@ -338,6 +342,8 @@ def eval(
                     time_min=time_min,
                     server_config=job_server_config,
                     with_sandbox=job_needs_sandbox or with_sandbox,
+                    keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+                    sandbox_mount_paths=mount_paths,
                     sandbox_port=None if get_random_port else 6000,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
@@ -404,6 +410,7 @@ def eval(
                 partition=partition,
                 time_min=time_min,
                 with_sandbox=with_sandbox,
+                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
