@@ -420,6 +420,70 @@ class TrainTask(Component):
 
 
 @dataclass
+class RunCmd(Component):
+    """Declarative component for running arbitrary bash commands in containers."""
+
+    command: str
+    container: str = "nemo-skills"
+    gpus: Optional[int] = None
+    nodes: int = 1
+    name: Optional[str] = None
+    working_dir: str = "/nemo_run/code"
+    env_vars: Dict[str, str] = field(default_factory=dict)
+    installation_command: Optional[str] = None
+
+    def __post_init__(self):
+        super().__init__()  # Initialize cross-group capabilities
+        if self.name is None:
+            self.name = "runcmd"
+
+    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
+        """Convert to MainTask for running arbitrary commands."""
+        # Build the command with proper environment setup
+        cmd_parts = [
+            "export HYDRA_FULL_ERROR=1",
+            f"export PYTHONPATH=$PYTHONPATH:{self.working_dir}",
+            f"cd {self.working_dir}",
+        ]
+
+        # Add any custom environment variables
+        for env_var, value in self.env_vars.items():
+            cmd_parts.append(f"export {env_var}={value}")
+
+        # Add the actual command
+        cmd_parts.append(self.command.strip())
+
+        cmd = " && ".join(cmd_parts)
+
+        # Apply hardware config overrides
+        num_gpus = hardware_config.get("num_gpus", self.gpus) if hardware_config else self.gpus
+        num_nodes = hardware_config.get("num_nodes", self.nodes) if hardware_config else self.nodes
+        partition = hardware_config.get("partition") if hardware_config else None
+        exclusive = hardware_config.get("exclusive", False) if hardware_config else False
+
+        # Determine container from cluster config or use specified
+        container_name = self.container
+        if container_name in cluster_config.get("containers", {}):
+            container_image = cluster_config["containers"][container_name]
+        else:
+            container_image = container_name  # Assume it's a direct container image name
+
+        return TaskFactory.create_generation_task(  # Reuse generation task factory
+            name=self.name,
+            cmd=cmd,
+            container=container_image,
+            num_gpus=num_gpus,
+            num_nodes=num_nodes,
+            partition=partition,
+            installation_command=self.installation_command,
+            exclusive=exclusive,
+        )
+
+    def get_name(self) -> str:
+        return self.name
+
+
+@dataclass
 class HardwareConfig:
     """Hardware configuration for a group of tasks."""
 

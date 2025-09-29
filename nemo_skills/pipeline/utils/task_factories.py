@@ -37,6 +37,7 @@ class TaskFactory:
         num_tasks: int = 1,
         partition: Optional[str] = None,
         installation_command: Optional[str] = None,
+        exclusive: bool = True,
         **kwargs,
     ) -> MainTask:
         """Create a generation/inference task."""
@@ -45,6 +46,7 @@ class TaskFactory:
             num_gpus=num_gpus,
             num_nodes=num_nodes,
             partition=partition,
+            exclusive=exclusive,
         )
 
         return MainTask(
