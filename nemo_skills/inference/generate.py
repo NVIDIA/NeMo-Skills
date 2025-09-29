@@ -29,6 +29,7 @@ import hydra
 import litellm
 from omegaconf import ListConfig
 from tqdm import tqdm
+from transformers import AutoTokenizer
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
@@ -39,7 +40,7 @@ from nemo_skills.inference.model import (
     get_tool_calling_model,
     server_params,
 )
-from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.prompt.utils import get_prompt, get_token_count
 from nemo_skills.utils import (
     chunk_data,
     get_help_message,
@@ -271,8 +272,14 @@ class GenerationTask:
         if self.cfg.use_completions_api or self.cfg.server.get("enable_soft_fail", False):
             # These are the only cases where we need a tokenizer
             self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
+            try:
+                self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
+            except ValueError:
+                self.hf_tokenizer = None
+                LOG.warning("Not a valid huggingface tokenizer: %s", self.tokenizer)
         else:
             self.tokenizer = None
+            self.hf_tokenizer = None
 
         # Setup litellm cache
         self.setup_litellm_cache()
@@ -321,8 +328,9 @@ class GenerationTask:
         self.output_lock = None
 
     def setup_prompt(self):
+        prompt = None
         if self.cfg.prompt_format == "openai":
-            return None
+            prompt = None
 
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
@@ -331,6 +339,7 @@ class GenerationTask:
             examples_type=self.cfg.examples_type,
             system_message=self.cfg.system_message,
         )
+
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
@@ -509,23 +518,12 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        # Tracking the tokens and generation time
-        input_sequence_length = None
-        if self.prompt is not None:
-            if generation_params["prompt"] is not None:
-                input_sequence_length = self.prompt.get_token_count(generation_params["prompt"])
-
-        # Start to track the generation time
-        start_time = time.time()
-
         result = await self.llm.generate_async(**generation_params)
 
-        end_time = time.time()
-        # Add the generation time and input sequence length
-        if self.cfg.add_generation_stats:
-            result["generation_start_time"] = start_time
-            result["generation_end_time"] = end_time
-            result["generation_time"] = end_time - start_time
+        if self.prompt is not None:
+            input_sequence_length = get_token_count(self.prompt.tokenizer, generation_params["prompt"])
+        elif self.hf_tokenizer is not None:
+            input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
 
         if input_sequence_length is not None:
             result["input_sequence_length"] = input_sequence_length
@@ -544,7 +542,15 @@ class GenerationTask:
         """Process a single data point with semaphore control."""
         async with self.semaphore:
             # Generate output for this single data point
+            start_time = time.time()
             output = await self.process_single_datapoint(data_point, all_data)
+            end_time = time.time()
+
+            if self.cfg.add_generation_stats:
+                output["generation_start_time"] = start_time
+                output["generation_end_time"] = end_time
+                output["generation_time"] = end_time - start_time
+
             # Apply evaluation hook if configured
             # TODO: note that this currently only evaluates independently--if there
             # is any post-processing that needs to be done on the full set of
