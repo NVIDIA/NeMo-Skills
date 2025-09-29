@@ -509,7 +509,12 @@ class GenerationTask:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
         # Tracking the tokens and generation time
-        input_sequence_length = self.prompt.get_token_count(generation_params["prompt"])
+        input_sequence_length = None
+        if self.prompt is not None:
+            if generation_params["prompt"] is not None:
+                input_sequence_length = self.prompt.get_token_count(generation_params["prompt"])
+
+        # Start to track the generation time
         start_time = time.time()
 
         result = await self.llm.generate_async(**generation_params)
