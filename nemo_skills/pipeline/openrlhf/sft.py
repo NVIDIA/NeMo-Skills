@@ -29,7 +29,7 @@ from nemo_skills.pipeline.utils import (
     get_timeout_str,
     run_exp,
 )
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -266,7 +266,7 @@ def sft_openrlhf(
     extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
-
+    validate_wandb_project_name(wandb_project)
     cluster_config = get_cluster_config(cluster, config_dir)
     check_if_mounted(cluster_config, output_dir)
     check_if_mounted(cluster_config, hf_model)

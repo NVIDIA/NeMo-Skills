@@ -27,6 +27,7 @@ from nemo_skills.utils import (
     get_logger_name,
     setup_logging,
     str_ids_to_list,
+    validate_wandb_project_name,
 )
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -170,7 +171,7 @@ def generate(
     extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
-
+    validate_wandb_project_name(wandb_project)
     try:
         server_type = server_type.value
     except AttributeError:

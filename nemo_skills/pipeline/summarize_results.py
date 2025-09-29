@@ -36,7 +36,7 @@ from nemo_skills.pipeline.utils import (
     get_unmounted_path,
     resolve_mount_paths,
 )
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -195,6 +195,7 @@ def summarize_results(
 ):
     """Summarize results of an evaluation job."""
     setup_logging(disable_hydra_logs=False, log_level=logging.WARNING if not debug else logging.DEBUG)
+    validate_wandb_project_name(wandb_project)
 
     if " " in str(benchmarks):
         raise ValueError("benchmarks should be separated with commas")

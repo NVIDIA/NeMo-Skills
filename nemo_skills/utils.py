@@ -187,6 +187,27 @@ def init_wandb(project, name, exp_dir=None, verbose=False):
         return False
 
 
+def validate_wandb_project_name(wandb_project):
+    """
+    Validate a Weights & Biases (W&B) project name.
+
+    Rules (based on W&B conventions):
+      - Must be <= 128 characters
+      - Can contain only lowercase letters, digits, underscores (_), and hyphens (-)
+    """
+
+    # Check maximum length (W&B enforces a safe upper limit of 128 chars)
+    if len(wandb_project) > 128:
+        raise ValueError("Project name exceeds the 128-character limit.")
+
+    # Check for invalid characters (anything outside a-z, 0-9, _, -)
+    if not re.fullmatch(r"[a-z0-9_-]+", wandb_project):
+        raise ValueError(
+            "Project name contains invalid characters. "
+            "Only lowercase letters, digits, underscores (_), and hyphens (-) are allowed."
+        )
+
+
 def extract_comments(code: str):
     """Extract a list of comments from the given Python code."""
     comments = []
