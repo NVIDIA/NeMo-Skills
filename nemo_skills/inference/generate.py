@@ -476,6 +476,7 @@ class GenerationTask:
                 output.pop("generation_end_time", None)
                 output.pop("generation_time", None)
                 output.pop("num_generated_tokens", None)
+                output.pop("input_sequence_length", None)
 
             for key in output:
                 original_data_point.pop(key, None)
@@ -526,7 +527,8 @@ class GenerationTask:
             result["generation_end_time"] = end_time
             result["generation_time"] = end_time - start_time
 
-        result["input_sequence_length"] = input_sequence_length
+        if input_sequence_length is not None:
+            result["input_sequence_length"] = input_sequence_length
         return result
 
     async def apply_evaluation_hook(self, data_point):
