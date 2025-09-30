@@ -34,7 +34,7 @@ Example usage:
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 from nemo_skills.pipeline.utils import get_exp, run_exp
 from nemo_skills.pipeline.utils.generation import get_chunked_rs_filename
@@ -69,8 +69,16 @@ def reference_property(attribute_name: str):
                     else:
                         return "localhost"  # Safe fallback
 
-                var_name = f"{self.get_name().upper()}_{attr_name.upper()}_HET_GROUP_{self.het_group_index}"
-                return f"${{{var_name}}}"
+                # For heterogeneous jobs, use appropriate SLURM expressions
+                if attr_name == "host":
+                    # Use SLURM nodelist to get the hostname for this het component
+                    return (
+                        f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
+                    )
+                else:
+                    # For other attributes (like port), use environment variables
+                    var_name = f"{self.get_name().upper()}_{attr_name.upper()}_HET_GROUP_{self.het_group_index}"
+                    return f"${{{var_name}}}"
 
             return ref_method
 
@@ -539,9 +547,17 @@ class TrainTask(Component):
 
 @dataclass
 class RunCmd(Component):
-    """Declarative component for running arbitrary bash commands in containers."""
+    """Declarative component for running arbitrary bash commands in containers.
 
-    command: str
+    The command can be either:
+    - A string: evaluated immediately
+    - A callable (lambda): evaluated lazily when the task is prepared
+
+    Using a lambda allows references to work correctly in heterogeneous jobs:
+        RunCmd(command=lambda: f"curl {server.url_ref()}")
+    """
+
+    command: Union[str, Callable[[], str]]
     container: str = "nemo-skills"
     gpus: Optional[int] = None
     nodes: int = 1
@@ -568,8 +584,11 @@ class RunCmd(Component):
         for env_var, value in self.env_vars.items():
             cmd_parts.append(f"export {env_var}={value}")
 
+        # Evaluate command if it's a callable (lazy evaluation)
+        actual_command = self.command() if callable(self.command) else self.command
+
         # Add the actual command
-        cmd_parts.append(self.command.strip())
+        cmd_parts.append(actual_command.strip())
 
         cmd = " && ".join(cmd_parts)
 
@@ -731,8 +750,12 @@ class Pipeline:
         # If multiple groups, they need special handling for heterogeneous jobs
         if len(self.groups) > 1:
             # Each HetGroup becomes a separate het component
-            # We need to add all groups to the builder and let it handle het job creation
-            for group in self.groups:
+            # Update het_group_indices for components to match their actual het component positions
+            for het_idx, group in enumerate(self.groups):
+                # Update all components in this group to have the correct het_group_index
+                for component in group.components:
+                    component.het_group_index = het_idx
+
                 task_group = group.to_task_group(final_cluster_config, self.output_dir)
                 # Mark that this is part of a multi-group pipeline
                 task_group._is_het_component = True

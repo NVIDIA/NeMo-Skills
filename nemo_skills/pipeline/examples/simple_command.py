@@ -22,6 +22,9 @@ def main():
     shared_server = Server(model="Qwen/Qwen3-8B", gpus=8)  # 8 GPUs as needed
     shared_sandbox = Sandbox()
 
+    # Note: Using f-string (not lambda) is fine here because this is a single HetGroup
+    # All components are in the same group, so url_ref() works correctly
+    # For cross-component references (multiple HetGroups), use lambda: f"..." instead
     comand = RunCmd(
         command=f"""
         echo 'Waiting for server to be ready...' &&
