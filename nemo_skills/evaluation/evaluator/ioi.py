@@ -139,12 +139,12 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         file_creation_commands = [
             # Create the unique run directory itself
             f"mkdir -p {unique_dir}",
-            # Copy precompiled artifacts (this will also create the graders/ directory if present)
-            f"cp -r {precompiled_dir}/* {unique_dir}/",
-            # Ensure `graders/` exists even if it was absent in the precompiled bundle
+            # Ensure `graders/` directory exists
             f"mkdir -p {unique_dir}/graders",
-            # Write the contestant's generated solution into the graders folder
-            f"cat <<'_EOT_' > {unique_dir}/graders/{task_args['problem_id']}.cpp\n{task_args['generated_code']}\n_EOT_\n",
+            # First write the contestant's generated solution into the graders folder
+            f"cat <<'_EOT_' > {unique_dir}/graders/{task_args['problem_id']}.cpp\\n{task_args['generated_code']}\\n_EOT_\\n",
+            # Finally copy precompiled artifacts and ALLOW them to overwrite existing files (for debugging purposes)
+            f"cp -r {precompiled_dir}/* {unique_dir}/",
         ]
 
         # Prepare input and expected output files
