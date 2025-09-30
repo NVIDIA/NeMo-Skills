@@ -10,6 +10,7 @@
 #   DOCKER_NAME: fully qualified name of the docker image (default inferred from repository)
 #   DOCKER_TAG: docker tag (default set as `YY.MM.DD-git-hash`)
 #   DOCKER_PUSH: pushes docker image when variable is set.
+#   DOCKER_CACHE: uses registry cache when variable is set.
 #
 
 if [[ -z "${1}" ]]; then
@@ -38,11 +39,14 @@ __docker_tag=${DOCKER_TAG:-"$(date +"%Y.%m.%d")-$(git rev-parse --short HEAD)"}
 
 echo "Building ${__docker_name}:${__docker_tag} from context ${__context_dir}"
 
-docker build \
+if [[ ! -z ${DOCKER_PUSH} ]]; then
+    __docker_build_args="${__docker_build_args} --push"
+fi
+if [[ ! -z ${DOCKER_CACHE} ]]; then
+    __docker_build_args="${__docker_build_args} --cache-to type=registry,ref=${__docker_name}/cache,mode=max --cache-from type=registry,ref=${__docker_name}/cache"
+fi
+
+docker build ${__docker_build_args} \
     -f "${__dockerfile}" \
     -t "${__docker_name}:${__docker_tag}" \
     "${__context_dir}"
-
-if [[ ($? -eq 0) && ( ! -z "${DOCKER_PUSH}" ) ]]; then
-    docker push "${__docker_name}:${__docker_tag}"
-fi
