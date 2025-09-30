@@ -280,7 +280,7 @@ class GenerateTask(Component):
     """Declarative generation task that can reference other components - cross-group compatible."""
 
     input_source: str  # Can be file or directory
-    output_dir: str
+    output_subdir: str = "generation"  # Relative path under pipeline output_dir
     server: Optional[Server] = None
     server_ref: Optional[RuntimeRef] = None  # For cross-group server references
     sandbox: Optional[Sandbox] = None
@@ -302,8 +302,14 @@ class GenerateTask(Component):
         if self.chunks is None:
             self.chunks = [None]
 
-    def discover_jobs(self) -> List[Dict]:
+    def get_full_output_dir(self, pipeline_output_dir: str) -> str:
+        """Get full output directory path."""
+        return f"{pipeline_output_dir}/{self.output_subdir}"
+
+    def discover_jobs(self, pipeline_output_dir: str) -> List[Dict]:
         """Discover what actual jobs need to run based on existing outputs."""
+        full_output_dir = self.get_full_output_dir(pipeline_output_dir)
+
         if self.rerun_done:
             # Return all combinations
             return [{"seed": seed, "chunk_id": chunk_id} for seed in self.seeds for chunk_id in self.chunks]
@@ -311,7 +317,7 @@ class GenerateTask(Component):
         incomplete = []
         for seed in self.seeds:
             for chunk_id in self.chunks:
-                output_file = get_chunked_rs_filename(self.output_dir, seed, chunk_id)
+                output_file = get_chunked_rs_filename(full_output_dir, seed, chunk_id)
                 if not os.path.exists(f"{output_file}.done"):
                     incomplete.append({"seed": seed, "chunk_id": chunk_id})
 
@@ -319,7 +325,8 @@ class GenerateTask(Component):
 
     def to_task_definitions(self, cluster_config: Dict, hardware_config: Optional[Dict] = None) -> List:
         """Convert to multiple MainTask definitions based on job discovery."""
-        jobs_needed = self.discover_jobs()
+        pipeline_output_dir = hardware_config.get("pipeline_output_dir", "/tmp") if hardware_config else "/tmp"
+        jobs_needed = self.discover_jobs(pipeline_output_dir)
 
         if not jobs_needed:
             LOG.info(f"GenerateTask '{self.name}': All jobs complete, nothing to run")
@@ -333,7 +340,7 @@ class GenerateTask(Component):
             chunk_id = job["chunk_id"]
 
             # Build job-specific command
-            cmd = self._build_command_for_job(seed, chunk_id)
+            cmd = self._build_command_for_job(seed, chunk_id, cluster_config, pipeline_output_dir)
 
             # Create job-specific name
             job_name = self.name
@@ -373,7 +380,13 @@ class GenerateTask(Component):
         task_defs = self.to_task_definitions(cluster_config, hardware_config)
         return task_defs[0] if task_defs else None
 
-    def _build_command_for_job(self, seed: Optional[int], chunk_id: Optional[int]) -> str:
+    def _build_command_for_job(
+        self,
+        seed: Optional[int],
+        chunk_id: Optional[int],
+        cluster_config: Optional[Dict] = None,
+        pipeline_output_dir: Optional[str] = None,
+    ) -> str:
         """Build generation command for a specific seed/chunk job."""
         # Determine input file for this job
         if os.path.isfile(self.input_source):
@@ -383,7 +396,9 @@ class GenerateTask(Component):
         else:
             input_file = self.input_source
 
-        output_file = get_chunked_rs_filename(self.output_dir, seed, chunk_id)
+        # Use pipeline output directory
+        full_output_dir = self.get_full_output_dir(pipeline_output_dir or "/tmp")
+        output_file = get_chunked_rs_filename(full_output_dir, seed, chunk_id)
 
         cmd_parts = [
             "export HYDRA_FULL_ERROR=1 &&",
@@ -542,7 +557,8 @@ class RunCmd(Component):
         cmd = " && ".join(cmd_parts)
 
         # Apply hardware config overrides
-        num_gpus = hardware_config.get("num_gpus", self.gpus) if hardware_config else self.gpus
+        # RunCmd defaults to 0 GPUs unless explicitly set on the component
+        num_gpus = self.gpus if self.gpus is not None else 0
         num_nodes = hardware_config.get("num_nodes", self.nodes) if hardware_config else self.nodes
         partition = hardware_config.get("partition") if hardware_config else None
         exclusive = hardware_config.get("exclusive", False) if hardware_config else False
@@ -609,10 +625,11 @@ class HetGroup:
             setattr(self.hardware, key, value)
         return self
 
-    def to_task_group(self, cluster_config: Dict) -> TaskGroup:
+    def to_task_group(self, cluster_config: Dict, pipeline_output_dir: Optional[str] = None) -> TaskGroup:
         """Convert to actual TaskGroup."""
         name = self._name or self._generate_name()
-        group = TaskGroup(name, heterogeneous=len(self.components) > 1)
+        # All components in a HetGroup share the same resources, so NOT heterogeneous within the group
+        group = TaskGroup(name, heterogeneous=False)
 
         # Convert hardware config to dict for passing to components
         hardware_dict = {
@@ -623,6 +640,7 @@ class HetGroup:
             "server_nodes": self.hardware.server_nodes,
             "num_gpus": self.hardware.num_gpus,
             "num_nodes": self.hardware.num_nodes,
+            "pipeline_output_dir": pipeline_output_dir,  # ✨ Pass pipeline output dir
         }
 
         for component in self.components:
@@ -644,10 +662,13 @@ class HetGroup:
 class Pipeline:
     """Top-level pipeline that composes groups."""
 
-    def __init__(self, name: str, groups: List[HetGroup], cluster: Optional[str] = None):
+    def __init__(
+        self, name: str, groups: List[HetGroup], cluster: Optional[str] = None, output_dir: Optional[str] = None
+    ):
         self.name = name
         self.groups = groups
         self.cluster = cluster
+        self.output_dir = output_dir or f"/tmp/{name}_outputs"
         self._cluster_config: Optional[Dict] = None
         self._assign_het_group_indices()
 
@@ -692,12 +713,13 @@ class Pipeline:
 
         # Convert all groups to task groups
         for group in self.groups:
-            task_group = group.to_task_group(final_cluster_config)
+            task_group = group.to_task_group(final_cluster_config, self.output_dir)
             builder.add_task_group(task_group)
 
         # Execute
+        log_dir = f"{self.output_dir}/logs"
         with get_exp(self.name, final_cluster_config) as exp:
-            builder.build_experiment(exp, "/tmp/logs")
+            builder.build_experiment(exp, log_dir)
             if not dry_run:
                 run_exp(exp, final_cluster_config)
             return exp

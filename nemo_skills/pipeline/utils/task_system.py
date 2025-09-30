@@ -203,11 +203,16 @@ class ExecutorBuilder:
         overlap: bool = False,
         with_ray: bool = False,
         extra_package_dirs: Optional[List[str]] = None,
+        heterogeneous: bool = False,
+        executor_gpus: Optional[int] = None,
     ):
         """Build an executor for a specific task."""
 
         # Get task-specific executor kwargs
         executor_kwargs = task.get_executor_kwargs()
+
+        # Use executor_gpus if provided (for het groups), otherwise use task's GPU count
+        final_gpus = executor_gpus if executor_gpus is not None else task.resources.num_gpus
 
         # Use temporary environment update if task has environment variables
         if task.environment:
@@ -217,7 +222,7 @@ class ExecutorBuilder:
                     container=task.container,
                     num_nodes=task.resources.num_nodes or 1,  # Default to 1 if None
                     tasks_per_node=task.resources.num_tasks or 1,  # Default to 1 if None
-                    gpus_per_node=task.resources.num_gpus,
+                    gpus_per_node=final_gpus,
                     job_name=task.name,
                     log_dir=log_dir,
                     log_prefix=task.log_prefix,
@@ -225,7 +230,7 @@ class ExecutorBuilder:
                     time_min=task.resources.time_min,
                     dependencies=dependencies,
                     extra_package_dirs=tuple(extra_package_dirs) if extra_package_dirs else None,
-                    heterogeneous=len([t for t in [task] if isinstance(t, TaskDefinition)]) > 1,
+                    heterogeneous=heterogeneous,
                     het_group=het_group,
                     total_het_groups=total_het_groups,
                     slurm_kwargs=task.resources.slurm_kwargs,
@@ -239,7 +244,7 @@ class ExecutorBuilder:
                 container=task.container,
                 num_nodes=task.resources.num_nodes or 1,  # Default to 1 if None
                 tasks_per_node=task.resources.num_tasks or 1,  # Default to 1 if None
-                gpus_per_node=task.resources.num_gpus,
+                gpus_per_node=final_gpus,
                 job_name=task.name,
                 log_dir=log_dir,
                 log_prefix=task.log_prefix,
@@ -304,6 +309,17 @@ class PipelineBuilder:
 
         total_het_groups = len(group.tasks) if group.heterogeneous else 1
 
+        # For groups with multiple tasks, use the max GPU count across all tasks
+        # All tasks share the same hardware, so we allocate based on the max needed
+        shared_gpus = None
+        if len(group.tasks) > 1:
+            max_gpus = 0
+            for task in group.tasks:
+                if task.resources.num_gpus is not None:
+                    max_gpus = max(max_gpus, task.resources.num_gpus)
+            shared_gpus = max_gpus if max_gpus > 0 else None
+            LOG.info(f"Multi-task group: All tasks will share {shared_gpus} GPUs")
+
         for i, task in enumerate(group.tasks):
             # Prepare the command
             cmd = task.prepare_command(self.cluster_config)
@@ -311,6 +327,10 @@ class PipelineBuilder:
 
             # Build executor
             het_group = i if group.heterogeneous else 0
+
+            # Use shared GPUs for multi-task groups, otherwise use task's own count
+            executor_gpus = shared_gpus if len(group.tasks) > 1 else task.resources.num_gpus
+
             executor = ExecutorBuilder.build_executor(
                 task=task,
                 cluster_config=self.cluster_config,
@@ -321,6 +341,8 @@ class PipelineBuilder:
                 overlap=len(group.tasks) > 1,
                 with_ray=self.global_config["with_ray"],
                 extra_package_dirs=self.global_config["extra_package_dirs"],
+                heterogeneous=group.heterogeneous,
+                executor_gpus=executor_gpus,
             )
             executors.append(executor)
             het_group_indices.append(het_group)
