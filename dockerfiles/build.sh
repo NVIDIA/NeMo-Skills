@@ -45,7 +45,7 @@ if [[ ! -z ${DOCKER_CACHE} ]]; then
     __docker_build_args="${__docker_build_args} --cache-to type=registry,ref=${__docker_name}/cache,mode=max --cache-from type=registry,ref=${__docker_name}/cache"
 fi
 
-# docker build ${__docker_build_args} \
-#     -f "${__dockerfile}" \
-#     -t "${__docker_name}:${__docker_tag}" \
-#     "${__context_dir}"
+docker build ${__docker_build_args} \
+    -f "${__dockerfile}" \
+    -t "${__docker_name}:${__docker_tag}" \
+    "${__context_dir}"
