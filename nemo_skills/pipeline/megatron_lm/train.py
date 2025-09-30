@@ -13,23 +13,21 @@
 # limitations under the License.
 
 import logging
-from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 
 import typer
 
-from nemo_skills.pipeline.app import typer_unpacker
+from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
     check_mounts,
     get_cluster_config,
-    get_env_variables,
     get_exp,
     get_mounted_path,
+    get_timeout_str,
     resolve_mount_paths,
     run_exp,
-    temporary_env_update,
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -39,110 +37,63 @@ LOG = logging.getLogger(get_logger_name(__file__))
 megatron_lm_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 
 
-@dataclass
-class MegatronLMTask:
-    """Configuration for Megatron-LM SFT training task."""
-
-    # Only essential parameters that need validation/processing
-    entrypoint: str
-    pretrained_checkpoint: str
-    tokenizer_model: str
-    training_data: str
-    validation_data: Optional[str]
-    output_dir: str
-    expname: str
-    wandb_project: str
-    wandb_group: Optional[str]
-    disable_wandb: bool
-    extra_arguments: str = ""
-
-    def get_training_cmd(self) -> str:
-        """Generate the Megatron-LM training command."""
-
-        # Base command setup
-        cmd = (
-            "export UB_TIMEOUT=720 && "
-            "export CUDA_DEVICE_MAX_CONNECTIONS=1 && "
-            "export NVTE_FWD_LAYERNORM_SM_MARGIN=16 && "
-            "export NVTE_BWD_LAYERNORM_SM_MARGIN=16 && "
-            "export NCCL_P2P_NET_CHUNKSIZE=2097152 && "
-            "export NCCL_DEBUG=WARN && "
-            "export TORCHINDUCTOR_WORKER_START=fork && "
-            "echo 'Starting Megatron-LM SFT training' && "
-            f"python -u {self.entrypoint} "
-            f"    --sft "
-            f"    --pretrained-checkpoint {self.pretrained_checkpoint} "
-            f"    --tokenizer-model {self.tokenizer_model} "
-            f"    --per-split-data-args-path {self.training_data} "
-            f"    --load {self.output_dir}/checkpoints "
-            f"    --save {self.output_dir}/checkpoints "
-            f"    --tensorboard-dir {self.output_dir}/tensorboard "
-            f"    --tensor-model-parallel-size {self.num_gpus} "
-            f"    --data-cache-path {self.output_dir}/data_cache "
-        )
-
-        # Add wandb configuration if enabled
-        if not self.disable_wandb:
-            essential_args.extend([f"--wandb-project {self.wandb_project}", f"--wandb-exp-name {self.expname}"])
-            if self.wandb_group:
-                essential_args.append(f"--wandb-group {self.wandb_group}")
-
-        # Add extra arguments if provided
-        if self.extra_arguments:
-            essential_args.extend(self.extra_arguments.split())
-
-        # Format arguments with line continuations
-        for i, arg in enumerate(essential_args):
-            if i == len(essential_args) - 1:
-                cmd_parts.append(f"    {arg}")
-            else:
-                cmd_parts.append(f"    {arg} \\")
-
-        return "\n".join(cmd_parts)
-
-
 def get_training_cmd(
     cluster_config,
     partition,
+    entrypoint,
+    init_cmd,
     pretrained_checkpoint,
     tokenizer_model,
     training_data,
     validation_data,
-    num_gpus,
-    num_nodes,
     expname,
     output_dir,
     disable_wandb,
     wandb_project,
     wandb_group,
     extra_arguments,
-    log_dir,
-    env_variables,
 ):
     """Generate Megatron-LM training command."""
 
-    # timeout = get_timeout(cluster_config, partition)
+    timeout_str = get_timeout_str(cluster_config, partition)
+    # timeout_str is in NeMo-RL format: DD:HH:MM:SS (see get_timeout_str)
+    days_str, hours_str, mins_str, secs_str = timeout_str.split(":")
+    days, hours, mins, secs = int(days_str), int(hours_str), int(mins_str), int(secs_str)
+    timeout_minutes = days * 24 * 60 + hours * 60 + mins
+    # round up if there are leftover seconds
+    if secs > 0:
+        timeout_minutes += 1
 
-    task = MegatronLMTask(
-        entrypoint=entrypoint,
-        pretrained_checkpoint=pretrained_checkpoint,
-        tokenizer_model=tokenizer_model,
-        training_data=training_data,
-        validation_data=validation_data,
-        output_dir=output_dir,
-        expname=expname,
-        wandb_project=wandb_project,
-        wandb_group=wandb_group,
-        disable_wandb=disable_wandb,
-        extra_arguments=extra_arguments,
+    # Base command setup
+    cmd = (
+        f"echo 'Running init command' && "
+        f"{init_cmd} && "
+        "echo 'Starting Megatron-LM training' && "
+        f"python -u {entrypoint} "
+        f"    --pretrained-checkpoint {pretrained_checkpoint} "
+        f"    --tokenizer-model {tokenizer_model} "
+        f"    --per-split-data-args-path {training_data} "
+        f"    --load {output_dir}/checkpoints "
+        f"    --save {output_dir}/checkpoints "
+        f"    --tensorboard-dir {output_dir}/tensorboard "
+        f"    --data-cache-path {output_dir}/megatron-lm-data-cache "  # unused for sft
+        f"    --exit-duration-in-mins {timeout_minutes} "
     )
 
-    return task.get_training_cmd()
+    # Add wandb configuration if enabled
+    if not disable_wandb:
+        cmd += f"--wandb-project {wandb_project} --wandb-exp-name {expname} "
+        if wandb_group:
+            cmd += f"--wandb-group {wandb_group} "
+
+    cmd += f" {extra_arguments} "
+
+    return cmd
 
 
-@megatron_lm_app.command(name="sft", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@megatron_lm_app.command(name="train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
-def sft_megatron_lm(
+def train_megatron_lm(
     ctx: typer.Context,
     cluster: str = typer.Option(
         None,
@@ -150,12 +101,18 @@ def sft_megatron_lm(
         "Can also use NEMO_SKILLS_CONFIG instead of specifying as argument.",
     ),
     output_dir: str = typer.Option(..., help="Where to put results"),
-    expname: str = typer.Option("megatron-lm-sft", help="Experiment name"),
-    entrypoint: str = typer.Option("pretrain_mamba.py", help="Entrypoint script name"),
+    expname: str = typer.Option("megatron-lm-train", help="Experiment name"),
+    entrypoint: str = typer.Option(..., help="Entrypoint script name, e.g. pretrain_gpt.py or pretrain_mamba.py"),
+    init_cmd: str = typer.Option(
+        "",
+        help="Initialization command to run before the main command. "
+        "Useful to include a large list of environment variables.",
+    ),
     pretrained_checkpoint: str = typer.Option(..., help="Path to the pretrained checkpoint"),
     tokenizer_model: str = typer.Option(..., help="Path to the tokenizer model"),
-    training_data: str = typer.Option(..., help="Path to the training data"),
-    validation_data: Optional[str] = typer.Option(None, help="Path to the validation data"),
+    per_split_data_path: str = typer.Option(
+        ..., help="Path to the json file containing information about per-split training data"
+    ),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
@@ -237,21 +194,17 @@ def sft_megatron_lm(
         check_if_mounted(cluster_config, pretrained_checkpoint)
     if tokenizer_model.startswith("/"):
         check_if_mounted(cluster_config, tokenizer_model)
-    if training_data.startswith("/"):
-        training_data = get_mounted_path(cluster_config, training_data)
-    if validation_data is not None and validation_data.startswith("/"):
-        validation_data = get_mounted_path(cluster_config, validation_data)
-
-    env_variables = get_env_variables(cluster_config)
+    if per_split_data_path.startswith("/"):
+        per_split_data_path = get_mounted_path(cluster_config, per_split_data_path)
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
         partition=partition,
         entrypoint=entrypoint,
+        init_cmd=init_cmd,
         pretrained_checkpoint=pretrained_checkpoint,
         tokenizer_model=tokenizer_model,
-        training_data=training_data,
-        validation_data=validation_data,
+        per_split_data_path=per_split_data_path,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         expname=expname,
@@ -260,40 +213,30 @@ def sft_megatron_lm(
         wandb_project=wandb_project,
         wandb_group=wandb_group,
         extra_arguments=extra_arguments,
-        log_dir=f"{log_dir}/training-logs",
-        env_variables=env_variables,
     )
-
-    server_config = None
-    env_update = {}
 
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
-        with temporary_env_update(cluster_config, env_update):
-            for job_id in range(num_training_jobs):
-                prev_task = add_task(
-                    exp,
-                    cmd=train_cmd,
-                    task_name=f"{expname}-sft-{job_id}",
-                    log_dir=f"{log_dir}/training-logs",
-                    container=cluster_config["containers"]["megatron-lm"],
-                    num_gpus=num_gpus,
-                    num_nodes=num_nodes,
-                    cluster_config=cluster_config,
-                    server_config=server_config,
-                    partition=partition,
-                    time_min=time_min,
-                    run_after=run_after,
-                    reuse_code=reuse_code,
-                    reuse_code_exp=reuse_code_exp,
-                    task_dependencies=[prev_task] if prev_task is not None else None,
-                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                    heterogeneous=True if server_config is not None else False,
-                    with_sandbox=False,
-                    with_ray=False,  # Megatron-LM doesn't use Ray
-                    installation_command=installation_command,
-                    skip_hf_home_check=skip_hf_home_check,
-                )
+        for job_id in range(num_training_jobs):
+            prev_task = add_task(
+                exp,
+                cmd=train_cmd,
+                task_name=f"{expname}-{job_id}",
+                log_dir=f"{log_dir}/training-logs",
+                container=cluster_config["containers"]["megatron"],
+                num_gpus=num_gpus,
+                num_nodes=num_nodes,
+                cluster_config=cluster_config,
+                partition=partition,
+                time_min=time_min,
+                run_after=run_after,
+                reuse_code=reuse_code,
+                reuse_code_exp=reuse_code_exp,
+                task_dependencies=[prev_task] if prev_task is not None else None,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
+            )
         run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 
     if _reuse_exp:
@@ -303,4 +246,4 @@ def sft_megatron_lm(
 
 if __name__ == "__main__":
     typer.main.get_command_name = lambda name: name
-    megatron_lm_app()
+    app()

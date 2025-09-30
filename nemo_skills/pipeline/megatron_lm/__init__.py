@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from nemo_skills.pipeline.app import app
-from nemo_skills.pipeline.megatron_lm.sft import megatron_lm_app
+from nemo_skills.pipeline.megatron_lm.train import megatron_lm_app
 
 app.add_typer(megatron_lm_app, name="megatron_lm")
 
