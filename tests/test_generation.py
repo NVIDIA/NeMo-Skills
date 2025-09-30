@@ -53,7 +53,7 @@ def test_eval_judge_api(tmp_path):
     cmd = (
         f"ns eval "
         f"    --server_type=openai "
-        f"    --model=nvidia/nvidia-nemotron-nano-9b-v2"
+        f"    --model=nvidia/nvidia-nemotron-nano-9b-v2 "
         f"    --server_address=https://integrate.api.nvidia.com/v1 "
         f"    --benchmarks=math-500 "
         f"    --output_dir={tmp_path} "
