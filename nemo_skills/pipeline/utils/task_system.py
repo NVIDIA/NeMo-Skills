@@ -323,6 +323,21 @@ class PipelineBuilder:
         all_executors = []
         het_group_indices = []
 
+        # First pass: Prepare commands and collect all environment variables from all tasks
+        shared_env_vars = {}
+        for het_idx, group in enumerate(het_component_groups):
+            for task in group.tasks:
+                cmd = task.prepare_command(self.cluster_config)
+                # Collect environment variables from each task
+                shared_env_vars.update(task.environment)
+
+        # Share all environment variables across all tasks (for cross-component references)
+        LOG.info(f"Sharing {len(shared_env_vars)} environment variables across all het components")
+        for group in het_component_groups:
+            for task in group.tasks:
+                task.environment.update(shared_env_vars)
+
+        # Second pass: Build executors and commands with shared environment
         for het_idx, group in enumerate(het_component_groups):
             LOG.info(f"Het component {het_idx}: {len(group.tasks)} tasks from group '{group.name}'")
 
@@ -330,7 +345,6 @@ class PipelineBuilder:
             dependencies = self._resolve_dependencies(group)
 
             # Get the shared GPU count for this het component
-            # All tasks in this het component share the same resources
             max_gpus = 0
             for task in group.tasks:
                 if task.resources.num_gpus is not None:

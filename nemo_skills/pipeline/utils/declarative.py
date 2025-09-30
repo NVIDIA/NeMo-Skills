@@ -69,12 +69,12 @@ def reference_property(attribute_name: str):
                     else:
                         return "localhost"  # Safe fallback
 
-                # For heterogeneous jobs, use appropriate SLURM expressions
+                # For heterogeneous jobs
                 if attr_name == "host":
-                    # Use SLURM nodelist to get the hostname for this het component
-                    return (
-                        f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
-                    )
+                    # SLURM_JOB_NODELIST_HET_GROUP_N contains the hostname(s) for this het component
+                    # Just extract the first one if there are multiple (comma-separated)
+                    # For a single node, it's already the full hostname (e.g., "cw-dfw-h100-004-004-033")
+                    return f"$(echo $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | cut -d',' -f1)"
                 else:
                     # For other attributes (like port), use environment variables
                     var_name = f"{self.get_name().upper()}_{attr_name.upper()}_HET_GROUP_{self.het_group_index}"
@@ -170,7 +170,11 @@ class Component:
         return type(self).__name__.lower()
 
     def _add_cross_group_env_vars(self, task_def, attributes: List[str]):
-        """Add environment variables for cross-group access."""
+        """Add environment variables for cross-group access (currently only ports).
+
+        Note: Hostnames are resolved directly from SLURM_JOB_NODELIST_HET_GROUP_N
+        in the shell script, not through environment variables.
+        """
         if self.het_group_index is not None:
             for attr in attributes:
                 if hasattr(self, attr):
@@ -180,11 +184,6 @@ class Component:
                         task_def.environment[
                             f"{self.get_name().upper()}_{attr.upper()}_HET_GROUP_{self.het_group_index}"
                         ] = str(value)
-                    elif attr == "host":
-                        # For hosts, export the hostname
-                        task_def.environment[
-                            f"{self.get_name().upper()}_{attr.upper()}_HET_GROUP_{self.het_group_index}"
-                        ] = "$(hostname)"
 
 
 @reference_component
