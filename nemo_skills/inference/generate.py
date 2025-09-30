@@ -29,6 +29,7 @@ import hydra
 import litellm
 from omegaconf import ListConfig
 from tqdm import tqdm
+from transformers import AutoTokenizer
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
@@ -39,7 +40,7 @@ from nemo_skills.inference.model import (
     get_tool_calling_model,
     server_params,
 )
-from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.prompt.utils import get_prompt, get_token_count
 from nemo_skills.utils import (
     chunk_data,
     get_help_message,
@@ -113,6 +114,9 @@ class GenerateSolutionsConfig:
     # Useful when running judge jobs to keep the original generation statistics
     add_generation_stats: bool = True
 
+    # Count the number of tokens in the prompt
+    count_prompt_tokens: bool = False
+
     generation_key: str = "generation"
 
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
@@ -167,6 +171,10 @@ class GenerateSolutionsConfig:
     # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
     enable_litellm_cache: bool = False
 
+    # Evaluation during generation
+    eval_type: str | None = None  # "lean4-proof", "math", etc.
+    eval_config: dict = field(default_factory=dict)  # Config for the evaluator
+
     def __post_init__(self):
         self._post_init_validate_data()
         self._post_init_validate_server()
@@ -191,7 +199,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.cfg.use_completions_api = True
+            self.use_completions_api = True
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -264,7 +272,11 @@ class GenerationTask:
                 self.cfg.chat_template_kwargs = None
 
         # Setup tokenizer
-        if self.cfg.use_completions_api or self.cfg.server.get("enable_soft_fail", False):
+        if (
+            self.cfg.use_completions_api
+            or self.cfg.server.get("enable_soft_fail", False)
+            or self.cfg.count_prompt_tokens
+        ):
             # These are the only cases where we need a tokenizer
             self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
         else:
@@ -280,10 +292,31 @@ class GenerationTask:
         self.prompt = self.setup_prompt()
         self.llm = self.setup_llm()
 
+        # Setup hf_tokenizer for counting prompt tokens
+        self.hf_tokenizer = None
+        if self.cfg.count_prompt_tokens:
+            self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
+
+            if self.hf_tokenizer is None:
+                raise ValueError("Tokenizer could not be initialized. Needed for counting prompt tokens.")
+
         if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
         else:
             self.extra_generate_params = {}
+
+        # Setup evaluator if specified
+        self.evaluator = None
+        if self.cfg.eval_type:
+            from nemo_skills.evaluation.evaluator import get_evaluator_class, supports_single_eval
+
+            if not supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
+                raise ValueError(
+                    f"Evaluator '{self.cfg.eval_type}' does not support single evaluation during generation. "
+                    f"Use the evaluation pipeline instead."
+                )
+
+            self.evaluator = get_evaluator_class(self.cfg.eval_type, self.cfg.eval_config)
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
@@ -314,6 +347,7 @@ class GenerationTask:
             examples_type=self.cfg.examples_type,
             system_message=self.cfg.system_message,
         )
+
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
@@ -454,23 +488,12 @@ class GenerationTask:
             # all of the ground-truth data to the output file alongside the generated solutions
             output[self.cfg.generation_key] = output.pop("generation")
 
-            # calculating total generation time
-            if self.cfg.add_generation_stats:
-                output["generation_end_time"] = time.time()
-                # TODO: start time is saved in data_point, not output, need to fix that
-                output["generation_time"] = (
-                    output["generation_end_time"] - original_data_point["generation_start_time"]
-                )
-            else:
-                # generation_start_time was overriden, so restoring it from end and total
-                # TODO: this is a bit hacky, need a rewrite
-                if "generation_end_time" in original_data_point and "generation_time" in original_data_point:
-                    output["generation_start_time"] = (
-                        original_data_point["generation_end_time"] - original_data_point["generation_time"]
-                    )
-                else:
-                    output.pop("generation_start_time", None)
+            if not self.cfg.add_generation_stats:
+                output.pop("generation_start_time", None)
+                output.pop("generation_end_time", None)
+                output.pop("generation_time", None)
                 output.pop("num_generated_tokens", None)
+                output.pop("input_sequence_length", None)
 
             for key in output:
                 original_data_point.pop(key, None)
@@ -503,16 +526,41 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        return await self.llm.generate_async(**generation_params)
+        result = await self.llm.generate_async(**generation_params)
+
+        if self.cfg.count_prompt_tokens:
+            input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
+            result["input_sequence_length"] = input_sequence_length
+        return result
+
+    async def apply_evaluation_hook(self, data_point):
+        if self.evaluator:
+            eval_start_time = time.time()
+            eval_results = await self.evaluator.eval_single(data_point)
+            eval_end_time = time.time()
+            data_point["interleaved_eval_single_time_s"] = eval_end_time - eval_start_time
+            data_point.update(eval_results)
+        return data_point
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point with semaphore control."""
         async with self.semaphore:
-            # registering current time to calculate total generation time
-            data_point["generation_start_time"] = time.time()
-
             # Generate output for this single data point
+            start_time = time.time()
             output = await self.process_single_datapoint(data_point, all_data)
+            end_time = time.time()
+
+            if self.cfg.add_generation_stats:
+                output["generation_start_time"] = start_time
+                output["generation_end_time"] = end_time
+                output["generation_time"] = end_time - start_time
+
+            # Apply evaluation hook if configured
+            # TODO: note that this currently only evaluates independently--if there
+            # is any post-processing that needs to be done on the full set of
+            # generations, this will not work correctly, and we might need another
+            # hook at the end of generation to make it work properly
+            output = await self.apply_evaluation_hook({**data_point, **output})
 
             # Thread-safe output writing
             async with self.output_lock:
