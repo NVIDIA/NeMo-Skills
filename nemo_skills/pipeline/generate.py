@@ -27,6 +27,7 @@ from nemo_skills.utils import (
     get_logger_name,
     setup_logging,
     str_ids_to_list,
+    validate_wandb_project_name,
 )
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -185,10 +186,15 @@ def generate(
             "project": wandb_project,
             "group": wandb_group,
         }
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=wandb_name or expname,
+            wandb_group=wandb_group,
+        )
     else:
         wandb_parameters = None
 
-    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
 
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")

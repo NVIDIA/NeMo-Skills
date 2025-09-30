@@ -27,7 +27,7 @@ from nemo_skills.inference import GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import generate as _generate
 from nemo_skills.pipeline.utils.eval import combine_cmds, prepare_eval_commands
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -235,6 +235,11 @@ def eval(
             "project": wandb_project,
             "group": wandb_group,
         }
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=wandb_name or expname,
+            wandb_group=wandb_group,
+        )
     else:
         wandb_parameters = None
 
@@ -313,7 +318,7 @@ def eval(
         generation_type=generation_type,
         generation_module=generation_module,
     )
-    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     has_tasks = False
     job_id_to_tasks = {}
