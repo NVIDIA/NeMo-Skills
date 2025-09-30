@@ -138,13 +138,9 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         file_creation_commands = [
             f"mkdir -p {unique_dir}",
             # Copy precompiled artifacts (graders/, checker/, compile.sh, run.sh)
+            f"cat <<'_EOT_' > {unique_dir}/graders/{task_args['problem_id']}.cpp\n{task_args['generated_code']}\n_EOT_\n",
             f"cp -r {precompiled_dir}/* {unique_dir}/",
         ]
-
-        # Write the candidate solution CPP file overwriting if necessary
-        file_creation_commands.append(
-            f"cat <<'_EOT_' > {unique_dir}/graders/{task_args['problem_id']}.cpp\n{task_args['generated_code']}\n_EOT_\n"
-        )
 
         # Prepare input and expected output files
         file_creation_commands.append(f"cat <<'_EOT_' > {unique_dir}/input.txt\n{task_args['test_input']}\n_EOT_\n")
