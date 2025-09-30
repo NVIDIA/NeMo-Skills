@@ -155,10 +155,10 @@ def main():
     result = pipeline.run(dry_run=args.dry_run)
 
     if args.dry_run:
-        print("✅ Dry run completed successfully!")
+        print("Dry run completed successfully!")
         print("To run for real, use: python multi_hetgroup_example.py --cluster ord")
     else:
-        print("✅ Pipeline execution completed!")
+        print("Pipeline execution completed!")
 
     return result
 
