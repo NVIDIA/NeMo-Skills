@@ -54,11 +54,16 @@ class RuntimeRef:
     het_group_index: int
     attribute: str = "host"  # What to resolve (host, port, etc.)
 
-    def resolve_expression(self) -> str:
+    def resolve_expression(self, cluster_config: Optional[Dict] = None) -> str:
         """Get the runtime expression to resolve this reference."""
         if self.attribute == "host":
-            # Use SLURM environment variable to get first host in the het group
-            return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
+            # Check execution environment
+            if cluster_config and cluster_config.get("executor") in ["local", "none"]:
+                # Local execution - everything runs on localhost
+                return "127.0.0.1"
+            else:
+                # SLURM execution - use environment variable to get first host in the het group
+                return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
         elif self.attribute == "port":
             # Use environment variable set by the component
             return f"${{{self.component_name.upper()}_PORT_HET_GROUP_{self.het_group_index}}}"
@@ -247,7 +252,7 @@ class GenerateTask(Component):
             chunk_id = job["chunk_id"]
 
             # Build job-specific command
-            cmd = self._build_command_for_job(seed, chunk_id)
+            cmd = self._build_command_for_job(seed, chunk_id, cluster_config)
 
             # Create job-specific name
             job_name = self.name
@@ -287,7 +292,9 @@ class GenerateTask(Component):
         task_defs = self.to_task_definitions(cluster_config, hardware_config)
         return task_defs[0] if task_defs else None
 
-    def _build_command_for_job(self, seed: Optional[int], chunk_id: Optional[int]) -> str:
+    def _build_command_for_job(
+        self, seed: Optional[int], chunk_id: Optional[int], cluster_config: Optional[Dict] = None
+    ) -> str:
         """Build generation command for a specific seed/chunk job."""
         # Determine input file for this job
         if os.path.isfile(self.input_source):
@@ -321,9 +328,9 @@ class GenerateTask(Component):
         # Handle server references (local or cross-group)
         if self.server_ref:
             # Cross-group server reference - resolve at runtime
-            server_host = self.server_ref.resolve_expression()
+            server_host = self.server_ref.resolve_expression(cluster_config)
             server_port_ref = RuntimeRef(self.server_ref.component_name, self.server_ref.het_group_index, "port")
-            server_port = server_port_ref.resolve_expression()
+            server_port = server_port_ref.resolve_expression(cluster_config)
 
             # We need to determine server_type and model from the reference
             # For now, we'll need to pass these as additional attributes or handle differently
@@ -348,9 +355,9 @@ class GenerateTask(Component):
         # Handle sandbox references (local or cross-group)
         if self.sandbox_ref:
             # Cross-group sandbox reference - resolve at runtime
-            sandbox_host = self.sandbox_ref.resolve_expression()
+            sandbox_host = self.sandbox_ref.resolve_expression(cluster_config)
             sandbox_port_ref = RuntimeRef(self.sandbox_ref.component_name, self.sandbox_ref.het_group_index, "port")
-            sandbox_port = sandbox_port_ref.resolve_expression()
+            sandbox_port = sandbox_port_ref.resolve_expression(cluster_config)
 
             cmd_parts.extend(
                 [
@@ -455,9 +462,17 @@ class RunCmd(Component):
 
         cmd = " && ".join(cmd_parts)
 
-        # Apply hardware config overrides
-        num_gpus = hardware_config.get("num_gpus", self.gpus) if hardware_config else self.gpus
-        num_nodes = hardware_config.get("num_nodes", self.nodes) if hardware_config else self.nodes
+        # Apply hardware config overrides with proper None handling
+        num_gpus = (
+            hardware_config.get("num_gpus")
+            if hardware_config and hardware_config.get("num_gpus") is not None
+            else self.gpus
+        )
+        num_nodes = (
+            hardware_config.get("num_nodes")
+            if hardware_config and hardware_config.get("num_nodes") is not None
+            else self.nodes
+        )
         partition = hardware_config.get("partition") if hardware_config else None
         exclusive = hardware_config.get("exclusive", False) if hardware_config else False
 
@@ -558,9 +573,11 @@ class HetGroup:
 class Pipeline:
     """Top-level pipeline that composes groups."""
 
-    def __init__(self, name: str, groups: List[HetGroup]):
+    def __init__(self, name: str, groups: List[HetGroup], cluster: Optional[str] = None):
         self.name = name
         self.groups = groups
+        self.cluster = cluster
+        self._cluster_config: Optional[Dict] = None
         self._assign_het_group_indices()
 
     def _assign_het_group_indices(self):
@@ -571,24 +588,47 @@ class Pipeline:
                 component.het_group_index = group_idx
                 LOG.debug(f"Assigned het_group_index {group_idx} to {component.get_name()}")
 
-    def run(self, cluster_config: Dict, dry_run: bool = False):
+    def _get_cluster_config(self) -> Dict:
+        """Get cluster configuration, loading it if necessary."""
+        if self._cluster_config is None:
+            if self.cluster is None:
+                raise ValueError("Must specify cluster either in Pipeline() or run() method")
+            from nemo_skills.pipeline.utils import get_cluster_config
+
+            self._cluster_config = get_cluster_config(self.cluster)
+        return self._cluster_config
+
+    def run(self, cluster_config: Optional[Dict] = None, cluster: Optional[str] = None, dry_run: bool = False):
         """Execute the pipeline."""
         if not self.groups:
             LOG.info("No groups to execute")
             return None
 
-        builder = PipelineBuilder(self.name, cluster_config)
+        # Determine cluster config to use
+        if cluster_config is not None:
+            # Explicit config provided
+            final_cluster_config = cluster_config
+        elif cluster is not None:
+            # Cluster name provided
+            from nemo_skills.pipeline.utils import get_cluster_config
+
+            final_cluster_config = get_cluster_config(cluster)
+        else:
+            # Use pipeline's cluster
+            final_cluster_config = self._get_cluster_config()
+
+        builder = PipelineBuilder(self.name, final_cluster_config)
 
         # Convert all groups to task groups
         for group in self.groups:
-            task_group = group.to_task_group(cluster_config)
+            task_group = group.to_task_group(final_cluster_config)
             builder.add_task_group(task_group)
 
         # Execute
-        with get_exp(self.name, cluster_config) as exp:
+        with get_exp(self.name, final_cluster_config) as exp:
             builder.build_experiment(exp, "/tmp/logs")
             if not dry_run:
-                run_exp(exp, cluster_config)
+                run_exp(exp, final_cluster_config)
             return exp
 
 

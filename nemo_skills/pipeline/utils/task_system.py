@@ -108,7 +108,7 @@ class ServerTask(TaskDefinition):
         server_config = {
             "server_type": self.server_type,
             "num_gpus": self.resources.num_gpus or 0,
-            "num_nodes": self.resources.num_nodes,
+            "num_nodes": self.resources.num_nodes or 1,  # Default to 1 if None
             "model_path": self.model_path or "",
             "server_port": server_port,
             "server_args": self.server_args,
@@ -215,8 +215,8 @@ class ExecutorBuilder:
                 return get_executor(
                     cluster_config=cluster_config,
                     container=task.container,
-                    num_nodes=task.resources.num_nodes,
-                    tasks_per_node=task.resources.num_tasks,
+                    num_nodes=task.resources.num_nodes or 1,  # Default to 1 if None
+                    tasks_per_node=task.resources.num_tasks or 1,  # Default to 1 if None
                     gpus_per_node=task.resources.num_gpus,
                     job_name=task.name,
                     log_dir=log_dir,
@@ -237,8 +237,8 @@ class ExecutorBuilder:
             return get_executor(
                 cluster_config=cluster_config,
                 container=task.container,
-                num_nodes=task.resources.num_nodes,
-                tasks_per_node=task.resources.num_tasks,
+                num_nodes=task.resources.num_nodes or 1,  # Default to 1 if None
+                tasks_per_node=task.resources.num_tasks or 1,  # Default to 1 if None
                 gpus_per_node=task.resources.num_gpus,
                 job_name=task.name,
                 log_dir=log_dir,
