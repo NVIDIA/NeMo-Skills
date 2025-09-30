@@ -27,31 +27,21 @@ def clone_dataset_repo(url, destination):
         sys.exit(1)
 
     try:
-        if destination.is_dir():
-            # If the destination exists, check if it's a Git repository.
-            if (destination / ".git").is_dir():
-                print(f"Destination '{destination}' exists. Pulling latest changes...")
-                subprocess.run(
-                    ["git", "pull", "origin"],
-                    cwd=destination,
-                    check=True,
-                    capture_output=True,
-                )
+        if destination.exists() or destination.is_symlink():
+            print(f"Destination '{destination}' already exists. Removing it...")
+            if destination.is_dir():
+                shutil.rmtree(destination)
             else:
-                print(
-                    f"❌ Error: Path '{destination}' exists but is not a Git repository.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-        else:
-            print(f"Cloning {url} into {destination}...")
-            subprocess.run(["git", "clone", url, destination], check=True, capture_output=True)
+                destination.unlink()
 
-        print("✅ Git repository is up to date.")
+        print(f"Cloning {url} into {destination}...")
+        subprocess.run(["git", "clone", url, destination], check=True, capture_output=True)
+
+        print("✅ Git clone is successful.")
 
     except subprocess.CalledProcessError as e:
         print("❌ Git command failed:", file=sys.stderr)
-        print(f"   Command: {' '.join(e.cmd)}", file=sys.stderr)
+        print(f"   Command: {' '.join(map(str, e.cmd))}", file=sys.stderr)
         print(f"   Stderr: {e.stderr.decode().strip()}", file=sys.stderr)
         sys.exit(1)
 
@@ -84,6 +74,7 @@ if __name__ == "__main__":
                     outfile_cpp.write(json.dumps(data) + "\n")
                 processed_lines += 1
         print(f"✅ Successfully processed {processed_lines} lines.")
+
     except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
         print(f"❌ Error during file processing: {e}", file=sys.stderr)
         sys.exit(1)
