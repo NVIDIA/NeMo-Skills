@@ -15,13 +15,13 @@
 executor: slurm
 
 containers:
-  trtllm: nvcr.io/nvidia/tensorrt-llm/release:0.21.0
+  trtllm: nvcr.io/nvidia/tensorrt-llm/release:1.0.0
   vllm: vllm/vllm-openai:v0.10.1.1
-  sglang: igitman/nemo-skills-sglang:0.7.0
+  sglang: lmsysorg/sglang:v0.5.3rc1-cu126
   nemo: igitman/nemo-skills-nemo:0.7.0
   megatron: igitman/nemo-skills-megatron:0.7.0
   sandbox: igitman/nemo-skills-sandbox:0.7.1
-  nemo-skills: igitman/nemo-skills:0.7.0
+  nemo-skills: igitman/nemo-skills:0.7.1
   verl: igitman/nemo-skills-verl:0.7.0
   nemo-rl: igitman/nemo-skills-nemo-rl:0.7.0
 
@@ -62,9 +62,10 @@ job_name_prefix: "nemo_skills:"
 # can use this section to set timeouts for different partitions
 # this will be used as a slurm parameter + to signal SFT job to finish
 # before the timeout to have time to save the last checkpoint
+# default_timeout: "06:00:00"
 # timeouts:
-#   partition_name1: 06:00:00
-#   partition_name2: 01:30:00
+#   partition_name1: "06:00:00"
+#   partition_name2: "01:30:00"
 
 # define any environment variables. Note that HF_HOME is required by default and needs to be a mounted path!
 # env_vars:

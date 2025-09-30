@@ -188,8 +188,7 @@ ns run_cmd --log_dir=/workspace/prepare-sft-data --expname=prepare-sft-data --ru
       ++tokenizer=Qwen/Qwen2.5-32B-Instruct \
       ++filters.remove_contaminated=false \
       ++add_unlabeled=true \
-      ++filters.remove_no_think_tags=true \
-      ++filters.trim_solutions=false'
+      ++filters.remove_no_think_tags=true
 ```
 
 Next, [convert the model](https://nvidia.github.io/NeMo-Skills/pipelines/checkpoint-conversion/) to NeMo format. You can skip this step for NeMo-RL training.
@@ -246,7 +245,7 @@ ns nemo_rl sft \
     ++policy.train_global_batch_size=32 \
     ++policy.megatron_cfg.tensor_model_parallel_size=4 \
     ++policy.megatron_cfg.context_parallel_size=2 \
-    ++policy.megatron_cfg.optimizer.lr=1e-4 \
+    ++policy.lr=1e-5 \
     ++sft.max_num_epochs=2
 ```
 

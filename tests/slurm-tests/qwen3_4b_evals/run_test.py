@@ -17,36 +17,33 @@ import argparse
 from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 
-def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
-    """Run evals in Reasoning ON mode"""
-    base_model = "Qwen/Qwen3-4B"
+def eval_qwen3_bfcl(workspace, cluster, expname_prefix, wandb_project):
+    model = "Qwen/Qwen3-4B"
 
-    # Common settings for reasoning ON
-    common_params = "++inference.temperature=0.6 ++inference.top_p=0.95 "
-    tokens_to_generate = "++inference.tokens_to_generate=8192 "
-
-    # BFCL (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++model_name=Qwen/Qwen3-4B"),
+        ctx=wrap_arguments(
+            f"++inference.temperature=0.6 "
+            f"++inference.top_p=0.95 "
+            f"++inference.tokens_to_generate=8192 "
+            f"++model_name={model} "
+        ),
         cluster=cluster,
         benchmarks="bfcl_v3",
-        model=base_model,
+        model=model,
         server_gpus=2,
         num_jobs=1,
         server_type="vllm",
-        output_dir=f"{workspace}/reasoning_on_tool_calling",
-        expname=f"{expname_prefix}-bfcl-on",
+        output_dir=workspace,
+        expname=expname_prefix,
         wandb_project=wandb_project,
-        wandb_name=f"{expname_prefix}-qwen3-4b-eval-reasoning-on",
+        wandb_name=expname_prefix,
     )
 
-    return [
-        f"{expname_prefix}-bfcl-on",
-    ]
+    return expname_prefix
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Qwen3-4B eval pipeline")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", required=True, help="Workspace directory containing all experiment data")
     parser.add_argument("--cluster", required=True, help="Cluster name, e.g. oci")
     parser.add_argument("--expname_prefix", required=True, help="Experiment name prefix")
@@ -56,7 +53,7 @@ def main():
 
     prepare_data(ctx=wrap_arguments("bfcl_v3"))
 
-    reasoning_on_expnames = eval_reasoning_on(
+    eval_expname = eval_qwen3_bfcl(
         workspace=args.workspace,
         cluster=args.cluster,
         expname_prefix=args.expname_prefix,
@@ -64,16 +61,14 @@ def main():
     )
 
     # schedule a dependent check job on the cluster and check if the results are as expected
-    checker = (
-        f"cd /nemo_run/code/tests/slurm-tests/qwen3_4b_evals && python check_results.py --workspace {args.workspace} "
-    )
+    checker_cmd = f"python tests/slurm-tests/qwen3_4b_evals/check_results.py --workspace {args.workspace} "
 
     run_cmd(
-        ctx=wrap_arguments(checker),
+        ctx=wrap_arguments(checker_cmd),
         cluster=args.cluster,
-        expname="check-eval-results-for-qwen3-4b",
+        expname=args.expname_prefix + "-check-results",
         log_dir=f"{args.workspace}/check-results-logs",
-        run_after=reasoning_on_expnames,
+        run_after=eval_expname,
     )
 
 

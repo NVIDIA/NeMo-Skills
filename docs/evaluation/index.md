@@ -20,18 +20,18 @@ Make sure that `/workspace` is mounted inside of your
 
 ## Preparing data
 
-You need to run the following commands to prepare the data.
+You need to run the following command to prepare the data.
 
 ```bash
-ns prepare_data
+ns prepare_data <benchmarks1> <benchmark2> ...
 ```
 
-If you're only interested in a subset of datasets (e.g. only math-related or code-related), run with
-`--dataset_groups ...` and if you only need a couple of specific datasets, list them directly e.g.
+e.g.
 
 ```bash
 ns prepare_data aime24 aime25 gpqa livecodebench
 ```
+
 
 !!! note
     If you have the repo cloned locally, the data files will be available inside `nemo_skills/dataset/<benchmark>/<split>.jsonl`
@@ -41,8 +41,8 @@ ns prepare_data aime24 aime25 gpqa livecodebench
     python -c "import nemo_skills; print(nemo_skills.__path__)"
     ```
 
-Some benchmarks (e.g. ruler) require extra parameters to be passed to the prepare_data script. Thus you'd need to explicitly
-call `ns prepare_data <benchmark name>` for them, e.g. for ruler you can use
+Some benchmarks (e.g. ruler) require extra parameters to be passed to the prepare_data script which you can list directly
+as arguments.
 
 ```bash
 ns prepare_data ruler --setup=llama_128k --tokenizer_path=meta-llama/Llama-3.1-8B-Instruct --max_seq_length=131072
@@ -117,6 +117,23 @@ evaluation_mode  | num_entries | avg_tokens | gen_seconds | passing_base_tests |
 pass@1[avg-of-4] | 164         | 215        | 219         | 64.63%             | 59.30%
 pass@4           | 164         | 215        | 219         | 79.27%             | 74.39%
 ```
+
+### Variance analysis
+
+When using multiple samples (`:<num repeats>` after the benchmark name), the evaluation automatically computes standard deviation and standard error metrics. These metrics are included inside `{metric_name}_statistics` dictionary.
+
+- **`avg`**: Average of all values across runs. This is typically exactly the same as `{metric_name}` except not multiplied by 100.
+
+- **`std_dev_across_runs`**: Standard deviation of average metric values across runs. Measures how much the average metric value varies between different runs (each run uses attempt i from each sample).
+
+- **`std_err_across_runs`**: Standard error of average metric values across runs. Calculated as `std_dev_across_runs / sqrt(k)` where k is the number of runs. Provides a measure of uncertainty in the run variance estimate.
+
+- **`avg_sample_std_dev`**: Average of per-sample standard deviations. Measures the average within-sample variance across all samples (for each sample, calculates standard deviation across its k attempts, then averages).
+
+These statistical metrics are added as additional columns to `pass@1[avg-of-k]` evaluation modes, providing comprehensive variance and uncertainty statistics alongside the main performance metrics.
+
+!!! warning
+    Currently the extra statistics are only available for a subset of metrics, not everything inside `pass@1[avg-of-k]`.
 
 ## Customizing evaluations
 

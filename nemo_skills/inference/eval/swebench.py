@@ -160,6 +160,12 @@ class SweBenchGenerationTask(GenerationTask):
     def setup_llm(self):
         return
 
+    def setup_litellm_cache(self):
+        return
+
+    def cleanup_litellm_cache(self):
+        return
+
     async def _execute_container_command(
         self, data_point, command, expected_file_pattern, mode, max_retries=3, timeout=100000
     ):
@@ -171,8 +177,6 @@ class SweBenchGenerationTask(GenerationTask):
         # Create logs directory if it doesn't exist
         logs_dir = self.output_dir / "apptainer_logs"
         logs_dir.mkdir(exist_ok=True)
-        log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}.log"
-        LOG.info("Starting execution of an apptainer command. Logs are available at %s", log_file_path)
 
         # Fix localhost URLs not working sometimes
         command = f"echo '127.0.0.1 localhost' >/etc/hosts && {command}"
@@ -187,6 +191,14 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Retry apptainer command up to max_retries times
         for attempt in range(max_retries):
+            log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}_attempt{attempt + 1}.log"
+            LOG.info(
+                "Starting execution of an apptainer command (attempt %d of %d). Logs are available at %s",
+                attempt + 1,
+                max_retries,
+                log_file_path,
+            )
+
             try:
                 # Stream output to log file as it appears
                 with open(log_file_path, "w") as log_file:
@@ -339,6 +351,11 @@ class SweBenchGenerationTask(GenerationTask):
 
         config_str = tomlkit.dumps(config)
 
+        # Folder to copy the dataset into.
+        # It's important that the name includes the original HF dataset name,
+        # because OpenHands has internal checks for substrings like "swe-bench-live" in the name (case-insensitive)
+        data_dir = "/root/" + data_point["dataset_name"].replace("/", "__")
+
         openhands_cmd = (
             # make sure /workspace isn't mounted as a safety precaution
             # (mounting it in the nemo-skills cluster config is ok, just not inside of apptainer specifically)
@@ -361,6 +378,9 @@ class SweBenchGenerationTask(GenerationTask):
             "export INSTALL_DOCKER=0 && "
             "make build && "
             "poetry run python -m pip install datasets && "
+            # copy dataset
+            f"mkdir {data_dir} && "
+            f"cp {self.cfg.input_file} {data_dir} && "
             # set up config files
             f"echo {shlex.quote(config_str)} >config.toml && "
             f"echo \"selected_ids = ['{data_point['instance_id']}']\" >evaluation/benchmarks/swe_bench/config.toml && "
@@ -376,8 +396,8 @@ class SweBenchGenerationTask(GenerationTask):
             f"    1 "  # number of instances
             f"    {self.cfg.agent_max_turns} "  # max agent iterations
             f"    1 "  # number of workers
-            f"    {data_point['dataset_name']} "  # dataset name
-            f"    {data_point['split']} && "  # dataset split
+            f"    {data_dir} "  # dataset path
+            f"    train && "  # dataset split (always "train" for local datasets)
             # move outputs to the mounted directory
             f"mkdir -p /trajectories_mount/trajectories && "
             f"cp -r evaluation/evaluation_outputs/outputs/*/*/* /trajectories_mount/trajectories/{data_point['instance_id']}"
@@ -393,6 +413,8 @@ class SweBenchGenerationTask(GenerationTask):
         patch = out_dict["test_result"]["git_patch"]
         if not patch:
             patch = None
+        elif not patch.endswith("\n"):
+            patch += "\n"
 
         # Create file in the SWE-bench evaluation format
         pred_file = out_file.replace("output.jsonl", "output_for_eval.jsonl")
@@ -411,6 +433,9 @@ class SweBenchGenerationTask(GenerationTask):
     async def process_single_datapoint(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
         self.output_dir = Path(self.cfg.output_file).parent
+        if self.cfg.inference.random_seed is not None:
+            self.output_dir = self.output_dir / f"rs{self.cfg.inference.random_seed}"
+            self.output_dir.mkdir(exist_ok=True)
 
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
         # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?

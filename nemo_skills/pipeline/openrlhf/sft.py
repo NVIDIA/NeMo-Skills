@@ -26,10 +26,10 @@ from nemo_skills.pipeline.utils import (
     check_if_mounted,
     get_cluster_config,
     get_exp,
-    get_timeout,
+    get_timeout_str,
     run_exp,
 )
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -132,6 +132,11 @@ def format_wandb_args(cluster_config, disable_wandb, wandb_project, expname):
             f" --wandb_id {expname} "
             f" --wandb_resume auto"
         )
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=expname,
+            wandb_id=expname,
+        )
     else:
         cmd = ""
 
@@ -174,7 +179,7 @@ def get_training_cmd(
     if validation_data is None:
         validation_data = training_data
 
-    timeout = get_timeout(cluster_config, partition)
+    timeout = get_timeout_str(cluster_config, partition)
 
     logging_params = format_wandb_args(cluster_config, disable_wandb, wandb_project, expname)
 

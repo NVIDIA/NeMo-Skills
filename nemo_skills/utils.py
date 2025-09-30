@@ -86,6 +86,10 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
     logger = logging.getLogger("nemo_skills")
     logger.setLevel(log_level)
 
+    # Remove all existing handlers
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
     if use_rich:
         handler = RichHandler(
             rich_tracebacks=True,
@@ -99,12 +103,11 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
                 datefmt="[%X]",
             )
         )
-        for hdlr in logger.handlers[:]:
-            logger.removeHandler(hdlr)
     else:
         handler = logging.StreamHandler()
         formatter = logging.Formatter("%(asctime)s %(levelname)s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
         handler.setFormatter(formatter)
+
     logger.addHandler(handler)
     logging.getLogger("sshtunnel_requests.cache").setLevel(logging.ERROR)
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -182,6 +185,34 @@ def init_wandb(project, name, exp_dir=None, verbose=False):
             print("Wandb initialization failed with the following error.")
             print(e)
         return False
+
+
+def validate_wandb_project_name(wandb_project=None, wandb_name=None, wandb_group=None, wandb_id=None):
+    """
+    Validate Weights & Biases (W&B) identifiers.
+
+    Rules (based on W&B conventions):
+      - Only validate non-None fields.
+      - Must be <= 128 characters (W&B safe upper limit).
+    """
+
+    # Helper function for length validation
+    def _validate_length(value, field_name):
+        if len(value) > 128:
+            raise ValueError(f"{field_name} exceeds the 128-character limit.")
+
+    # Only check if not None
+    if wandb_project is not None:
+        _validate_length(wandb_project, "wandb_project")
+
+    if wandb_name is not None:
+        _validate_length(wandb_name, "wandb_name")
+
+    if wandb_group is not None:
+        _validate_length(wandb_group, "wandb_group")
+
+    if wandb_id is not None:
+        _validate_length(wandb_id, "wandb_id")
 
 
 def extract_comments(code: str):

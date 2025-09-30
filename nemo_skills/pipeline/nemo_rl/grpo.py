@@ -23,18 +23,19 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.nemo_rl import nemo_rl_app
 from nemo_skills.pipeline.utils import (
     add_task,
+    check_if_mounted,
     check_mounts,
     get_cluster_config,
     get_env_variables,
     get_exp,
     get_mounted_path,
     get_nsight_cmd,
-    get_timeout,
+    get_timeout_str,
     resolve_mount_paths,
     run_exp,
     temporary_env_update,
 )
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -97,6 +98,15 @@ class NemoRLTask:
         )
         if self.wandb_group:
             cmd += f"++logger.wandb.group={self.wandb_group} "
+
+        if not self.disable_wandb:
+            validate_wandb_project_name(
+                wandb_project=self.wandb_project,
+                wandb_name=self.expname,
+                wandb_group=self.wandb_group,
+                wandb_id=wandb_id,
+            )
+
         return cmd
 
     def get_cmd(self):
@@ -135,7 +145,7 @@ def get_training_cmd(
     backend,
     profile_step_range,
 ):
-    timeout = get_timeout(cluster_config, partition)
+    timeout = get_timeout_str(cluster_config, partition)
 
     task = NemoRLTask(
         model=hf_model,
@@ -278,12 +288,14 @@ def grpo_nemo_rl(
     if log_dir is None:
         log_dir = output_dir
 
-    hf_model, output_dir, log_dir = check_mounts(
+    output_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={hf_model: None, output_dir: None},
+        mount_map={output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
+    if hf_model.startswith("/"):  # could ask to download from HF
+        check_if_mounted(cluster_config, hf_model)
 
     env_variables = get_env_variables(cluster_config)
     if backend == "megatron":

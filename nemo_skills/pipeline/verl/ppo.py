@@ -24,7 +24,7 @@ import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils.server import get_free_port
 from nemo_skills.pipeline.verl import verl_app
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -124,6 +124,10 @@ class PPOVerlTask:
             cmd = f"{cmd} trainer.logger=['console'] "
         else:
             cmd = f"{cmd} trainer.logger=['console','wandb'] "
+            validate_wandb_project_name(
+                wandb_project=wandb_project,
+                wandb_name=expname,
+            )
 
         return cmd
 
@@ -185,7 +189,7 @@ def get_training_cmd(
     verl_config_name=None,
 ):
     # TODO: use those
-    timeout = pipeline_utils.get_timeout(cluster_config, partition)
+    timeout = pipeline_utils.get_timeout_str(cluster_config, partition)
 
     if task is None:
         task = PPOVerlTask(
@@ -358,7 +362,7 @@ def ppo_verl(
 
     server_config = None
     if server_type is not None:
-        get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+        get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
         if server_address is None:  # we need to host the model
             assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
             server_port = get_free_port(strategy="random") if get_random_port else 5000
