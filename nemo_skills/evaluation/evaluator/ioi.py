@@ -135,11 +135,16 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
     try:
         # 1. Create all necessary files in one batch command
         precompiled_dir = task_args.get("precompiled_dir")
+        # Step 1: prepare the working directory and copy shared pre-compiled artifacts first
         file_creation_commands = [
+            # Create the unique run directory itself
             f"mkdir -p {unique_dir}",
-            # Copy precompiled artifacts (graders/, checker/, compile.sh, run.sh)
-            f"cat <<'_EOT_' > {unique_dir}/graders/{task_args['problem_id']}.cpp\n{task_args['generated_code']}\n_EOT_\n",
+            # Copy precompiled artifacts (this will also create the graders/ directory if present)
             f"cp -r {precompiled_dir}/* {unique_dir}/",
+            # Ensure `graders/` exists even if it was absent in the precompiled bundle
+            f"mkdir -p {unique_dir}/graders",
+            # Write the contestant's generated solution into the graders folder
+            f"cat <<'_EOT_' > {unique_dir}/graders/{task_args['problem_id']}.cpp\n{task_args['generated_code']}\n_EOT_\n",
         ]
 
         # Prepare input and expected output files
