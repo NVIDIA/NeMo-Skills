@@ -114,6 +114,9 @@ class GenerateSolutionsConfig:
     # Useful when running judge jobs to keep the original generation statistics
     add_generation_stats: bool = True
 
+    # Count the number of tokens in the prompt
+    count_prompt_tokens: bool = False
+
     generation_key: str = "generation"
 
     async_position_key: str = "_async_position"  # key to use for preserving position in async loop in data dict
@@ -196,7 +199,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.use_completions_api = True
+            self.cfg.use_completions_api = True
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -269,17 +272,15 @@ class GenerationTask:
                 self.cfg.chat_template_kwargs = None
 
         # Setup tokenizer
-        if self.cfg.use_completions_api or self.cfg.server.get("enable_soft_fail", False):
+        if (
+            self.cfg.use_completions_api
+            or self.cfg.server.get("enable_soft_fail", False)
+            or self.cfg.count_prompt_tokens
+        ):
             # These are the only cases where we need a tokenizer
             self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
-            try:
-                self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
-            except ValueError:
-                self.hf_tokenizer = None
-                LOG.warning("Not a valid huggingface tokenizer: %s", self.tokenizer)
         else:
             self.tokenizer = None
-            self.hf_tokenizer = None
 
         # Setup litellm cache
         self.setup_litellm_cache()
@@ -290,6 +291,17 @@ class GenerationTask:
         # Setup prompt formatter and LLM
         self.prompt = self.setup_prompt()
         self.llm = self.setup_llm()
+
+        # Setup hf_tokenizer for counting prompt tokens
+        self.hf_tokenizer = None
+        if self.cfg.count_prompt_tokens:
+            if self.prompt is not None:
+                self.hf_tokenizer = self.prompt.tokenizer
+            else:
+                self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
+
+            if self.hf_tokenizer is None:
+                raise ValueError("Tokenizer could not be initialized. Needed for counting prompt tokens.")
 
         if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
@@ -328,9 +340,8 @@ class GenerationTask:
         self.output_lock = None
 
     def setup_prompt(self):
-        prompt = None
         if self.cfg.prompt_format == "openai":
-            prompt = None
+            return None
 
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
@@ -520,13 +531,10 @@ class GenerationTask:
 
         result = await self.llm.generate_async(**generation_params)
 
-        if self.prompt is not None:
-            input_sequence_length = get_token_count(self.prompt.tokenizer, generation_params["prompt"])
-        elif self.hf_tokenizer is not None:
+        if self.cfg.count_prompt_tokens:
             input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
-
-        if input_sequence_length is not None:
-            result["input_sequence_length"] = input_sequence_length
+            if input_sequence_length is not None:
+                result["input_sequence_length"] = input_sequence_length
         return result
 
     async def apply_evaluation_hook(self, data_point):
