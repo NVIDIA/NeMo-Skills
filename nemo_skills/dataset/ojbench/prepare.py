@@ -13,12 +13,14 @@
 # limitations under the License.
 
 import json
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_URL = "https://huggingface.co/datasets/He-Ren/OJBench_testdata"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 
 def clone_dataset_repo(url, destination):
@@ -34,8 +36,9 @@ def clone_dataset_repo(url, destination):
             else:
                 destination.unlink()
 
+        auth_url = url.replace("https://huggingface.co/", f"https://user:{HF_TOKEN}@huggingface.co/", 1)
         print(f"Cloning {url} into {destination}...")
-        subprocess.run(["git", "clone", url, destination], check=True, capture_output=True)
+        subprocess.run(["git", "clone", auth_url, destination], check=True, capture_output=True)
 
         print("✅ Git clone is successful.")
 
