@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import json
-import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_URL = "https://huggingface.co/datasets/He-Ren/OJBench_testdata"
@@ -23,58 +23,63 @@ REPO_URL = "https://huggingface.co/datasets/He-Ren/OJBench_testdata"
 
 def clone_dataset_repo(url, destination):
     if not shutil.which("git"):
-        print("Error: Git executable not found.")
-        return
+        print("❌ Error: Git executable not found. Please install Git.", file=sys.stderr)
+        sys.exit(1)
 
-    # if os.path.exists(destination):
-    #     print(f"Destination path '{destination}' already exists. Removing it.")
-    #     try:
-    #         shutil.rmtree(destination)
-    #     except OSError as e:
-    #         print(f"Error removing directory {destination}: {e}")
-    #         return
+    try:
+        if destination.is_dir():
+            # If the destination exists, check if it's a Git repository.
+            if (destination / ".git").is_dir():
+                print(f"Destination '{destination}' exists. Pulling latest changes...")
+                subprocess.run(
+                    ["git", "pull", "origin"],
+                    cwd=destination,
+                    check=True,
+                    capture_output=True,
+                )
+            else:
+                print(
+                    f"❌ Error: Path '{destination}' exists but is not a Git repository.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            print(f"Cloning {url} into {destination}...")
+            subprocess.run(["git", "clone", url, destination], check=True, capture_output=True)
 
-    print(f"Cloning {url} into {destination}...")
+        print("✅ Git repository is up to date.")
 
-    command = ["git", "clone", url, destination]
-
-    result = subprocess.run(command, capture_output=True, text=True)
-
-    if result.returncode == 0:
-        print("✅ Clone successful.")
-
-        source_file = os.path.join(destination, "prompts", "full.jsonl")
-        target_file = os.path.join(destination, "test.jsonl")
-        prompts_dir = os.path.join(destination, "prompts")
-
-        if not os.path.exists(source_file):
-            raise FileNotFoundError(f"Expected dataset file not found at {source_file}")
-
-        print(f"Moving {source_file} to {target_file} and replacing 'prompt' key with 'question'")
-        try:
-            with (
-                open(source_file, "r", encoding="utf-8") as infile,
-                open(target_file, "w", encoding="utf-8") as outfile,
-            ):
-                for line in infile:
-                    data = json.loads(line)
-                    data["question"] = data.pop("prompt")
-                    data["subset_for_metrics"] = [data["language"], data["difficulty"]]
-                    outfile.write(json.dumps(data) + "\n")
-
-            print(f"Removing directory: {prompts_dir}")
-            shutil.rmtree(prompts_dir)
-            print("✅ Directory removed successfully.")
-
-        except OSError as e:
-            print(f"❌ Error during file/directory operations: {e}")
-
-    else:
-        print("❌ Clone failed.")
-        print(f"Error Details:\n{result.stderr}")
+    except subprocess.CalledProcessError as e:
+        print("❌ Git command failed:", file=sys.stderr)
+        print(f"   Command: {' '.join(e.cmd)}", file=sys.stderr)
+        print(f"   Stderr: {e.stderr.decode().strip()}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
-    clone_dataset_repo(REPO_URL, data_dir)
+    destination = data_dir / "OJBench_testdata"
+    clone_dataset_repo(REPO_URL, destination)
+
+    source_file = destination / "prompts" / "full.jsonl"
+    target_file = data_dir / "test.jsonl"
+
+    print(f"Processing '{source_file}' and saving to '{target_file}'...")
+    processed_lines = 0
+    try:
+        with (
+            source_file.open("r", encoding="utf-8") as infile,
+            target_file.open("w", encoding="utf-8") as outfile,
+        ):
+            for line in infile:
+                data = json.loads(line)
+                data["question"] = data.pop("prompt")
+                data["subset_for_metrics"] = [data["language"], data["difficulty"]]
+                outfile.write(json.dumps(data) + "\n")
+                processed_lines += 1
+        print(f"✅ Successfully processed {processed_lines} lines.")
+
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+        print(f"❌ Error during file processing: {e}", file=sys.stderr)
+        sys.exit(1)

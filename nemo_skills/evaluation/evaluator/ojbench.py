@@ -71,8 +71,8 @@ async def install_packages(eval_config: OJBenchConfig) -> bool:
 async def eval_ojbench_async(cfg):
     eval_config = OJBenchConfig(**cfg.eval_config)
     problem_dirs = [
-        Path(cfg.data_dir, "ojbench/NOI"),
-        Path(cfg.data_dir, "ojbench/ICPC"),
+        Path(cfg.data_dir, "ojbench/OJBench_testdata/NOI"),
+        Path(cfg.data_dir, "ojbench/OJBench_testdata/ICPC"),
     ]
 
     if not await install_packages(eval_config):
