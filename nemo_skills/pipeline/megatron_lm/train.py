@@ -25,7 +25,6 @@ from nemo_skills.pipeline.utils import (
     check_mounts,
     get_cluster_config,
     get_exp,
-    get_mounted_path,
     get_timeout_str,
     resolve_mount_paths,
     run_exp,
@@ -182,20 +181,15 @@ def train_megatron_lm(
     if log_dir is None:
         log_dir = output_dir
 
-    output_dir, log_dir = check_mounts(
+    output_dir, megatron_model, per_split_data_path, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={output_dir: None},
+        mount_map={output_dir: None, megatron_model: None, per_split_data_path: None},
         check_mounted_paths=check_mounted_paths,
     )
 
-    # Check if paths are mounted
-    if megatron_model.startswith("/"):
-        check_if_mounted(cluster_config, megatron_model)
     if tokenizer_model.startswith("/"):
         check_if_mounted(cluster_config, tokenizer_model)
-    if per_split_data_path.startswith("/"):
-        per_split_data_path = get_mounted_path(cluster_config, per_split_data_path)
 
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
