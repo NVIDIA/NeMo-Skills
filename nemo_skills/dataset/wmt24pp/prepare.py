@@ -13,22 +13,17 @@ from tqdm import tqdm
 LANG2CODE = {"de": "de_DE", "es": "es_MX", "fr": "fr_FR", "it": "it_IT", "ja": "ja_JP"}
 
 
-def make_prompt(source_text, target_lang):
-    lang_name = Language(target_lang).display_name()
-    prompt = f"Translate the following segment into {lang_name}, without additional explanation.\n\n{source_text}"
-    return prompt
-
-
 def write_data_to_file(output_file, datasets, tgt_languages):
     with open(output_file, "wt", encoding="utf-8") as fout:     
         for tgt_lang in tgt_languages:
                 for src, tgt in zip(datasets[tgt_lang]["source"], datasets[tgt_lang]["target"]):
                     json_dict = {
-                        "question": make_prompt(src, tgt_lang),
                         "text": src,
                         "translation": tgt,
                         "source_language": "en",
-                        "target_language": tgt_lang
+                        "target_language": tgt_lang,
+                        "source_lang_name": "English",
+                        "target_lang_name": Language(tgt_lang).display_name()
                     }
                     json.dump(json_dict, fout)
                     fout.write("\n")

@@ -15,7 +15,7 @@
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 
-PROMPT_CONFIG = "generic/default"
+PROMPT_CONFIG = "generic/translation"
 DATASET_GROUP = "chat"
 METRICS_TYPE = "translation"
 EVAL_ARGS = "++eval_type=no-op"

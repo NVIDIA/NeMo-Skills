@@ -11,25 +11,19 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 
-def make_prompt(source_text, target_lang):
-    lang_name = Language(target_lang).display_name()
-    prompt = f"Translate the following segment into {lang_name}, without additional explanation.\n\n{source_text}"
-    return prompt
-
-
 def write_data_to_file(output_file, datasets, src_languages, tgt_languages):
     with open(output_file, "wt", encoding="utf-8") as fout:
-        
         for src_lang in src_languages:
             for tgt_lang in tgt_languages:
                 if src_lang != tgt_lang:
                     for src, tgt in zip(datasets[src_lang], datasets[tgt_lang]):
                         json_dict = {
-                            "question": make_prompt(src, tgt_lang),
                             "text": src,
                             "translation": tgt,
                             "source_language": src_lang,
-                            "target_language": tgt_lang
+                            "target_language": tgt_lang,
+                            "source_lang_name": Language(src_lang).display_name(),
+                            "target_lang_name": Language(tgt_lang).display_name(),
                         }
                         json.dump(json_dict, fout)
                         fout.write("\n")
