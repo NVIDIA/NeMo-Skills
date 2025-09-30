@@ -207,3 +207,78 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 
 - Benchmark is defined in [`nemo_skills/dataset/ojbench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/ojbench/__init__.py)
 - Original benchmark source is [here](https://github.com/He-Ren/OJBench/tree/main).
+
+#### Data preparation
+
+Before running ns eval, you will need to prepare the data with this command:
+
+```
+ns prepare_data --data_dir=<DATA_DIR> --cluster=<CLUSTER_NAME> ojbench
+```
+
+We encourage to download OJBench data into a Slurm cluster location because 15GB data will be downloaded by cloning [huggingface.co/datasets/He-Ren/OJBench_testdata](https://huggingface.co/datasets/He-Ren/OJBench_testdata). Two files will be created at `<DATA_DIR>` named `test_python.jsonl` and `test_cpp.jsonl`.
+
+Note that, data downloading require `HF_TOKEN` to be in the environment variables.
+
+#### Sample run
+
+Here's how to run a sample evaluation of [Qwen3-32B](https://huggingface.co/Qwen/Qwen3-32B) on a Slurm cluster.
+
+1. Prepare the data following instructions in the previous section.
+2. Run
+```
+ns eval \
+    --cluster=<CLUSTER_NAME> \
+    --model=Qwen/Qwen3-32B \
+    --server_type=vllm \
+    --server_args="--async-scheduling" \
+    --server_nodes=1 \
+    --server_gpus=8 \
+    --benchmarks=ojbench \
+    --split=test_python \
+    --data_dir=<DATA_DIR> \
+    --output_dir=<OUTPUT_DIR> \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++inference.tokens_to_generate=32768
+```
+replacing <...> with your desired parameters.
+
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/ojbench/metrics.json`. They should look something like this:
+```
+{
+  "ojbench": {
+    "pass@1": {
+      "num_entries": 232,
+      "avg_tokens": 19628,
+      "gen_seconds": 2201,
+      "accuracy": 27.155172413793103
+    }
+  },
+  "ojbench-easy": {
+    "pass@1": {
+      "num_entries": 36,
+      "avg_tokens": 12052,
+      "gen_seconds": 1729,
+      "accuracy": 72.22222222222223
+    }
+  },
+  "ojbench-hard": {
+    "pass@1": {
+      "num_entries": 117,
+      "avg_tokens": 22585,
+      "gen_seconds": 2191,
+      "accuracy": 5.128205128205129
+    }
+  },
+  "ojbench-medium": {
+    "pass@1": {
+      "num_entries": 79,
+      "avg_tokens": 18701,
+      "gen_seconds": 2201,
+      "accuracy": 39.24050632911393
+    }
+  }
+}
+```
+Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate. To do that automatically, you can set `--benchmarks=swe-bench:N`, where N is your desired number of repeats.
