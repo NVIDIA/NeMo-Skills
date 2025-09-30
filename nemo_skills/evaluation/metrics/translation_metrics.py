@@ -35,7 +35,7 @@ class TranslationMetrics(BaseMetrics):
             
             bleu_score = corpus_bleu(preds, [gts], tokenize=tokenize).score
             metrics_dict[key] = {"bleu": bleu_score}
-            self.aggregation_dict[f"xx_xx"].append(bleu_score)
+            self.aggregation_dict["xx_xx"].append(bleu_score)
             self.aggregation_dict[f"{src_lang}_xx"].append(bleu_score)
             self.aggregation_dict[f"xx_{tgt_lang}"].append(bleu_score)
 
