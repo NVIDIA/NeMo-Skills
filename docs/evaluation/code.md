@@ -202,3 +202,8 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 
 - Benchmark is defined in [`nemo_skills/dataset/livebench-coding/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livebench-coding/__init__.py)
 - Original benchmark source is [here](https://huggingface.co/datasets/livebench/coding).
+
+### OJBench
+
+- Benchmark is defined in [`nemo_skills/dataset/ojbench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/ojbench/__init__.py)
+- Original benchmark source is [here](https://github.com/He-Ren/OJBench/tree/main).
