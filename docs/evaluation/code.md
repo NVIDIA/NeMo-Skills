@@ -178,6 +178,76 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench/__init__.py)
 - Original benchmark source is [here](https://github.com/LiveCodeBench/LiveCodeBench).
 
+#### Data Preparation
+
+First, prepare the dataset by running the `ns prepare_data` command. The arguments below will generate `test_v6_2408_2505.jsonl`.
+
+```
+ns prepare_data livecodebench --release_version v6 --start_date 2024-08 --end_date 2025-05
+```
+
+##### For Pypy3 Evaluation:
+If you plan to evaluate using the Pypy3 interpreter, you must add the `--keep_all_columns` flag during data preparation. This will download a larger dataset (~1.9GB) containing the necessary test cases. So, we recommend downloading the dataset into a Slurm cluster location.
+
+```
+ns prepare_data livecodebench --release_version v6 --start_date 2024-08 --end_date 2025-05 --keep_all_columns --cluster=<CLUSTER_NAME> --data_dir=<DATA_DIR>
+```
+
+#### Running the Evaluation
+
+Once the data is prepared, you can run the evaluation. Replace `<...>` placeholders with your cluster and directory paths.
+
+##### Standard Python Evaluation
+
+This command runs an evaluation of [OpenReasoning-Nemotron-32B](https://huggingface.co/nvidia/OpenReasoning-Nemotron-32B) on a Slurm cluster.
+
+```
+ns eval \
+    --cluster=<CLUSTER_NAME> \
+    --model=nvidia/OpenReasoning-Nemotron-32B \
+    --server_type=vllm \
+    --server_args="--async-scheduling" \
+    --server_nodes=1 \
+    --server_gpus=8 \
+    --benchmarks=livecodebench \
+    --split=test_v6_2408_2505 \
+    --data_dir=<DATA_DIR> \
+    --output_dir=<OUTPUT_DIR> \
+    --extra_eval_args="++eval_config.interpreter=python" \
+    --with_sandbox \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++inference.tokens_to_generate=65536
+```
+
+##### Pypy3 Evaluation
+
+To run with the Pypy3 interpreter, modify the `--extra_eval_args` flag as shown below.
+```
+--extra_eval_args="++eval_config.interpreter=pypy3 ++eval_config.test_file=<DATA_DIR>/livecodebench/test_v6_2408_2505.jsonl"
+```
+
+##### Verifying Results
+
+After the evaluation is complete, find the results in `<OUTPUT_DIR>/eval-results/livecodebench/metrics.json`. The output will be broken down by difficulty:
+
+```
+{
+  "livecodebench": { "pass@1": { "accuracy": 71.14 ... }},
+  "livecodebench-easy": { "pass@1": { "accuracy": 99.09 ... }},
+  "livecodebench-hard": { "pass@1": { "accuracy": 46.30 ... }},
+  "livecodebench-medium": { "pass@1": { "accuracy": 85.10 ... }}
+}
+```
+
+##### Advanced: Averaging Multiple Runs
+
+Due to variance between runs, you can automatically repeat the evaluation and average the results. To run the evaluation 3 times, for example, set the `--benchmarks` flag as follows:
+
+```
+--benchmarks=livecodebench:3
+```
+
 ### livecodebench-pro
 
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench-pro/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench-pro/__init__.py)
