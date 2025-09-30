@@ -533,8 +533,7 @@ class GenerationTask:
 
         if self.cfg.count_prompt_tokens:
             input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
-            if input_sequence_length is not None:
-                result["input_sequence_length"] = input_sequence_length
+            result["input_sequence_length"] = input_sequence_length
         return result
 
     async def apply_evaluation_hook(self, data_point):
