@@ -289,12 +289,100 @@ class PipelineBuilder:
         """Build the experiment by adding all task groups."""
         task_ids = []
 
-        for group in self.task_groups:
-            task_id = self._add_task_group_to_experiment(exp, group, log_dir)
-            group._task_id = task_id
+        # Check if we have multiple het components that should be combined
+        het_components = [g for g in self.task_groups if hasattr(g, "_is_het_component") and g._is_het_component]
+
+        if len(het_components) > 1:
+            # Combine multiple HetGroups into a single heterogeneous job
+            task_id = self._add_heterogeneous_job(exp, het_components, log_dir)
+            for group in het_components:
+                group._task_id = task_id
             task_ids.append(task_id)
 
+            # Add any remaining non-het groups separately
+            for group in self.task_groups:
+                if group not in het_components:
+                    task_id = self._add_task_group_to_experiment(exp, group, log_dir)
+                    group._task_id = task_id
+                    task_ids.append(task_id)
+        else:
+            # Normal processing - each group is a separate job
+            for group in self.task_groups:
+                task_id = self._add_task_group_to_experiment(exp, group, log_dir)
+                group._task_id = task_id
+                task_ids.append(task_id)
+
         return task_ids
+
+    def _add_heterogeneous_job(self, exp: run.Experiment, het_component_groups: List[TaskGroup], log_dir: str) -> str:
+        """Add multiple task groups as a single heterogeneous SLURM job."""
+        LOG.info(f"Creating heterogeneous job with {len(het_component_groups)} HetGroup components")
+
+        # Collect all commands and executors across all het components
+        all_commands = []
+        all_executors = []
+        het_group_indices = []
+
+        for het_idx, group in enumerate(het_component_groups):
+            LOG.info(f"Het component {het_idx}: {len(group.tasks)} tasks from group '{group.name}'")
+
+            # Resolve dependencies for this group
+            dependencies = self._resolve_dependencies(group)
+
+            # Get the shared GPU count for this het component
+            # All tasks in this het component share the same resources
+            max_gpus = 0
+            for task in group.tasks:
+                if task.resources.num_gpus is not None:
+                    max_gpus = max(max_gpus, task.resources.num_gpus)
+            shared_gpus = max_gpus if max_gpus > 0 else None
+            LOG.info(f"  Het component {het_idx} will use {shared_gpus} GPUs")
+
+            # Process all tasks in this het component
+            for task in group.tasks:
+                cmd = task.prepare_command(self.cluster_config)
+                all_commands.append(cmd)
+
+                # All tasks in this het component get the same het_group index
+                het_group_indices.append(het_idx)
+
+                # Build executor with shared GPU allocation
+                executor = ExecutorBuilder.build_executor(
+                    task=task,
+                    cluster_config=self.cluster_config,
+                    log_dir=log_dir,
+                    dependencies=dependencies,
+                    het_group=het_idx,
+                    total_het_groups=len(het_component_groups),
+                    overlap=len(group.tasks) > 1,  # Tasks within a het component use overlap
+                    with_ray=self.global_config["with_ray"],
+                    extra_package_dirs=self.global_config["extra_package_dirs"],
+                    heterogeneous=True,
+                    executor_gpus=shared_gpus,
+                )
+                all_executors.append(executor)
+
+                LOG.info(f"  Task '{task.name}' in het component {het_idx}")
+
+        # Set het_group_indices on the first executor
+        all_executors[0].het_group_indices = het_group_indices
+
+        # Create nemo-run scripts
+        metadata = (
+            {"use_with_ray_cluster": True}
+            if self.global_config["with_ray"] and self.cluster_config["executor"] == "slurm"
+            else None
+        )
+
+        return exp.add(
+            [
+                run.Script(inline=command, metadata=(metadata if idx == 0 else None))
+                for idx, command in enumerate(all_commands)
+            ],
+            executor=all_executors,
+            name="nemo-run",
+            dependencies=None,  # Dependencies handled at executor level
+        )
 
     def _add_task_group_to_experiment(self, exp: run.Experiment, group: TaskGroup, log_dir: str) -> str:
         """Add a single task group to the experiment."""
@@ -309,16 +397,18 @@ class PipelineBuilder:
 
         total_het_groups = len(group.tasks) if group.heterogeneous else 1
 
-        # For groups with multiple tasks, use the max GPU count across all tasks
-        # All tasks share the same hardware, so we allocate based on the max needed
+        # For non-heterogeneous groups with multiple tasks, all tasks share the same hardware
+        # For heterogeneous groups, each task gets its own resource allocation
         shared_gpus = None
-        if len(group.tasks) > 1:
+        if not group.heterogeneous and len(group.tasks) > 1:
             max_gpus = 0
             for task in group.tasks:
                 if task.resources.num_gpus is not None:
                     max_gpus = max(max_gpus, task.resources.num_gpus)
             shared_gpus = max_gpus if max_gpus > 0 else None
-            LOG.info(f"Multi-task group: All tasks will share {shared_gpus} GPUs")
+            LOG.info(f"Multi-task group: All tasks will share {shared_gpus} GPUs on same hardware")
+        elif group.heterogeneous:
+            LOG.info(f"Heterogeneous job: {len(group.tasks)} components with independent resource allocations")
 
         for i, task in enumerate(group.tasks):
             # Prepare the command
@@ -328,8 +418,12 @@ class PipelineBuilder:
             # Build executor
             het_group = i if group.heterogeneous else 0
 
-            # Use shared GPUs for multi-task groups, otherwise use task's own count
-            executor_gpus = shared_gpus if len(group.tasks) > 1 else task.resources.num_gpus
+            # For non-heterogeneous multi-task groups, use shared GPUs
+            # For heterogeneous groups, each task uses its own GPU count
+            if not group.heterogeneous and len(group.tasks) > 1:
+                executor_gpus = shared_gpus
+            else:
+                executor_gpus = task.resources.num_gpus
 
             executor = ExecutorBuilder.build_executor(
                 task=task,

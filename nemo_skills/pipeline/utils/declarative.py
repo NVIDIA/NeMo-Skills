@@ -212,10 +212,19 @@ class Server(Component):
 
     def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
         """Convert to ServerTask with cross-group capabilities."""
-        # Apply hardware config overrides
-        num_gpus = hardware_config.get("server_gpus", self.gpus) if hardware_config else self.gpus
-        num_nodes = hardware_config.get("server_nodes", self.nodes) if hardware_config else self.nodes
-        partition = hardware_config.get("partition") if hardware_config else None
+        # Apply hardware config overrides (only if they're not None)
+        if hardware_config:
+            num_gpus = (
+                hardware_config.get("server_gpus") if hardware_config.get("server_gpus") is not None else self.gpus
+            )
+            num_nodes = (
+                hardware_config.get("server_nodes") if hardware_config.get("server_nodes") is not None else self.nodes
+            )
+            partition = hardware_config.get("partition")
+        else:
+            num_gpus = self.gpus
+            num_nodes = self.nodes
+            partition = None
 
         task_def = TaskFactory.create_server_task(
             name=self.name,
@@ -349,10 +358,10 @@ class GenerateTask(Component):
             if chunk_id is not None:
                 job_name += f"_chunk{chunk_id}"
 
-            # Apply hardware config if provided
+            # Apply hardware config if provided (only if not None)
             num_gpus = 0 if self.server else 1
-            if hardware_config:
-                num_gpus = hardware_config.get("num_gpus", num_gpus)
+            if hardware_config and hardware_config.get("num_gpus") is not None:
+                num_gpus = hardware_config.get("num_gpus")
 
             task_def = TaskFactory.create_generation_task(
                 name=job_name,
@@ -500,11 +509,19 @@ class TrainTask(Component):
         """Convert to MainTask."""
         cmd = f"python train.py --data {self.training_data} --output {self.output_dir} --config {self.model_config}"
 
-        # Apply hardware config overrides
-        num_gpus = hardware_config.get("num_gpus", self.gpus) if hardware_config else self.gpus
-        num_nodes = hardware_config.get("num_nodes", self.nodes) if hardware_config else self.nodes
-        partition = hardware_config.get("partition") if hardware_config else None
-        exclusive = hardware_config.get("exclusive", False) if hardware_config else False
+        # Apply hardware config overrides (only if they're not None)
+        if hardware_config:
+            num_gpus = hardware_config.get("num_gpus") if hardware_config.get("num_gpus") is not None else self.gpus
+            num_nodes = (
+                hardware_config.get("num_nodes") if hardware_config.get("num_nodes") is not None else self.nodes
+            )
+            partition = hardware_config.get("partition")
+            exclusive = hardware_config.get("exclusive") if hardware_config.get("exclusive") is not None else False
+        else:
+            num_gpus = self.gpus
+            num_nodes = self.nodes
+            partition = None
+            exclusive = False
 
         return TaskFactory.create_training_task(
             name=self.name,
@@ -711,9 +728,18 @@ class Pipeline:
 
         builder = PipelineBuilder(self.name, final_cluster_config)
 
-        # Convert all groups to task groups
-        for group in self.groups:
-            task_group = group.to_task_group(final_cluster_config, self.output_dir)
+        # If multiple groups, they need special handling for heterogeneous jobs
+        if len(self.groups) > 1:
+            # Each HetGroup becomes a separate het component
+            # We need to add all groups to the builder and let it handle het job creation
+            for group in self.groups:
+                task_group = group.to_task_group(final_cluster_config, self.output_dir)
+                # Mark that this is part of a multi-group pipeline
+                task_group._is_het_component = True
+                builder.add_task_group(task_group)
+        else:
+            # Single group - just add it directly
+            task_group = self.groups[0].to_task_group(final_cluster_config, self.output_dir)
             builder.add_task_group(task_group)
 
         # Execute
