@@ -26,13 +26,13 @@ def clone_dataset_repo(url, destination):
         print("Error: Git executable not found.")
         return
 
-    if os.path.exists(destination):
-        print(f"Destination path '{destination}' already exists. Removing it.")
-        try:
-            shutil.rmtree(destination)
-        except OSError as e:
-            print(f"Error removing directory {destination}: {e}")
-            return
+    # if os.path.exists(destination):
+    #     print(f"Destination path '{destination}' already exists. Removing it.")
+    #     try:
+    #         shutil.rmtree(destination)
+    #     except OSError as e:
+    #         print(f"Error removing directory {destination}: {e}")
+    #         return
 
     print(f"Cloning {url} into {destination}...")
 
