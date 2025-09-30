@@ -67,7 +67,7 @@ if __name__ == "__main__":
             for line in infile:
                 data = json.loads(line)
                 data["question"] = data.pop("prompt")
-                data["subset_for_metrics"] = [data["language"], data["difficulty"]]
+                data["subset_for_metrics"] = data["difficulty"]
                 if data["language"] == "python":
                     outfile_py.write(json.dumps(data) + "\n")
                 elif data["language"] == "cpp":
