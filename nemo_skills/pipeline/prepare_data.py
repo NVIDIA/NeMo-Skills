@@ -56,7 +56,8 @@ def prepare_data(
     config_dir: str = typer.Option(None, help="Custom cluster config directory"),
     with_sandbox: bool = typer.Option(False, help="Start a sandbox container alongside"),
     keep_mounts_for_sandbox: bool = typer.Option(
-        False, help="If True, will keep the mounts for the sandbox container"
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
     ),
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),

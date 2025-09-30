@@ -248,7 +248,8 @@ def train(
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
     keep_mounts_for_sandbox: bool = typer.Option(
-        False, help="If True, will keep the mounts for the sandbox container"
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
     ),
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),

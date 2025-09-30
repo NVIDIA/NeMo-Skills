@@ -63,7 +63,8 @@ def start_server(
         False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
     ),
     keep_mounts_for_sandbox: bool = typer.Option(
-        False, help="If True, will keep the mounts for the sandbox container"
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
     ),
     launch_chat_interface: bool = typer.Option(
         False, help="If True, will launch a gradio app that provides chat with the model"
