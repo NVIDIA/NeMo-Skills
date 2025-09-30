@@ -11,6 +11,7 @@
 #   DOCKER_TAG: docker tag (default set as `YY.MM.DD-git-hash`)
 #   DOCKER_PUSH: pushes docker image when variable is set.
 #   DOCKER_CACHE: uses registry cache when variable is set.
+#   DOCKER_PLATFORM: directly passed to --platform.
 #
 
 if [[ -z "${1}" ]]; then
@@ -78,6 +79,9 @@ if [[ ! -z ${DOCKER_PUSH} ]]; then
 fi
 if [[ ! -z ${DOCKER_CACHE} ]]; then
     __docker_build_args="${__docker_build_args} --cache-to type=registry,ref=${DOCKER_NAME}/cache,mode=max --cache-from type=registry,ref=${DOCKER_NAME}/cache"
+fi
+if [[ ! -z ${DOCKER_PLATFORM} ]]; then
+    __docker_build_args="${__docker_build_args} --platform ${DOCKER_PLATFORM}"
 fi
 
 docker build ${__docker_build_args} \

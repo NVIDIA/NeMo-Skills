@@ -1,19 +1,27 @@
 # How to build all necessary dockerfiles
 
 Some dockerfiles are directly included in this folder and for some others the instructions to build them are below.
-To build one of the existing dockerfiles use a command like this
 
+To build one of the existing dockerfiles use a command like this
 ```
-docker build -t igitman/nemo-skills:0.7.1 -f dockerfiles/Dockerfile.nemo-skills .
+./build.sh Dockerfile.nemo-skills
 ```
-It might take a long time for some of the images.
+
+Key configuration environment variables:
+- `DOCKER_NAME`: A fully qualified name of the docker image. The default is inferred from the git repository attributes.
+- `DOCKER_TAG`: Docker tag to use. Defaults to `yyyy.mm.dd-<commit_hash>`
+- `DOCKER_PUSH`: When set, pushes image after building.
+- `DOCKER_PLATFORM`: Directly passed to `--platform` for [multi-platform builds](https://docs.docker.com/build/building/multi-platform/).
+
+Some images may take longer to build.
 
 ## Building for arm64/aarch64
 
 To build for arm64 architecture (e.g. to use with GB200 machines) first follow the installation process at
 https://docs.docker.com/build/building/multi-platform/#install-qemu-manually
 
-Then run the same docker command but adding `--platform linux/arm64`.
+Then run the same docker command but adding `--platform linux/arm64` or
+set `DOCKER_PLATFORM=linux/arm64` for the build script described above.
 
 ## Building trtllm image
 
