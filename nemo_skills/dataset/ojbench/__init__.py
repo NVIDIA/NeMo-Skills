@@ -15,7 +15,7 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "code"
 METRICS_TYPE = "ojbench"
-EVAL_SPLIT = "test"
+EVAL_SPLIT = "test_python"
 EVAL_ARGS = "++eval_type=ojbench"
 REQUIRES_SANDBOX = True
 KEEP_MOUNTS_FOR_SANDBOX = True

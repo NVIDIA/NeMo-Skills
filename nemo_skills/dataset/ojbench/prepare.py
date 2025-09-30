@@ -63,23 +63,27 @@ if __name__ == "__main__":
     clone_dataset_repo(REPO_URL, destination)
 
     source_file = destination / "prompts" / "full.jsonl"
-    target_file = data_dir / "test.jsonl"
+    python_target_file = data_dir / "test_python.jsonl"
+    cpp_target_file = data_dir / "test_cpp.jsonl"
 
-    print(f"Processing '{source_file}' and saving to '{target_file}'...")
+    print(f"Processing '{source_file}' and splitting into Python and C++ subsets...")
     processed_lines = 0
     try:
         with (
             source_file.open("r", encoding="utf-8") as infile,
-            target_file.open("w", encoding="utf-8") as outfile,
+            python_target_file.open("w", encoding="utf-8") as outfile_py,
+            cpp_target_file.open("w", encoding="utf-8") as outfile_cpp,
         ):
             for line in infile:
                 data = json.loads(line)
                 data["question"] = data.pop("prompt")
                 data["subset_for_metrics"] = [data["language"], data["difficulty"]]
-                outfile.write(json.dumps(data) + "\n")
+                if data["language"] == "python":
+                    outfile_py.write(json.dumps(data) + "\n")
+                elif data["language"] == "cpp":
+                    outfile_cpp.write(json.dumps(data) + "\n")
                 processed_lines += 1
         print(f"✅ Successfully processed {processed_lines} lines.")
-
     except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
         print(f"❌ Error during file processing: {e}", file=sys.stderr)
         sys.exit(1)
