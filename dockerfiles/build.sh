@@ -45,8 +45,8 @@ if [[ -z "${DOCKER_NAME}" ]]; then
         exit 1
     fi
 
-    __repo_user=$(basename $(dirname $(echo ${__git_remote} | sed -E -e "s|[@:]|/|g")))
-    __repo_name=$(basename -s .git $(echo ${__git_remote}))
+    __repo_user=$(basename "$(dirname "$(echo "${__git_remote}" | sed -E -e "s|[@:]|/|g")")")
+    __repo_name=$(basename -s .git "$(echo "${__git_remote}")")
     __project_name=$(basename "${__dockerfile}")
     if [[ "${__project_name}" == *.* ]]; then
         __project_name=/$(echo "${__project_name}" | cut -d. -f2)
