@@ -93,7 +93,7 @@ async def eval_ojbench_async(cfg):
             with open(jsonl_file, "w", encoding="utf-8") as f_out:
                 f_out.writelines(json.dumps(sample) + "\n" for sample in samples)
 
-            eval_results_path = jsonl_file[:-6] + "_eval_results.jsonl"
+            eval_results_path = jsonl_file[:-6] + "_eval_results.json"
             LOG.info(f"jsonl_file = {jsonl_file}.")
             LOG.info(f"eval_results_path = {eval_results_path}.")
             eval_code = textwrap.dedent(f"""
