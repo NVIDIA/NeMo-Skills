@@ -295,10 +295,7 @@ class GenerationTask:
         # Setup hf_tokenizer for counting prompt tokens
         self.hf_tokenizer = None
         if self.cfg.count_prompt_tokens:
-            if self.prompt is not None:
-                self.hf_tokenizer = self.prompt.tokenizer
-            else:
-                self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
+            self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
 
             if self.hf_tokenizer is None:
                 raise ValueError("Tokenizer could not be initialized. Needed for counting prompt tokens.")
