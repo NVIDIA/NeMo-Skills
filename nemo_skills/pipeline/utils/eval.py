@@ -354,9 +354,11 @@ def prepare_eval_commands(
             benchmarks_dict[benchmark] = benchmark_args
             if rs_num != -1:
                 if len(cur_benchmarks) > 1:
-                    raise ValueError(
-                        f"Cannot specify number of samples ({rs_num}) for benchmark group {benchmark_or_group}. "
-                        f"Use '{benchmark_or_group}' instead of '{benchmark_or_group}:{rs_num}'."
+                    LOG.warning(
+                        "Number of samples > 1 (%d) is specified for a benchmark group %s, "
+                        "overriding for all benchmarks in the group.",
+                        rs_num,
+                        benchmark_or_group,
                     )
                 benchmarks_dict[benchmark].num_samples = rs_num
 
@@ -404,9 +406,7 @@ def prepare_eval_commands(
         eval_to_job_map.extend([i] * count)
 
     cur_job_idx = 0
-    get_random_port = pipeline_utils.should_get_random_port(
-        server_parameters["server_gpus"], exclusive, server_parameters["server_type"]
-    )
+    get_random_port = pipeline_utils.should_get_random_port(server_parameters["server_gpus"], exclusive)
     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         **server_parameters,
         extra_arguments=extra_arguments,
