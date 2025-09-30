@@ -18,6 +18,7 @@ from typing import List
 import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.megatron_lm import megatron_lm_app
 from nemo_skills.pipeline.utils import (
     add_task,
     check_if_mounted,
@@ -33,19 +34,15 @@ from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-# Create a separate app for Megatron-LM
-megatron_lm_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
-
 
 def get_training_cmd(
     cluster_config,
     partition,
     entrypoint,
     init_cmd,
-    pretrained_checkpoint,
+    megatron_model,
     tokenizer_model,
-    training_data,
-    validation_data,
+    per_split_data_path,
     expname,
     output_dir,
     disable_wandb,
@@ -69,10 +66,11 @@ def get_training_cmd(
         f"echo 'Running init command' && "
         f"{init_cmd} && "
         "echo 'Starting Megatron-LM training' && "
+        f"cd /opt/Megatron-LM && "
         f"python -u {entrypoint} "
-        f"    --pretrained-checkpoint {pretrained_checkpoint} "
+        f"    --pretrained-checkpoint {megatron_model} "
         f"    --tokenizer-model {tokenizer_model} "
-        f"    --per-split-data-args-path {training_data} "
+        f"    --per-split-data-args-path {per_split_data_path} "
         f"    --load {output_dir}/checkpoints "
         f"    --save {output_dir}/checkpoints "
         f"    --tensorboard-dir {output_dir}/tensorboard "
@@ -91,7 +89,9 @@ def get_training_cmd(
     return cmd
 
 
-@megatron_lm_app.command(name="train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@megatron_lm_app.command(
+    name="megatron-lm train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
 @typer_unpacker
 def train_megatron_lm(
     ctx: typer.Context,
@@ -108,7 +108,7 @@ def train_megatron_lm(
         help="Initialization command to run before the main command. "
         "Useful to include a large list of environment variables.",
     ),
-    pretrained_checkpoint: str = typer.Option(..., help="Path to the pretrained checkpoint"),
+    megatron_model: str = typer.Option(..., help="Path to the Megatron model checkpoint"),
     tokenizer_model: str = typer.Option(..., help="Path to the tokenizer model"),
     per_split_data_path: str = typer.Option(
         ..., help="Path to the json file containing information about per-split training data"
@@ -190,8 +190,8 @@ def train_megatron_lm(
     )
 
     # Check if paths are mounted
-    if pretrained_checkpoint.startswith("/"):
-        check_if_mounted(cluster_config, pretrained_checkpoint)
+    if megatron_model.startswith("/"):
+        check_if_mounted(cluster_config, megatron_model)
     if tokenizer_model.startswith("/"):
         check_if_mounted(cluster_config, tokenizer_model)
     if per_split_data_path.startswith("/"):
@@ -202,11 +202,9 @@ def train_megatron_lm(
         partition=partition,
         entrypoint=entrypoint,
         init_cmd=init_cmd,
-        pretrained_checkpoint=pretrained_checkpoint,
+        megatron_model=megatron_model,
         tokenizer_model=tokenizer_model,
         per_split_data_path=per_split_data_path,
-        num_gpus=num_gpus,
-        num_nodes=num_nodes,
         expname=expname,
         output_dir=output_dir,
         disable_wandb=disable_wandb,
@@ -224,6 +222,7 @@ def train_megatron_lm(
                 task_name=f"{expname}-{job_id}",
                 log_dir=f"{log_dir}/training-logs",
                 container=cluster_config["containers"]["megatron"],
+                num_tasks=num_gpus,
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
                 cluster_config=cluster_config,

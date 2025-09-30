@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typer import Typer
+
 from nemo_skills.pipeline.app import app
-from nemo_skills.pipeline.megatron_lm.train import megatron_lm_app
+
+megatron_lm_app = Typer(help="Megatron-LM training pipelines (run 'ns megatron_lm --help' for more information)")
 
 app.add_typer(megatron_lm_app, name="megatron_lm")
-
-__all__ = ["megatron_lm_app"]
