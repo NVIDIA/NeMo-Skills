@@ -36,8 +36,7 @@ fi
 __docker_name=$(echo ${DOCKER_NAME:-"gitlab-master.nvidia.com/${__repo_user}/${__repo_name}${__project_name}"} | tr "[:upper:]" "[:lower:]")
 __docker_tag=${DOCKER_TAG:-"$(date +"%Y.%m.%d")-$(git rev-parse --short HEAD)"}
 
-echo "Image: ${__docker_name}:${__docker_tag}"
-echo "Context: ${__context_dir}"
+echo "Building ${__docker_name}:${__docker_tag} from context ${__context_dir}"
 
 docker build \
     -f "${__dockerfile}" \
