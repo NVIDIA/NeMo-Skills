@@ -62,6 +62,9 @@ def start_server(
     with_sandbox: bool = typer.Option(
         False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
     ),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False, help="If True, will keep the mounts for the sandbox container"
+    ),
     launch_chat_interface: bool = typer.Option(
         False, help="If True, will launch a gradio app that provides chat with the model"
     ),
@@ -119,6 +122,7 @@ def start_server(
             time_min=time_min,
             server_config=server_config,
             with_sandbox=with_sandbox,
+            keep_mounts_for_sandbox=keep_mounts_for_sandbox,
             sandbox_port=None if get_random_port else 6000,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )

@@ -21,6 +21,11 @@ from pathlib import Path
 
 REPO_URL = "https://huggingface.co/datasets/He-Ren/OJBench_testdata"
 HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    print("❌ Error: Hugging Face token not found.", file=sys.stderr)
+    print("   Please set the HF_TOKEN environment variable with your access token.", file=sys.stderr)
+    print("   You can create a token at: https://huggingface.co/settings/tokens", file=sys.stderr)
+    sys.exit(1)
 
 
 def clone_dataset_repo(url, destination):
@@ -44,8 +49,11 @@ def clone_dataset_repo(url, destination):
 
     except subprocess.CalledProcessError as e:
         print("❌ Git command failed:", file=sys.stderr)
-        print(f"   Command: {' '.join(map(str, e.cmd))}", file=sys.stderr)
-        print(f"   Stderr: {e.stderr.decode().strip()}", file=sys.stderr)
+        cmd = [url if i == 2 else arg for i, arg in enumerate(e.cmd)]
+        print(f"   Command: {' '.join(map(str, cmd))}", file=sys.stderr)
+        stderr = e.stderr.decode().strip()
+        stderr = stderr.replace(HF_TOKEN, "***") if HF_TOKEN else stderr
+        print(f"   Stderr: {stderr}", file=sys.stderr)
         sys.exit(1)
 
 

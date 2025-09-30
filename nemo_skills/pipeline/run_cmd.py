@@ -88,6 +88,9 @@ def run_cmd(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False, help="If True, will keep the mounts for the sandbox container"
+    ),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
@@ -184,6 +187,7 @@ def run_cmd(
                 time_min=time_min,
                 server_config=server_config,
                 with_sandbox=with_sandbox,
+                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 sandbox_port=None if get_random_port else 6000,
                 run_after=run_after,
                 reuse_code=reuse_code,

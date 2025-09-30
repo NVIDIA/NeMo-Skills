@@ -32,7 +32,6 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class OJBenchConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
-    keep_mounts_for_sandbox: bool = True
     timeout: int = 6
 
 
@@ -55,17 +54,16 @@ async def install_packages(eval_config: OJBenchConfig) -> bool:
         clone_cmd = "git clone https://github.com/He-Ren/OJBench.git"
         result, _ = await sandbox.execute_code(clone_cmd, language="shell", timeout=300)
         if result["process_status"] != "completed":
-            LOG.warning(f"Failed to clone OJBench repo: {result.get('stderr', 'Unknown error')}")
-            return False
+            stderr = result.get("stderr", "Unknown error")
+            raise RuntimeError(f"Failed to clone OJBench repo: {stderr}")
 
         install_cmd = "pip install -e OJBench"
         result, _ = await sandbox.execute_code(install_cmd, language="shell", timeout=300)
         if result["process_status"] != "completed":
-            LOG.warning(f"Failed to install ojbench: {result.get('stderr', 'Unknown error')}")
-            return False
+            stderr = result.get("stderr", "Unknown error")
+            raise RuntimeError(f"Failed to install ojbench. Stderr: {stderr}")
 
         LOG.info("Successfully installed ojbench.")
-        return True
 
 
 async def eval_ojbench_async(cfg):
@@ -75,8 +73,7 @@ async def eval_ojbench_async(cfg):
         Path(cfg.data_dir, "ojbench/OJBench_testdata/ICPC"),
     ]
 
-    if not await install_packages(eval_config):
-        return
+    await install_packages(eval_config)
 
     async with sandbox_context(eval_config.sandbox) as sandbox:
         for jsonl_file in unroll_files(cfg.input_files):
@@ -115,13 +112,16 @@ async def eval_ojbench_async(cfg):
             )
 
             if output.get("process_status") != "completed":
-                LOG.error(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
-                continue
+                raise RuntimeError(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
 
             with open(eval_results_path, "rt", encoding="utf-8") as fin:
                 results = [json.loads(line) for line in fin]
 
-            for sample, result in zip(samples, results):
+            if len(results) != len(samples):
+                LOG.error(f"Result count mismatch for {jsonl_file}: {len(results)} results vs {len(samples)} samples")
+                continue
+
+            for sample, result in zip(samples, results, strict=True):
                 sample["verdict"] = result["verdict"]
                 sample["is_passed"] = result["is_passed"]
 
