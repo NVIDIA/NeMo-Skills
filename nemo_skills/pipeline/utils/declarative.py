@@ -46,6 +46,74 @@ from nemo_skills.utils import get_logger_name
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
+def reference_property(attribute_name: str):
+    """Decorator that creates reference methods for component attributes."""
+
+    def decorator(cls):
+        def make_var_method(attr_name):
+            def var_method(self) -> str:
+                """Get environment variable name for this attribute."""
+                return f"{self.get_name().upper()}_{attr_name.upper()}_HET_GROUP_{self.het_group_index}"
+
+            return var_method
+
+        def make_ref_method(attr_name):
+            def ref_method(self) -> str:
+                """Get shell reference for this attribute."""
+                if self.het_group_index is None:
+                    # Fallback for local execution
+                    if attr_name == "host":
+                        return "127.0.0.1"
+                    elif attr_name == "port" and hasattr(self, "port"):
+                        return str(self.port)
+                    else:
+                        return "localhost"  # Safe fallback
+
+                var_name = f"{self.get_name().upper()}_{attr_name.upper()}_HET_GROUP_{self.het_group_index}"
+                return f"${{{var_name}}}"
+
+            return ref_method
+
+        # Add var and ref methods for the attribute
+        setattr(cls, f"{attribute_name}_var", make_var_method(attribute_name))
+        setattr(cls, f"{attribute_name}_ref", make_ref_method(attribute_name))
+
+        # Add to reference registry for discovery
+        if not hasattr(cls, "_reference_attributes"):
+            cls._reference_attributes = []
+        cls._reference_attributes.append(attribute_name)
+
+        return cls
+
+    return decorator
+
+
+def reference_component(cls):
+    """Class decorator that adds discovery methods to components."""
+
+    def discover_vars(self) -> Dict[str, str]:
+        """Discover all environment variable names this component will create."""
+        vars_dict = {}
+        for attr in getattr(self, "_reference_attributes", []):
+            var_method = getattr(self, f"{attr}_var")
+            vars_dict[f"{attr}_var"] = var_method()
+        return vars_dict
+
+    def discover_refs(self) -> Dict[str, str]:
+        """Discover all shell references this component provides."""
+        refs_dict = {}
+        for attr in getattr(self, "_reference_attributes", []):
+            ref_method = getattr(self, f"{attr}_ref")
+            refs_dict[f"{attr}_ref"] = ref_method()
+        return refs_dict
+
+    # Add discovery methods
+    cls.discover_vars = discover_vars
+    cls.discover_refs = discover_refs
+
+    return cls
+
+
 @dataclass
 class RuntimeRef:
     """Reference to a component that will be resolved at runtime using SLURM environment variables."""
@@ -54,16 +122,11 @@ class RuntimeRef:
     het_group_index: int
     attribute: str = "host"  # What to resolve (host, port, etc.)
 
-    def resolve_expression(self, cluster_config: Optional[Dict] = None) -> str:
+    def resolve_expression(self) -> str:
         """Get the runtime expression to resolve this reference."""
         if self.attribute == "host":
-            # Check execution environment
-            if cluster_config and cluster_config.get("executor") in ["local", "none"]:
-                # Local execution - everything runs on localhost
-                return "127.0.0.1"
-            else:
-                # SLURM execution - use environment variable to get first host in the het group
-                return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
+            # Use SLURM environment variable to get first host in the het group
+            return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
         elif self.attribute == "port":
             # Use environment variable set by the component
             return f"${{{self.component_name.upper()}_PORT_HET_GROUP_{self.het_group_index}}}"
@@ -116,6 +179,9 @@ class Component:
                         ] = "$(hostname)"
 
 
+@reference_component
+@reference_property("host")
+@reference_property("port")
 @dataclass
 class Server(Component):
     """Declarative server component - cross-group compatible by default."""
@@ -135,6 +201,14 @@ class Server(Component):
             self.port = get_free_port(strategy="random")
         if self.name is None:
             self.name = f"{self.server_type}_server"
+
+    def url_ref(self) -> str:
+        """Get URL reference (composed from host + port)."""
+        return f"http://{self.host_ref()}:{self.port_ref()}"
+
+    def health_ref(self) -> str:
+        """Get health endpoint reference."""
+        return f"{self.url_ref()}/health"
 
     def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
         """Convert to ServerTask with cross-group capabilities."""
@@ -165,6 +239,9 @@ class Server(Component):
         return self.name
 
 
+@reference_component
+@reference_property("host")
+@reference_property("port")
 @dataclass
 class Sandbox(Component):
     """Declarative sandbox component - cross-group compatible by default."""
@@ -176,6 +253,10 @@ class Sandbox(Component):
         super().__init__()  # Initialize cross-group capabilities
         if self.port is None:
             self.port = get_free_port(strategy="random")
+
+    def url_ref(self) -> str:
+        """Get URL reference for sandbox."""
+        return f"http://{self.host_ref()}:{self.port_ref()}"
 
     def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
         """Convert to SandboxTask with cross-group capabilities."""
@@ -252,7 +333,7 @@ class GenerateTask(Component):
             chunk_id = job["chunk_id"]
 
             # Build job-specific command
-            cmd = self._build_command_for_job(seed, chunk_id, cluster_config)
+            cmd = self._build_command_for_job(seed, chunk_id)
 
             # Create job-specific name
             job_name = self.name
@@ -292,9 +373,7 @@ class GenerateTask(Component):
         task_defs = self.to_task_definitions(cluster_config, hardware_config)
         return task_defs[0] if task_defs else None
 
-    def _build_command_for_job(
-        self, seed: Optional[int], chunk_id: Optional[int], cluster_config: Optional[Dict] = None
-    ) -> str:
+    def _build_command_for_job(self, seed: Optional[int], chunk_id: Optional[int]) -> str:
         """Build generation command for a specific seed/chunk job."""
         # Determine input file for this job
         if os.path.isfile(self.input_source):
@@ -328,9 +407,9 @@ class GenerateTask(Component):
         # Handle server references (local or cross-group)
         if self.server_ref:
             # Cross-group server reference - resolve at runtime
-            server_host = self.server_ref.resolve_expression(cluster_config)
+            server_host = self.server_ref.resolve_expression()
             server_port_ref = RuntimeRef(self.server_ref.component_name, self.server_ref.het_group_index, "port")
-            server_port = server_port_ref.resolve_expression(cluster_config)
+            server_port = server_port_ref.resolve_expression()
 
             # We need to determine server_type and model from the reference
             # For now, we'll need to pass these as additional attributes or handle differently
@@ -355,9 +434,9 @@ class GenerateTask(Component):
         # Handle sandbox references (local or cross-group)
         if self.sandbox_ref:
             # Cross-group sandbox reference - resolve at runtime
-            sandbox_host = self.sandbox_ref.resolve_expression(cluster_config)
+            sandbox_host = self.sandbox_ref.resolve_expression()
             sandbox_port_ref = RuntimeRef(self.sandbox_ref.component_name, self.sandbox_ref.het_group_index, "port")
-            sandbox_port = sandbox_port_ref.resolve_expression(cluster_config)
+            sandbox_port = sandbox_port_ref.resolve_expression()
 
             cmd_parts.extend(
                 [
@@ -462,17 +541,9 @@ class RunCmd(Component):
 
         cmd = " && ".join(cmd_parts)
 
-        # Apply hardware config overrides with proper None handling
-        num_gpus = (
-            hardware_config.get("num_gpus")
-            if hardware_config and hardware_config.get("num_gpus") is not None
-            else self.gpus
-        )
-        num_nodes = (
-            hardware_config.get("num_nodes")
-            if hardware_config and hardware_config.get("num_nodes") is not None
-            else self.nodes
-        )
+        # Apply hardware config overrides
+        num_gpus = hardware_config.get("num_gpus", self.gpus) if hardware_config else self.gpus
+        num_nodes = hardware_config.get("num_nodes", self.nodes) if hardware_config else self.nodes
         partition = hardware_config.get("partition") if hardware_config else None
         exclusive = hardware_config.get("exclusive", False) if hardware_config else False
 
