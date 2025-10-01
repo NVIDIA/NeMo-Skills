@@ -206,7 +206,10 @@ class SweBenchGenerationTask(GenerationTask):
             # Clone the repo.
             # This follows the procedure used for the SWE-bench environments:
             # https://github.com/SWE-bench/SWE-bench/blob/7a6b44e4a82eece60ac06afd3042a76d8a95eec3/swebench/harness/test_spec/python.py#L274
-            # except we clone all branches because we can't always know which branch the commit is on.
+            # with the following differences:
+            #     1. we clone all branches because we can't always know which branch the commit is on,
+            #     2. we compare commit times using Unix timestamps (%ct instead of %ci)
+            #        to fix issues with commits being in different timezones.
             container_commands.append(
                 # Remove existing repo if present
                 "rm -rf /testbed && "
@@ -218,12 +221,12 @@ class SweBenchGenerationTask(GenerationTask):
                 # Remove the remote and tags so the agent won't see newer commits
                 "git remote remove origin && "
                 # Remove only tags pointing to commits after target timestamp
-                f"TARGET_TIMESTAMP=$(git show -s --format=%ci {data_point['base_commit']}) && "
-                'git tag -l | while read tag; do TAG_COMMIT=$(git rev-list -n 1 "$tag"); TAG_TIME=$(git show -s --format=%ci "$TAG_COMMIT"); if [[ "$TAG_TIME" > "$TARGET_TIMESTAMP" ]]; then git tag -d "$tag"; fi; done && '
+                f"TARGET_TIMESTAMP=$(git show -s --format=%ct {data_point['base_commit']}) && "
+                'git tag -l | while read tag; do TAG_COMMIT=$(git rev-list -n 1 "$tag"); TAG_TIME=$(git show -s --format=%ct "$TAG_COMMIT"); if [[ "$TAG_TIME" -gt "$TARGET_TIMESTAMP" ]]; then git tag -d "$tag"; fi; done && '
                 "git reflog expire --expire=now --all && "
                 "git gc --prune=now --aggressive && "
                 # Verify future logs aren't available
-                "AFTER_TIMESTAMP=$(date -d \"$TARGET_TIMESTAMP + 1 second\" '+%Y-%m-%d %H:%M:%S') && "
+                "AFTER_TIMESTAMP=$(($TARGET_TIMESTAMP + 1)) && "
                 'COMMIT_COUNT=$(git log --oneline --all --since="$AFTER_TIMESTAMP" | wc -l) && '
                 'if [ "$COMMIT_COUNT" -ne 0 ]; then '
                 "    echo 'Exiting because future logs are visible after resetting the repo to the base commit.' && "
