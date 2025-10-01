@@ -131,34 +131,43 @@ def main():
         name="monitor",
     )
 
-    # Create HetGroups
+    # Create HetGroups with static names
     hetgroup_8b = HetGroup(
-        [server_8b, sandbox, monitor_cmd],
+        commands=[server_8b, sandbox, monitor_cmd],
         hardware=HardwareConfig(
             num_nodes=1,
             num_gpus=8,
             partition=args.partition,
         ),
-    ).named("qwen3_8b_group")
+        name="qwen3_8b_group",
+    )
 
     hetgroup_32b = HetGroup(
-        [server_32b],
+        commands=[server_32b],
         hardware=HardwareConfig(
             num_nodes=1,
             num_gpus=8,
             partition=args.partition,
         ),
-    ).named("qwen3_32b_group")
+        name="qwen3_32b_group",
+    )
 
     # Create pipeline - het_group_indices will be assigned automatically
     # When monitor_cmd.command lambda is evaluated, references will work correctly!
+    # Using new static jobs API for multi-hetgroup
     pipeline = Pipeline(
         name="multi_hetgroup_demo",
         cluster=args.cluster,
         output_dir=args.output_dir,
-        groups=[
-            hetgroup_8b,  # Component +0: server_8b + sandbox + monitor
-            hetgroup_32b,  # Component +1: server_32b
+        jobs=[
+            # Multi-hetgroup: Combines both HetGroups into ONE heterogeneous SLURM job
+            {
+                "name": "combined_servers",
+                "groups": [
+                    hetgroup_8b,  # Component +0: server_8b + sandbox + monitor
+                    hetgroup_32b,  # Component +1: server_32b
+                ],
+            },
         ],
     )
 

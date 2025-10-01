@@ -300,47 +300,94 @@ class HardwareConfig:
 class HetGroup:
     """Heterogeneous group where commands run with different resource requirements."""
 
-    def __init__(self, commands: List[Command], hardware: Optional[HardwareConfig] = None):
+    def __init__(
+        self,
+        commands: List[Command],
+        hardware: Optional[HardwareConfig] = None,
+        name: Optional[str] = None,
+    ):
         self.components = commands  # Keep as self.components internally for backwards compatibility
         self.hardware = hardware or HardwareConfig()
-        self.dependencies: List[Union["HetGroup", str]] = []
-        self._name: Optional[str] = None
+        self.name = name
 
+    # Keep these for backward compatibility (but prefer static config)
     def depends_on(self, dependency: Union["HetGroup", str]) -> "HetGroup":
-        """Add dependency and return self for chaining."""
-        self.dependencies.append(dependency)
+        """Add dependency and return self for chaining. Deprecated - use Pipeline jobs config."""
+        import warnings
+
+        warnings.warn(
+            "depends_on() is deprecated. Use Pipeline jobs config with dependencies instead.", DeprecationWarning
+        )
         return self
 
     def named(self, name: str) -> "HetGroup":
-        """Set explicit name and return self for chaining."""
-        self._name = name
+        """Set explicit name and return self for chaining. Deprecated - use name parameter."""
+        import warnings
+
+        warnings.warn("named() is deprecated. Use HetGroup(name=...) instead.", DeprecationWarning)
+        self.name = name
         return self
 
     def with_hardware(self, **kwargs) -> "HetGroup":
-        """Set hardware configuration and return self for chaining."""
+        """Set hardware configuration and return self for chaining. Deprecated - use hardware parameter."""
+        import warnings
+
+        warnings.warn("with_hardware() is deprecated. Use HardwareConfig directly.", DeprecationWarning)
         for key, value in kwargs.items():
             setattr(self.hardware, key, value)
         return self
 
 
 class Pipeline:
-    """Top-level pipeline that composes groups."""
+    """Top-level pipeline that composes groups with dependency support.
+
+    Supports two modes:
+    1. Legacy: groups=[hetgroup1, hetgroup2] - combines all into one het job
+    2. New: jobs=[{...}, {...}] - supports dependencies and multi-hetgroup
+    """
 
     def __init__(
-        self, name: str, groups: List[HetGroup], cluster: Optional[str] = None, output_dir: Optional[str] = None
+        self,
+        name: str,
+        cluster: Optional[str] = None,
+        output_dir: Optional[str] = None,
+        groups: Optional[List[HetGroup]] = None,  # Legacy mode
+        jobs: Optional[List[Dict]] = None,  # New mode with dependencies
     ):
         self.name = name
-        self.groups = groups
         self.cluster = cluster
         self.output_dir = output_dir or f"/tmp/{name}_outputs"
         self._cluster_config: Optional[Dict] = None
+
+        # Support both legacy and new API
+        if groups is not None and jobs is not None:
+            raise ValueError("Cannot specify both 'groups' and 'jobs'. Use 'jobs' for new API.")
+
+        if groups is not None:
+            # Legacy mode: convert to jobs format
+            self.jobs = [{"group": g} for g in groups]
+            self._legacy_mode = True
+        elif jobs is not None:
+            self.jobs = jobs
+            self._legacy_mode = False
+        else:
+            raise ValueError("Must specify either 'groups' or 'jobs'")
+
         self._assign_het_group_indices()
 
     def _assign_het_group_indices(self):
         """Assign het_group_index to all components for cross-group references."""
-        for group_idx, group in enumerate(self.groups):
+        # Collect all groups from jobs
+        all_groups = []
+        for job_spec in self.jobs:
+            if "group" in job_spec:
+                all_groups.append(job_spec["group"])
+            elif "groups" in job_spec:
+                all_groups.extend(job_spec["groups"])
+
+        # Assign indices
+        for group_idx, group in enumerate(all_groups):
             for component in group.components:
-                # All components are now cross-group compatible
                 component.het_group_index = group_idx
                 LOG.debug(f"Assigned het_group_index {group_idx} to {component.get_name()}")
 
@@ -356,8 +403,8 @@ class Pipeline:
 
     def run(self, cluster_config: Optional[Dict] = None, cluster: Optional[str] = None, dry_run: bool = False):
         """Execute the pipeline by calling NeMo-Run directly."""
-        if not self.groups:
-            LOG.info("No groups to execute")
+        if not self.jobs:
+            LOG.info("No jobs to execute")
             return None
 
         # Determine cluster config to use
@@ -370,30 +417,73 @@ class Pipeline:
         else:
             final_cluster_config = self._get_cluster_config()
 
-        # Assign het_group_indices for cross-group references
-        for het_idx, group in enumerate(self.groups):
-            for command in group.components:
-                command.het_group_index = het_idx
-
         log_dir = f"{self.output_dir}/logs"
 
+        # Track job name -> task handle for dependency resolution
+        job_name_to_handle = {}
+
         with get_exp(self.name, final_cluster_config) as exp:
-            if len(self.groups) > 1:
-                # Multiple HetGroups = heterogeneous job
-                self._add_heterogeneous_job(exp, final_cluster_config, log_dir)
-            else:
-                # Single group
-                self._add_group(exp, self.groups[0], final_cluster_config, log_dir)
+            # Process each job in order
+            for job_spec in self.jobs:
+                job_name = job_spec.get("name", "unnamed")
+
+                # Resolve dependencies to task handles (for jobs in this pipeline)
+                run_after_deps = []
+                for dep in job_spec.get("dependencies", []):
+                    if isinstance(dep, str):
+                        # String dependency - look up by name
+                        if dep in job_name_to_handle:
+                            # Internal pipeline dependency - add the handle
+                            run_after_deps.append(job_name_to_handle[dep])
+                            LOG.info(f"Job '{job_name}' depends on '{dep}' (handle: {job_name_to_handle[dep]})")
+                        else:
+                            # External experiment name - will be resolved by get_exp_handles
+                            run_after_deps.append(dep)
+                            LOG.info(f"Job '{job_name}' depends on external experiment '{dep}'")
+
+                # Check if this is a multi-hetgroup job or single group
+                if "groups" in job_spec:
+                    # Multi-hetgroup: combine multiple HetGroups into one heterogeneous job
+                    task_handle = self._add_multi_hetgroup_job(
+                        exp,
+                        job_spec["groups"],
+                        final_cluster_config,
+                        log_dir,
+                        run_after_deps if run_after_deps else None,
+                    )
+                elif "group" in job_spec:
+                    # Single group job
+                    task_handle = self._add_single_group_job(
+                        exp,
+                        job_spec["group"],
+                        final_cluster_config,
+                        log_dir,
+                        run_after_deps if run_after_deps else None,
+                    )
+                else:
+                    raise ValueError(f"Job spec must have either 'group' or 'groups': {job_spec}")
+
+                # Track task handle for this job
+                job_name_to_handle[job_name] = task_handle
+                LOG.info(f"Added job '{job_name}' with task_handle={task_handle}")
 
             if not dry_run:
                 run_exp(exp, final_cluster_config)
             return exp
 
-    def _add_group(self, exp, group: HetGroup, cluster_config: Dict, log_dir: str):
-        """Add a single HetGroup to the experiment."""
+    def _add_single_group_job(
+        self, exp, group: HetGroup, cluster_config: Dict, log_dir: str, run_after: Optional[List] = None
+    ) -> str:
+        """Add a single HetGroup as one job and return its task handle."""
         import nemo_run as run
 
         from nemo_skills.pipeline.utils import get_executor, temporary_env_update
+
+        # Task handles from run_after are already in the right format for dependencies
+        dependencies = run_after if (run_after and cluster_config["executor"] == "slurm") else None
+
+        if dependencies:
+            LOG.info(f"Single group job '{group.name}' has {len(dependencies)} dependencies: {dependencies}")
 
         commands = []
         executors = []
@@ -440,27 +530,39 @@ class Pipeline:
 
             executors.append(executor)
 
-        # Add to experiment
+        # Add to experiment with dependencies and return task ID
         if len(commands) == 1:
-            exp.add(
+            task_id = exp.add(
                 run.Script(inline=commands[0]),
                 executor=executors[0],
-                name="nemo-run",
+                name=group.name or "nemo-run",
+                dependencies=dependencies,  # Pass to exp.add(), not executor!
             )
         else:
-            exp.add(
+            task_id = exp.add(
                 [run.Script(inline=cmd) for cmd in commands],
                 executor=executors,
-                name="nemo-run",
+                name=group.name or "nemo-run",
+                dependencies=dependencies,  # Pass to exp.add(), not executor!
             )
 
-    def _add_heterogeneous_job(self, exp, cluster_config: Dict, log_dir: str):
-        """Add multiple HetGroups as a single heterogeneous SLURM job."""
+        return task_id
+
+    def _add_multi_hetgroup_job(
+        self, exp, groups: List[HetGroup], cluster_config: Dict, log_dir: str, run_after: Optional[List] = None
+    ) -> str:
+        """Add multiple HetGroups as a single heterogeneous SLURM job and return task handle."""
         import nemo_run as run
 
         from nemo_skills.pipeline.utils import get_executor, temporary_env_update
 
-        LOG.info(f"Creating heterogeneous job with {len(self.groups)} HetGroup components")
+        # Task handles from run_after are already in the right format for dependencies
+        dependencies = run_after if (run_after and cluster_config["executor"] == "slurm") else None
+
+        if dependencies:
+            LOG.info(f"Multi-hetgroup job has {len(dependencies)} dependencies: {dependencies}")
+
+        LOG.info(f"Creating heterogeneous job with {len(groups)} HetGroup components")
 
         all_commands = []
         all_executors = []
@@ -468,14 +570,14 @@ class Pipeline:
 
         # Collect environment variables from all commands (for cross-component refs)
         shared_env_vars = {}
-        for het_idx, group in enumerate(self.groups):
+        for het_idx, group in enumerate(groups):
             for command in group.components:
                 _, exec_config = command.prepare_for_execution(cluster_config)
                 shared_env_vars.update(exec_config.get("environment", {}))
 
         # Build commands and executors
-        for het_idx, group in enumerate(self.groups):
-            LOG.info(f"Het component {het_idx}: {len(group.components)} commands from group '{group._name}'")
+        for het_idx, group in enumerate(groups):
+            LOG.info(f"Het component {het_idx}: {len(group.components)} commands from group '{group.name}'")
 
             for command in group.components:
                 # Prepare command
@@ -508,7 +610,7 @@ class Pipeline:
                             partition=group.hardware.partition if group.hardware else None,
                             heterogeneous=True,
                             het_group=het_idx,
-                            total_het_groups=len(self.groups),
+                            total_het_groups=len(groups),
                             overlap=len(group.components) > 1,
                             mounts=exec_config.get("mounts"),
                         )
@@ -525,7 +627,7 @@ class Pipeline:
                         partition=group.hardware.partition if group.hardware else None,
                         heterogeneous=True,
                         het_group=het_idx,
-                        total_het_groups=len(self.groups),
+                        total_het_groups=len(groups),
                         overlap=len(group.components) > 1,
                     )
 
@@ -534,9 +636,14 @@ class Pipeline:
         # Set het_group_indices on first executor
         all_executors[0].het_group_indices = het_group_indices
 
-        # Add to experiment
-        exp.add(
+        # Add to experiment with dependencies and return task ID
+        # Use first group's name as job name
+        job_name = groups[0].name or "multi_hetgroup"
+        task_id = exp.add(
             [run.Script(inline=cmd) for cmd in all_commands],
             executor=all_executors,
-            name="nemo-run",
+            name=job_name,
+            dependencies=dependencies,  # Pass to exp.add(), not executor!
         )
+
+        return task_id

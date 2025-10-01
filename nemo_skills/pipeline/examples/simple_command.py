@@ -53,15 +53,36 @@ def main():
     )
 
     # Create pipeline - each Command becomes a separate SLURM job
-    # If you want them to run together, wrap them in a HetGroup
+    # Using new static jobs API
     pipeline = Pipeline(
         name="simple_demo",
         cluster=args.cluster,
         output_dir=args.output_dir,
-        groups=[
-            HetGroup([hello_cmd], hardware=HardwareConfig(partition=args.partition)),
-            HetGroup([process_cmd], hardware=HardwareConfig(partition=args.partition)),
-            HetGroup([custom_env_cmd], hardware=HardwareConfig(partition=args.partition)),
+        jobs=[
+            {
+                "name": "hello",
+                "group": HetGroup(
+                    commands=[hello_cmd],
+                    hardware=HardwareConfig(partition=args.partition),
+                    name="hello_job",
+                ),
+            },
+            {
+                "name": "process",
+                "group": HetGroup(
+                    commands=[process_cmd],
+                    hardware=HardwareConfig(partition=args.partition),
+                    name="process_job",
+                ),
+            },
+            {
+                "name": "custom_env",
+                "group": HetGroup(
+                    commands=[custom_env_cmd],
+                    hardware=HardwareConfig(partition=args.partition),
+                    name="custom_env_job",
+                ),
+            },
         ],
     )
 
