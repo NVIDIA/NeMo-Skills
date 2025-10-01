@@ -43,7 +43,7 @@ def clone_repo(repo, output_dir):
 
     try:
         # Clone repo
-        cmd = ["git", "clone", f"https://github.com/{repo}", repo_dir]
+        cmd = ["git", "clone", "--mirror", f"https://github.com/{repo}", repo_dir]
 
         print(f"Cloning {repo}...")
         result = subprocess.run(cmd, capture_output=True, text=True)
