@@ -38,8 +38,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from nemo_skills.pipeline.utils import get_exp, run_exp
-from nemo_skills.pipeline.utils.task_factories import TaskFactory
-from nemo_skills.pipeline.utils.task_system import PipelineBuilder, TaskGroup
+from nemo_skills.pipeline.utils.commands import wrap_command
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -169,7 +168,14 @@ class Command:
         client = Command(command=lambda: f"curl {server.hostname_ref()}:{server.meta_ref('port')}")
     """
 
-    command: Union[str, Callable[[], str], Tuple[str, Dict], Callable[[], Tuple[str, Dict]]]
+    command: Union[
+        str,
+        Callable[[], str],  # Lambda for cross-group refs
+        Callable[[Dict], str],  # Lambda needing cluster_config (e.g., sandbox)
+        Tuple[Optional[str], Dict],  # Command builder result
+        Callable[[], Tuple[Optional[str], Dict]],  # Lambda returning command builder result
+        None,
+    ]
     container: str = "nemo-skills"
     gpus: Optional[int] = None
     nodes: int = 1
@@ -186,14 +192,19 @@ class Command:
         if self.name is None:
             self.name = "command"
 
-        # Extract metadata if command is a tuple or callable returning tuple
+        # Extract metadata if command is a tuple
         self._extract_metadata()
+
+        # Wrap plain strings with environment setup
+        if isinstance(self.command, str) and (self.env_vars or self.working_dir):
+            self.command = wrap_command(self.command, self.working_dir, self.env_vars)
 
     def _extract_metadata(self):
         """Extract metadata from command if it's a tuple."""
         if not callable(self.command):
             if isinstance(self.command, tuple):
-                self.command, self.metadata = self.command
+                cmd, self.metadata = self.command
+                self.command = cmd  # Can be None for sandbox
                 # Set port if it's in metadata
                 if "port" in self.metadata:
                     self.port = self.metadata["port"]
@@ -212,143 +223,63 @@ class Command:
         else:
             return ""
 
-    def to_task_definition(self, cluster_config: Dict, hardware_config: Optional[Dict] = None):
-        """Convert to MainTask/ServerTask/SandboxTask based on metadata."""
-        # Evaluate command if it's a callable (lazy evaluation)
+    def prepare_for_execution(self, cluster_config: Dict) -> Tuple[str, Dict]:
+        """Prepare command for execution.
+
+        This method:
+        1. Evaluates callables (resolves cross-group references and cluster_config-dependent commands)
+        2. Adds cross-group environment variables
+
+        Returns:
+            Tuple of (final_command, execution_config)
+        """
+        # 1. Evaluate if callable (resolves cross-group references or cluster_config needs)
         if callable(self.command):
-            result = self.command()
+            # Check if lambda needs cluster_config (for sandbox)
+            import inspect
+
+            sig = inspect.signature(self.command)
+            if len(sig.parameters) > 0:
+                # Lambda expects cluster_config
+                result = self.command(cluster_config)
+            else:
+                # Regular lambda (cross-group refs)
+                result = self.command()
+
             if isinstance(result, tuple):
-                actual_command, self.metadata = result
-                if "port" in self.metadata and self.port is None:
-                    self.port = self.metadata["port"]
+                final_command, runtime_metadata = result
+                # Deep merge metadata, especially environment dict
+                for key, value in runtime_metadata.items():
+                    if key == "environment" and key in self.metadata:
+                        # Merge environment dicts instead of replacing
+                        self.metadata[key].update(value)
+                    else:
+                        self.metadata[key] = value
             else:
-                actual_command = result
+                final_command = result
         else:
-            actual_command = self.command
+            final_command = self.command
 
-        # Check if this is a server or sandbox based on metadata
-        is_server = "server_type" in self.metadata
-        is_sandbox = "port" in self.metadata and not is_server and actual_command.startswith("# Sandbox")
+        # 2. Add cross-group environment variables (for cross-group references)
+        if self.het_group_index is not None and self.port is not None:
+            env_vars = self.metadata.setdefault("environment", {})
+            env_vars[f"{self.name.upper()}_PORT_HET_GROUP_{self.het_group_index}"] = str(self.port)
 
-        # Apply hardware config overrides
-        num_gpus = self.gpus if self.gpus is not None else 0
-        num_nodes = hardware_config.get("num_nodes", self.nodes) if hardware_config else self.nodes
-        partition = hardware_config.get("partition") if hardware_config else None
-        exclusive = hardware_config.get("exclusive", False) if hardware_config else False
+        # 3. Build execution config from metadata
+        execution_config = {
+            "num_tasks": self.metadata.get("num_tasks", 1),
+            "num_gpus": self.metadata.get("gpus", self.gpus or 0),
+            "num_nodes": self.metadata.get("nodes", self.nodes),
+            "environment": self.metadata.get("environment", {}),
+            "log_prefix": self.metadata.get("log_prefix", "main"),
+            "mounts": self.metadata.get("mounts"),
+            "container": self.metadata.get("container", self.container),  # Use container from metadata if available
+        }
 
-        if is_server:
-            # This is a server - use ServerTask
-
-            server_config = {
-                "server_type": self.metadata["server_type"],
-                "num_gpus": self.metadata.get("gpus", num_gpus),
-                "num_nodes": self.metadata.get("nodes", num_nodes),
-                "model_path": self.metadata["model"],
-                "server_port": self.metadata["port"],
-                "server_args": self.metadata.get("server_args", ""),
-                "cluster_config": cluster_config,
-            }
-            if self.metadata.get("server_entrypoint"):
-                server_config["server_entrypoint"] = self.metadata["server_entrypoint"]
-
-            # Determine container
-            container_name = cluster_config["containers"].get(
-                self.metadata["server_type"],
-                cluster_config["containers"].get("nemo", cluster_config["containers"].get("nemo-skills")),
-            )
-
-            task_def = TaskFactory.create_server_task(
-                name=self.name,
-                server_type=self.metadata["server_type"],
-                container=container_name,
-                num_gpus=self.metadata.get("gpus", num_gpus),
-                num_nodes=self.metadata.get("nodes", num_nodes),
-                model_path=self.metadata["model"],
-                server_port=self.metadata["port"],
-                server_args=self.metadata.get("server_args", ""),
-                server_entrypoint=self.metadata.get("server_entrypoint"),
-                partition=partition,
-            )
-
-            # Add cross-group environment variables
-            self._add_cross_group_env_vars(task_def, ["host", "port"])
-
-            return task_def
-
-        elif is_sandbox:
-            # This is a sandbox - use SandboxTask
-            task_def = TaskFactory.create_sandbox_task(
-                name=self.name,
-                container=cluster_config["containers"]["sandbox"],
-                port=self.metadata["port"],
-            )
-
-            # Add cross-group environment variables
-            self._add_cross_group_env_vars(task_def, ["host", "port"])
-
-            return task_def
-
-        else:
-            # Regular command - build with environment setup
-            cmd_parts = [
-                "export HYDRA_FULL_ERROR=1",
-                f"export PYTHONPATH=$PYTHONPATH:{self.working_dir}",
-                f"cd {self.working_dir}",
-            ]
-
-            # Add any custom environment variables
-            for env_var, value in self.env_vars.items():
-                cmd_parts.append(f"export {env_var}={value}")
-
-            # Add the actual command
-            cmd_parts.append(actual_command.strip())
-
-            cmd = " && ".join(cmd_parts)
-
-            # Determine container from cluster config or use specified
-            container_name = self.container
-            if container_name in cluster_config.get("containers", {}):
-                container_image = cluster_config["containers"][container_name]
-            else:
-                container_image = container_name  # Assume it's a direct container image name
-
-            return TaskFactory.create_generation_task(  # Reuse generation task factory
-                name=self.name,
-                cmd=cmd,
-                container=container_image,
-                num_gpus=num_gpus,
-                num_nodes=num_nodes,
-                partition=partition,
-                installation_command=self.installation_command,
-                exclusive=exclusive,
-            )
+        return final_command, execution_config
 
     def get_name(self) -> str:
         return self.name
-
-    def to_task_definitions(self, cluster_config: Dict, hardware_config: Optional[Dict] = None) -> List:
-        """Convert this component to multiple TaskDefinitions (for components that can expand).
-
-        Most commands return a single task definition.
-        """
-        task_def = self.to_task_definition(cluster_config, hardware_config)
-        return [task_def] if task_def else []
-
-    def _add_cross_group_env_vars(self, task_def, attributes: List[str]):
-        """Add environment variables for cross-group access (currently only ports).
-
-        Note: Hostnames are resolved directly from SLURM_JOB_NODELIST_HET_GROUP_N
-        in the shell script, not through environment variables.
-        """
-        if self.het_group_index is not None:
-            for attr in attributes:
-                if hasattr(self, attr):
-                    value = getattr(self, attr)
-                    if attr == "port":
-                        # For ports, export the value directly
-                        task_def.environment[
-                            f"{self.get_name().upper()}_{attr.upper()}_HET_GROUP_{self.het_group_index}"
-                        ] = str(value)
 
 
 @dataclass
@@ -391,38 +322,6 @@ class HetGroup:
             setattr(self.hardware, key, value)
         return self
 
-    def to_task_group(self, cluster_config: Dict, pipeline_output_dir: Optional[str] = None) -> TaskGroup:
-        """Convert to actual TaskGroup."""
-        name = self._name or self._generate_name()
-        # All components in a HetGroup share the same resources, so NOT heterogeneous within the group
-        group = TaskGroup(name, heterogeneous=False)
-
-        # Convert hardware config to dict for passing to components
-        hardware_dict = {
-            "partition": self.hardware.partition,
-            "time_min": self.hardware.time_min,
-            "exclusive": self.hardware.exclusive,
-            "server_gpus": self.hardware.server_gpus,
-            "server_nodes": self.hardware.server_nodes,
-            "num_gpus": self.hardware.num_gpus,
-            "num_nodes": self.hardware.num_nodes,
-            "pipeline_output_dir": pipeline_output_dir,  # ✨ Pass pipeline output dir
-        }
-
-        for component in self.components:
-            task_defs = component.to_task_definitions(cluster_config, hardware_dict)
-            for task_def in task_defs:
-                group.add_task(task_def)
-
-        for dep in self.dependencies:
-            group.add_dependency(dep)
-
-        return group
-
-    def _generate_name(self) -> str:
-        """Generate name from component types."""
-        return "_".join(comp.get_name() for comp in self.components)
-
 
 class Pipeline:
     """Top-level pipeline that composes groups."""
@@ -456,48 +355,188 @@ class Pipeline:
         return self._cluster_config
 
     def run(self, cluster_config: Optional[Dict] = None, cluster: Optional[str] = None, dry_run: bool = False):
-        """Execute the pipeline."""
+        """Execute the pipeline by calling NeMo-Run directly."""
         if not self.groups:
             LOG.info("No groups to execute")
             return None
 
         # Determine cluster config to use
         if cluster_config is not None:
-            # Explicit config provided
             final_cluster_config = cluster_config
         elif cluster is not None:
-            # Cluster name provided
             from nemo_skills.pipeline.utils import get_cluster_config
 
             final_cluster_config = get_cluster_config(cluster)
         else:
-            # Use pipeline's cluster
             final_cluster_config = self._get_cluster_config()
 
-        builder = PipelineBuilder(self.name, final_cluster_config)
+        # Assign het_group_indices for cross-group references
+        for het_idx, group in enumerate(self.groups):
+            for command in group.components:
+                command.het_group_index = het_idx
 
-        # If multiple groups, they need special handling for heterogeneous jobs
-        if len(self.groups) > 1:
-            # Each HetGroup becomes a separate het component
-            # Update het_group_indices for components to match their actual het component positions
-            for het_idx, group in enumerate(self.groups):
-                # Update all components in this group to have the correct het_group_index
-                for component in group.components:
-                    component.het_group_index = het_idx
-
-                task_group = group.to_task_group(final_cluster_config, self.output_dir)
-                # Mark that this is part of a multi-group pipeline
-                task_group._is_het_component = True
-                builder.add_task_group(task_group)
-        else:
-            # Single group - just add it directly
-            task_group = self.groups[0].to_task_group(final_cluster_config, self.output_dir)
-            builder.add_task_group(task_group)
-
-        # Execute
         log_dir = f"{self.output_dir}/logs"
+
         with get_exp(self.name, final_cluster_config) as exp:
-            builder.build_experiment(exp, log_dir)
+            if len(self.groups) > 1:
+                # Multiple HetGroups = heterogeneous job
+                self._add_heterogeneous_job(exp, final_cluster_config, log_dir)
+            else:
+                # Single group
+                self._add_group(exp, self.groups[0], final_cluster_config, log_dir)
+
             if not dry_run:
                 run_exp(exp, final_cluster_config)
             return exp
+
+    def _add_group(self, exp, group: HetGroup, cluster_config: Dict, log_dir: str):
+        """Add a single HetGroup to the experiment."""
+        import nemo_run as run
+
+        from nemo_skills.pipeline.utils import get_executor, temporary_env_update
+
+        commands = []
+        executors = []
+
+        for command in group.components:
+            # Command prepares itself!
+            final_cmd, exec_config = command.prepare_for_execution(cluster_config)
+            commands.append(final_cmd)
+
+            # Determine container (use from exec_config if available, e.g., for sandbox)
+            container_name = exec_config.get("container", command.container)
+            if container_name in cluster_config.get("containers", {}):
+                container_image = cluster_config["containers"][container_name]
+            else:
+                container_image = container_name
+
+            # Build executor
+            if exec_config.get("environment"):
+                with temporary_env_update(cluster_config, exec_config["environment"]):
+                    executor = get_executor(
+                        cluster_config=cluster_config,
+                        container=container_image,
+                        num_nodes=exec_config["num_nodes"],
+                        tasks_per_node=exec_config["num_tasks"],
+                        gpus_per_node=exec_config["num_gpus"],
+                        job_name=command.name,
+                        log_dir=log_dir,
+                        log_prefix=exec_config["log_prefix"],
+                        partition=group.hardware.partition if group.hardware else None,
+                        mounts=exec_config.get("mounts"),
+                    )
+            else:
+                executor = get_executor(
+                    cluster_config=cluster_config,
+                    container=container_image,
+                    num_nodes=exec_config["num_nodes"],
+                    tasks_per_node=exec_config["num_tasks"],
+                    gpus_per_node=exec_config["num_gpus"],
+                    job_name=command.name,
+                    log_dir=log_dir,
+                    log_prefix=exec_config["log_prefix"],
+                    partition=group.hardware.partition if group.hardware else None,
+                )
+
+            executors.append(executor)
+
+        # Add to experiment
+        if len(commands) == 1:
+            exp.add(
+                run.Script(inline=commands[0]),
+                executor=executors[0],
+                name="nemo-run",
+            )
+        else:
+            exp.add(
+                [run.Script(inline=cmd) for cmd in commands],
+                executor=executors,
+                name="nemo-run",
+            )
+
+    def _add_heterogeneous_job(self, exp, cluster_config: Dict, log_dir: str):
+        """Add multiple HetGroups as a single heterogeneous SLURM job."""
+        import nemo_run as run
+
+        from nemo_skills.pipeline.utils import get_executor, temporary_env_update
+
+        LOG.info(f"Creating heterogeneous job with {len(self.groups)} HetGroup components")
+
+        all_commands = []
+        all_executors = []
+        het_group_indices = []
+
+        # Collect environment variables from all commands (for cross-component refs)
+        shared_env_vars = {}
+        for het_idx, group in enumerate(self.groups):
+            for command in group.components:
+                _, exec_config = command.prepare_for_execution(cluster_config)
+                shared_env_vars.update(exec_config.get("environment", {}))
+
+        # Build commands and executors
+        for het_idx, group in enumerate(self.groups):
+            LOG.info(f"Het component {het_idx}: {len(group.components)} commands from group '{group._name}'")
+
+            for command in group.components:
+                # Prepare command
+                final_cmd, exec_config = command.prepare_for_execution(cluster_config)
+                all_commands.append(final_cmd)
+                het_group_indices.append(het_idx)
+
+                # Merge shared environment
+                exec_config["environment"].update(shared_env_vars)
+
+                # Determine container (use from exec_config if available, e.g., for sandbox)
+                container_name = exec_config.get("container", command.container)
+                if container_name in cluster_config.get("containers", {}):
+                    container_image = cluster_config["containers"][container_name]
+                else:
+                    container_image = container_name
+
+                # Build executor
+                if exec_config.get("environment"):
+                    with temporary_env_update(cluster_config, exec_config["environment"]):
+                        executor = get_executor(
+                            cluster_config=cluster_config,
+                            container=container_image,
+                            num_nodes=exec_config["num_nodes"],
+                            tasks_per_node=exec_config["num_tasks"],
+                            gpus_per_node=exec_config["num_gpus"],
+                            job_name=command.name,
+                            log_dir=log_dir,
+                            log_prefix=exec_config["log_prefix"],
+                            partition=group.hardware.partition if group.hardware else None,
+                            heterogeneous=True,
+                            het_group=het_idx,
+                            total_het_groups=len(self.groups),
+                            overlap=len(group.components) > 1,
+                            mounts=exec_config.get("mounts"),
+                        )
+                else:
+                    executor = get_executor(
+                        cluster_config=cluster_config,
+                        container=container_image,
+                        num_nodes=exec_config["num_nodes"],
+                        tasks_per_node=exec_config["num_tasks"],
+                        gpus_per_node=exec_config["num_gpus"],
+                        job_name=command.name,
+                        log_dir=log_dir,
+                        log_prefix=exec_config["log_prefix"],
+                        partition=group.hardware.partition if group.hardware else None,
+                        heterogeneous=True,
+                        het_group=het_idx,
+                        total_het_groups=len(self.groups),
+                        overlap=len(group.components) > 1,
+                    )
+
+                all_executors.append(executor)
+
+        # Set het_group_indices on first executor
+        all_executors[0].het_group_indices = het_group_indices
+
+        # Add to experiment
+        exp.add(
+            [run.Script(inline=cmd) for cmd in all_commands],
+            executor=all_executors,
+            name="nemo-run",
+        )

@@ -26,16 +26,17 @@ def main():
     # Create servers and sandbox - now just Commands with command builders
     server_8b = Command(
         command=vllm_server_command(model="Qwen/Qwen3-8B", server_type="vllm"),
-        container="nemo-skills",
+        container="vllm",
         gpus=8,
         name="server_8b",
     )
 
-    sandbox = Command(command=sandbox_command(), container="nemo-skills", name="sandbox")
+    # Sandbox command builder provides container="sandbox" in metadata
+    sandbox = Command(command=sandbox_command(), container="sandbox", name="sandbox")
 
     server_32b = Command(
         command=vllm_server_command(model="Qwen/Qwen3-32B", server_type="vllm"),
-        container="nemo-skills",
+        container="vllm",
         gpus=8,
         name="server_32b",
     )
