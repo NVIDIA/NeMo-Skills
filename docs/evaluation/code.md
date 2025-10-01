@@ -178,6 +178,7 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench/__init__.py)
 - Original benchmark source is [here](https://github.com/LiveCodeBench/LiveCodeBench).
 
+<<<<<<< HEAD
 #### Data Preparation
 
 First, prepare the dataset by running the `ns prepare_data` command. The arguments below will generate `test_v6_2408_2505.jsonl`.
@@ -248,6 +249,8 @@ Due to variance between runs, you can automatically repeat the evaluation and av
 --benchmarks=livecodebench:3
 ```
 
+=======
+>>>>>>> origin/main
 ### livecodebench-pro
 
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench-pro/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench-pro/__init__.py)

@@ -23,7 +23,8 @@ from argparse import Namespace
 
 from omegaconf import OmegaConf
 
-from nemo_skills.utils import get_logger_name, unroll_files
+from nemo_skills.file_utils import unroll_files
+from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
