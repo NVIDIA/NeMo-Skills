@@ -63,6 +63,7 @@ def format_entry(entry):
     return {
         "expected_answer": f"{chr(ord('A') + correct_answer_index)}",
         "uuid": uuid,
+        "subset_for_metrics": entry["discipline"],
         "discipline": discipline,
         "field": field,
         "subfield": subfield,
@@ -86,6 +87,12 @@ def save_data(split, random_seed):
     output_file = data_dir / f"{split}.jsonl"
     random.seed(random_seed)
     dataset = load_dataset("m-a-p/SuperGPQA")["train"]
+    if split == "science":
+        dataset = dataset.filter(lambda x: x["discipline"] == "Science")
+    elif split == "test":
+        dataset = dataset
+    else:
+        raise ValueError(f"Invalid split: {split}")
 
     write_data_to_file(output_file, dataset)
 
@@ -95,14 +102,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--split",
         default="all",
-        choices=("all", "test"),
+        choices=("all", "test", "science"),
         help="Dataset split to process.",
     )
     parser.add_argument("--random_seed", type=int, default=42)
     args = parser.parse_args()
 
     if args.split == "all":
-        for split in ["test"]:
+        for split in ["test", "science"]:
             save_data(split, args.random_seed)
     else:
         save_data(args.split, args.random_seed)

@@ -16,6 +16,21 @@ More details are coming soon!
 - Original benchmark source code for SimpleQA (OpenAI) is [here](https://github.com/openai/simple-evals/) and the leaderboard is [here](https://www.kaggle.com/benchmarks/openai/simpleqa). An improved version with 1,000 examples from Google, SimpleQA-verified, is [here](https://www.kaggle.com/benchmarks/deepmind/simpleqa-verified).
 - To use the SimpleQA-verified, set `split=verified`. To use the original version of SimpleQA, please set `split=test`.
 
+### SuperGPQA
+- Benchmark is defined in [`nemo_skills/dataset/supergpqa/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/supergpqa/__init__.py)
+- Original benchmark source is [here](https://github.com/SuperGPQA/SuperGPQA). The official leaderboard is available [here](https://supergpqa.github.io/#Dataset).
+- The `science` split contains all the data where the discipline is "Science". The default full split is `test`.
+
+| Reproduction                                                      |   pass@1[avg-of-2] |   majority@2 |   reference |
+|:--------------------------------------------------------------|:-------------------|:-------------|:---------|
+| GPT-oss 20b (high, no tool) |                               47.02  |      47.79  |    44.91 |
+| GPT-oss 120b (high, no tool) |            53.40 |      53.57 |  51.87	 |
+| Qwen3-30b-a3b-think   |            55.82 |      55.88  |  N/A |
+
+> [Source of reference](https://supergpqa.github.io/#Dataset) and the arXiv paper did not mention the reasoning effort set for GPT-oss.
+
+
+
 ### scicode
 
 !!! note
