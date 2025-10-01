@@ -191,7 +191,19 @@ class SweBenchGenerationTask(GenerationTask):
 
         if self.cfg.generic_inference_container is not None and mode == "agent":
             container_name = self.cfg.generic_inference_container
+
             # If the container is generic, we have to clone the repo inside of it before running the agent.
+
+            # repo_formatter tells us where to get the repo from: either from a URL or from a local mirror.
+            # If repo_formatter is not set, we try to fetch it from GitHub using the "repo" column of the dataset.
+            repo_formatter = data_point.get("repo_formatter", "https://github.com/{repo}")
+            repo_url_or_path = repo_formatter.format(repo=data_point["repo"])
+            if repo_url_or_path.startswith("/"):
+                # If repo is local, we need to mount it inside of Apptainer
+                apptainer_args += f" --mount type=bind,src={repo_url_or_path},dst=/instance_repo,ro "
+                repo_url_or_path = "/instance_repo"
+
+            # Clone the repo.
             # This follows the procedure used for the SWE-bench environments:
             # https://github.com/SWE-bench/SWE-bench/blob/7a6b44e4a82eece60ac06afd3042a76d8a95eec3/swebench/harness/test_spec/python.py#L274
             # except we clone all branches because we can't always know which branch the commit is on.
@@ -199,7 +211,7 @@ class SweBenchGenerationTask(GenerationTask):
                 # Remove existing repo if present
                 "rm -rf /testbed && "
                 # Clone the repo we need
-                f"git clone -o origin https://github.com/{data_point['repo']} /testbed && "
+                f"git clone -o origin {repo_url_or_path} /testbed && "
                 "chmod -R 777 /testbed && "
                 "cd /testbed && "
                 f"git reset --hard {data_point['base_commit']} && "
