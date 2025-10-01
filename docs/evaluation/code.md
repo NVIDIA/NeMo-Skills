@@ -229,7 +229,7 @@ To run with the Pypy3 interpreter, modify the `--extra_eval_args` flag as shown 
 
 ##### Verifying Results
 
-After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/livecodebench/metrics.json`. You can also take a look at `<OUTPUT_DIR>/eval-results/ojbench/summarized-results/main_*` They should look something like this:
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/livecodebench/metrics.json`. You can also take a look at `<OUTPUT_DIR>/eval-results/livecodebench/summarized-results/main_*` They should look something like this:
 
 ```
 -------------------------- livecodebench --------------------------
