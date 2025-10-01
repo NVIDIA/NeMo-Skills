@@ -1,12 +1,11 @@
 import argparse
 
+from nemo_skills.pipeline.utils.commands import sandbox_command, vllm_server_command
 from nemo_skills.pipeline.utils.declarative import (
+    Command,
     HardwareConfig,
     HetGroup,
     Pipeline,
-    RunCmd,
-    Sandbox,
-    Server,
 )
 
 
@@ -24,20 +23,38 @@ def main():
 
     args = parser.parse_args()
 
-    # Create servers and sandbox
-    server_8b = Server(model="Qwen/Qwen3-8B", gpus=8)
-    sandbox = Sandbox()
-    server_32b = Server(model="Qwen/Qwen3-32B", gpus=8, name="vllm_server_32b")
+    # Create servers and sandbox - now just Commands with command builders
+    server_8b = Command(
+        command=vllm_server_command(model="Qwen/Qwen3-8B", server_type="vllm"),
+        container="nemo-skills",
+        gpus=8,
+        name="server_8b",
+    )
+
+    sandbox = Command(command=sandbox_command(), container="nemo-skills", name="sandbox")
+
+    server_32b = Command(
+        command=vllm_server_command(model="Qwen/Qwen3-32B", server_type="vllm"),
+        container="nemo-skills",
+        gpus=8,
+        name="server_32b",
+    )
 
     # Create monitor command with LAZY evaluation using lambda
     # The lambda ensures references are evaluated AFTER Pipeline assigns het_group_indices
     # This way cross-component references work correctly in heterogeneous jobs
-    monitor_cmd = RunCmd(
+    monitor_cmd = Command(
         command=lambda: f"""
         echo '=== Starting Server Monitor ==='
-        echo 'Qwen3-8B should be at: {server_8b.url_ref()}'
-        echo 'Qwen3-32B should be at: {server_32b.url_ref()}'
-        echo 'Sandbox should be at: {sandbox.url_ref()}'
+
+        # Build URLs from hostnames and ports (user has full control)
+        server_8b_url="http://{server_8b.hostname_ref()}:{server_8b.meta_ref("port")}"
+        server_32b_url="http://{server_32b.hostname_ref()}:{server_32b.meta_ref("port")}"
+        sandbox_url="http://{sandbox.hostname_ref()}:{sandbox.meta_ref("port")}"
+
+        echo "Qwen3-8B should be at: $server_8b_url"
+        echo "Qwen3-32B should be at: $server_32b_url"
+        echo "Sandbox should be at: $sandbox_url"
         echo ''
 
         # Track which servers are ready
@@ -58,11 +75,11 @@ def main():
 
             # Check Qwen3-8B
             if [ "$server_8b_ready" = false ]; then
-                if curl -s "{server_8b.health_ref()}" > /dev/null 2>&1; then
-                    echo "✅ Qwen3-8B is READY at {server_8b.url_ref()}"
+                if curl -s "$server_8b_url/health" > /dev/null 2>&1; then
+                    echo "✅ Qwen3-8B is READY at $server_8b_url"
                     server_8b_ready=true
                 else
-                    echo "⏳ Qwen3-8B is NOT ready yet at {server_8b.url_ref()}"
+                    echo "⏳ Qwen3-8B is NOT ready yet at $server_8b_url"
                 fi
             else
                 echo "✅ Qwen3-8B is READY"
@@ -70,21 +87,21 @@ def main():
 
             # Check Qwen3-32B
             if [ "$server_32b_ready" = false ]; then
-                if curl -s "{server_32b.health_ref()}" > /dev/null 2>&1; then
-                    echo "✅ Qwen3-32B is READY at {server_32b.url_ref()}"
+                if curl -s "$server_32b_url/health" > /dev/null 2>&1; then
+                    echo "✅ Qwen3-32B is READY at $server_32b_url"
                     server_32b_ready=true
                 else
-                    echo "⏳ Qwen3-32B is NOT ready yet at {server_32b.url_ref()}"
+                    echo "⏳ Qwen3-32B is NOT ready yet at $server_32b_url"
                 fi
             else
                 echo "✅ Qwen3-32B is READY"
             fi
 
             # Check sandbox
-            if curl -s "{sandbox.url_ref()}" > /dev/null 2>&1; then
-                echo "✅ Sandbox is READY at {sandbox.url_ref()}"
+            if curl -s "$sandbox_url" > /dev/null 2>&1; then
+                echo "✅ Sandbox is READY at $sandbox_url"
             else
-                echo "⏳ Sandbox is NOT ready yet at {sandbox.url_ref()}"
+                echo "⏳ Sandbox is NOT ready yet at $sandbox_url"
             fi
 
             echo ""
@@ -97,9 +114,9 @@ def main():
 
         echo ""
         echo "🎉 All servers are ready!"
-        echo "  - Qwen3-8B:  {server_8b.url_ref()}"
-        echo "  - Qwen3-32B: {server_32b.url_ref()}"
-        echo "  - Sandbox:   {sandbox.url_ref()}"
+        echo "  - Qwen3-8B:  $server_8b_url"
+        echo "  - Qwen3-32B: $server_32b_url"
+        echo "  - Sandbox:   $sandbox_url"
         echo ""
         echo "You can now use these services!"
 
@@ -110,6 +127,7 @@ def main():
         """,
         container="nemo-skills",
         gpus=8,
+        name="monitor",
     )
 
     # Create HetGroups
@@ -156,7 +174,7 @@ def main():
 
     if args.dry_run:
         print("Dry run completed successfully!")
-        print("To run for real, use: python multi_hetgroup_example.py --cluster ord")
+        print(f"To run for real, use: python multi_hetgroup_example.py --cluster {args.cluster}")
     else:
         print("Pipeline execution completed!")
 

@@ -1,72 +1,83 @@
 import argparse
 
 from nemo_skills.pipeline.utils.declarative import (
+    Command,
     HardwareConfig,
     HetGroup,
     Pipeline,
-    RunCmd,
-    Sandbox,
-    Server,
 )
 
 
 def main():
-    """Main function with command line argument parsing."""
+    """Simple command example - just running basic commands in containers."""
     parser = argparse.ArgumentParser(description="Simple command pipeline example")
     parser.add_argument("--dry-run", action="store_true", default=False, help="Run in dry-run mode (default: False)")
     parser.add_argument("--cluster", default="local", help="Cluster to run on (default: local)")
+    parser.add_argument("--partition", default=None, help="Partition to run on (default: None)")
+    parser.add_argument(
+        "--output_dir",
+        default="/experiments/declarative/simple_outputs",
+        help="Output directory to save the results",
+    )
 
     args = parser.parse_args()
 
-    # Create components
-    shared_server = Server(model="Qwen/Qwen3-8B", gpus=8)  # 8 GPUs as needed
-    shared_sandbox = Sandbox()
+    # Just a simple command - no HetGroup wrapper needed for single tasks
+    hello_cmd = Command(command="echo 'Hello from GPU!' && nvidia-smi", container="nemo-skills", gpus=1, name="hello")
 
-    # Note: Using f-string (not lambda) is fine here because this is a single HetGroup
-    # All components are in the same group, so url_ref() works correctly
-    # For cross-component references (multiple HetGroups), use lambda: f"..." instead
-    comand = RunCmd(
-        command=f"""
-        echo 'Waiting for server to be ready...' &&
-        echo "Server should be at {shared_server.url_ref()}" &&
-        while ! curl -s "{shared_server.health_ref()}" > /dev/null 2>&1; do
-            echo "Server not ready yet, waiting 5 seconds..."
-            sleep 5
-        done &&
-        echo 'Server is ready!'
+    # Multiple commands can run as separate jobs
+    process_cmd = Command(
+        command="""
+        echo "Processing data..."
+        # Add your data processing commands here
+        python -c "print('Data processing complete!')"
         """,
         container="nemo-skills",
+        gpus=2,
+        name="processor",
     )
 
-    # Create pipeline
+    # Commands with custom environment variables
+    custom_env_cmd = Command(
+        command="""
+        echo "MY_VAR is set to: $MY_VAR"
+        echo "ANOTHER_VAR is set to: $ANOTHER_VAR"
+        """,
+        container="nemo-skills",
+        gpus=0,  # CPU only
+        env_vars={
+            "MY_VAR": "custom_value",
+            "ANOTHER_VAR": "another_value",
+        },
+        name="custom_env",
+    )
+
+    # Create pipeline - each Command becomes a separate SLURM job
+    # If you want them to run together, wrap them in a HetGroup
     pipeline = Pipeline(
-        name="simple_command",
+        name="simple_demo",
         cluster=args.cluster,
-        output_dir="/experiments/georgea/declarative/simple_command_outputs/run_01",  # Single output directory for entire pipeline
+        output_dir=args.output_dir,
         groups=[
-            HetGroup(
-                [
-                    shared_server,
-                    shared_sandbox,
-                    comand,
-                ],
-                hardware=HardwareConfig(
-                    num_nodes=1,
-                    num_gpus=8,  # Total GPUs for the HetGroup job
-                    server_gpus=8,  # Explicitly set server GPUs
-                    partition="interactive",
-                ),
-            ).named("simple_command")
+            HetGroup([hello_cmd], hardware=HardwareConfig(partition=args.partition)),
+            HetGroup([process_cmd], hardware=HardwareConfig(partition=args.partition)),
+            HetGroup([custom_env_cmd], hardware=HardwareConfig(partition=args.partition)),
         ],
     )
 
     print(f"Running pipeline with dry_run={args.dry_run} on cluster='{args.cluster}'")
+    print("Expected behavior:")
+    print("  - 3 separate SLURM jobs, one for each command")
+    print("  - hello_cmd: runs on 1 GPU")
+    print("  - process_cmd: runs on 2 GPUs")
+    print("  - custom_env_cmd: runs on CPU with custom environment variables")
+    print()
+
     result = pipeline.run(dry_run=args.dry_run)
 
     if args.dry_run:
         print("Dry run completed successfully!")
-        print("To run for real, use: python simple_command.py")
-        print("For help, use: python simple_command.py --help")
+        print(f"To run for real, use: python simple_command.py --cluster {args.cluster}")
     else:
         print("Pipeline execution completed!")
 
