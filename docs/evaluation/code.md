@@ -216,9 +216,7 @@ Before running ns eval, you will need to prepare the data with this command:
 ns prepare_data --data_dir=<DATA_DIR> --cluster=<CLUSTER_NAME> ojbench
 ```
 
-We encourage to download OJBench data into a Slurm cluster location because 15GB data will be downloaded by cloning [huggingface.co/datasets/He-Ren/OJBench_testdata](https://huggingface.co/datasets/He-Ren/OJBench_testdata). Two files will be created at `<DATA_DIR>` named `test_python.jsonl` and `test_cpp.jsonl`.
-
-Note that, data downloading require `HF_TOKEN` to be in the environment variables.
+We encourage to download OJBench data into a Slurm cluster location because 15GB data will be downloaded by cloning [huggingface.co/datasets/He-Ren/OJBench_testdata](https://huggingface.co/datasets/He-Ren/OJBench_testdata). Two files will be created at `<DATA_DIR>` named `test_python.jsonl` and `test_cpp.jsonl`. Note that, data downloading require `HF_TOKEN` to be in the environment variables.
 
 #### Sample run
 
@@ -231,7 +229,6 @@ ns eval \
     --cluster=<CLUSTER_NAME> \
     --model=Qwen/Qwen3-32B \
     --server_type=vllm \
-    --server_args="--async-scheduling" \
     --server_nodes=1 \
     --server_gpus=8 \
     --benchmarks=ojbench \
@@ -244,42 +241,26 @@ ns eval \
 ```
 replacing <...> with your desired parameters.
 
-After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/ojbench/metrics.json`. They should look something like this:
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/ojbench/metrics.json`. You can also take a look at `<OUTPUT_DIR>/eval-results/ojbench/summarized-results/main_*` They should look something like this:
 ```
-{
-  "ojbench": {
-    "pass@1": {
-      "num_entries": 232,
-      "avg_tokens": 19628,
-      "gen_seconds": 2201,
-      "accuracy": 27.155172413793103
-    }
-  },
-  "ojbench-easy": {
-    "pass@1": {
-      "num_entries": 36,
-      "avg_tokens": 12052,
-      "gen_seconds": 1729,
-      "accuracy": 72.22222222222223
-    }
-  },
-  "ojbench-hard": {
-    "pass@1": {
-      "num_entries": 117,
-      "avg_tokens": 22585,
-      "gen_seconds": 2191,
-      "accuracy": 5.128205128205129
-    }
-  },
-  "ojbench-medium": {
-    "pass@1": {
-      "num_entries": 79,
-      "avg_tokens": 18701,
-      "gen_seconds": 2201,
-      "accuracy": 39.24050632911393
-    }
-  }
-}
+----------------------------- ojbench -----------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 232         | 19628      | 2201        | 27.16%
+
+
+--------------------------- ojbench-easy --------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 36          | 12052      | 1729        | 72.22%
+
+
+--------------------------- ojbench-hard --------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 117         | 22585      | 2191        | 5.13%
+
+
+-------------------------- ojbench-medium -------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 79          | 18701      | 2201        | 39.24%
 ```
 
 Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate. To do that automatically, you can set `--benchmarks=ojbench:N`, where N is your desired number of repeats.

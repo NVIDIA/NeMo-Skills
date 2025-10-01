@@ -76,7 +76,8 @@ async def eval_ojbench_async(cfg):
     await install_packages(eval_config)
 
     async with sandbox_context(eval_config.sandbox) as sandbox:
-        for jsonl_file in unroll_files(cfg.input_files):
+        for jsonl_file_str in unroll_files(cfg.input_files):
+            jsonl_file = Path(jsonl_file_str)
             with open(jsonl_file, encoding="utf-8") as f_in:
                 samples = []
                 for line in f_in:
@@ -87,18 +88,20 @@ async def eval_ojbench_async(cfg):
                     sample.pop("completion")
                     samples.append(sample)
 
-            with open(jsonl_file, "w", encoding="utf-8") as f_out:
+            input_filename = jsonl_file.name.replace("output-", "eval-input-", 1)
+            eval_input_file = jsonl_file.with_name(input_filename)
+            results_filename = jsonl_file.name.replace("output-", "eval-results-", 1)
+            eval_results_file = jsonl_file.with_name(results_filename)
+
+            with open(eval_input_file, "w", encoding="utf-8") as f_out:
                 f_out.writelines(json.dumps(sample) + "\n" for sample in samples)
 
-            eval_results_path = jsonl_file[:-6] + "_eval_results.json"
-            LOG.info(f"jsonl_file = {jsonl_file}.")
-            LOG.info(f"eval_results_path = {eval_results_path}.")
             eval_code = textwrap.dedent(f"""
                 import ojbench
                 ojbench.init(problem_dirs={repr([str(p) for p in problem_dirs])})
                 ojbench.judge_jsonl(
-                    input_path={repr(jsonl_file)},
-                    output_path={repr(eval_results_path)},
+                    input_path={repr(str(eval_input_file))},
+                    output_path={repr(str(eval_results_file))},
                     num_workers=16
                 )
             """)
@@ -114,7 +117,7 @@ async def eval_ojbench_async(cfg):
             if output.get("process_status") != "completed":
                 raise RuntimeError(f"Evaluation failed for {jsonl_file}. Stderr: {output.get('stderr')}")
 
-            with open(eval_results_path, "rt", encoding="utf-8") as fin:
+            with open(eval_results_file, "rt", encoding="utf-8") as fin:
                 results = [json.loads(line) for line in fin]
 
             if len(results) != len(samples):
