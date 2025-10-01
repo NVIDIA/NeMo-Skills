@@ -229,15 +229,27 @@ To run with the Pypy3 interpreter, modify the `--extra_eval_args` flag as shown 
 
 ##### Verifying Results
 
-After the evaluation is complete, find the results in `<OUTPUT_DIR>/eval-results/livecodebench/metrics.json`. The output will be broken down by difficulty:
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/livecodebench/metrics.json`. You can also take a look at `<OUTPUT_DIR>/eval-results/ojbench/summarized-results/main_*` They should look something like this:
 
 ```
-{
-  "livecodebench": { "pass@1": { "accuracy": 71.14 ... }},
-  "livecodebench-easy": { "pass@1": { "accuracy": 99.09 ... }},
-  "livecodebench-hard": { "pass@1": { "accuracy": 46.30 ... }},
-  "livecodebench-medium": { "pass@1": { "accuracy": 85.10 ... }}
-}
+-------------------------- livecodebench --------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 454         | 15995      | 2188        | 71.15%
+
+
+------------------------ livecodebench-easy -----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 110         | 5338       | 1806        | 99.09%
+
+
+------------------------ livecodebench-hard -----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 203         | 23031      | 2188        | 46.31%
+
+
+----------------------- livecodebench-medium ----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 141         | 14178      | 1889        | 85.11%
 ```
 
 ##### Advanced: Averaging Multiple Runs
