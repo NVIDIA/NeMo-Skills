@@ -128,10 +128,10 @@ def remove_handlers():
 
 
 def get_logger_name(file):
-    if "nemo_skills" in file:
+    if "/nemo_skills/" in file:
         return "nemo_skills" + file.split("nemo_skills")[1].replace("/", ".").replace(".py", "")
     else:
-        return Path(file).stem
+        return f"[external] {Path(file).stem}"
 
 
 def get_skills_root_dir():
