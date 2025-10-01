@@ -7,6 +7,7 @@
 #   ./dockerfiles/build.sh [/path/to/Dockerfile]
 #
 # Configuration Environment variables:
+#   SKIP_GIT_CHECK: skip check for uncommitted changes in git repo when set.
 #   DOCKER_NAME: fully qualified name of the docker image (default inferred from repository)
 #   DOCKER_TAG: docker tag (default set as `YY.MM.DD-git-hash`)
 #   DOCKER_PUSH: pushes docker image when variable is set.
@@ -15,8 +16,8 @@
 #
 
 if [[ -z "${1}" ]]; then
-    echo "Missing Dockerfile argument."
-    echo "Usage: ./dockerfiles/build.sh [/path/to/Dockerfile]"
+    echo "[ERROR] Missing Dockerfile argument."
+    echo "[INFO] Usage: ./dockerfiles/build.sh [/path/to/Dockerfile]"
     exit 1
 fi
 
@@ -42,7 +43,7 @@ fi
 if [[ -z "${DOCKER_NAME}" ]]; then
     __git_remote=$(git remote get-url origin 2>/dev/null)
     if [[ $? -ne 0 ]]; then
-        echo "Dockerfile is not part of a git repo. Set DOCKER_NAME explicitly."
+        echo "[ERROR] Dockerfile is not part of a git repo. set DOCKER_NAME explicitly."
         exit 1
     fi
 
@@ -61,10 +62,22 @@ DOCKER_NAME=$(echo "${DOCKER_NAME}" | tr "[:upper:]" "[:lower:]")
 if [[ -z "${DOCKER_TAG}" ]]; then
     __git_sha=$(git rev-parse --short HEAD 2>/dev/null)
     if [[ $? -ne 0 ]]; then
-        echo "Dockerfile is not part of a git repo. Set DOCKER_TAG explicitly."
+        echo "[ERROR] Dockerfile is not part of a git repo. set DOCKER_TAG explicitly."
         exit 1
     fi
     DOCKER_TAG="$(date +"%Y.%m.%d")-${__git_sha}"
+
+    ## In case we reach here with a dirty repository.
+    if [[ ! -z "$(git status -s)" ]]; then
+        echo "[INFO] changes detected in git repository ${__git_repo_root}"
+        if [[ -z "${SKIP_GIT_CHECK}" ]]; then
+            echo "[ERROR] set SKIP_GIT_CHECK to ignore."
+            exit 1
+        else
+            echo "[WARN] added -dirty tag for uncommited changes."
+            DOCKER_TAG="${DOCKER_TAG}-dirty"
+        fi
+    fi
 fi
 
 if [[ ${__is_git_repo} -eq 1 ]]; then
