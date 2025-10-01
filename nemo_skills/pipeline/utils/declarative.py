@@ -410,7 +410,6 @@ class HetGroup:
         }
 
         for component in self.components:
-            # Components that can expand (like GenerateTask) return multiple task definitions
             task_defs = component.to_task_definitions(cluster_config, hardware_dict)
             for task_def in task_defs:
                 group.add_task(task_def)
@@ -502,7 +501,3 @@ class Pipeline:
             if not dry_run:
                 run_exp(exp, final_cluster_config)
             return exp
-
-
-# JobDiscovery and GenerationPipeline have been removed
-# Use Command with command builders to create custom pipelines instead
