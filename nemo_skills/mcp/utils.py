@@ -14,17 +14,15 @@
 
 import importlib
 import importlib.util
-import json
 import logging
 import os
 import tempfile
 from typing import Optional
 
 from mcp import StdioServerParameters
-from mcp.types import CallToolResult
 from omegaconf import DictConfig, OmegaConf
 
-from nemo_skills.mcp.clients import MCPStdioClient, MCPStreamableHttpClient
+from nemo_skills.mcp.clients import MCPStdioClient
 
 logger = logging.getLogger(__name__)
 
@@ -51,24 +49,6 @@ def locate(path):
     module_path, obj_name = path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, obj_name)
-
-
-def exa_auth_connector(client: MCPStreamableHttpClient):
-    client.base_url = f"{client.base_url}?exaApiKey={os.getenv('EXA_API_KEY')}"
-
-
-def exa_stdio_connector(client: MCPStdioClient):
-    client.server_params = StdioServerParameters(
-        command=client.server_params.command,
-        args=list(client.server_params.args) + ["--exa-api-key", os.getenv("EXA_API_KEY", "")],
-    )
-
-
-def exa_output_formatter(result: CallToolResult):
-    if getattr(result, "isError", False):
-        logger.error(f"Exa error: {result}")
-        return result.content[0].text
-    return json.loads(result.content[0].text)["results"]
 
 
 def hydra_config_connector_factory(config_obj):
