@@ -130,6 +130,7 @@ class BaseModel:
             max_retries=max_retries,
             api_key=api_key,
             base_url=self.base_url,
+            api_base=self.base_url,  # Used in later versions with responses API
         )
         httpx_limits = httpx.Limits(max_keepalive_connections=2048, max_connections=2048)
         litellm.client_session = httpx.Client(limits=httpx_limits)
