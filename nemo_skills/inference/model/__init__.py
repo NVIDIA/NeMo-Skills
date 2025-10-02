@@ -47,6 +47,7 @@ models = {
     "gemini": GeminiModel,
     "vllm": VLLMModel,
     "sglang": VLLMModel,
+    "transformers": VLLMModel,
 }
 
 
