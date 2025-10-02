@@ -322,21 +322,23 @@ def eval_human_eval_infilling(cfg):
         samples = []
         with open(jsonl_file) as f:
             for line in f:
-                output = preprocess_code(json.loads(line), strip_whitespace=False)
-                output["original_completion"] = output["completion"]
-                output = postprocess_code(output)
-                samples.append(output)
-
-        # all changes will be done with a new key "completion", so it's ok to write to the same file
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
+                sample = json.loads(line)
                 if data_split is None:
                     data_split = sample["split"]
                 elif data_split != sample["split"]:
                     raise ValueError(
                         f"All samples should have the same split, but got {data_split} and {sample['split']}"
                     )
+
+                sample = preprocess_code(sample, strip_whitespace=False)
+                sample["original_completion"] = sample["completion"]
+                sample = postprocess_code(sample)
+                samples.append(sample)
+
+        # all changes will be done with a new key "completion", so it's ok to write to the same file
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in samples:
+                f.write(json.dumps(sample) + "\n")
 
         evaluate(data_split, jsonl_file, k=[1], n_workers=4, timeout=3.0)
 

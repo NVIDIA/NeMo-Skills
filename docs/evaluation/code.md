@@ -349,5 +349,5 @@ Keep in mind there is some variance between runs, so we recommend running evalua
 
 ### human-eval-infilling
 
-- Benchmark is defined in [`nemo_skills/dataset/human_eval_infilling/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/human_eval_infilling/__init__.py)
+- Benchmark is defined in [`nemo_skills/dataset/human_eval_infilling/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/human-eval-infilling/__init__.py)
 - Original benchmark source is [here](https://github.com/openai/human-eval-infilling).
