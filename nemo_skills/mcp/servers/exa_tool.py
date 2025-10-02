@@ -13,14 +13,19 @@
 # limitations under the License.
 
 import argparse
+import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import Annotated
 
 import httpx
+from mcp import StdioServerParameters
 from mcp.server.fastmcp import FastMCP
+from mcp.types import CallToolResult
 from pydantic import Field
 
+from nemo_skills.mcp.clients import MCPStdioClient, MCPStreamableHttpClient
 from nemo_skills.mcp.tool_providers import MCPClientTool
 
 logger = logging.getLogger(__name__)
@@ -32,7 +37,7 @@ class ExecutionResult:
     result: str | None = None
 
 
-mcp = FastMCP(name="exa_tool")
+mcp = FastMCP(name="exa")
 
 # Populated from CLI args in main()
 EXA_API_KEY: str | None = None
@@ -67,12 +72,12 @@ async def exa_websearch(
 def main():
     # Parse CLI arguments
     parser = argparse.ArgumentParser(description="MCP server for Exa web search tool")
-    parser.add_argument("--exa-api-key", dest="exa_api_key", type=str, required=False, help="Exa API key")
+    parser.add_argument("--api-key", type=str, required=False, help="Exa API key")
     args = parser.parse_args()
 
     global EXA_API_KEY
     # Prefer CLI arg; do not fall back to environment unless explicitly desired
-    EXA_API_KEY = args.exa_api_key
+    EXA_API_KEY = args.api_key
 
     # Initialize and run the server
     mcp.run(transport="stdio")
@@ -81,6 +86,13 @@ def main():
 # ==============================
 # Module-based tool implementation
 # ==============================
+
+
+def exa_stdio_connector(client: MCPStdioClient):
+    client.server_params = StdioServerParameters(
+        command=client.server_params.command,
+        args=list(client.server_params.args) + ["--api-key", os.getenv("EXA_API_KEY", "")],
+    )
 
 
 class ExaTool(MCPClientTool):
@@ -95,9 +107,20 @@ class ExaTool(MCPClientTool):
                     "args": ["-m", "nemo_skills.mcp.servers.exa_tool"],
                 },
                 "hide_args": {},
-                "init_hook": "nemo_skills.mcp.utils.exa_stdio_connector",
+                "init_hook": "nemo_skills.mcp.servers.exa_tool.exa_stdio_connector",
             }
         )
+
+
+def exa_auth_connector(client: MCPStreamableHttpClient):
+    client.base_url = f"{client.base_url}?exaApiKey={os.getenv('EXA_API_KEY')}"
+
+
+def exa_output_formatter(result: CallToolResult):
+    if getattr(result, "isError", False):
+        logger.error(f"Exa error: {result}")
+        return result.content[0].text
+    return json.loads(result.content[0].text)["results"]
 
 
 class ExaMCPTool(MCPClientTool):
@@ -111,11 +134,11 @@ class ExaMCPTool(MCPClientTool):
                     "base_url": "https://mcp.exa.ai/mcp",
                 },
                 # Add API key via query param using the helper
-                "init_hook": "nemo_skills.mcp.utils.exa_auth_connector",
+                "init_hook": "nemo_skills.mcp.servers.exa_tool.exa_auth_connector",
                 # Optional: limit to specific tools
                 # "enabled_tools": ["web_search_exa"],
                 # Parse structured output conveniently
-                "output_formatter": "nemo_skills.mcp.utils.exa_output_formatter",
+                "output_formatter": "nemo_skills.mcp.servers.exa_tool.exa_output_formatter",
             }
         )
 
