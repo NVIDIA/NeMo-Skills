@@ -298,10 +298,18 @@ def eval_human_eval_infilling(cfg):
         preceding_len = len(preceding_text)
         following_len = len(following_text)
         for i in range(min(preceding_len, following_len), 0, -1):
-            if truncate_from == "following" and following_text.startswith(preceding_text[-i:]):
-                return following_text[i:]
-            elif truncate_from == "preceding" and preceding_text.endswith(following_text[:i]):
-                return preceding_text[:-i]
+            if truncate_from == "following":
+                overlap = preceding_text[-i:]
+                if overlap.strip() == "" and "\n" not in overlap:
+                    continue
+                if following_text.startswith(overlap):
+                    return following_text[i:]
+            elif truncate_from == "preceding":
+                overlap = following_text[:i]
+                if overlap.strip() == "" and "\n" not in overlap:
+                    continue
+                if preceding_text.endswith(overlap):
+                    return preceding_text[:-i]
         return following_text if truncate_from == "following" else preceding_text
 
     def postprocess_code(sample):
