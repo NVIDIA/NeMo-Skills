@@ -190,15 +190,6 @@ class BaseModel:
     def _build_completion_request_params(self, **kwargs) -> dict:
         pass
 
-    def _build_request_params(self, prompt: str | list[dict], stream: bool, **kwargs) -> dict:
-        if isinstance(prompt, str):
-            return self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
-        elif isinstance(prompt, list):
-            request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-            return request_params
-        else:
-            raise ValueError("Either prompt or messages must be provided")
-
     @with_context_retry
     async def generate_async(
         self,
