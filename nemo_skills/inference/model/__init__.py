@@ -23,7 +23,6 @@ from .base import BaseModel
 
 # Code execution
 from .code_execution import CodeExecutionConfig, CodeExecutionWrapper
-from .context_retry import ContextLimitRetryConfig
 from .gemini import GeminiModel
 from .megatron import MegatronModel
 from .openai import OpenAIModel
@@ -31,12 +30,8 @@ from .parallel_thinking import ParallelThinkingConfig, ParallelThinkingTask
 
 # Tool Calling
 from .tool_call import ToolCallingWrapper
-
-# Utilities
+from .transformers import TransformersModel
 from .vllm import VLLMModel
-
-# Model implementations
-
 
 # Model registry
 models = {
@@ -47,7 +42,7 @@ models = {
     "gemini": GeminiModel,
     "vllm": VLLMModel,
     "sglang": VLLMModel,
-    "transformers": VLLMModel,
+    "transformers": TransformersModel,
 }
 
 
