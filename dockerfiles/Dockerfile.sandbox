@@ -16,7 +16,6 @@
 FROM tiangolo/uwsgi-nginx-flask:python3.10
 
 # Install dependencies required for Lean 4, pypy3, and other tools
-ARG TARGETARCH
 RUN apt-get update && \
     apt-get install -y curl git net-tools bzip2 build-essential libseccomp-dev && \
     case "$TARGETARCH" in \
