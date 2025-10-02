@@ -27,7 +27,8 @@ RUN apt-get update && \
     tar -xjf /tmp/pypy.tar.bz2 -C /opt/ && \
     ln -s /opt/pypy3.10-v7.3.17-$PYPY_ARCH/bin/pypy3 /usr/bin/pypy3 && \
     /usr/bin/pypy3 -m ensurepip && \
-    rm /tmp/pypy.tar.bz2
+    rm /tmp/pypy.tar.bz2 && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Install the DMOJ judge-server using pip (OJBench eval requirement)
 RUN pip install git+https://github.com/DMOJ/judge-server.git@11bf2cd03df83f0df5970a08e98b4cec2dfaecd5
