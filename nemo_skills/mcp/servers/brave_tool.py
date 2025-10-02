@@ -32,10 +32,10 @@ BRAVE_API_KEY: str | None = None
 async def summarize(
     query: Annotated[str, Field(description="Search query.")],
 ) -> ExecutionResult:
-    """Get a summary of search results from the web."""
+    """Get a summary of search results from the web using Brave."""
 
     if not BRAVE_API_KEY:
-        return {"error": "Missing server port"}
+        return {"error": "Missing Brave API key"}
 
     base_url = "https://api.search.brave.com/res/v1"
 
