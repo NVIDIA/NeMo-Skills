@@ -71,10 +71,10 @@ class BraveSearchTool(MCPClientTool):
                 "client": "nemo_skills.mcp.clients.MCPStdioClient",
                 "client_params": {
                     "command": "python",
-                    "args": ["-m", "nemo_tir.mcp.servers.brave_tool"],
+                    "args": ["-m", "nemo_skills.mcp.servers.brave_tool"],
                 },
                 "hide_args": {},
-                "init_hook": "nemo_tir.mcp.servers.brave_tool.stdio_connector",
+                "init_hook": "nemo_skills.mcp.servers.brave_tool.stdio_connector",
             }
         )
 
