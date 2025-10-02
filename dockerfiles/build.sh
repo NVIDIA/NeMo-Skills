@@ -9,7 +9,7 @@
 # Configuration Environment variables:
 #   SKIP_GIT_CHECK: skip check for uncommitted changes in git repo when set.
 #   DOCKER_NAME: fully qualified name of the docker image (default inferred from repository)
-#   DOCKER_TAG: docker tag (default set as `YY.MM.DD-git-hash`)
+#   DOCKER_TAG: docker tag (default set as `YYYY.MM.DD-git-hash`)
 #   DOCKER_PUSH: pushes docker image when variable is set.
 #   DOCKER_CACHE: uses registry cache when variable is set.
 #   DOCKER_PLATFORM: directly passed to --platform.
@@ -22,6 +22,10 @@ if [[ -z "${1}" ]]; then
 fi
 
 __dockerfile="${1}"
+if [[ ! -f "${__dockerfile}" ]]; then
+    echo "[ERROR] Dockerfile not found at '${__dockerfile}'"
+    exit 1
+fi
 
 ##
 #  Conditions to set the context for docker build.
@@ -74,7 +78,7 @@ if [[ -z "${DOCKER_TAG}" ]]; then
             echo "[ERROR] set SKIP_GIT_CHECK to ignore."
             exit 1
         else
-            echo "[WARN] added -dirty tag for uncommited changes."
+            echo "[WARN] added -dirty tag for uncommitted changes."
             DOCKER_TAG="${DOCKER_TAG}-dirty"
         fi
     fi
