@@ -1,19 +1,22 @@
-# How to build all necessary dockerfiles
+# Building Docker Images
 
 Some dockerfiles are directly included in this folder and for some others the instructions to build them are below.
 
-To build one of the existing dockerfiles use a command like this
+The dockerfiles can be built using the standard docker build command. e.g.,
+```shell
+docker build -t igitman/nemo-skills:0.7.1 -f dockerfiles/Dockerfile.nemo-skills .
 ```
+
+In addition, we provide a utility script which provides sane build defaults
+```shell
 ./build.sh Dockerfile.nemo-skills
 ```
 
-Key configuration environment variables:
+Key configuration environment variables for `build.sh`:
 - `DOCKER_NAME`: A fully qualified name of the docker image. The default is inferred from the git repository attributes.
 - `DOCKER_TAG`: Docker tag to use. Defaults to `yyyy.mm.dd-<commit_hash>`
 - `DOCKER_PUSH`: When set, pushes image after building.
 - `DOCKER_PLATFORM`: Directly passed to `--platform` for [multi-platform builds](https://docs.docker.com/build/building/multi-platform/).
-
-Some images may take longer to build.
 
 ## Building for arm64/aarch64
 
