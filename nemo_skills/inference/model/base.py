@@ -220,8 +220,6 @@ class BaseModel:
         include_response: bool = False,
         extra_body: dict = None,
     ) -> dict:
-        """Native async version of generate for single prompt."""
-
         # Check tool calls are a list of dict
         if tools is not None:
             for tool in tools:
@@ -286,73 +284,6 @@ class BaseModel:
                 else:
                     raise e
 
-        return result
-
-    @with_context_retry
-    def generate_sync(
-        self,
-        prompt: str | list[dict],
-        tokens_to_generate: int | None = None,
-        temperature: float = 0.0,
-        top_p: float = 0.95,
-        top_k: int = -1,
-        min_p: float = 0.0,
-        repetition_penalty: float = 1.0,
-        random_seed: int = None,
-        stop_phrases: list[str] | None = None,
-        top_logprobs: int | None = None,
-        timeout: float | int | None = 14400,  # None is 10min
-        remove_stop_phrases: bool = True,
-        stream: bool = False,
-        reasoning_effort: str | None = None,
-        tools: list[dict] | None = None,
-        include_response: bool = False,
-        extra_body: dict = None,
-    ) -> dict:
-        """
-        Synchronous version of generate for single prompt.
-        See generate_async for full list of parameters.
-        """
-        # Check tool calls are a list of dict
-        if tools is not None:
-            for tool in tools:
-                # TODO: We may want to add additional checks for tools in the future
-                if not isinstance(tool, dict):
-                    raise ValueError(f"Tool must be a dictionary, got {type(tool)}")
-
-        kwargs = {
-            "tokens_to_generate": tokens_to_generate,
-            "temperature": temperature,
-            "top_p": top_p,
-            "top_k": top_k,
-            "min_p": min_p,
-            "repetition_penalty": repetition_penalty,
-            "random_seed": random_seed,
-            "stop_phrases": stop_phrases,
-            "top_logprobs": top_logprobs,
-            "timeout": timeout,
-            "reasoning_effort": reasoning_effort,
-            "tools": tools,
-            "extra_body": extra_body,
-        }
-        request_params = self._build_request_params(prompt=prompt, stream=stream, **kwargs)
-        if isinstance(prompt, list):
-            response = litellm.completion(**request_params, **self.litellm_kwargs)
-            if stream:
-                result = self._stream_chat_chunks_sync(response)
-            else:
-                result = self._parse_chat_completion_response(response, include_response=include_response, **kwargs)
-
-        elif isinstance(prompt, str):
-            response = litellm.text_completion(**request_params, **self.litellm_kwargs)
-            if stream:
-                result = self._stream_completion_chunks_sync(response)
-            else:
-                result = self._parse_completion_response(response, include_response=include_response, **kwargs)
-        else:
-            raise TypeError(f"Unsupported prompt type: {type(prompt)}")
-
-        self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
         return result
 
     def _parse_completion_response(
@@ -482,23 +413,7 @@ class BaseModel:
 
         return [result]
 
-    def _stream_completion_chunks_sync(self, response):
-        """Synchronous version of stream completion chunks."""
-        emitted_so_far = []
-        for chunk in response:
-            results = self._process_completion_chunk(chunk, emitted_so_far)
-            for result in results:
-                yield result
-
-    def _stream_chat_chunks_sync(self, response):
-        """Synchronous version of stream chat chunks."""
-        for chunk in response:
-            results = self._process_chat_chunk(chunk)
-            for result in results:
-                yield result
-
     async def _stream_completion_chunks_async(self, response):
-        """Async version of stream completion chunks."""
         emitted_so_far = []
         async for chunk in response:
             results = self._process_completion_chunk(chunk, emitted_so_far)
@@ -506,7 +421,6 @@ class BaseModel:
                 yield result
 
     async def _stream_chat_chunks_async(self, response):
-        """Async version of stream chat chunks."""
         async for chunk in response:
             results = self._process_chat_chunk(chunk)
             for result in results:
