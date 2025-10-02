@@ -22,7 +22,7 @@ from nemo_skills.code_execution import extract_code_to_execute, format_code_outp
 from nemo_skills.code_execution.sandbox import Sandbox
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
-from .base import BaseModel
+from .base import BaseModel, CompletionType
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -65,6 +65,7 @@ class CodeExecutionWrapper:
         max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
         extra_body: dict = None,
+        completion_type: CompletionType = None,
     ):
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
@@ -75,6 +76,7 @@ class CodeExecutionWrapper:
         if stream:
             return self._stream_single(
                 prompt=prompt,
+                completion_type=completion_type,
                 code_begin=code_begin,
                 code_end=code_end,
                 code_output_begin=code_output_begin,
@@ -108,6 +110,7 @@ class CodeExecutionWrapper:
         stop_phrases = stop_phrases or []
 
         request = {
+            "completion_type": completion_type,
             "prompt": new_prompt,
             "tokens_to_generate": tokens_to_generate,
             "temperature": temperature,
@@ -252,6 +255,7 @@ class CodeExecutionWrapper:
         max_code_executions: int | None = None,
         stream: bool = False,
         extra_body: dict = None,
+        completion_type: CompletionType = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -261,6 +265,7 @@ class CodeExecutionWrapper:
             raise NotImplementedError("top_logprobs is not supported yet.")
 
         kwargs = {
+            "completion_type": completion_type,
             "code_begin": code_begin,
             "code_end": code_end,
             "code_output_begin": code_output_begin,
@@ -308,6 +313,7 @@ class CodeExecutionWrapper:
         timeout: float | int | None = 14400,  # None is 10min,
         max_code_executions: int | None = None,
         extra_body: dict = None,
+        completion_type: CompletionType = None,
     ):
         """
         Helper method, that implements streaming generation.
@@ -322,6 +328,7 @@ class CodeExecutionWrapper:
         stop_phrases = stop_phrases or []
 
         request = {
+            "completion_type": completion_type,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,

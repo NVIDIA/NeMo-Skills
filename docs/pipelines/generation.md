@@ -126,7 +126,7 @@ ns generate \
        --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
-       ++use_completions_api=True \
+       ++inference.completion_type=text \
        ++tokenizer=meta-llama/Llama-3.1-405B \
        ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```

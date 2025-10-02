@@ -138,3 +138,10 @@ class VLLMModel(BaseModel):
             request["allowed_openai_params"] = ["reasoning_effort"]
             request["reasoning_effort"] = reasoning_effort
         return request
+
+    def _build_responses_request_params(self, input, **kwargs) -> dict:
+        # Parameters are the same as chat completion request params
+        # Instead, messages is renamed to input
+        responses_params = self._build_chat_request_params(input=input, **kwargs)
+        responses_params["input"] = responses_params.pop("messages")
+        return responses_params
