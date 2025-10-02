@@ -44,8 +44,8 @@ EXA_API_KEY: str | None = None
 
 
 @mcp.tool()
-async def exa_websearch(
-    query: Annotated[str, Field(description="Search query for Exa.")],
+async def answer(
+    query: Annotated[str, Field(description="Search query.")],
 ) -> ExecutionResult:
     """Search the web using Exa. Provide relevant links in your answer."""
 
@@ -65,8 +65,8 @@ async def exa_websearch(
 
     if response.status_code != 200:
         return {"error": response.json()["error"]}
-    else:
-        return {"result": response.json()["answer"]}
+
+    return {"result": response.json()["answer"]}
 
 
 def main():
