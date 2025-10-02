@@ -337,5 +337,5 @@ def eval_human_eval_infilling(cfg):
 
         with open(jsonl_file, "wt", encoding="utf-8") as f_out:
             for s in samples:
-                s["passed"] = eval_grades["eval"][s["task_id"]]["passed"]
+                s["passed"] = eval_grades["eval"][s["task_id"]][0]["passed"]
                 f_out.write(json.dumps(s) + "\n")
