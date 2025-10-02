@@ -35,6 +35,7 @@ def clean_data(dataset, split):
         data["prefix"] = data.pop("prompt")
         data["language"] = "python"
         data["split"] = split
+        data["comment_delimiter"] = "#"
         return data
 
     dataset = dataset.map(map_fn, remove_columns=["entry_point", "test"])
