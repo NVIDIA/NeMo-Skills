@@ -141,7 +141,8 @@ class VLLMModel(BaseModel):
 
     def _build_responses_request_params(self, input, **kwargs) -> dict:
         # Parameters are the same as chat completion request params
-        # Instead, messages is renamed to input
-        responses_params = self._build_chat_request_params(input=input, **kwargs)
+        # For now, we hack this by renaming messages to input
+        # Until we need more parameters for responses API
+        responses_params = self._build_chat_request_params(messages=input, **kwargs)
         responses_params["input"] = responses_params.pop("messages")
         return responses_params
