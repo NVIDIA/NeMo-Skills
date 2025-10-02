@@ -17,6 +17,7 @@ import os
 from enum import Enum
 from typing import Union
 
+import httpx
 import litellm
 import openai
 
@@ -131,9 +132,9 @@ class BaseModel:
             base_url=self.base_url,
             api_base=self.base_url,  # Used in later versions with responses API
         )
-        # httpx_limits = httpx.Limits(max_keepalive_connections=None, max_connections=None)
-        # litellm.client_session = httpx.Client(limits=httpx_limits)
-        # litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
+        httpx_limits = httpx.Limits(max_keepalive_connections=None, max_connections=None)
+        litellm.client_session = httpx.Client(limits=httpx_limits)
+        litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
 
     def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
         if api_key:  # explicit cmd argument always takes precedence
@@ -361,6 +362,7 @@ class BaseModel:
             result["finish_reason"] = choice.finish_reason
         if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
             result["tool_calls"] = choice.message.tool_calls
+        result["serialized_output"] = self._serialize_output(response)
         if include_response:
             result["response"] = response
 
@@ -435,21 +437,13 @@ class BaseModel:
             for result in results:
                 yield result
 
-    def _parse_responses_completion_response(self, response, **kwargs) -> dict:
+    def _parse_responses_completion_response(self, response, include_response: bool = False, **kwargs) -> dict:
         """Public method for parsing responses API responses"""
         result = {"generation": "", "num_generated_tokens": 0}
 
-        # Get token usage - ensure it's always an integer
-        if hasattr(response, "usage") and response.usage:
-            tokens = getattr(response.usage, "output_tokens", None)
-            if tokens is None:
-                # Try alternative field names for token usage
-                tokens = getattr(response.usage, "completion_tokens", None)
-            result["num_generated_tokens"] = tokens if tokens is not None else 0
-        else:
-            result["num_generated_tokens"] = 0
+        if hasattr(response, "usage"):
+            result["num_generated_tokens"] = response.usage.output_tokens
 
-        # Check for tool calls in the output array
         tool_calls = []
         reasoning_content = ""
         generation_text = ""
@@ -457,49 +451,51 @@ class BaseModel:
         if hasattr(response, "output") and response.output:
             for output_item in response.output:
                 # Handle reasoning content
-                if hasattr(output_item, "type") and output_item.type == "reasoning":
-                    if hasattr(output_item, "content") and output_item.content:
+                if output_item.type == "reasoning":
+                    if output_item.content:
                         for content_item in output_item.content:
-                            if hasattr(content_item, "text"):
+                            if content_item.text:
                                 reasoning_content += content_item.text + "\n"
 
                 # Handle function calls
-                elif hasattr(output_item, "type") and output_item.type == "function_call":
+                elif output_item.type == "function_call":
                     tool_calls.append(output_item)
 
                 # Handle message content
-                elif hasattr(output_item, "type") and output_item.type == "message":
-                    if hasattr(output_item, "content") and output_item.content:
+                elif output_item.type == "message":
+                    if output_item.content:
                         for content_item in output_item.content:
-                            if hasattr(content_item, "text"):
+                            if content_item.text:
                                 generation_text += content_item.text
 
-        # Set the appropriate response fields
         if tool_calls:
             result["tool_calls"] = tool_calls
             result["generation"] = ""  # No text generation when there are tool calls
         else:
             result["generation"] = generation_text
-
-        # Add reasoning content if available
         if reasoning_content:
             result["reasoning_content"] = reasoning_content.strip()
 
-        # Add finish reason if available
-        if hasattr(response, "status"):
-            result["finish_reason"] = response.status
-
-        # Add serialized output for conversation history
-        result["serialized_output"] = self._serialize_response_output(response)
-
-        if kwargs.get("include_response", False):
+        result["finish_reason"] = response.status
+        result["serialized_output"] = self._serialize_output(response)
+        if include_response:
             result["response"] = response
 
-        # Ensure num_generated_tokens is never None for metrics compatibility
-        if result["num_generated_tokens"] is None:
-            result["num_generated_tokens"] = 0
-
         return result
+
+    def _serialize_output(self, response):
+        """Serialize response output objects using model_dump() for conversation history."""
+        serialized_output = []
+
+        if hasattr(response, "output") and response.output:
+            for output_item in response.output:
+                serialized_output.append(output_item.model_dump())
+        elif hasattr(response, "choices") and response.choices:
+            for choice in response.choices:
+                serialized_output.append(choice.model_dump()["message"])
+        else:
+            raise ValueError(f"Unsupported response type: {type(response)}")
+        return serialized_output
 
     async def _stream_chat_chunks_async(self, response):
         async for chunk in response:
