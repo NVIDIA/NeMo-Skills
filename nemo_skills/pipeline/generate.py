@@ -469,11 +469,6 @@ def generate(
     if not jobs:
         return None
 
-    # Handle _reuse_exp case
-    if _reuse_exp:
-        # For internal use: return job names for dependency tracking
-        return all_job_names
-
     # Create and run pipeline
     pipeline = Pipeline(
         name=expname,
@@ -484,7 +479,8 @@ def generate(
         skip_hf_home_check=skip_hf_home_check,
     )
 
-    result = pipeline.run(cluster_config=cluster_config, dry_run=dry_run)
+    # Pass _reuse_exp to pipeline.run() to add jobs to existing experiment
+    result = pipeline.run(cluster_config=cluster_config, dry_run=dry_run, _reuse_exp=_reuse_exp)
     return result
 
 

@@ -336,6 +336,7 @@ class Pipeline:
         cluster: Optional[str] = None,
         dry_run: bool = False,
         log_dir: Optional[str] = None,
+        _reuse_exp=None,
     ):
         """Execute the pipeline by calling NeMo-Run directly.
 
@@ -344,6 +345,7 @@ class Pipeline:
             cluster: Cluster name to load config from (optional if cluster_config provided)
             dry_run: If True, validate without executing
             log_dir: Default log directory for groups that don't specify one (optional)
+            _reuse_exp: Internal - reuse existing experiment object (for eval.py integration)
         """
         if not self.jobs:
             LOG.info("No jobs to execute")
@@ -372,7 +374,7 @@ class Pipeline:
         # Track job name -> task handle for dependency resolution
         job_name_to_handle = {}
 
-        with get_exp(self.name, final_cluster_config) as exp:
+        with get_exp(self.name, final_cluster_config, _reuse_exp) as exp:
             # Process each job in order
             for job_spec in self.jobs:
                 job_name = job_spec.get("name", "unnamed")
@@ -393,23 +395,39 @@ class Pipeline:
 
                 for dep in job_dependencies:
                     if isinstance(dep, str):
-                        # String dependency - look up by name
+                        # String dependency - could be job name, task handle, or experiment name
                         if dep in job_name_to_handle:
                             # Internal pipeline dependency - add the handle
                             run_after_deps.append(job_name_to_handle[dep])
                             LOG.info(f"Job '{job_name}' depends on '{dep}' (handle: {job_name_to_handle[dep]})")
                         else:
-                            # External experiment name - will be resolved by get_exp_handles below
+                            # Could be external experiment name OR task handle from _reuse_exp case
+                            # Try to get as experiment name first
                             if final_cluster_config["executor"] == "slurm":
                                 exp_handles = get_exp_handles(dep)
                                 if len(exp_handles) == 0:
                                     LOG.warning(
                                         f"No pending or running tasks found for experiment {dep}, cannot set dependencies."
                                     )
-                                run_after_deps.extend(exp_handles)
-                                LOG.info(
-                                    f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
-                                )
+                                    # If no experiment found, treat as direct task handle (for _reuse_exp case)
+                                    if _reuse_exp:
+                                        run_after_deps.append(dep)
+                                        LOG.info(
+                                            f"Job '{job_name}' depends on task handle '{dep}' (from reused experiment)"
+                                        )
+                                else:
+                                    run_after_deps.extend(exp_handles)
+                                    LOG.info(
+                                        f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
+                                    )
+                            elif _reuse_exp:
+                                # For non-SLURM executors with _reuse_exp, treat as task handle
+                                run_after_deps.append(dep)
+                                LOG.info(f"Job '{job_name}' depends on task handle '{dep}'")
+                    else:
+                        # Direct task handle object (not string)
+                        run_after_deps.append(dep)
+                        LOG.info(f"Job '{job_name}' depends on task handle (object)")
 
                 # Convert empty list to None for cleaner handling
                 if len(run_after_deps) == 0:
@@ -451,7 +469,8 @@ class Pipeline:
                 job_name_to_handle[job_name] = task_handle
                 LOG.info(f"Added job '{job_name}' with task_handle={task_handle}")
 
-            if not dry_run:
+            # Only run if not using existing experiment (matching generate_v0.py line 331)
+            if not dry_run and not _reuse_exp:
                 run_exp(exp, final_cluster_config)
 
                 # Cache experiment for code reuse in future runs
@@ -461,6 +480,10 @@ class Pipeline:
                     if cur_tunnel_hash not in REUSE_CODE_EXP:
                         REUSE_CODE_EXP[cur_tunnel_hash] = exp
                         LOG.info("Cached experiment for future code reuse")
+
+            # When reusing experiment, return list of task handles (matching generate_v0.py line 335)
+            if _reuse_exp:
+                return list(job_name_to_handle.values())
 
             return exp
 
@@ -539,8 +562,8 @@ class Pipeline:
         differences are controlled by the 'heterogeneous' flag and the provided 'groups'.
         """
 
-        # Dependencies are only passed through for SLURM
-        dependencies = run_after if (run_after and cluster_config["executor"] == "slurm") else None
+        # Pass dependencies through (nemo-run handles executor-specific behavior)
+        dependencies = run_after if run_after else None
 
         # Resolve log directory (use first group's log_dir if present)
         log_dir = groups[0].log_dir or default_log_dir
