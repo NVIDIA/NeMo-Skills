@@ -714,16 +714,10 @@ HELP_MESSAGE = get_help_message(
 )
 
 
-if __name__ == "__main__":
-    if "--help" in sys.argv or "-h" in sys.argv:
-        print(HELP_MESSAGE)
-    else:
-        setup_logging()
-        generate()
-
-
 async def _cancel_other_async_tasks():
-    LOG.info("Cancelling other async tasks")
+    LOG.info("INSIDE _cancel_other_async_tasks function - START")
+    sys.stdout.flush()
+    sys.stderr.flush()
     attempt = 0
     while True:
         tasks_to_cancel = []
@@ -769,3 +763,11 @@ async def _cancel_other_async_tasks():
                 f"tasks still running out of {len(tasks_to_cancel)} total"
             )
         await asyncio.sleep(0.1)
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(HELP_MESSAGE)
+    else:
+        setup_logging()
+        generate()
