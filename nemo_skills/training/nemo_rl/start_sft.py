@@ -22,6 +22,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import yaml
 from datasets import Dataset, load_dataset, load_from_disk
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
@@ -101,8 +102,11 @@ class PromptResponseDataset:
 
         self.input_template = None
         if input_template_path:
-            with open(input_template_path, "r") as f:
-                self.input_template = f.read()
+            with open(input_template_path, "rt", encoding="utf-8") as fin:
+                data = yaml.safe_load(fin)
+                if "user" not in data:
+                    raise KeyError(f"'user' key is missing in the YAML file: {input_template_path}")
+                self.input_template = data["user"]
 
         # Train split
         self.formatted_ds = {
@@ -134,6 +138,7 @@ class PromptResponseDataset:
         print(f"[Map] Processing {split_name} dataset from: {path}")
         dataset = load_dataset("json", data_files=str(path))["train"]
 
+        current_input_key = self.input_key
         if self.input_template:
             assert "messages" not in dataset.column_names
             dataset = dataset.map(
@@ -141,13 +146,14 @@ class PromptResponseDataset:
                 batched=True,
                 num_proc=self.num_proc,
             )
-            self.input_key = "formatted_input"
+            current_input_key = "formatted_input"
 
         if "messages" not in dataset.column_names:
             dataset = dataset.map(
                 self.add_messages_key,
                 batched=True,
                 num_proc=self.num_proc,
+                fn_kwargs={"current_input_key": current_input_key},
             )
 
         # Save dataset + new size signature
@@ -159,14 +165,16 @@ class PromptResponseDataset:
         print(f"[Cache] Saved {split_name} dataset to: {cache_dir}")
         return dataset
 
-    def add_messages_key(self, examples: dict[str, list[Any]]) -> dict[str, list[list[dict[str, Any]]]]:
+    def add_messages_key(
+        self, examples: dict[str, list[Any]], input_key: str
+    ) -> dict[str, list[list[dict[str, Any]]]]:
         return {
             "messages": [
                 [
                     {"role": "user", "content": input_},
                     {"role": "assistant", "content": output},
                 ]
-                for input_, output in zip(examples[self.input_key], examples[self.output_key])
+                for input_, output in zip(examples[input_key], examples[self.output_key])
             ]
         }
 
@@ -175,7 +183,6 @@ class PromptResponseDataset:
         examples["formatted_input"] = [
             self.input_template.format(**{k: examples[k][i] for k in keys}) for i in range(len(examples[keys[0]]))
         ]
-
         return examples
 
 
