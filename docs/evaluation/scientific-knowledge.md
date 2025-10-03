@@ -18,10 +18,8 @@ More details are coming soon!
 
 ### SuperGPQA
 - Benchmark is defined in [`nemo_skills/dataset/supergpqa/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/supergpqa/__init__.py)
-- Original benchmark source is [here](https://github.com/SuperGPQA/SuperGPQA). The official leaderboard is available [here](https://supergpqa.github.io/#Dataset).
+- Original benchmark source is available in the [SuperGPQA repository](https://github.com/SuperGPQA/SuperGPQA). The official leaderboard is listed on the [SuperGPQA dataset page](https://supergpqa.github.io/#Dataset).
 - The `science` split contains all the data where the discipline is "Science". The default full split is `test`.
-
-
 
 
 ### scicode
