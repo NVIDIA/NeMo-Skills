@@ -187,6 +187,7 @@ class GenerateSolutionsConfig:
         self._post_init_validate_data()
         self._post_init_validate_server()
         self._post_init_validate_params()
+        self._post_init_deprecated_params()
 
     def _post_init_validate_data(self):
         if isinstance(self.total_code_executions_in_prompt, ListConfig):
