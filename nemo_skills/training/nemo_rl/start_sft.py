@@ -179,7 +179,7 @@ class PromptResponseDataset:
         }
 
     def apply_input_template(self, examples: dict[str, list[Any]]) -> dict[str, list[str]]:
-        keys = [k.strip() for k in self.input_key.split(",")]
+        keys = [k.strip() for k in self.input_key.split(";")]
         examples["formatted_input"] = [
             self.input_template.format(**{k: examples[k][i] for k in keys}) for i in range(len(examples[keys[0]]))
         ]
