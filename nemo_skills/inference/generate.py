@@ -621,7 +621,7 @@ class GenerationTask:
 
         self.restore_async_order()
 
-        # Litellm async logging worker sometimes does not stop. We force terminate the async loop.
+        # Litellm async logging worker sometimes does not stop. We force cancel its tasks.
         # TODO: Remove this once LiteLLM fixes it.
         while True:
             tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]

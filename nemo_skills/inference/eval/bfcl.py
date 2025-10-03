@@ -31,6 +31,7 @@ from nemo_skills.inference.eval.bfcl_utils import (
 )
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
+from nemo_skills.inference.model.base import CompletionType
 from nemo_skills.inference.model.utils import is_context_window_exceeded_error
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
@@ -117,10 +118,13 @@ class ClientMessageParser:
 
     def construct_input_dict(self, messages: list[dict], tools: list[dict]):
         fmted_prompt = self.message_formatter(messages, tools=tools)
+        kwargs = asdict(self.cfg.inference)
+        # Replace the completion type with text
+        kwargs["completion_type"] = CompletionType.text
         return {
             "prompt": fmted_prompt,
             "include_response": True,
-            **asdict(self.cfg.inference),
+            **kwargs,
         }
 
     def parse_output_dict(self, output_dict: dict):
