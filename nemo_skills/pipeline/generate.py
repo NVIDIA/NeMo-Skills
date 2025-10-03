@@ -461,39 +461,6 @@ def generate(
                         "dependencies": job_deps,
                     }
                 )
-                prev_tasks = _task_dependencies
-                for _ in range(dependent_jobs + 1):
-                    task_name = f"{expname}-rs{seed}" if seed is not None else expname
-                    if chunk_id is not None:
-                        task_name += f"-chunk{chunk_id}"
-                    new_task = pipeline_utils.add_task(
-                        exp,
-                        cmd=pipeline_utils.wrap_python_path(cmd=cmd),
-                        task_name=task_name,
-                        log_dir=log_dir,
-                        container=cluster_config["containers"]["nemo-skills"],
-                        cluster_config=cluster_config,
-                        partition=partition,
-                        time_min=time_min,
-                        server_config=server_config,
-                        with_sandbox=with_sandbox,
-                        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
-                        sandbox_port=None if get_random_port else 6000,
-                        run_after=run_after,
-                        reuse_code=reuse_code,
-                        reuse_code_exp=reuse_code_exp,
-                        task_dependencies=(
-                            prev_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
-                        ),
-                        get_server_command=generation_task.get_server_command_fn(),
-                        slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-                        installation_command=installation_command,
-                        skip_hf_home_check=skip_hf_home_check,
-                    )
-                    prev_tasks = [new_task]
-                    all_tasks.append(new_task)
-        if has_tasks and not _reuse_exp:  # if we are reusing an experiment, the tasks will run from there
-            pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
                 all_job_names.append(internal_job_name)
 
