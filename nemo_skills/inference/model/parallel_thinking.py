@@ -217,6 +217,8 @@ class ParallelThinkingTask:
             chat_template_kwargs=self.cfg.chat_template_kwargs,
         )
 
+        LOG.info(kwargs)
+
         return await self.model.generate_async(
             **kwargs,
             prompt=parallel_thinking_prompt,
@@ -362,7 +364,7 @@ class ParallelThinkingTask:
 
         # Step 2: Run GenSelect/GenSynthesis
         if self.cfg.mode == "genselect":
-            output_dict = await self._run_genselect(prompt, solutions, local_random)
+            output_dict = await self._run_genselect(prompt, solutions, local_random, **kwargs)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
             result["genselect_comparison"] = parallel_thinking_result["generation"]
             result["genselect_selection_successful"] = parallel_thinking_result["selection_successful"]
