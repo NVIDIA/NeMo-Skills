@@ -51,7 +51,7 @@ In the example below, we use Megatron as the backend.
 It provides two configuration options: fsdp and megatron
 
 ```bash
-ns train \
+ns sft_nemo_rl \
     --cluster=slurm \
     --expname=my-training-job \
     --output_dir=/workspace/my-training-job/checkpoints \
