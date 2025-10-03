@@ -84,7 +84,7 @@ class ParallelThinkingTask:
         self.cfg = cfg
 
         if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer or self.model.model_name_or_path
+            tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
         else:
             tokenizer = None
 
@@ -189,9 +189,6 @@ class ParallelThinkingTask:
                     )
 
         return prompt_to_solutions_dict
-
-    def _format_solutions_for_parallel_thinking(self, solutions: List[Dict]) -> str:
-        """Format solutions for parallel thinking prompt."""
 
     async def _generate_parallel_thinking_contraction(
         self, prompt: Union[str, List], solutions: List[Dict], **kwargs
@@ -349,6 +346,7 @@ class ParallelThinkingTask:
         if not solutions:
             return {
                 self.cfg.solution_key: "",
+                "generation": "",  # Required by inference/generate.py
                 "solution_list": [],
                 f"{self.cfg.mode}_comparison": "",
                 f"{self.cfg.mode}_num_generated_tokens": 0,
