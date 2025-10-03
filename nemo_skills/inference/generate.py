@@ -729,6 +729,28 @@ async def _cancel_other_async_tasks():
             if t is asyncio.current_task():
                 continue
             tasks_to_cancel.append(t)
+
+        for t in tasks_to_cancel:
+            coro = t.get_coro()
+            coro_name = getattr(coro, "__qualname__", repr(coro))
+            coro_frame = getattr(coro, "cr_frame", None)
+            if coro_frame:
+                code = coro_frame.f_code
+                func_name = code.co_name
+                filename = code.co_filename
+                lineno = coro_frame.f_lineno
+                location = f"{filename}:{lineno} in {func_name}"
+            else:
+                location = "unknown"
+            LOG.info(
+                f"Task to cancel: {t!r}, "
+                f"done={t.done()}, "
+                f"cancelled={t.cancelled()}, "
+                f"name={getattr(t, 'get_name', lambda: None)()}, "
+                f"coro={coro_name}, "
+                f"location={location}, "
+                f"exception={t.exception() if t.done() else None}"
+            )
         if not tasks_to_cancel:
             return
         for t in tasks_to_cancel:

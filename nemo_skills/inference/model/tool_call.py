@@ -77,6 +77,7 @@ class ToolCallingWrapper:
         try:
             tool_args = json.loads(tool_args)
         except json.decoder.JSONDecodeError as e:
+            LOG.error(f"Tool arguments are not in JSON format: {tool_args}")
             LOG.exception(e)
             return {"error": "Tool argument parsing failed."}
 
