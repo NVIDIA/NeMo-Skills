@@ -624,7 +624,7 @@ class GenerationTask:
         # Litellm async logging worker sometimes does not stop. We force stop them.
         # TODO: Remove this once LiteLLM fixes it.
         LOG.info("Cancelling other async tasks")
-        # await _cancel_other_async_tasks()
+        await _cancel_other_async_tasks()
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
@@ -748,6 +748,8 @@ async def _cancel_other_async_tasks():
                 f"location={location}, "
                 f"exception={t.exception() if t.done() else None}"
             )
+        sys.stdout.flush()
+        sys.stderr.flush()
         if not tasks_to_cancel:
             return
         for t in tasks_to_cancel:
