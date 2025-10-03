@@ -25,7 +25,6 @@ from dataclasses import asdict, field, is_dataclass
 from pathlib import Path
 from typing import Any
 
-import GPUtil  # lightweight GPU util wrapper
 import hydra
 import litellm
 import psutil
@@ -558,10 +557,10 @@ class GenerationTask:
                 pbar.update(1)
                 if getattr(self, "wandb_inited", False):
                     cpu = psutil.cpu_percent()
-                    gpus = GPUtil.getGPUs()
-                    if gpus:
-                        gpu = gpus[0].load * 100.0
-                    metrics = {"completed": pbar.n, "system_cpu": cpu, "gpu_util": gpu}
+                    # gpus = GPUtil.getGPUs()
+                    # print(gpus)
+                    # gpu = gpus[0].load * 100.0
+                    metrics = {"completed": pbar.n, "system_cpu": cpu}
                     wandb.log(metrics)
 
     async def async_loop(self, data):
