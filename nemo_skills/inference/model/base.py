@@ -135,6 +135,7 @@ class BaseModel:
         httpx_limits = httpx.Limits(max_keepalive_connections=None, max_connections=None)
         litellm.logging = False
         litellm.disable_streaming_logging = True
+        litellm._logging.disable_debugging()
         litellm.client_session = httpx.Client(limits=httpx_limits)
         litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
 
