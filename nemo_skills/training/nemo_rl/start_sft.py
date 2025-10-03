@@ -153,7 +153,7 @@ class PromptResponseDataset:
                 self.add_messages_key,
                 batched=True,
                 num_proc=self.num_proc,
-                fn_kwargs={"current_input_key": current_input_key},
+                fn_kwargs={"input_key": current_input_key},
             )
 
         # Save dataset + new size signature
