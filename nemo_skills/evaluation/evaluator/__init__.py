@@ -23,6 +23,7 @@ from nemo_skills.evaluation.evaluator.code import (
     eval_human_eval_infilling,
     eval_livebench_coding,
     eval_livecodebench_pro,
+    CodeExecEvaluator
 )
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
@@ -58,6 +59,8 @@ EVALUATOR_MAP = {
 EVALUATOR_CLASS_MAP = {
     "math": MathEvaluator,
     "lean4-proof": Lean4ProofEvaluator,
+    "lean4-statement": Lean4StatementEvaluator,
+    "code_exec": CodeExecEvaluator,
     # Other evaluators can be added here as they're converted to classes
     "ioi": IOIEvaluator,
 }
