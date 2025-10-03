@@ -25,20 +25,13 @@ from dataclasses import asdict, field, is_dataclass
 from pathlib import Path
 from typing import Any
 
+import GPUtil  # lightweight GPU util wrapper
 import hydra
 import litellm
 import psutil
 import wandb
 from omegaconf import ListConfig
 from tqdm import tqdm
-
-try:
-    import pynvml
-
-    pynvml.nvmlInit()
-    _nvml_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-except Exception:
-    _nvml_handle = None
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
 from nemo_skills.inference.model import (
@@ -565,12 +558,10 @@ class GenerationTask:
                 pbar.update(1)
                 if getattr(self, "wandb_inited", False):
                     cpu = psutil.cpu_percent()
-                    gpu = None
-                    if _nvml_handle is not None:
-                        gpu = pynvml.nvmlDeviceGetUtilizationRates(_nvml_handle).gpu
-                    metrics = {"completed": pbar.n, "system_cpu": cpu}
-                    if gpu is not None:
-                        metrics["gpu_util"] = gpu
+                    gpus = GPUtil.getGPUs()
+                    if gpus:
+                        gpu = gpus[0].load * 100.0
+                    metrics = {"completed": pbar.n, "system_cpu": cpu, "gpu_util": gpu}
                     wandb.log(metrics)
 
     async def async_loop(self, data):
