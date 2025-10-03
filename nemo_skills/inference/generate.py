@@ -620,14 +620,19 @@ class GenerationTask:
             pbar.close()
 
         self.restore_async_order()
-        pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        for t in pending:
-            LOG.warning("Pending task at shutdown: %r | coro=%r", t, getattr(t, "get_coro", lambda: None)())
-        await litellm.aclient_session.aclose()
-        LOG.info("Async session closed, is it working?")
-        from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 
-        await GLOBAL_LOGGING_WORKER.clear_queue()
+        # Cancel any lingering logging-related coroutines (e.g., LiteLLM logging workers)
+        tasks_to_cancel = []
+        for t in asyncio.all_tasks():
+            if t is asyncio.current_task():
+                continue
+            coro = t.get_coro()
+            qualname = getattr(coro, "__qualname__", "")
+            if "Logging" in qualname:
+                t.cancel()
+                tasks_to_cancel.append(t)
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
         LOG.info("Is logger stopped?")
 
     def restore_async_order(self):
