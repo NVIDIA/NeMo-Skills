@@ -110,12 +110,17 @@ def _create_commandgroup_from_config(
             cmd_builder, initial_metadata = sandbox_command(port=sandbox_port, keep_mounts=keep_mounts_for_sandbox)
             # Call the builder to get the actual command string
             cmd_string, runtime_metadata = cmd_builder(cfg)
-            # Merge metadata
+            # Merge metadata (deep-merge environment)
             metadata = initial_metadata.copy()
-            metadata.update(runtime_metadata)
+            if "environment" in runtime_metadata:
+                env = metadata.get("environment", {}).copy()
+                env.update(runtime_metadata["environment"])
+                metadata["environment"] = env
+            for k, v in runtime_metadata.items():
+                if k != "environment":
+                    metadata[k] = v
             metadata["log_prefix"] = "sandbox"
             return (cmd_string, metadata)
-
         sandbox_cmd = Command(
             command=make_sandbox_cmd,
             container=cluster_config["containers"]["sandbox"],
