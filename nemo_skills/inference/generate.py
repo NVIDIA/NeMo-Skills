@@ -721,10 +721,6 @@ HELP_MESSAGE = get_help_message(
 )
 
 
-class TerminateAsyncLoop(Exception):
-    """Exception to terminate the async loop."""
-
-
 if __name__ == "__main__":
     if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
