@@ -621,18 +621,9 @@ class GenerationTask:
 
         self.restore_async_order()
 
-        # Cancel any lingering logging-related coroutines (e.g., LiteLLM logging workers)
-        tasks_to_cancel = []
-        for t in asyncio.all_tasks():
-            if t is asyncio.current_task():
-                continue
-            coro = t.get_coro()
-            if "Logging" in str(coro):
-                t.cancel()
-                tasks_to_cancel.append(t)
-        if tasks_to_cancel:
-            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
-        LOG.info("Is logger stopped?")
+        # Litellm async logging worker sometimes does not stop. We force stop them.
+        # TODO: Remove this once LiteLLM fixes it.
+        await _cancel_logging_tasks()
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
@@ -728,3 +719,16 @@ if __name__ == "__main__":
     else:
         setup_logging()
         generate()
+
+
+async def _cancel_logging_tasks():
+    tasks_to_cancel = []
+    for t in asyncio.all_tasks():
+        if t is asyncio.current_task():
+            continue
+        coro = t.get_coro()
+        if "Logging" in str(coro):
+            t.cancel()
+            tasks_to_cancel.append(t)
+    if tasks_to_cancel:
+        await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
