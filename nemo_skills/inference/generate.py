@@ -623,6 +623,7 @@ class GenerationTask:
 
         # Litellm async logging worker sometimes does not stop. We force stop them.
         # TODO: Remove this once LiteLLM fixes it.
+        LOG.info("Cancelling other async tasks")
         await _cancel_other_async_tasks()
 
     def restore_async_order(self):
