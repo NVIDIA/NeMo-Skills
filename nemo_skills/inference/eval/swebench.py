@@ -497,8 +497,7 @@ class SweBenchGenerationTask(GenerationTask):
                 f"    --instance_ids {data_point['instance_id']} "
                 f"    --run_id eval-outputs "
                 f"    --timeout {self.cfg.swebench_tests_timeout} "
-                f"    --dataset_name {data_point['dataset_name']} "
-                f"    --split {data_point['split']} && "
+                f"    --dataset_name {self.cfg.input_file} && "
                 f"cp -r logs/run_evaluation/eval-outputs /trajectories_mount/"
             )
 
