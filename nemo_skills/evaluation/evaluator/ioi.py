@@ -182,6 +182,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             "compile_stderr": compile_result.get("stderr", ""),
             "run_stdout": "",
             "run_stderr": "",
+            "error": "",
             "score": 0.0,
         }
 
@@ -390,7 +391,6 @@ class IOIEvaluator(BaseEvaluator):
             "name": entry["name"],
             "subtask": entry["subtask"],
             "test_case_results": test_case_results,
-            "eval_status": {"complete": True, "eval_error_log": []},
         }
 
     async def eval_full(self, input_files):  # type: ignore[override]
