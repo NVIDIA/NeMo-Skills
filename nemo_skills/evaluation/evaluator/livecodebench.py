@@ -62,6 +62,8 @@ async def eval_livecodebench_async(cfg):
 
     if eval_config.language == "python" and eval_config.interpreter not in ["python", "pypy3"]:
         raise ValueError("Python interpreter must be 'python' or 'pypy3'.")
+    if eval_config.language == "cpp" and eval_config.interpreter != "python":
+        eval_config.interpreter = "python"
 
     if not await install_packages(eval_config):
         return
