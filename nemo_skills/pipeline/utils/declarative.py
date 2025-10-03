@@ -155,7 +155,7 @@ class Command:
     installation_command: Optional[str] = None
     port: Optional[int] = None  # Can be set from metadata
     metadata: Dict[str, any] = field(default_factory=dict)  # Stores metadata from command builders
-    het_group_index: Optional[int] = None  # Set automatically by Pipeline
+    het_group_index: Optional[int] = None  # Set per-job by Pipeline (not global)
 
     def __post_init__(self):
         # Initialize component (merged from old Component class)
@@ -319,23 +319,7 @@ class Pipeline:
         else:
             raise ValueError("Must specify either 'groups' or 'jobs'")
 
-        self._assign_het_group_indices()
-
-    def _assign_het_group_indices(self):
-        """Assign het_group_index to all components for cross-group references."""
-        # Collect all groups from jobs
-        all_groups = []
-        for job_spec in self.jobs:
-            if "group" in job_spec:
-                all_groups.append(job_spec["group"])
-            elif "groups" in job_spec:
-                all_groups.extend(job_spec["groups"])
-
-        # Assign indices
-        for group_idx, group in enumerate(all_groups):
-            for component in group.components:
-                component.het_group_index = group_idx
-                LOG.debug(f"Assigned het_group_index {group_idx} to {component.get_name()}")
+        # Note: het_group_indices are assigned per-job in _plan_and_add_job, not globally
 
     def _get_cluster_config(self) -> Dict:
         """Get cluster configuration, loading it if necessary."""
@@ -591,6 +575,13 @@ class Pipeline:
             )
 
             for comp_idx, command in enumerate(group.components):
+                # Assign het_group_index ONLY for heterogeneous jobs (per-job, not global)
+                # Non-heterogeneous jobs use localhost, so het_group_index should remain None
+                if heterogeneous:
+                    command.het_group_index = het_idx
+                else:
+                    command.het_group_index = None
+
                 final_cmd, exec_config = self._prepare_command(command, cluster_config)
                 commands.append(final_cmd)
 
