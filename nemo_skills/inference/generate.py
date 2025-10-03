@@ -623,6 +623,8 @@ class GenerationTask:
         pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
         for t in pending:
             LOG.warning("Pending task at shutdown: %r | coro=%r", t, getattr(t, "get_coro", lambda: None)())
+        await litellm.aclient_session.aclose()
+        LOG.info("Async session closed, is it working?")
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
