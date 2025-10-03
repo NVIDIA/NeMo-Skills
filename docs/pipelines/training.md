@@ -117,7 +117,7 @@ expname = "my-training-job"
 cluster = "slurm"
 output_dir = f"/workspace/{expname}/checkpoints"
 
-train(
+sft_nemo_rl(
     ctx=wrap_arguments(""),
     cluster=cluster,
     expname=expname,
