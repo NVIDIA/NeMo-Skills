@@ -629,7 +629,7 @@ class GenerationTask:
                 break
             for task in tasks_to_cancel:
                 task.cancel()
-            await asyncio.gather(*tasks_to_cancel)
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
