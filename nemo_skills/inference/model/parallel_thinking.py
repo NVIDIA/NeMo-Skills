@@ -215,8 +215,7 @@ class ParallelThinkingTask:
         )
 
         for duplicate_key in ["temperature", "tokens_to_generate", "prompt"]:
-            if duplicate_key in kwargs:
-                del kwargs[duplicate_key]
+            kwargs.pop(duplicate_key, None)
 
         return await self.model.generate_async(
             prompt=parallel_thinking_prompt,
