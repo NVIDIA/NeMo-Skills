@@ -625,6 +625,10 @@ class GenerationTask:
             LOG.warning("Pending task at shutdown: %r | coro=%r", t, getattr(t, "get_coro", lambda: None)())
         await litellm.aclient_session.aclose()
         LOG.info("Async session closed, is it working?")
+        from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
+
+        GLOBAL_LOGGING_WORKER.stop()
+        LOG.info("Is logger stopped?")
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
