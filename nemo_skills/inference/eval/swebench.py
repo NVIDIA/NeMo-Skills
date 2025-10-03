@@ -112,9 +112,14 @@ class SweBenchGenerationConfig:
     # Whether to run evaluation. If False, will only run inference (trajectory/patch generation).
     evaluate: bool = True
 
-    apptainer_max_retries: int = 3
-    apptainer_min_retry_interval: int = 60
-    apptainer_max_retry_interval: int = 180
+    # How many times to try running inference & evaluation commands until they produce a valid output file
+    max_retries: int = 3
+
+    # Interval between retries, in seconds.
+    # Selected randomly between min_retry_interval and max_retry_interval for each instance,
+    # in order to avoid too many instances making network requests at the same time.
+    min_retry_interval: int = 60
+    max_retry_interval: int = 180
 
     inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
@@ -270,12 +275,12 @@ class SweBenchGenerationTask(GenerationTask):
         logs_dir.mkdir(exist_ok=True)
 
         # Retry apptainer command up to max_retries times
-        for attempt in range(self.cfg.apptainer_max_retries):
+        for attempt in range(self.cfg.max_retries):
             log_file_path = logs_dir / f"{data_point['instance_id']}_{mode}_attempt{attempt + 1}.log"
             LOG.info(
                 "Starting execution of an apptainer command (attempt %d of %d). Logs are available at %s",
                 attempt + 1,
-                self.cfg.apptainer_max_retries,
+                self.cfg.max_retries,
                 log_file_path,
             )
 
@@ -298,7 +303,7 @@ class SweBenchGenerationTask(GenerationTask):
                         if process.returncode is None:
                             process.kill()
                             await process.wait()
-                        attempt = self.cfg.apptainer_max_retries  # Force exit the loop on timeout
+                        attempt = self.cfg.max_retries  # Force exit the loop on timeout
                         raise ValueError("Command timed out")
 
                 # Look for the expected file
@@ -313,10 +318,8 @@ class SweBenchGenerationTask(GenerationTask):
                         f"found {len(pred_files)}."
                     )
             except Exception:
-                if attempt < self.cfg.apptainer_max_retries - 1:
-                    retry_interval = random.randint(
-                        self.cfg.apptainer_min_retry_interval, self.cfg.apptainer_max_retry_interval
-                    )
+                if attempt < self.cfg.max_retries - 1:
+                    retry_interval = random.randint(self.cfg.min_retry_interval, self.cfg.max_retry_interval)
                     LOG.warning(
                         "Attempt %d failed for instance %s. Retrying in %d seconds...",
                         attempt + 1,
@@ -329,7 +332,7 @@ class SweBenchGenerationTask(GenerationTask):
                 else:
                     LOG.error(
                         "All %d attempts failed for instance %s",
-                        self.cfg.apptainer_max_retries,
+                        self.cfg.max_retries,
                         data_point["instance_id"],
                     )
                     LOG.error("Apptainer command failed. Check logs at: %s", log_file_path)
