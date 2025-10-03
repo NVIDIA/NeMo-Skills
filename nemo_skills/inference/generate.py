@@ -626,6 +626,21 @@ class GenerationTask:
         # TODO: Remove this once LiteLLM fixes it.
         while True:
             tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+            # Print all the details of the tasks
+            LOG.info(
+                "Tasks: %s",
+                [
+                    {
+                        "task": str(task),
+                        "done": task.done(),
+                        "cancelled": task.cancelled(),
+                        "coro": repr(task.get_coro()),
+                    }
+                    for task in tasks
+                ],
+            )
+            sys.stdout.flush()
+            sys.stderr.flush()
             litellm_tasks = [task for task in tasks if "litellm" in str(task)]
             if len(litellm_tasks) == 0:
                 break
