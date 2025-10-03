@@ -76,13 +76,14 @@ def vllm_server_command(
     return server_cmd_builder, metadata
 
 
-def sandbox_command(port: Optional[int] = None, **kwargs) -> Tuple[Callable, Dict]:
+def sandbox_command(port: Optional[int] = None, keep_mounts: bool = False, **kwargs) -> Tuple[Callable, Dict]:
     """Build sandbox command.
 
     Returns a lambda that will build the command when cluster_config is available.
 
     Args:
         port: Port to use for sandbox
+        keep_mounts: If True, keep mounts from cluster config. If False, use empty mounts for safety.
 
     Returns:
         Tuple of (lambda, metadata_dict)
@@ -93,7 +94,7 @@ def sandbox_command(port: Optional[int] = None, **kwargs) -> Tuple[Callable, Dic
     metadata = {
         "port": port,
         "log_prefix": "sandbox",
-        "mounts": [],  # Sandbox doesn't mount anything
+        "mounts": None if keep_mounts else [],  # None means use cluster config mounts, [] means no mounts
         "environment": {
             "LISTEN_PORT": str(port),
             "NGINX_PORT": str(port),

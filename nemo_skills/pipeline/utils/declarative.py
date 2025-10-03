@@ -255,6 +255,7 @@ class HardwareConfig:
     """Hardware configuration for a group of tasks."""
 
     partition: Optional[str] = None
+    qos: Optional[str] = None
     time_min: Optional[str] = None
     exclusive: bool = False
     num_gpus: Optional[int] = None
@@ -528,6 +529,7 @@ class Pipeline:
                 log_dir=log_dir,
                 log_prefix=exec_config["log_prefix"],
                 partition=hardware.partition if hardware else None,
+                qos=hardware.qos if hardware else None,
                 time_min=hardware.time_min if hardware else None,
                 heterogeneous=heterogeneous,
                 het_group=het_group,
