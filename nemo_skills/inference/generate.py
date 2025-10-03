@@ -722,6 +722,7 @@ if __name__ == "__main__":
 
 
 async def _cancel_other_async_tasks():
+    LOG.info("Cancelling other async tasks")
     attempt = 0
     while True:
         tasks_to_cancel = []
@@ -730,6 +731,7 @@ async def _cancel_other_async_tasks():
                 continue
             tasks_to_cancel.append(t)
 
+        LOG.info(f"Tasks to cancel: {len(tasks_to_cancel)}")
         for t in tasks_to_cancel:
             coro = t.get_coro()
             coro_name = getattr(coro, "__qualname__", repr(coro))
