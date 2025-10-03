@@ -145,7 +145,6 @@ class ToolCallingWrapper:
             tool_calls = generation.get("tool_calls", [])
             if tool_calls:
                 tool_calls = [tool_call.model_dump() for tool_call in tool_calls]
-                LOG.info("!!!", tool_calls)
                 tool_calls_output_messages = await self._execute_tool_calls(
                     tool_calls, request_id=request_id, completion_type=completion_type
                 )

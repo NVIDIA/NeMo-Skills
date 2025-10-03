@@ -103,7 +103,7 @@ def format_tool_response_by_completion_type(tool_call, result, completion_type: 
     elif completion_type == CompletionType.responses:
         return {
             "type": "function_call_output",
-            "call_id": tool_call["id"],
+            "call_id": tool_call["call_id"],
             "output": json.dumps(result) if not isinstance(result, str) else result,
         }
     else:
