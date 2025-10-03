@@ -113,8 +113,8 @@ class SweBenchGenerationConfig:
     evaluate: bool = True
 
     apptainer_max_retries: int = 3
-    apptainer_min_retry_interval: int = 0
-    apptainer_max_retry_interval: int = 0
+    apptainer_min_retry_interval: int = 60
+    apptainer_max_retry_interval: int = 180
 
     inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
     # Inference server configuration {server_params}
