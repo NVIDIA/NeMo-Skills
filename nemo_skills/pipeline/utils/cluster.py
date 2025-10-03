@@ -134,6 +134,11 @@ def get_env_variables(cluster_config):
                 env_var_name, value = env_var.split("=")
                 env_var_name = env_var_name.strip()
                 value = value.strip()
+
+                # If the value contains a '$', we treat it as an env var reference
+                if "$" in value:
+                    value = os.path.expanduser(value)
+
             else:
                 raise ValueError(f"Invalid required environment variable format: {env_var}")
             env_vars[env_var_name] = value

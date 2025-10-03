@@ -356,7 +356,7 @@ def add_task(
     heterogeneous: bool = False,
     with_ray: bool = False,
     installation_command: str | None = None,
-    skip_hf_home_check: bool = False,
+    skip_hf_home_check: bool | None = None,
     dry_run: bool = False,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
@@ -412,6 +412,10 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     env_vars = get_env_variables(cluster_config)
+    # If not set by env variable, try to resolve from config
+    if skip_hf_home_check is None:
+        skip_hf_home_check = cluster_config.get("skip_hf_home_check", False)
+
     if cluster_config["executor"] != "none" and not skip_hf_home_check:
         if "HF_HOME" not in env_vars:
             raise RuntimeError(
