@@ -217,19 +217,16 @@ class ParallelThinkingTask:
             chat_template_kwargs=self.cfg.chat_template_kwargs,
         )
 
-        LOG.info(kwargs)
         for duplicate_key in ["temperature", "tokens_to_generate", "prompt"]:
             if duplicate_key in kwargs:
                 del kwargs[duplicate_key]
 
-        LOG.info("Post-deletion kwargs: ", kwargs)
-
         return await self.model.generate_async(
-            **kwargs,
             prompt=parallel_thinking_prompt,
             # Overriding the tokens_to_generate, temperature
             tokens_to_generate=self.cfg.tokens_to_generate,
             temperature=self.cfg.temperature,
+            **kwargs,
         )
 
     def _extract_selected_solution(self, generation: str, max_idx: int) -> Optional[int]:
