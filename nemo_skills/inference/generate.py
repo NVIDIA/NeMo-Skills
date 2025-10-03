@@ -627,8 +627,7 @@ class GenerationTask:
             if t is asyncio.current_task():
                 continue
             coro = t.get_coro()
-            qualname = getattr(coro, "__qualname__", "")
-            if "Logging" in qualname:
+            if "Logging" in str(coro):
                 t.cancel()
                 tasks_to_cancel.append(t)
         if tasks_to_cancel:

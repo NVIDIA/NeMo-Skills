@@ -132,7 +132,7 @@ class BaseModel:
             base_url=self.base_url,
             api_base=self.base_url,  # Used in later versions with responses API
         )
-        httpx_limits = httpx.Limits(max_keepalive_connections=None, max_connections=None)
+        httpx_limits = httpx.Limits(max_keepalive_connections=2048, max_connections=2048)
         litellm.client_session = httpx.Client(limits=httpx_limits)
         litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
 
