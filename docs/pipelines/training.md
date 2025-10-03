@@ -41,49 +41,66 @@ a good idea to check their documentation to understand how this config is struct
 
 ## Running training
 
-We use [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/) to run LLM training,
+We use [NeMo-RL](https://github.com/NVIDIA-NeMo/RL) to run LLM training,
 so you can check their documentation to learn about all supported parameters.
 
 Here is an example of how to run a training job.
+It supports models in the Hugging Face format directly.
+
+In the example below, we use Megatron as the backend.
+It provides two configuration options: fsdp and megatron
 
 ```bash
 ns train \
     --cluster=slurm \
     --expname=my-training-job \
     --output_dir=/workspace/my-training-job/checkpoints \
-    --nemo_model=/nemo_models/llama3.1-8b-base \
+    --hf_model=/hf_models/llama3.1-8b-base \
     --num_nodes=8 \
     --num_gpus=8 \
     --num_training_jobs=4 \
+    --backend=megatron \
     --training_data=/data/sft-data.jsonl
 ```
 
 This will run training on 8 nodes of 8 GPUs, using 4 dependent slurm jobs.
-By default we are training for 2 epochs, saving checkpoints every 1000 steps,
-but you can adjust these values. It's also recommended to tune micro batch size
-and tensor parallel parameters for optimal performance. E.g. these are good
-defaults for an 8B model size
+You can adjust the number of epochs and steps as shown below.
+The training will finish earlier once either the specified number of epochs or steps is reached.
 
 ```bash
-    ++model.data.train_ds.micro_batch_size=4 \
-    ++model.tensor_model_parallel_size=4
+    ++sft.max_num_epochs=2 \
+    ++sft.max_num_stepss=1000 \
 ```
 
-You can customize any of the SFT parameters by directly providing them, e.g.
-to disable wandb logging and add dropout use
+It is also recommended to tune the micro batch size and tensor parallel parameters for optimal performance.
+
+For dense models (e.g., Qwen3-8B), adjusting these settings can significantly improve training efficiency.
 
 ```bash
-   --disable_wandb \
-   ++model.ffn_dropout=0.1 \
-   ++model.attention_dropout=0.1 \
-   ++model.hidden_dropout=0.1
+    ++policy.train_global_batch_size=32 \
+    ++policy.train_micro_batch_size=1 \
+    ++policy.tensor_model_parallel_size=4
+    ++policy.pipeline_model_parallel_size=4
 ```
 
-The training script will average all of your generated checkpoints upon completion
-(we found this to consistently increase the downstream accuracy). If you want to
-only average a subset of checkpoint, add `--average_steps` parameter (e.g. if you
-want to disable averaging, set it to the last training step). If you only want
-to average the checkpoints of the finished job, set `--num_training_jobs=0`.
+For MoE models (e.g., Qwen3-30B-A3B), you can also adjust additional MoE-specific parameters to further optimize performance.
+
+```bash
+    ++policy.megatron_cfg.expert_model_parallel_size=2 \
+    ++policy.megatron_cfg.expert_tensor_parallel_size=4
+```
+
+
+We also support sequence packing and context parallel, espeically for training sequences > 4k or so, it's recommended to use sequence packing and context parallel.
+(By default, our sft config set sequence_packing as True)
+```bash
+   ++policy.sequence_packing.enabled=True \
+   ++++policy.megatron_cfg.context_parallel_size=4
+```
+
+
+The training script will automatically convert the final saved checkpoint into the Hugging Face format and average all generated checkpoints upon completion.
+
 
 ## Chaining pipelines with Python
 
@@ -105,36 +122,22 @@ train(
     cluster=cluster,
     expname=expname,
     output_dir=output_dir,
-    nemo_model="/nemo_models/llama3.1-8b-base",
+    hf_model="/hf_models/llama3.1-8b-base",
     num_nodes=8,
     num_gpus=8,
     num_training_jobs=4,
     training_data="/data/sft-data.jsonl",
 )
 
-convert(
-    ctx=wrap_arguments(""),
-    cluster=cluster,
-    input_model=f"{output_dir}/model-averaged-nemo",
-    output_model=f"{output_dir}/model-averaged-hf",
-    expname=f"{expname}-to-hf",
-    run_after=expname,
-    convert_from="nemo",
-    convert_to="hf",
-    model_type="llama",
-    num_gpus=8,
-    tokenizer="meta-llama/Meta-Llama-3.1-8B",
-)
-
 eval(
     ctx=wrap_arguments(""),
     cluster=cluster,
-    model=f"{output_dir}/model-averaged-hf",
+    model=f"{output_dir}/final_hf_model",
     server_type="trtllm",
     output_dir=f"{output_dir}/results/",
     benchmarks="gsm8k,math",
     server_gpus=8,
-    run_after=f"{expname}-to-hf",
+    run_after=expname,
 )
 ```
 
