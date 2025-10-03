@@ -623,31 +623,14 @@ class GenerationTask:
 
         # Litellm async logging worker sometimes does not stop. We force terminate the async loop.
         # TODO: Remove this once LiteLLM fixes it.
-        LOG.info("Starting to cancel tasks")
-        sys.stdout.flush()
-        sys.stderr.flush()
-        LOG.info("Lets go!")
         while True:
-            tasks_to_cancel = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
-            if len(tasks_to_cancel) == 0:
+            tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+            litellm_tasks = [task for task in tasks if "litellm" in str(task)]
+            if len(litellm_tasks) == 0:
                 break
-            LOG.info(
-                "Tasks to cancel: %s",
-                [
-                    {
-                        "task": str(task),
-                        "done": task.done(),
-                        "cancelled": task.cancelled(),
-                        "coro": repr(task.get_coro()),
-                    }
-                    for task in tasks_to_cancel
-                ],
-            )
-            sys.stdout.flush()
-            sys.stderr.flush()
-            for task in tasks_to_cancel:
+            for task in litellm_tasks:
                 task.cancel()
-            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
+            await asyncio.gather(*litellm_tasks, return_exceptions=True)
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
