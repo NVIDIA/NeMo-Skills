@@ -53,36 +53,33 @@ def _create_commandgroup_from_config(
     task_name: str,
     log_dir: str,
 ) -> CommandGroup:
-    """Create a CommandGroup from server_config, matching add_task logic.
+    """Create a CommandGroup from server_config.
 
-    This function replicates the component ordering from add_task:
+    Component ordering:
     1. Server (if server_config provided)
-    2. Main client command
+    2. Client command
     3. Sandbox (if with_sandbox=True)
     """
 
     components = []
 
-    # 1. Add server if server_config is provided (matches add_task lines 433-463)
+    # 1. Add server if server_config is provided
     if server_config is not None and int(server_config["num_gpus"]) > 0:
-        # Extract server container (matches line 435)
         server_type = server_config["server_type"]
         server_container = server_config.pop("container", cluster_config["containers"][server_type])
 
-        # Use the EXISTING get_server_command function via lambda
-        # This ensures we use the same server command construction as add_task
+        # Create server command builder that defers execution until cluster_config is available
         server_config_copy = server_config.copy()
 
         def make_server_cmd(cfg):
             cmd, num_tasks = get_server_command_fn(**server_config_copy, cluster_config=cfg)
-            # Include log_prefix in metadata to match old add_task behavior
             return (
                 cmd,
                 {
                     "num_tasks": num_tasks,
                     "gpus": server_config_copy["num_gpus"],
                     "nodes": server_config_copy["num_nodes"],
-                    "log_prefix": "server",  # Explicitly set log prefix
+                    "log_prefix": "server",
                 },
             )
 
@@ -91,24 +88,23 @@ def _create_commandgroup_from_config(
             container=server_container,
             gpus=server_config["num_gpus"],
             nodes=server_config["num_nodes"],
-            name=task_name,  # Use base task_name, not with _server suffix
+            name=task_name,
         )
         components.append(server_cmd)
 
-    # 2. Add main generation command (matches add_task lines 466-580)
+    # 2. Add main generation command
     client_cmd = Command(
-        command=generation_cmd,  # Already built with get_generation_cmd!
+        command=generation_cmd,
         container=cluster_config["containers"]["nemo-skills"],
-        name=task_name,  # Use base task_name, not with _client suffix
+        name=task_name,
         installation_command=installation_command,
-        metadata={"log_prefix": "main"},  # Set log prefix to match old add_task
+        metadata={"log_prefix": "main"},
     )
     components.append(client_cmd)
 
-    # 3. Add sandbox if requested (matches add_task lines 527-565)
+    # 3. Add sandbox if requested
     if with_sandbox:
-        # Use existing sandbox_command builder
-        # Wrap to ensure log_prefix is set in returned metadata
+
         def make_sandbox_cmd(cfg):
             # sandbox_command returns (callable, metadata), so we need to call the callable
             cmd_builder, initial_metadata = sandbox_command(port=sandbox_port, keep_mounts=keep_mounts_for_sandbox)
@@ -117,18 +113,18 @@ def _create_commandgroup_from_config(
             # Merge metadata
             metadata = initial_metadata.copy()
             metadata.update(runtime_metadata)
-            metadata["log_prefix"] = "sandbox"  # Explicitly set log prefix
+            metadata["log_prefix"] = "sandbox"
             return (cmd_string, metadata)
 
         sandbox_cmd = Command(
             command=make_sandbox_cmd,
             container=cluster_config["containers"]["sandbox"],
-            name=task_name,  # Use base task_name, not with _sandbox suffix
+            name=task_name,
         )
         components.append(sandbox_cmd)
 
-    # Find MAXIMUM GPUs needed by any component for the HardwareConfig
-    # This is critical for multi-component jobs - the job-level request must be the max
+    # Find maximum GPUs/nodes needed by any component for the HardwareConfig
+    # The job-level resource request must be the maximum across all components
     max_gpus = max((comp.gpus or 0) for comp in components)
     max_nodes = max((comp.nodes or 1) for comp in components)
 
@@ -417,13 +413,12 @@ def generate(
             )
             cmd = pipeline_utils.wrap_python_path(cmd=cmd)
 
-            # Base task name (same for all dependent jobs in chain - matches original!)
+            # Base task name (shared across all dependent jobs in the chain)
             task_name = f"{expname}-rs{seed}" if seed is not None else expname
             if chunk_id is not None:
                 task_name += f"-chunk{chunk_id}"
 
-            # Handle dependent_jobs chain (matching add_task behavior)
-            # Note: run_after will be handled by Stage for jobs that don't have task_dependencies
+            # Handle dependent_jobs chain
             dependencies = _task_dependencies.copy() if _task_dependencies else []
 
             for dep_idx in range(dependent_jobs + 1):
@@ -448,16 +443,16 @@ def generate(
                 # Use unique internal job name for dependency tracking, but same task_name
                 internal_job_name = f"{task_name}-dep{dep_idx}" if dep_idx > 0 else task_name
 
-                # Build dependencies: first job gets _task_dependencies+run_after, rest get previous in chain
+                # Build dependencies: first job in chain gets external dependencies, rest chain to previous
                 if dep_idx == 0:
-                    # First job: add run_after if no task_dependencies (matching add_task logic)
+                    # First job: add run_after if no task_dependencies
                     job_deps = dependencies.copy() if dependencies else []
                     if not dependencies and run_after:
                         run_after_list = run_after if isinstance(run_after, list) else [run_after]
                         job_deps.extend(run_after_list)
                     job_deps = job_deps if job_deps else None
                 else:
-                    # Subsequent jobs in chain depend on previous
+                    # Subsequent jobs in chain depend on previous job
                     job_deps = [f"{task_name}-dep{dep_idx - 1}"]
 
                 jobs.append(
@@ -479,14 +474,14 @@ def generate(
         # For internal use: return job names for dependency tracking
         return all_job_names
 
-    # Create and run pipeline (with performance optimizations)
+    # Create and run pipeline
     pipeline = Pipeline(
         name=expname,
         cluster=cluster,
         jobs=jobs,
-        reuse_code=reuse_code,  # PERFORMANCE: Enable code reuse
-        reuse_code_exp=reuse_code_exp,  # PERFORMANCE: Reuse from specific exp
-        skip_hf_home_check=skip_hf_home_check,  # Validation control
+        reuse_code=reuse_code,
+        reuse_code_exp=reuse_code_exp,
+        skip_hf_home_check=skip_hf_home_check,
     )
 
     result = pipeline.run(cluster_config=cluster_config, dry_run=dry_run)

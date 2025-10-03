@@ -38,7 +38,7 @@ Basic Example (Single job with multiple commands):
     pipeline = Pipeline(
         name="my_inference",
         cluster="local",
-        groups=[inference_group]  # Legacy mode: single job
+        groups=[inference_group]
     )
     pipeline.run()
 
@@ -158,7 +158,7 @@ class Command:
     het_group_index: Optional[int] = None  # Set per-job by Pipeline (not global)
 
     def __post_init__(self):
-        # Initialize component (merged from old Component class)
+        # Initialize defaults
         if self.name is None:
             self.name = "command"
 
@@ -229,7 +229,7 @@ class Command:
         else:
             final_command = self.command
 
-        # 2. Wrap with installation_command if provided (matches add_task behavior)
+        # 2. Wrap with installation_command if provided
         if self.installation_command:
             final_command = install_packages_wrap(final_command, self.installation_command)
 
@@ -272,7 +272,7 @@ class CommandGroup:
         name: Optional[str] = None,
         log_dir: Optional[str] = None,
     ):
-        self.components = commands  # Keep as self.components internally for backwards compatibility
+        self.components = commands
         self.hardware = hardware or HardwareConfig()
         self.name = name
         self.log_dir = log_dir
@@ -357,7 +357,7 @@ class Pipeline:
         else:
             final_cluster_config = self._get_cluster_config()
 
-        # Validate HF_HOME (matching add_task validation)
+        # Validate HF_HOME environment variable
         if final_cluster_config["executor"] != "none" and not self.skip_hf_home_check:
             env_vars = get_env_variables(final_cluster_config)
             if "HF_HOME" not in env_vars:
@@ -377,7 +377,7 @@ class Pipeline:
             for job_spec in self.jobs:
                 job_name = job_spec.get("name", "unnamed")
 
-                # Resolve dependencies to task handles (matching add_task lines 390-404)
+                # Resolve dependencies to task handles
                 run_after_deps = []
 
                 # Handle dependencies from job spec
@@ -386,7 +386,7 @@ class Pipeline:
                 if job_dependencies is None:
                     job_dependencies = []
 
-                # If no dependencies and Pipeline has run_after, apply it (matching add_task behavior)
+                # If no job-level dependencies, apply pipeline-level run_after
                 if not job_dependencies and self.run_after:
                     run_after_list = self.run_after if isinstance(self.run_after, list) else [self.run_after]
                     job_dependencies = run_after_list
@@ -411,7 +411,7 @@ class Pipeline:
                                     f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
                                 )
 
-                # Convert empty list to None (matching add_task line 402)
+                # Convert empty list to None for cleaner handling
                 if len(run_after_deps) == 0:
                     run_after_deps = None
 
@@ -454,7 +454,7 @@ class Pipeline:
             if not dry_run:
                 run_exp(exp, final_cluster_config)
 
-                # Cache experiment for code reuse in future runs (matching add_task behavior)
+                # Cache experiment for code reuse in future runs
                 if final_cluster_config["executor"] != "none":
                     tunnel = get_tunnel(final_cluster_config)
                     cur_tunnel_hash = tunnel_hash(tunnel)
@@ -559,7 +559,7 @@ class Pipeline:
                     _, exec_config_probe = command.prepare_for_execution(cluster_config)
                     shared_env_vars.update(exec_config_probe.get("environment", {}))
 
-        # PERFORMANCE: Track first packager to share across executors (single-group only)
+        # Share packager across executors for efficiency (single-group only)
         shared_packager = None
 
         # Build commands and executors
@@ -624,7 +624,7 @@ class Pipeline:
         if heterogeneous and executors:
             executors[0].het_group_indices = het_group_indices
 
-        # PERFORMANCE: Handle code reuse from previous experiments (single-group only)
+        # Handle code reuse from previous experiments (single-group only)
         if (not heterogeneous) and cluster_config["executor"] != "none":
             tunnel = get_tunnel(cluster_config)
             if self.reuse_code:
@@ -650,7 +650,7 @@ class Pipeline:
                         else:
                             LOG.warning(f"Relevant packaging job not found for experiment {reuse_exp._title}")
             else:
-                # If reuse_code=False, clear cache (matching original behavior)
+                # If reuse_code=False, clear cache
                 REUSE_CODE_EXP.pop(tunnel_hash(tunnel), None)
 
         # Handle executor="none" path replacements (single-group only)
@@ -725,7 +725,3 @@ class Pipeline:
             run_after=run_after,
             heterogeneous=True,
         )
-
-
-# Backwards compatibility alias
-Pipeline = Pipeline
