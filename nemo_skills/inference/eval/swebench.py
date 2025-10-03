@@ -101,6 +101,10 @@ class SweBenchGenerationConfig:
     agent_config: str | None = None
     agent_max_turns: int = 100  # Max iterations for the agent
 
+    # URL of the evaluation harness repo to pass to git clone. Defaults to our fork of SWE-bench with local evaluation
+    eval_harness_repo: str = "https://github.com/Kipok/SWE-bench.git"
+    eval_harness_commit: str = "HEAD"  # Which commit to use when cloning the eval harness repo
+
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
     inference: SweBenchInferenceConfig = field(default_factory=SweBenchInferenceConfig)  # LLM call parameters
@@ -480,9 +484,10 @@ class SweBenchGenerationTask(GenerationTask):
                 # first installing SWE-bench repo
                 "curl -LsSf https://astral.sh/uv/install.sh | sh && "
                 "source /root/.local/bin/env && "
-                "cd /root && "
-                "git clone https://github.com/Kipok/SWE-bench.git && "
-                "cd SWE-bench && "
+                "mkdir /root/SWE-bench && "
+                "cd /root/SWE-bench && "
+                f"git clone {self.cfg.eval_harness_repo} . && "
+                f"git checkout {self.cfg.eval_harness_commit} && "
                 "uv venv --python 3.12 venv && "
                 "source venv/bin/activate && "
                 "uv pip install -e . && "
