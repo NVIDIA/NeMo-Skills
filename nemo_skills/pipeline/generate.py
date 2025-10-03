@@ -121,11 +121,13 @@ def _create_commandgroup_from_config(
                     metadata[k] = v
             metadata["log_prefix"] = "sandbox"
             return (cmd_string, metadata)
+
         sandbox_cmd = Command(
             command=make_sandbox_cmd,
             container=cluster_config["containers"]["sandbox"],
             name=task_name,
         )
+
         components.append(sandbox_cmd)
 
     # Find maximum GPUs/nodes needed by any component for the HardwareConfig
