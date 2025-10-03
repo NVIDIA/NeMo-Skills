@@ -610,8 +610,7 @@ class GenerationTask:
             # Create tasks for all remaining data points
             tasks = []
             for data_point in remaining_data_points:
-                # task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
-                task = self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar)
+                task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
                 tasks.append(task)
 
             # Wait for all tasks to complete
@@ -624,7 +623,13 @@ class GenerationTask:
 
         # Litellm async logging worker sometimes does not stop. We force terminate the async loop.
         # TODO: Remove this once LiteLLM fixes it.
-        # raise TerminateAsyncLoop()
+        while True:
+            tasks_to_cancel = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+            if len(tasks_to_cancel) == 0:
+                break
+            for task in tasks_to_cancel:
+                task.cancel()
+            await asyncio.gather(*tasks_to_cancel)
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
@@ -689,11 +694,7 @@ class GenerationTask:
                     output_path.unlink()
 
         self.wait_for_server()
-        try:
-            asyncio.run(self.async_loop(data))
-        except TerminateAsyncLoop:
-            LOG.info("Async Loop Finished")
-            return
+        asyncio.run(self.async_loop(data))
 
         self.postprocess()
 
