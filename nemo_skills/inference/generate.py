@@ -627,7 +627,7 @@ class GenerationTask:
         LOG.info("Async session closed, is it working?")
         from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 
-        GLOBAL_LOGGING_WORKER.stop()
+        await GLOBAL_LOGGING_WORKER.stop()
         LOG.info("Is logger stopped?")
 
     def restore_async_order(self):
