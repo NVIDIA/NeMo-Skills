@@ -264,7 +264,7 @@ Due to variance between runs, you can automatically repeat the evaluation and av
 
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench-cpp/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench-cpp/__init__.py)
 - Original benchmark source is [here](https://huggingface.co/datasets/nvidia/LiveCodeBench-CPP).
-- Data preparation and evaluation: you can repare the dataset by running `ns prepare_data livecodebench-cpp` command. The command will generate two dataset splits: `v5_2408_2501.jsonl` and `v6_2408_2505.jsonl`. Then perform evaluation following livecodebench evaluation instructions provided in the previous section. Set the split to either `v5_2408_2501` or `v6_2408_2505`.
+- Data preparation and evaluation: you can prepare the dataset by running `ns prepare_data livecodebench-cpp`. The command will generate two dataset splits: `v5_2408_2501.jsonl` and `v6_2408_2505.jsonl`. When evaluating, make sure to target the C++ benchmark entrypoint (`--benchmarks=livecodebench-cpp`) and set `--split` to either `v5_2408_2501` or `v6_2408_2505`. The remaining flags mirror the livecodebench instructions above.
 
 
 ### livecodebench-pro
