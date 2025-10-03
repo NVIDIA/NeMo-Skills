@@ -27,6 +27,7 @@ from typing import Any
 
 import hydra
 import litellm
+import wandb
 from omegaconf import ListConfig
 from tqdm import tqdm
 
@@ -45,6 +46,7 @@ from nemo_skills.utils import (
     get_help_message,
     get_logger_name,
     get_server_wait_cmd,
+    init_wandb,
     nested_dataclass,
     remove_thinking,
     setup_logging,
@@ -254,7 +256,7 @@ class GenerationTask:
             cfg: GenerateSolutionsConfig object with the configuration parameters or subclass.
         """
         self.cfg = cfg
-
+        self.wandb_inited = init_wandb(project="ioi_eval", name="ioi run", verbose=True)
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
         if self.cfg.chat_template_kwargs:
             if not self.cfg.use_completions_api:
@@ -552,6 +554,8 @@ class GenerationTask:
             async with self.output_lock:
                 self.dump_outputs([output], [data_point], fout)
                 pbar.update(1)
+                if getattr(self, "wandb_inited", False):
+                    wandb.log({"completed": pbar.n})
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
