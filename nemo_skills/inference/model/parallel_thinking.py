@@ -79,24 +79,21 @@ class ParallelThinkingTask:
     to choose the best one or synthesize a new solution.
     """
 
-    def __init__(self, model: BaseModel, orig_prompt_filler, cfg: ParallelThinkingConfig):
+    def __init__(self, model: BaseModel, tokenizer: str | None, orig_prompt_filler, cfg: ParallelThinkingConfig):
         self.model = model
         self.orig_prompt_filler = orig_prompt_filler
         self.cfg = cfg
 
-        if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer
-        else:
-            tokenizer = None
+        self.tokenizer = tokenizer
 
         # Load GenSelect/GenSynthesis prompt
         if self.cfg.mode == "genselect":
             self.parallel_thinking_prompt = get_prompt(
-                prompt_config=self.cfg.genselect.prompt_config, tokenizer=tokenizer
+                prompt_config=self.cfg.genselect.prompt_config, tokenizer=self.tokenizer
             )
         elif self.cfg.mode == "gensynthesis":
             self.parallel_thinking_prompt = get_prompt(
-                prompt_config=self.cfg.gensynthesis.prompt_config, tokenizer=tokenizer
+                prompt_config=self.cfg.gensynthesis.prompt_config, tokenizer=self.tokenizer
             )
         else:
             raise ValueError(f"Invalid parallel thinking mode: {self.cfg.mode}")
