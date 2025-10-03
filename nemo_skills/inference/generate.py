@@ -620,6 +620,9 @@ class GenerationTask:
             pbar.close()
 
         self.restore_async_order()
+        pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        for t in pending:
+            LOG.warning("Pending task at shutdown: %r | coro=%r", t, getattr(t, "get_coro", lambda: None)())
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
