@@ -623,10 +623,28 @@ class GenerationTask:
 
         # Litellm async logging worker sometimes does not stop. We force terminate the async loop.
         # TODO: Remove this once LiteLLM fixes it.
+        LOG.info("Starting to cancel tasks")
+        sys.stdout.flush()
+        sys.stderr.flush()
+        LOG.info("Lets go!")
         while True:
             tasks_to_cancel = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
             if len(tasks_to_cancel) == 0:
                 break
+            LOG.info(
+                "Tasks to cancel: %s",
+                [
+                    {
+                        "task": str(task),
+                        "done": task.done(),
+                        "cancelled": task.cancelled(),
+                        "coro": repr(task.get_coro()),
+                    }
+                    for task in tasks_to_cancel
+                ],
+            )
+            sys.stdout.flush()
+            sys.stderr.flush()
             for task in tasks_to_cancel:
                 task.cancel()
             await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
