@@ -209,7 +209,7 @@ def get_server_command(
             raise ValueError("Transformers server does not support multi-node deployment.")
         # automatically uses all gpus
         server_start_cmd = (
-            f"{server_entrypoint}     --force-model {model_path}     --port {server_port}     {server_args} "
+            f"{server_entrypoint} --force-model {model_path} --port {server_port} --model_timeout 14400 {server_args} "
         )
         num_tasks = 1
     else:
