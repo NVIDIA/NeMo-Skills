@@ -218,6 +218,11 @@ class ParallelThinkingTask:
         )
 
         LOG.info(kwargs)
+        for duplicate_key in ["temperature", "tokens_to_generate", "prompt"]:
+            if duplicate_key in kwargs:
+                del kwargs[duplicate_key]
+
+        LOG.info("Post-deletion kwargs: ", kwargs)
 
         return await self.model.generate_async(
             **kwargs,
