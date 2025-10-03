@@ -41,6 +41,7 @@ class CodeExecEvaluatorConfig:
     eval_type: str
     eval_config: dict
     language: str
+    sandbox: dict
 
 
 
