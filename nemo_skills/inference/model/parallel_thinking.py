@@ -55,6 +55,7 @@ class ParallelThinkingConfig:
     use_completions_api: bool = False
     tokenizer: str | None = None
     chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
+    start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
     # GenSelect vs GenSynthesis
     mode: str | None = None  # genselect or gensynthesis
@@ -84,7 +85,7 @@ class ParallelThinkingTask:
         self.cfg = cfg
 
         if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
+            tokenizer = self.cfg.tokenizer
         else:
             tokenizer = None
 
@@ -210,7 +211,11 @@ class ParallelThinkingTask:
             "max_idx": max_idx,
         }
 
-        parallel_thinking_prompt = self.parallel_thinking_prompt.fill(parallel_thinking_input)
+        parallel_thinking_prompt = self.parallel_thinking_prompt.fill(
+            parallel_thinking_input,
+            start_assistant_response_key=self.cfg.start_assistant_response_key,
+            chat_template_kwargs=self.cfg.chat_template_kwargs,
+        )
 
         return await self.model.generate_async(
             **kwargs,
