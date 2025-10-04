@@ -20,7 +20,7 @@ LIVECODEBENCH_PYPY3_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.gi
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
-    language: str = "python"  # "cpp" is another option now
+    language: str = "python"
     test_file: str = None
     interpreter: str = "python"  # use either "python" or pypy3
     timeout: int = 6
@@ -62,8 +62,8 @@ async def eval_livecodebench_async(cfg):
 
     if eval_config.language == "python" and eval_config.interpreter not in ["python", "pypy3"]:
         raise ValueError("Python interpreter must be 'python' or 'pypy3'.")
-    if eval_config.language == "cpp" and eval_config.test_file is None:
-        raise ValueError("C++ evaluation requires a test_file.")
+    if eval_config.language == "cpp" and eval_config.interpreter != "python":
+        eval_config.interpreter = "python"
 
     if not await install_packages(eval_config):
         return
@@ -79,6 +79,8 @@ async def eval_livecodebench_async(cfg):
             if len(versions) > 1:
                 raise ValueError(f"All samples should have the same release version. Found: {versions}")
             release_version = versions.pop()
+            if eval_config.language == "python":
+                release_version = f"release_{release_version}"
 
             for s in samples:
                 s["code_list"] = [s["completion"]]
@@ -91,7 +93,7 @@ async def eval_livecodebench_async(cfg):
                 from livecodebench.evaluate import evaluate
                 evaluate(
                     custom_output_file='{jsonl_file}',
-                    release_version='release_{release_version}',
+                    release_version='{release_version}',
                     test_file={test_file_arg},
                     k_list=[1],
                     language='{eval_config.language}',
