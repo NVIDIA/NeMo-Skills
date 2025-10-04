@@ -22,7 +22,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import yaml
 from datasets import Dataset, load_dataset, load_from_disk
 from nemo_rl.algorithms.sft import MasterConfig, setup, sft_train
 from nemo_rl.algorithms.utils import get_tokenizer
@@ -36,6 +35,8 @@ from nemo_rl.utils.logger import get_next_experiment_dir
 from omegaconf import OmegaConf
 from transformers import AutoTokenizer
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+
+from nemo_skills.prompt.utils import load_config as load_prompt_config
 
 TokenizerType = PreTrainedTokenizerBase
 _call_counter = 0
@@ -102,11 +103,10 @@ class PromptResponseDataset:
 
         self.input_template = None
         if input_template_path:
-            with open(input_template_path, "rt", encoding="utf-8") as fin:
-                data = yaml.safe_load(fin)
-                if "user" not in data:
-                    raise KeyError(f"'user' key is missing in the YAML file: {input_template_path}")
-                self.input_template = data["user"]
+            input_template_config = load_prompt_config(input_template_path)
+            if "user" not in input_template_config:
+                raise KeyError(f"'user' key is missing in the YAML file: {input_template_path}")
+            self.input_template = input_template_config["user"]
 
         # Train split
         self.formatted_ds = {
