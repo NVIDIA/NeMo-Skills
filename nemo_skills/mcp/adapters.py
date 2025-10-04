@@ -15,7 +15,7 @@
 
 import json
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Any, Dict, List
 
 from litellm.types.utils import ChatCompletionMessageToolCall
 
@@ -40,6 +40,25 @@ class ToolResponseFormatter(ABC):
     @abstractmethod
     def format(self, tool_call: ChatCompletionMessageToolCall, result: dict) -> dict:
         """Format the response from a tool call."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+
+class ConversationManager(ABC):
+    """Manages conversation history building for different model types."""
+
+    @abstractmethod
+    def add_assistant_response(self, conversation: List[Dict[str, Any]], response: Dict[str, Any]) -> None:
+        """Add an assistant response to the conversation."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def add_tool_results(
+        self,
+        conversation: List[Dict[str, Any]],
+        tool_calls_message: Dict[str, Any],
+        formatted_results: List[Dict[str, Any]],
+    ) -> None:
+        """Add tool call results to the conversation."""
         raise NotImplementedError("Subclasses must implement this method.")
 
 
@@ -116,3 +135,112 @@ class ChatCompletionResponseFormatter(ToolResponseFormatter):
             "tool_call_id": tool_call["id"],
             "content": json.dumps(result) if not isinstance(result, str) else result,
         }
+
+
+# ==============================
+# CONVERSATION MANAGERS
+# ==============================
+
+
+class CompletionConversationManager(ConversationManager):
+    """Manages conversation history for chat completion models."""
+
+    def add_assistant_response(self, conversation: List[Dict[str, Any]], response: Dict[str, Any]) -> None:
+        """Add an assistant response to the conversation."""
+        message = {"role": "assistant", "content": response["generation"]}
+
+        # Add reasoning content if available
+        if "reasoning_content" in response:
+            message["reasoning_content"] = response["reasoning_content"]
+
+        conversation.append(message)
+
+    def add_tool_results(
+        self,
+        conversation: List[Dict[str, Any]],
+        tool_calls_message: Dict[str, Any],
+        formatted_results: List[Dict[str, Any]],
+    ) -> None:
+        """Add tool call results to the conversation."""
+        # Update the last assistant message with tool calls (completion models need this)
+        if conversation and conversation[-1]["role"] == "assistant":
+            conversation[-1].update(tool_calls_message)
+
+        # Add the formatted tool result messages directly - they're already in the right format
+        conversation.extend(formatted_results)
+
+
+class ResponsesConversationManager(ConversationManager):
+    """Manages conversation history for responses API models."""
+
+    def add_assistant_response(self, conversation: List[Dict[str, Any]], response: Dict[str, Any]) -> None:
+        """Add an assistant response to the conversation using serialized output."""
+        # Use the serialized output from the responses API
+        conversation.extend(response["serialized_output"])
+
+    def add_tool_results(
+        self,
+        conversation: List[Dict[str, Any]],
+        tool_calls_message: Dict[str, Any],
+        formatted_results: List[Dict[str, Any]],
+    ) -> None:
+        """Add tool call results to the conversation."""
+        # For responses models, we don't need to update the last assistant message
+        # The tool calls are already part of the serialized output
+
+        # Add the formatted tool result messages directly - they're already in the right format
+        conversation.extend(formatted_results)
+
+
+# ==============================
+# RESPONSES API ADAPTERS
+# ==============================
+
+
+class ResponsesCallInterpreter(ToolCallInterpreter):
+    """Convert responses API tool calls to a standardized format."""
+
+    def parse(self, tool_calls: List[Any]) -> Dict[str, Any]:
+        """Parse tool calls from responses API format."""
+        parsed_calls = []
+
+        for tool_call in tool_calls:
+            parsed_call = {
+                "type": "function",
+                "id": getattr(tool_call, "call_id", getattr(tool_call, "id", "unknown")),
+                "function": {
+                    "name": getattr(tool_call, "name", "unknown"),
+                    "arguments": getattr(tool_call, "arguments", "{}"),
+                },
+            }
+            parsed_calls.append(parsed_call)
+
+        return {"role": "assistant", "tool_calls": parsed_calls}
+
+
+class ResponsesResponseFormatter(ToolResponseFormatter):
+    """Format tool call results for responses API conversation history."""
+
+    def format(self, tool_call: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
+        """Format the response from a tool call for responses API."""
+        return {
+            "type": "function_call_output",
+            "call_id": tool_call["id"],
+            "output": json.dumps(result) if not isinstance(result, str) else result,
+        }
+
+
+class ResponsesSchemaAdapter(ToolSchemaAdapter):
+    """Convert MCP tool definitions to responses API format (flatter structure)."""
+
+    def convert(self, tools):
+        """Convert tools to responses API format without nested 'function' object."""
+        return [
+            {
+                "type": "function",
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["input_schema"],
+            }
+            for t in tools
+        ]
