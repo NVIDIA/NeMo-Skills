@@ -26,6 +26,7 @@ from nemo_skills.utils import get_logger_name
 from .context_retry import ContextLimitRetryConfig, with_context_retry
 from .utils import ServerTokenizer, WrapperAutoTokenizer, trim_after_stop_phrases
 
+litellm._turn_on_debug()
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
