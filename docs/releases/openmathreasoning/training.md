@@ -90,7 +90,7 @@ timeout policy, you can run multiple dependent jobs with `--num_training_jobs=N`
 
 
 ```bash
-ns sft_nemo_rl \
+ns nemo_rl sft \
     --cluster=slurm \
     --expname=openmathinstruct2-repro-70b \
      --output_dir=/workspace/openmathinstruct2-repro-70b/checkpoints \
@@ -114,7 +114,7 @@ ns sft_nemo_rl \
 
 
 ```bash
-ns sft_nemo_rl \
+ns nemo_rl sft \
     --cluster=slurm \
     --expname=openmathreasoning-repro-1.5b \
     --output_dir=/workspace/openmathreasoning-sft/checkpoints \

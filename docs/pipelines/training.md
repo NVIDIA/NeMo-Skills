@@ -51,7 +51,7 @@ In the example below, we use Megatron as the backend.
 It provides two configuration options: fsdp and megatron
 
 ```bash
-ns sft_nemo_rl \
+ns nemo_rl sft \
     --cluster=slurm \
     --expname=my-training-job \
     --output_dir=/workspace/my-training-job/checkpoints \
@@ -111,7 +111,7 @@ to schedule evaluation after training
 (whenever you need to run multiple commands, it's more convenient to use python interface)
 
 ```python
-from nemo_skills.pipeline.cli import wrap_arguments, train, convert, eval
+from nemo_skills.pipeline.cli import wrap_arguments, sft_nemo_rl, convert, eval
 
 expname = "my-training-job"
 cluster = "slurm"

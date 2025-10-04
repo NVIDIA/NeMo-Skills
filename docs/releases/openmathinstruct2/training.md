@@ -56,7 +56,7 @@ Run the training (assuming slurm configuration here with the same folder structu
 timeout policy, you can run multiple dependent jobs with `--num_training_jobs=N`.
 
 ```bash
-ns sft_nemo_rl \
+ns nemo_rl sft \
     --cluster=slurm \
     --expname=openmathinstruct2-repro-8b \
     --output_dir=/workspace/openmathinstruct2-repro/checkpoints \
@@ -82,7 +82,7 @@ it longer is likely going to improve results.
 
 
 ```bash
-ns sft_nemo_rl \
+ns nemo_rl sft \
     --cluster=slurm \
     --expname=openmathinstruct2-repro-70b \
      --output_dir=/workspace/openmathinstruct2-repro-70b/checkpoints \
