@@ -21,12 +21,16 @@ import httpx
 import litellm
 import openai
 
+from nemo_skills.inference.patch_litellm_logging import patch_litellm_logging_worker
 from nemo_skills.utils import get_logger_name
 
 from .context_retry import ContextLimitRetryConfig, with_context_retry
 from .utils import ServerTokenizer, WrapperAutoTokenizer, trim_after_stop_phrases
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+# Patch litellm logging worker to disable its functionality
+patch_litellm_logging_worker()
 
 
 class CompletionType(str, Enum):
