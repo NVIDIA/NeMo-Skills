@@ -41,11 +41,13 @@ class NoOpLoggingWorker:
 
     def enqueue(self, coroutine: Coroutine) -> None:
         """No-op enqueue - drops all logging tasks."""
-        pass
+        if coroutine is not None:
+            coroutine.close()
 
     def ensure_initialized_and_enqueue(self, async_coroutine: Coroutine):
         """No-op ensure and enqueue."""
-        pass
+        if async_coroutine is not None:
+            async_coroutine.close()
 
     async def stop(self) -> None:
         """No-op stop."""
