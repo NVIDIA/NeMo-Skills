@@ -93,7 +93,7 @@ class BenchmarkArgs:
     judge_args: str
     judge_pipeline_args: dict
     requires_sandbox: bool
-    keep_mounts_for_sandbox: bool
+    # keep_mounts_for_sandbox: bool
     generation_module: str
     num_samples: int
     num_chunks: int | None
@@ -181,9 +181,9 @@ def get_benchmark_args_from_module(
     if prompt_config:
         generation_args = f"++prompt_config={prompt_config} {generation_args}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
-    keep_mounts_for_sandbox = get_arg_from_module_or_dict(
-        benchmark_module, "KEEP_MOUNTS_FOR_SANDBOX", False, override_dict
-    )
+    # keep_mounts_for_sandbox = get_arg_from_module_or_dict(
+    #     benchmark_module, "KEEP_MOUNTS_FOR_SANDBOX", False, override_dict
+    # )
 
     generation_module = get_arg_from_module_or_dict(
         benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate", override_dict
@@ -225,7 +225,7 @@ def get_benchmark_args_from_module(
         judge_args=judge_args,
         judge_pipeline_args=judge_pipeline_args,
         requires_sandbox=requires_sandbox,
-        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+        # keep_mounts_for_sandbox=keep_mounts_for_sandbox,
         generation_module=generation_module,
         num_samples=num_samples,
         num_chunks=num_chunks,
