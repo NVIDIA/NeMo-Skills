@@ -19,10 +19,12 @@ FROM tiangolo/uwsgi-nginx-flask:python3.10
 ARG TARGETARCH
 RUN apt-get update && \
     apt-get install -y curl git net-tools bzip2 build-essential libseccomp-dev && \
-    case "$TARGETARCH" in \
+    ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" && \
+    case "$ARCH" in \
         amd64) PYPY_ARCH=linux64 ;; \
         arm64|aarch64) PYPY_ARCH=aarch64 ;; \
-    *) echo "Unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
+        x86_64) PYPY_ARCH=linux64 ;; \
+    *) echo "Unsupported TARGETARCH '$ARCH'" >&2; exit 1 ;; \
     esac && \
     curl -L https://downloads.python.org/pypy/pypy3.10-v7.3.17-$PYPY_ARCH.tar.bz2 -o /tmp/pypy.tar.bz2 && \
     tar -xjf /tmp/pypy.tar.bz2 -C /opt/ && \
