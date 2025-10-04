@@ -641,12 +641,11 @@ class GenerationTask:
             )
             sys.stdout.flush()
             sys.stderr.flush()
-            litellm_tasks = [task for task in tasks if "litellm" in str(task)]
-            if len(litellm_tasks) == 0:
+            if len(tasks) == 0:
                 break
-            for task in litellm_tasks:
+            for task in tasks:
                 task.cancel()
-            await asyncio.gather(*litellm_tasks, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
@@ -712,6 +711,9 @@ class GenerationTask:
 
         self.wait_for_server()
         asyncio.run(self.async_loop(data))
+        LOG.info("Generation completed")
+        sys.stdout.flush()
+        sys.stderr.flush()
 
         self.postprocess()
 
