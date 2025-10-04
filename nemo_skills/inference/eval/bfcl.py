@@ -281,10 +281,12 @@ class BFCLGenerationTask(GenerationTask):
         output_dict = {"num_generated_tokens": 0}
         out_of_context = False
 
+        LOG.info("Generating I'm here 284")
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
             current_turn_response = []
             count = 0
 
+            LOG.info("Generating I'm here 290")
             if str(turn_idx) in holdout_function:
                 data_point["function"].extend(holdout_function[str(turn_idx)])
                 # Need to recompile the tools
@@ -299,10 +301,11 @@ class BFCLGenerationTask(GenerationTask):
                         "content": DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC,
                     }
                 ]
-
+            LOG.info("Generating I'm here 305")
             state_dict["messages"].extend(current_turn_message)
 
             while True:
+                LOG.info("Generating I'm here 308")
                 model_response = await self._generate_single_assistant_turn(state_dict)
                 if model_response["message"] is None:
                     # Ran out of context
@@ -353,7 +356,7 @@ class BFCLGenerationTask(GenerationTask):
                         "tool_call_id": tool_call_id,
                     }
                     state_dict["messages"].append(tool_message)
-
+                LOG.info("Generating I'm here 360")
                 count += 1
                 # Force quit after too many steps
                 if count > MAXIMUM_STEP_LIMIT:
@@ -367,11 +370,12 @@ class BFCLGenerationTask(GenerationTask):
             if force_quit or out_of_context:
                 break
 
+        LOG.info("Generating I'm here 375")
         output_dict["generation"] = all_model_response
 
         if out_of_context:
             output_dict["error"] = "_ran_out_of_context_"
-
+        LOG.info("Generating I'm here 378")
         return output_dict
 
     def _remove_thinking_from_message_content(self, model_response_text: str | None):
