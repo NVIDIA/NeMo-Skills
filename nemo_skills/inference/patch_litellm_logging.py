@@ -65,11 +65,15 @@ def patch_litellm_logging_worker():
     Patches the litellm LoggingWorker to disable its functionality.
     This prevents any logging worker from keeping the server alive.
     """
-    # Import the module
-    import litellm.litellm_core_utils.logging_worker as logging_worker_module
+    try:
+        # Import the module
+        import litellm.litellm_core_utils.logging_worker as logging_worker_module
 
-    # Replace the LoggingWorker class with our no-op version
-    logging_worker_module.LoggingWorker = NoOpLoggingWorker
+        # Replace the LoggingWorker class with our no-op version
+        logging_worker_module.LoggingWorker = NoOpLoggingWorker
 
-    # Replace the global instance with a no-op instance
-    logging_worker_module.GLOBAL_LOGGING_WORKER = NoOpLoggingWorker()
+        # Replace the global instance with a no-op instance
+        logging_worker_module.GLOBAL_LOGGING_WORKER = NoOpLoggingWorker()
+    except ModuleNotFoundError:
+        # Ensure compatibility with different litellm versions
+        pass
