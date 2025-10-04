@@ -29,7 +29,8 @@ from .utils import ServerTokenizer, WrapperAutoTokenizer, trim_after_stop_phrase
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
-# Patch litellm logging worker to disable its functionality
+# The logging worker sometimes does not stop. We patch it to disable its functionality.
+# TODO: Remove this once LiteLLM fixes it.
 patch_litellm_logging_worker()
 
 
