@@ -123,7 +123,7 @@ def start_server(
             time_min=time_min,
             server_config=server_config,
             with_sandbox=with_sandbox,
-            keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+            # keep_mounts_for_sandbox=keep_mounts_for_sandbox,
             sandbox_port=None if get_random_port else 6000,
             slurm_kwargs={"exclusive": exclusive} if exclusive else None,
         )

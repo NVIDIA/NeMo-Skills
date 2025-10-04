@@ -381,7 +381,7 @@ def train(
                 partition=partition,
                 time_min=time_min,
                 with_sandbox=with_sandbox,
-                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+                # keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,

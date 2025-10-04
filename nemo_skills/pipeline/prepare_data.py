@@ -143,7 +143,7 @@ def prepare_data(
         reuse_code_exp=reuse_code_exp,
         config_dir=config_dir,
         with_sandbox=with_sandbox,
-        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+        # keep_mounts_for_sandbox=keep_mounts_for_sandbox,
         log_dir=log_dir,
         exclusive=exclusive,
         check_mounted_paths=check_mounted_paths,
