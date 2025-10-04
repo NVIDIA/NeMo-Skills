@@ -55,10 +55,10 @@ def prepare_data(
     reuse_code_exp: str = typer.Option(None, help="Experiment to reuse code from"),
     config_dir: str = typer.Option(None, help="Custom cluster config directory"),
     with_sandbox: bool = typer.Option(False, help="Start a sandbox container alongside"),
-    # keep_mounts_for_sandbox: bool = typer.Option(
-    #     False,
-    #     help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
-    # ),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
@@ -143,7 +143,7 @@ def prepare_data(
         reuse_code_exp=reuse_code_exp,
         config_dir=config_dir,
         with_sandbox=with_sandbox,
-        # keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
         log_dir=log_dir,
         exclusive=exclusive,
         check_mounted_paths=check_mounted_paths,
