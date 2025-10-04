@@ -309,7 +309,7 @@ def prepare_eval_commands(
     extra_datasets_type,
     exclusive,
     with_sandbox,
-    keep_mounts_for_sandbox,
+    # keep_mounts_for_sandbox,
     wandb_parameters,
     extra_eval_args,
     eval_requires_judge,
@@ -514,16 +514,16 @@ def prepare_eval_commands(
 
                 if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
                     job_needs_sandbox = any(benchmarks_dict[b].requires_sandbox for b in job_benchmarks)
-                    job_needs_sandbox_to_keep_mounts = any(
-                        benchmarks_dict[b].keep_mounts_for_sandbox for b in job_benchmarks
-                    )
+                    # job_needs_sandbox_to_keep_mounts = any(
+                    #     benchmarks_dict[b].keep_mounts_for_sandbox for b in job_benchmarks
+                    # )
                     # TODO: move to a dataclass
                     job_batches.append(
                         (
                             job_cmds,
                             job_benchmarks,
                             job_needs_sandbox,
-                            job_needs_sandbox_to_keep_mounts,
+                            # job_needs_sandbox_to_keep_mounts,
                             job_server_config,
                             job_server_address,
                             # a check above guarantees that this is the same for all tasks in a job
