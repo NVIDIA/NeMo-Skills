@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -57,7 +58,7 @@ def test_context_retry(server_type):
 
     cfg_dir = Path(__file__).absolute().parent
     base_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-test_context_retry"
-    gen_dir = f"{base_dir}/generation"
+    eval_dir = f"{base_dir}/eval"
     # eval_dir = f"{base_dir}/eval"
     # input_file = f"{base_dir}/input.jsonl"
 
@@ -80,34 +81,34 @@ def test_context_retry(server_type):
 
     server_proc = subprocess.Popen(server_cmd, shell=True)
 
+    # Wait for server to be ready
+    time.sleep(60)
+
     try:
-        # 1) With no soft fail, the generation should fail
-        docker_rm([gen_dir])
-        base_gen_cmd = (
+        # (1) With no soft fail, the generation should fail
+        docker_rm([eval_dir])
+        base_eval_cmd = (
             f"ns eval "
             f"  --cluster test-local --config_dir {cfg_dir} "
-            f"  --server_address localhost:5000 "
+            f"  --server_address http://0.0.0.0:5000/v1 "
             f"  --server_type {server_type} "
-            f"  --output_dir {gen_dir} "
-            f"  --server_gpus 0 "
-            f"  --server_nodes 1 "
+            f"  --output_dir {eval_dir} "
             f"  --benchmarks gsm8k "
-            f"  ++prompt_config=generic/default "
+            f"  --model {model_path} "
             f"  ++max_samples={MAX_EVAL_SAMPLES} "
-            f"  ++skip_filled=False "
         )
-        subprocess.run(base_gen_cmd, shell=True, check=True)
-        # Check that the generation output is not created
-        assert not os.path.exists(f"{gen_dir}/output.jsonl"), "Generation output should not be done"
+        subprocess.run(base_eval_cmd, shell=True, check=True)
+        # Check that the eval output is not created
+        assert not os.path.exists(f"{eval_dir}/output.jsonl"), "Eval output should not be done"
 
-        # 2) With soft fail, the generation should succeed
-        docker_rm([gen_dir])
+        # (2) With soft fail, the eval should succeed
+        docker_rm([eval_dir])
 
-        gen_cmd = base_gen_cmd + " ++server.enable_soft_fail=True"
-        subprocess.run(gen_cmd, shell=True, check=True)
+        eval_cmd = base_eval_cmd + " ++server.enable_soft_fail=True"
+        subprocess.run(eval_cmd, shell=True, check=True)
 
-        # Check that the generation output is created
-        metrics_file = f"{gen_dir}/eval-results/gsm8k/metrics.json"
+        # Check that the eval output is created
+        metrics_file = f"{eval_dir}/eval-results/gsm8k/metrics.json"
         assert os.path.exists(metrics_file), "Metrics file should be created with soft fail"
         # Check that the number of samples is 4 but with 0 performance
         with open(metrics_file, "r") as f:
@@ -115,16 +116,16 @@ def test_context_retry(server_type):
         assert metrics["num_entries"] == 4
         assert metrics["symbolic_correct"] == 0
 
-        # 3) With soft fail and reduce_generation strategy, the generation should succeed
-        docker_rm([gen_dir])
+        # 3) With soft fail and reduce_generation strategy, the eval should succeed
+        docker_rm([eval_dir])
 
-        gen_cmd = base_gen_cmd + (
+        eval_cmd = base_eval_cmd + (
             " ++server.enable_soft_fail=True ++server.context_limit_retry_strategy=reduce_generation"
         )
-        subprocess.run(gen_cmd, shell=True, check=True)
+        subprocess.run(eval_cmd, shell=True, check=True)
 
-        # Check that the generation output is created
-        metrics_file = f"{gen_dir}/eval-results/gsm8k/metrics.json"
+        # Check that the eval output is created
+        metrics_file = f"{eval_dir}/eval-results/gsm8k/metrics.json"
         assert os.path.exists(metrics_file), "Metrics file should be created with soft fail"
         # Check that the number of samples is 4 but with 0 performance
         with open(metrics_file, "r") as f:
