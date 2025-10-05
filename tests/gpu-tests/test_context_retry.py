@@ -278,7 +278,8 @@ def test_context_retry_disabled(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["sglang", "vllm"])
+@pytest.mark.parametrize("server_type", ["vllm"])
+# Test only for vllm to save time. For sglang, we will test prompt reduction from the end.
 def test_context_retry_reduce_prompt_start(server_type):
     # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the start."""
@@ -295,7 +296,8 @@ def test_context_retry_reduce_prompt_start(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["sglang", "vllm"])
+@pytest.mark.parametrize("server_type", ["sglang"])
+# Test only for sglang to save time. For vllm, we test prompt reduction from the start.
 def test_context_retry_reduce_prompt_end(server_type):
     # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
     """Test that successful generation is possible if soft fail is enabled and the strategy is reduce_prompt, removing tokens from the end."""
