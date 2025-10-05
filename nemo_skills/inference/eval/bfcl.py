@@ -120,6 +120,8 @@ class ClientMessageParser:
         try:
             fmted_prompt = self.message_formatter(messages, tools=tools)
         except Exception as e:
+            # Sometimes the parsed tool-call is a string, which is not JSON serializable
+            # Putting a debugging here in case it happens in the future and we need to address it.
             LOG.info(f"Messages: {messages}, Tools: {tools}")
             LOG.error(f"Error formatting prompt: {e}")
             raise e
