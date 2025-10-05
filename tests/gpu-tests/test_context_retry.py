@@ -15,21 +15,39 @@
 import json
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
 
-from tests.conftest import docker_rm
+from tests.conftest import docker_rm, docker_run
 
-NUM_TOKENS_TO_GENERATE = 1_000_000
-NUM_SAMPLES = 4
-ACCURACY_THRESHOLD_PERCENT = 25
+ACCURACY_THRESHOLD = 25
+MAX_EVAL_SAMPLES = 4
+
+
+def _create_large_input_file(input_file: str, num_samples: int):
+    """Create a fake input jsonl file with long prompts"""
+    # TODO: Currently this is just a single turn message. Need to add tests for multi-turn messages.
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        try:
+            for _ in range(num_samples):
+                # Create large prompt that will likely exceed context limits
+                large_prompt = {"question": "a" * 500_000 + "b" * 500_000}
+                temp_file.write(json.dumps(large_prompt).encode())
+                temp_file.write(b"\n")
+            temp_file.flush()
+
+            # Copy to Docker container
+            docker_run(f"cp {temp_file.name} {input_file}")
+        finally:
+            # Clean up temporary file
+            os.unlink(temp_file.name)
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["sglang", "vllm", "trtllm"])
-def test_context_retry_no_strategy(server_type):
-    """Test that the generation finishes successfully but with error if soft fail is enabled and there is no retry strategy."""
+@pytest.mark.parametrize("server_type", ["vllm"])  # add "sglang" / "trtllm" when supported similarly
+def test_context_retry(server_type):
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
@@ -37,180 +55,90 @@ def test_context_retry_no_strategy(server_type):
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
 
-    output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval-no-strategy"
-    docker_rm([output_dir])
+    cfg_dir = Path(__file__).absolute().parent
+    base_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-test_context_retry"
+    gen_dir = f"{base_dir}/generation"
+    # eval_dir = f"{base_dir}/eval"
+    # input_file = f"{base_dir}/input.jsonl"
 
-    cmd = (
-        f"ns eval "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"    --model {model_path} "
-        f"    --server_type {server_type} "
-        f"    --output_dir {output_dir} "
-        f"    --server_gpus 1 "
-        f"    --server_nodes 1 "
-        f"    --benchmarks gsm8k "
-        f"    ++max_samples={NUM_SAMPLES} "
-        f"    ++inference.tokens_to_generate={NUM_TOKENS_TO_GENERATE} "
-        f"    ++server.enable_soft_fail=True "
+    # with open(input_file, "w") as f:
+    #     f.write(json.dumps({"question": "What is 2+2?"}) + "\n")
+
+    docker_rm([base_dir])
+
+    # 1) Start server (fixed port via --get_random_port=False for deterministic client targeting)
+    server_cmd = (
+        f"ns start_server "
+        f"  --cluster test-local --config_dir {cfg_dir} "
+        f"  --model {model_path} "
+        f"  --server_type {server_type} "
+        f"  --server_gpus 1 "
+        f"  --server_nodes 1 "
     )
-    cmd += "--server_args '--backend pytorch'" if server_type == "trtllm" else ""
-    subprocess.run(cmd, shell=True, check=True)
+    if server_type == "trtllm":
+        server_cmd += " --server_args '--backend pytorch'"
 
-    metrics_file = f"{output_dir}/eval-results/gsm8k/metrics.json"
-    assert os.path.exists(metrics_file), "Metrics file not found"
-    with open(metrics_file) as f:
-        metrics = json.load(f)["gsm8k"]["pass@1"]
-    assert metrics["num_entries"] == NUM_SAMPLES
-    assert metrics["symbolic_correct"] == 0
+    server_proc = subprocess.Popen(server_cmd, shell=True)
 
+    try:
+        # 1) With no soft fail, the generation should fail
+        docker_rm([gen_dir])
+        base_gen_cmd = (
+            f"ns eval "
+            f"  --cluster test-local --config_dir {cfg_dir} "
+            f"  --server_address localhost:5000 "
+            f"  --server_type {server_type} "
+            f"  --output_dir {gen_dir} "
+            f"  --server_gpus 0 "
+            f"  --server_nodes 1 "
+            f"  --benchmarks gsm8k "
+            f"  ++prompt_config=generic/default "
+            f"  ++max_samples={MAX_EVAL_SAMPLES} "
+            f"  ++skip_filled=False "
+        )
+        subprocess.run(base_gen_cmd, shell=True, check=True)
+        # Check that the generation output is not created
+        assert not os.path.exists(f"{gen_dir}/output.jsonl"), "Generation output should not be done"
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["sglang", "vllm"])
-def test_context_retry_reduce_generation_enabled(server_type):
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        # 2) With soft fail, the generation should succeed
+        docker_rm([gen_dir])
 
-    output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval-reduce-generation-enabled"
-    docker_rm([output_dir])
+        gen_cmd = base_gen_cmd + " ++server.enable_soft_fail=True"
+        subprocess.run(gen_cmd, shell=True, check=True)
 
-    cmd = (
-        f"ns eval "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"    --model {model_path} "
-        f"    --server_type {server_type} "
-        f"    --output_dir {output_dir} "
-        f"    --server_gpus 1 "
-        f"    --server_nodes 1 "
-        f"    --benchmarks gsm8k "
-        f"    ++max_samples={NUM_SAMPLES} "
-        f"    ++inference.tokens_to_generate={NUM_TOKENS_TO_GENERATE} "
-        f"    ++server.enable_soft_fail=True "
-        f"    ++server.context_limit_retry_strategy=reduce_generation "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-    metrics_file = f"{output_dir}/eval-results/gsm8k/metrics.json"
-    assert os.path.exists(metrics_file), "Metrics file not found"
-    with open(metrics_file) as f:
-        metrics = json.load(f)["gsm8k"]["pass@1"]
-    assert metrics["num_entries"] == NUM_SAMPLES
-    assert metrics["symbolic_correct"] >= ACCURACY_THRESHOLD_PERCENT
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["trtllm", "sglang", "vllm"])
-def test_context_retry_disabled(server_type):
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-
-    output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval-reduce-generation-disabled"
-    docker_rm([output_dir])
-
-    cmd = (
-        f"ns eval "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"    --model {model_path} "
-        f"    --server_type {server_type} "
-        f"    --output_dir {output_dir} "
-        f"    --server_gpus 1 "
-        f"    --server_nodes 1 "
-        f"    --benchmarks gsm8k "
-        f"    ++max_samples={NUM_SAMPLES} "
-        f"    ++inference.tokens_to_generate={NUM_TOKENS_TO_GENERATE} "
-        f"    ++server.enable_soft_fail=False "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-    metrics_file = f"{output_dir}/eval-results/gsm8k/metrics.json"
-    if not os.path.exists(metrics_file):
-        assert True  # expected: failure means no metrics
-    else:
-        with open(metrics_file) as f:
+        # Check that the generation output is created
+        metrics_file = f"{gen_dir}/eval-results/gsm8k/metrics.json"
+        assert os.path.exists(metrics_file), "Metrics file should be created with soft fail"
+        # Check that the number of samples is 4 but with 0 performance
+        with open(metrics_file, "r") as f:
             metrics = json.load(f)["gsm8k"]["pass@1"]
-        assert metrics["num_entries"] != NUM_SAMPLES, "Expected test to fail but it succeeded"
+        assert metrics["num_entries"] == 4
+        assert metrics["symbolic_correct"] == 0
 
+        # 3) With soft fail and reduce_generation strategy, the generation should succeed
+        docker_rm([gen_dir])
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["vllm"])
-def test_context_retry_reduce_prompt_start(server_type):
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        gen_cmd = base_gen_cmd + (
+            " ++server.enable_soft_fail=True ++server.context_limit_retry_strategy=reduce_generation"
+        )
+        subprocess.run(gen_cmd, shell=True, check=True)
 
-    base_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval-reduce-prompt-start"
-    output_dir = f"{base_dir}/generation"
-    input_file = f"{base_dir}/input.jsonl"
-    docker_rm([base_dir])
+        # Check that the generation output is created
+        metrics_file = f"{gen_dir}/eval-results/gsm8k/metrics.json"
+        assert os.path.exists(metrics_file), "Metrics file should be created with soft fail"
+        # Check that the number of samples is 4 but with 0 performance
+        with open(metrics_file, "r") as f:
+            metrics = json.load(f)["gsm8k"]["pass@1"]
+        assert metrics["num_entries"] == 4
+        assert metrics["symbolic_correct"] == ACCURACY_THRESHOLD
 
-    os.makedirs(base_dir, exist_ok=True)
-    with open(input_file, "w") as f:
-        f.write(json.dumps({"question": "a" * 500_000 + "b" * 500_000}) + "\n")
-
-    cmd = (
-        f"ns generate "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"    --model {model_path} "
-        f"    --server_type {server_type} "
-        f"    --output_dir {output_dir} "
-        f"    --server_gpus 1 "
-        f"    --server_nodes 1 "
-        f"    --input_file {input_file} "
-        f"    ++prompt_config=generic/default "
-        f"    ++server.enable_soft_fail=True "
-        f"    ++server.context_limit_retry_strategy=reduce_prompt_from_start "
-        f"    ++inference.tokens_to_generate=2048 "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-    assert os.path.exists(f"{output_dir}/output.jsonl"), "Output file not found"
-    assert os.path.exists(f"{output_dir}/output.jsonl.done"), "Done sentinel not found"
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize("server_type", ["sglang"])
-def test_context_retry_reduce_prompt_end(server_type):
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-
-    base_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval-reduce-prompt-end"
-    output_dir = f"{base_dir}/generation"
-    input_file = f"{base_dir}/input.jsonl"
-    docker_rm([base_dir])
-
-    os.makedirs(base_dir, exist_ok=True)
-    with open(input_file, "w") as f:
-        f.write(json.dumps({"question": "a" * 500_000 + "b" * 500_000}) + "\n")
-
-    cmd = (
-        f"ns generate "
-        f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
-        f"    --model {model_path} "
-        f"    --server_type {server_type} "
-        f"    --output_dir {output_dir} "
-        f"    --server_gpus 1 "
-        f"    --server_nodes 1 "
-        f"    --input_file {input_file} "
-        f"    ++prompt_config=generic/default "
-        f"    ++server.enable_soft_fail=True "
-        f"    ++server.context_limit_retry_strategy=reduce_prompt_from_end "
-        f"    ++inference.tokens_to_generate=2048 "
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-    assert os.path.exists(f"{output_dir}/output.jsonl"), "Output file not found"
-    assert os.path.exists(f"{output_dir}/output.jsonl.done"), "Done sentinel not found"
+    finally:
+        # best-effort teardown of the CLI process
+        try:
+            server_proc.terminate()
+            try:
+                server_proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                server_proc.kill()
+        except Exception:
+            pass

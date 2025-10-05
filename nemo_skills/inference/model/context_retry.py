@@ -289,7 +289,6 @@ def _try_reduce_generation_tokens(
         LOG.warning(detailed_error)
         return None
 
-    # Reduce the generation budget by further accounting for certain special tokens to be safe
     reduced_generation_budget = safe_remaining_budget - message_tokens
     # This min operation is probably not needed but just in case
     if original_budget is not None:
@@ -319,13 +318,12 @@ def _try_reduce_prompt_tokens(
         detailed_error = f"tokens_to_generate is not set. Cannot reduce prompt tokens.\n\n{original_error}"
         raise ValueError(detailed_error)
 
-    # Assume the num_special_tokens_budget to be part of the calculation for safety
+    # Assume the num_special_tokens_budget to be part of the calculation for safety. SGLang has thrown error for exact equality.
     safe_remaining_budget = max_context_length - config.num_special_tokens_budget
     if completion_tokens >= safe_remaining_budget:
         detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
         raise ValueError(detailed_error)
 
-    # SGLang has thrown error for exact equality. Subtracting the num_special_tokens_budget to be safe.
     num_prompt_tokens_to_keep = safe_remaining_budget - completion_tokens
     prompt = kwargs["prompt"]
 
