@@ -19,7 +19,7 @@ Here are some of the features we support:
     - [**Tool-calling**](https://nvidia.github.io/NeMo-Skills/evaluation/tool-calling): e.g. [bfcl_v3](https://nvidia.github.io/NeMo-Skills/evaluation/tool-calling/#bfcl_v3)
     - [**Multilingual**](https://nvidia.github.io/NeMo-Skills/evaluation/multilingual): e.g. [mmlu-prox](https://nvidia.github.io/NeMo-Skills/evaluation/multilingual/#mmlu-prox)
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
-- [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
+- [Model training](https://nvidia.github.io/NeMo-Skills/pipelines/training): Train models using [NeMo-RL](https://github.com/NVIDIA-NeMo/RL/) or [verl](https://github.com/volcengine/verl).
 
 ## News
 * [08/22/2025]: Added details for [reproducing evals](https://nvidia.github.io/NeMo-Skills/tutorials/2025/08/22/reproducing-nvidia-nemotron-nano-9b-v2-evals/) for the [NVIDIA-Nemotron-Nano-9B-v2](https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2) model by NVIDIA.
