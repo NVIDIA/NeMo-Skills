@@ -19,7 +19,4 @@ METRICS_TYPE = "ioi"
 EVAL_ARGS = "++eval_type=ioi"
 
 # environment variables required by this benchmark
-ENV_VARS = [
-    "NEMO_SKILLS_SANDBOX_CPU_AFFINITY=8",
-    "NEMO_SKILLS_SANDBOX_PROCESSES=128",
-]
+ENV_VARS = ["UWSGI_PROCESSES=1024", "UWSGI_CPU_AFFINITY=8", "UWSGI_CHEAPER=1023", "NUM_WORKERS=1"]
