@@ -120,7 +120,7 @@ class ContextLimitRetryConfig:
 
     enable_soft_fail: bool = False  # If True, will enable soft fail or try to reduce the context by reducing the number of tokens to generate/prompt and perform the task
     strategy: str = None  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
-    num_special_tokens_budget: int = 100  # To account for the discrepancy when tokenizing a message content standalone and when tokenizing it as part of a message list. Keep it high to be safe.
+    num_special_tokens_budget: int = 50  # To account for the discrepancy when tokenizing a message content standalone and when tokenizing it as part of a message list. Keep it high to be safe.
 
     def __post_init__(self):
         """Validate configuration."""
@@ -282,13 +282,15 @@ def _try_reduce_generation_tokens(
     max_context_length = parsed_error["max_context_length"]
     message_tokens = parsed_error["message_tokens"]
 
-    if message_tokens >= max_context_length:
+    # Assume the num_special_tokens_budget to be part of the calculation for safety
+    safe_remaining_budget = max_context_length - config.num_special_tokens_budget
+    if message_tokens >= safe_remaining_budget:
         detailed_error = f"Messages tokens are already at the max context length. Cannot reduce generate tokens.\n\n{original_error}"
         LOG.warning(detailed_error)
         return None
 
     # Reduce the generation budget by further accounting for certain special tokens to be safe
-    reduced_generation_budget = (max_context_length - message_tokens) - config.num_special_tokens_budget
+    reduced_generation_budget = safe_remaining_budget - message_tokens
     # This min operation is probably not needed but just in case
     if original_budget is not None:
         reduced_tokens = min(original_budget, reduced_generation_budget)
@@ -317,12 +319,14 @@ def _try_reduce_prompt_tokens(
         detailed_error = f"tokens_to_generate is not set. Cannot reduce prompt tokens.\n\n{original_error}"
         raise ValueError(detailed_error)
 
-    if completion_tokens >= max_context_length:
+    # Assume the num_special_tokens_budget to be part of the calculation for safety
+    safe_remaining_budget = max_context_length - config.num_special_tokens_budget
+    if completion_tokens >= safe_remaining_budget:
         detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
         raise ValueError(detailed_error)
 
     # SGLang has thrown error for exact equality. Subtracting the num_special_tokens_budget to be safe.
-    num_prompt_tokens_to_keep = (max_context_length - completion_tokens) - config.num_special_tokens_budget
+    num_prompt_tokens_to_keep = safe_remaining_budget - completion_tokens
     prompt = kwargs["prompt"]
 
     LOG.info(f"Num tokens to keep: {num_prompt_tokens_to_keep}")
