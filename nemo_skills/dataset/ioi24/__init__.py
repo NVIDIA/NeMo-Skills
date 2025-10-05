@@ -17,3 +17,9 @@ GENERATION_ARGS = "++prompt_config=generic/default"
 DATASET_GROUP = "code"
 METRICS_TYPE = "ioi"
 EVAL_ARGS = "++eval_type=ioi"
+
+# environment variables required by this benchmark
+ENV_VARS = [
+    "NEMO_SKILLS_SANDBOX_CPU_AFFINITY=8",
+    "NEMO_SKILLS_SANDBOX_PROCESSES=128",
+]
