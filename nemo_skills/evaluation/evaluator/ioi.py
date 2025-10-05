@@ -81,16 +81,6 @@ def init_worker():
     asyncio.set_event_loop(worker_loop)
 
 
-def _get_worker_sandbox() -> LocalSandbox:  # type: ignore
-    """Create a LocalSandbox the first time we need it in this worker."""
-    global worker_sandbox
-    if worker_sandbox is None:
-        worker_sandbox = LocalSandbox()
-        wait_for_sandbox(worker_sandbox)
-        worker_sandbox._owner_tid = threading.get_ident()
-    return worker_sandbox
-
-
 def _precompile_grader(
     problem_name: str, grader_files, compile_code: str, run_code: str, sandbox: LocalSandbox
 ) -> str:
@@ -154,7 +144,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         )
 
         setup_script = "\n".join(file_creation_commands)
-        sandbox = _get_worker_sandbox()
+        sandbox = LocalSandbox()
         setup_result, _ = worker_loop.run_until_complete(
             sandbox.execute_code(setup_script, language="shell", timeout=120)
         )
@@ -218,7 +208,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         # 4. Clean up the directory
         # Fire and forget; ignore return values
         try:
-            sandbox = _get_worker_sandbox()
+            sandbox = LocalSandbox()
             worker_loop.run_until_complete(sandbox.execute_code(f"rm -rf {unique_dir}", language="shell", timeout=120))
         except Exception:
             pass

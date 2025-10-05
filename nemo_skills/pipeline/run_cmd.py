@@ -94,7 +94,6 @@ def run_cmd(
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
     exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
-    cpus_per_task: int | None = typer.Option(None, help="Number of CPUs per task"),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     installation_command: str | None = typer.Option(
@@ -174,13 +173,6 @@ def run_cmd(
 
         prev_tasks = _task_dependencies
         for _ in range(dependent_jobs + 1):
-            slurm_kwargs_dict = {}
-            if exclusive:
-                slurm_kwargs_dict["exclusive"] = exclusive
-            if cpus_per_task is not None:
-                slurm_kwargs_dict["cpus_per_task"] = cpus_per_task
-            if not slurm_kwargs_dict:
-                slurm_kwargs_dict = None
             new_task = add_task(
                 exp,
                 cmd=commands,
@@ -200,7 +192,7 @@ def run_cmd(
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
                 num_tasks=[1] * len(commands),
-                slurm_kwargs=slurm_kwargs_dict,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )
