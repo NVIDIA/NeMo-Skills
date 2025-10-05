@@ -53,6 +53,7 @@ def test_context_retry_no_strategy(server_type):
         f"    ++inference.tokens_to_generate={NUM_TOKENS_TO_GENERATE} "
         f"    ++server.enable_soft_fail=True "
     )
+    cmd += "--server_args '--backend pytorch'" if server_type == "trtllm" else ""
     subprocess.run(cmd, shell=True, check=True)
 
     metrics_file = f"{output_dir}/eval-results/gsm8k/metrics.json"
