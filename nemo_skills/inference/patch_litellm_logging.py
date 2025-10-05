@@ -24,41 +24,32 @@ class NoOpLoggingWorker:
     """No-op implementation of LoggingWorker that disables all functionality."""
 
     def __init__(self, *args, **kwargs):
-        """Initialize with no-op."""
         pass
 
     def _ensure_queue(self) -> None:
-        """No-op queue initialization."""
         pass
 
     def start(self) -> None:
-        """No-op start."""
         pass
 
     async def _worker_loop(self) -> None:
-        """No-op worker loop."""
         pass
 
     def enqueue(self, coroutine: Coroutine) -> None:
-        """No-op enqueue - drops all logging tasks."""
         if coroutine is not None:
             coroutine.close()
 
     def ensure_initialized_and_enqueue(self, async_coroutine: Coroutine):
-        """No-op ensure and enqueue."""
         if async_coroutine is not None:
             async_coroutine.close()
 
     async def stop(self) -> None:
-        """No-op stop."""
         pass
 
     async def flush(self) -> None:
-        """No-op flush."""
         pass
 
     async def clear_queue(self):
-        """No-op clear queue."""
         pass
 
 
