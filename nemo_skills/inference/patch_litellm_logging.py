@@ -65,7 +65,7 @@ class NoOpLoggingWorker:
 def patch_litellm_logging_worker():
     """
     Patches the litellm LoggingWorker to disable its functionality.
-    This prevents any logging worker from keeping the server alive.
+    This prevents any logging worker from keeping the client alive.
     """
     try:
         import litellm.litellm_core_utils.logging_worker as logging_worker_module
