@@ -230,11 +230,12 @@ class BFCLGenerationTask(GenerationTask):
 
         return_dict = {}
         if self.cfg.count_prompt_tokens:
-            LOG.info("Counting prompt tokens")
-            LOG.info(f"Prompt: {input_dict['prompt']}")
-            LOG.info(f"Type of prompt: {type(input_dict['prompt'])}")
-            num_input_tokens = get_token_count(self.hf_tokenizer, input_dict["prompt"])
-            return_dict["num_input_tokens"] = num_input_tokens
+            try:
+                num_input_tokens = get_token_count(self.hf_tokenizer, input_dict["prompt"])
+                return_dict["num_input_tokens"] = num_input_tokens
+            except ValueError as e:
+                LOG.error(f"Error counting prompt tokens for {input_dict['prompt']}: {e}")
+                return_dict["num_input_tokens"] = None
 
         # Step 2: Query the LLM server
         try:
@@ -391,7 +392,10 @@ class BFCLGenerationTask(GenerationTask):
 
         output_dict["num_generated_tokens"] = sum(output_dict["num_generated_tokens_list"])
         if self.cfg.count_prompt_tokens:
-            output_dict["num_input_tokens"] = sum(output_dict["num_input_tokens_list"])
+            # Filter out cases where token count is not available
+            output_dict["num_input_tokens"] = sum(
+                [token_count for token_count in output_dict["num_input_tokens_list"] if token_count is not None]
+            )
 
         return output_dict
 
