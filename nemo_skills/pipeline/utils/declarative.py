@@ -20,8 +20,15 @@ Basic Example (Single job with multiple commands):
     from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
 
     # Commands that run together in one SLURM job
-    server = Command(command=vllm_server_command(model="Qwen/Qwen3-8B"), gpus=8, name="server")
-    sandbox = Command(command=sandbox_command(), name="sandbox")
+    # Note: Lambdas are needed for cross-component references (hostname_ref, meta_ref)
+    # which aren't resolved until het_group_index is assigned at pipeline execution time.
+    server = Command(
+        command=vllm_server_command(cluster_cfg, model="Qwen/Qwen3-8B"),
+        gpus=8,
+        name="server"
+    )
+    sandbox = Command(command=sandbox_command(cluster_cfg), name="sandbox")
+    # This lambda is ESSENTIAL - server.hostname_ref() and meta_ref() aren't available until runtime
     client = Command(
         command=lambda: f"curl {server.hostname_ref()}:{server.meta_ref('port')}/health",
         name="client"
@@ -58,12 +65,20 @@ Advanced Example (Multiple jobs with dependencies and heterogeneous components):
     )
 
     # Job 2: Two different model servers (HETEROGENEOUS SLURM job with 2 het components)
-    server_8b = Command(command=vllm_server_command(model="Qwen/Qwen3-8B"), gpus=8, name="server_8b")
-    sandbox_8b = Command(command=sandbox_command(), name="sandbox_8b")
+    server_8b = Command(
+        command=lambda cfg: vllm_server_command(cfg, model="Qwen/Qwen3-8B"),
+        gpus=8,
+        name="server_8b"
+    )
+    sandbox_8b = Command(command=lambda cfg: sandbox_command(cfg), name="sandbox_8b")
     eval_8b = Command(command="python eval.py --model 8b", gpus=1, name="eval_8b")
 
-    server_32b = Command(command=vllm_server_command(model="Qwen/Qwen3-32B"), gpus=8, name="server_32b")
-    sandbox_32b = Command(command=sandbox_command(), name="sandbox_32b")
+    server_32b = Command(
+        command=lambda cfg: vllm_server_command(cfg, model="Qwen/Qwen3-32B"),
+        gpus=8,
+        name="server_32b"
+    )
+    sandbox_32b = Command(command=lambda cfg: sandbox_command(cfg), name="sandbox_32b")
     eval_32b = Command(command="python eval.py --model 32b", gpus=1, name="eval_32b")
 
     group_8b = CommandGroup(commands=[server_8b, sandbox_8b, eval_8b], name="eval_8b", log_dir=log_dir)
@@ -130,11 +145,10 @@ class Command:
     - A tuple (command, metadata): command with metadata like port
     - A callable returning (command, metadata): lazy evaluation with metadata
 
-    Using a lambda allows references to work correctly in heterogeneous jobs:
-        Command(command=lambda: f"curl {server.hostname_ref()}:5000")
-
-    Metadata from command builders (like port) can be referenced:
-        server = Command(command=vllm_server_command(...))
+    Lambdas are needed for cross-component references (hostname_ref, meta_ref).
+    The het_group_index isn't assigned until pipeline execution, so these must be lazy:
+        server = Command(command=lambda cfg: vllm_server_command(cfg, ...))
+        # This lambda is ESSENTIAL - server.hostname_ref() and meta_ref() don't exist yet
         client = Command(command=lambda: f"curl {server.hostname_ref()}:{server.meta_ref('port')}")
     """
 

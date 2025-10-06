@@ -19,13 +19,14 @@ These are thin wrappers around existing command construction utilities
 in server.py and other modules, designed to work with Command objects.
 """
 
-from typing import Callable, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from nemo_skills.pipeline.utils.exp import get_sandbox_command
 from nemo_skills.pipeline.utils.server import get_free_port, get_server_command
 
 
 def vllm_server_command(
+    cluster_config: Dict,
     model: str,
     port: Optional[int] = None,
     server_type: str = "vllm",
@@ -34,12 +35,11 @@ def vllm_server_command(
     args: str = "",
     entrypoint: Optional[str] = None,
     **kwargs,
-) -> Tuple[Callable, Dict]:
+) -> Tuple[str, Dict]:
     """Build vLLM server command.
 
-    Returns a lambda that will build the command when cluster_config is available.
-
     Args:
+        cluster_config: Cluster configuration dictionary
         model: Model path or name
         port: Port to use (if None, will use get_free_port)
         server_type: Type of server (vllm, sglang, trtllm, megatron)
@@ -49,72 +49,65 @@ def vllm_server_command(
         entrypoint: Custom entrypoint script
 
     Returns:
-        Tuple of (lambda, metadata_dict)
+        Tuple of (command_string, metadata_dict)
     """
     if port is None:
         port = get_free_port(strategy="random")
+
+    cmd, num_tasks = get_server_command(
+        server_type=server_type,
+        num_gpus=gpus,
+        num_nodes=nodes,
+        model_path=model,
+        cluster_config=cluster_config,
+        server_port=port,
+        server_args=args,
+        server_entrypoint=entrypoint,
+    )
 
     metadata = {
         "port": port,
         "log_prefix": "server",
+        "num_tasks": num_tasks,
     }
 
-    # Return lambda that will call get_server_command when cluster_config is available
-    def server_cmd_builder(cfg):
-        cmd, num_tasks = get_server_command(
-            server_type=server_type,
-            num_gpus=gpus,
-            num_nodes=nodes,
-            model_path=model,
-            cluster_config=cfg,
-            server_port=port,
-            server_args=args,
-            server_entrypoint=entrypoint,
-        )
-        return (cmd, {"num_tasks": num_tasks})
-
-    return server_cmd_builder, metadata
+    return cmd, metadata
 
 
-def sandbox_command(port: Optional[int] = None, keep_mounts: bool = False, **kwargs) -> Tuple[Callable, Dict]:
+def sandbox_command(cluster_config: Dict, port: Optional[int] = None, **kwargs) -> Tuple[str, Dict]:
     """Build sandbox command.
 
-    Returns a lambda that will build the command when cluster_config is available.
-
     Args:
+        cluster_config: Cluster configuration dictionary
         port: Port to use for sandbox
-        keep_mounts: If True, keep mounts from cluster config. If False, use empty mounts for safety.
 
     Returns:
-        Tuple of (lambda, metadata_dict)
+        Tuple of (command_string, metadata_dict)
     """
     if port is None:
         port = get_free_port(strategy="random")
 
+    cmd = get_sandbox_command(cluster_config)
+
+    # Build PYTHONPATH from cluster config
+    pythonpath_env = {}
+    for env_var in cluster_config.get("env_vars", []):
+        if "PYTHONPATH" in env_var:
+            pythonpath = env_var[11:] if env_var.startswith("PYTHONPATH=") else env_var
+            pythonpath_env["PYTHONPATH"] = pythonpath + ":/app"
+            break
+
     metadata = {
         "port": port,
         "log_prefix": "sandbox",
-        "mounts": None if keep_mounts else [],  # None means use cluster config mounts, [] means no mounts
         "environment": {
             "LISTEN_PORT": str(port),
             "NGINX_PORT": str(port),
+            **pythonpath_env,
         },
     }
 
-    # Return lambda that will be evaluated when cluster_config is available
-    def sandbox_cmd_with_env(cfg):
-        cmd = get_sandbox_command(cfg)
-        # Build PYTHONPATH from cluster config
-        pythonpath_env = {}
-        for env_var in cfg.get("env_vars", []):
-            if "PYTHONPATH" in env_var:
-                pythonpath = env_var[11:] if env_var.startswith("PYTHONPATH=") else env_var
-                pythonpath_env["PYTHONPATH"] = pythonpath + ":/app"
-                break
-        # Return command + additional metadata
-        return (cmd, {"environment": pythonpath_env})
-
-    return sandbox_cmd_with_env, metadata
+    return cmd, metadata
 
 
 def wrap_command(command: str, working_dir: str = "/nemo_run/code", env_vars: Optional[Dict[str, str]] = None) -> str:

@@ -68,27 +68,25 @@ def _create_commandgroup_from_config(
         server_type = server_config["server_type"]
         server_container = server_config.pop("container", cluster_config["containers"][server_type])
 
-        # Create server command builder that defers execution until cluster_config is available
-        server_config_copy = server_config.copy()
+        # Call server command builder directly with cluster_config
+        cmd, metadata = get_server_command_fn(**server_config, cluster_config=cluster_config)
 
-        def make_server_cmd(cfg):
-            cmd, num_tasks = get_server_command_fn(**server_config_copy, cluster_config=cfg)
-            return (
-                cmd,
-                {
-                    "num_tasks": num_tasks,
-                    "gpus": server_config_copy["num_gpus"],
-                    "nodes": server_config_copy["num_nodes"],
-                    "log_prefix": "server",
-                },
-            )
+        # Add additional metadata
+        metadata.update(
+            {
+                "gpus": server_config["num_gpus"],
+                "nodes": server_config["num_nodes"],
+                "log_prefix": "server",
+            }
+        )
 
         server_cmd = Command(
-            command=make_server_cmd,
+            command=cmd,
             container=server_container,
             gpus=server_config["num_gpus"],
             nodes=server_config["num_nodes"],
             name=task_name,
+            metadata=metadata,
         )
         components.append(server_cmd)
 
@@ -104,28 +102,15 @@ def _create_commandgroup_from_config(
 
     # 3. Add sandbox if requested
     if with_sandbox:
-
-        def make_sandbox_cmd(cfg):
-            # sandbox_command returns (callable, metadata), so we need to call the callable
-            cmd_builder, initial_metadata = sandbox_command(port=sandbox_port, keep_mounts=keep_mounts_for_sandbox)
-            # Call the builder to get the actual command string
-            cmd_string, runtime_metadata = cmd_builder(cfg)
-            # Merge metadata (deep-merge environment)
-            metadata = initial_metadata.copy()
-            if "environment" in runtime_metadata:
-                env = metadata.get("environment", {}).copy()
-                env.update(runtime_metadata["environment"])
-                metadata["environment"] = env
-            for k, v in runtime_metadata.items():
-                if k != "environment":
-                    metadata[k] = v
-            metadata["log_prefix"] = "sandbox"
-            return (cmd_string, metadata)
+        # Call sandbox command builder directly with cluster_config
+        cmd, metadata = sandbox_command(cluster_config=cluster_config, port=sandbox_port)
+        metadata["log_prefix"] = "sandbox"
 
         sandbox_cmd = Command(
-            command=make_sandbox_cmd,
+            command=cmd,
             container=cluster_config["containers"]["sandbox"],
             name=task_name,
+            metadata=metadata,
         )
 
         components.append(sandbox_cmd)
