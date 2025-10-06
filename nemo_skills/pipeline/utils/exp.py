@@ -34,7 +34,12 @@ from nemo_skills.pipeline.utils.cluster import (
     temporary_env_update,
     tunnel_hash,
 )
-from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path, is_mounted_filepath
+from nemo_skills.pipeline.utils.mounts import (
+    check_remote_mount_directories,
+    get_mounts_from_config,
+    get_unmounted_path,
+    is_mounted_filepath,
+)
 from nemo_skills.pipeline.utils.packager import (
     get_packager,
     get_registered_external_repo,
@@ -624,6 +629,13 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
     if dry_run:
         LOG.info("Dry run mode is enabled, not running the experiment.")
         return
+
+    if "mounts" in cluster_config:
+        # Can only check cluster mounts here, not those added to add_task
+        mounts = get_mounts_from_config(cluster_config)
+        mount_sources = [m.split(":")[0] for m in mounts]
+        check_remote_mount_directories(mount_sources, cluster_config, exit_on_failure=True)
+
     if cluster_config["executor"] != "slurm":
         exp.run(detach=False, tail_logs=True, sequential=sequential)
     else:
