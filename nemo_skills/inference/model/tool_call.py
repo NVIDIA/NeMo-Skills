@@ -142,7 +142,7 @@ class ToolCallingWrapper:
                 tool_calls_output_messages = await self._execute_tool_calls(
                     tool_calls, request_id=request_id, completion_type=completion_type
                 )
-                print("Sending tool calls", tool_calls_output_messages)
+                LOG.info("Sending tool calls: %s", tool_calls_output_messages)
                 conversation.extend(tool_calls_output_messages)
 
                 result_steps["num_tool_calls"].append(len(tool_calls))
