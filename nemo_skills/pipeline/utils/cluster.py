@@ -134,11 +134,6 @@ def get_env_variables(cluster_config):
                 env_var_name, value = env_var.split("=")
                 env_var_name = env_var_name.strip()
                 value = value.strip()
-
-                # If the value contains a '$', we treat it as an env var reference
-                if "$" in value:
-                    value = os.path.expanduser(value)
-
             else:
                 raise ValueError(f"Invalid required environment variable format: {env_var}")
             env_vars[env_var_name] = value
@@ -202,6 +197,18 @@ def get_env_variables(cluster_config):
             if env_var_name not in _logged_optional_env_vars:
                 LOG.info(f"Optional environment variable {env_var_name} not found in user environment; skipping.")
                 _logged_optional_env_vars.add(env_var_name)
+
+    # replace placeholders with actual env var values
+    for key, value in env_vars.items():
+        if isinstance(value, str) and "$" in value:
+            if key in os.environ:
+                env_vars[key] = os.path.expandvars(value)
+                LOG.info(
+                    f"Resolved environment variable {key} inside the placeholder value: {value} with {env_vars[key]}"
+                )
+            else:
+                raise ValueError(f"Cannot resolve environment variable {key} inside the placeholder value: {value}")
+
     return env_vars
 
 
