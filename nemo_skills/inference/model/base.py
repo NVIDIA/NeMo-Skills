@@ -114,6 +114,8 @@ class BaseModel:
             self.tokenizer = None
 
         api_key = self._get_api_key(api_key, api_key_env_var, base_url)
+        if api_key is None:  # self-hosted models don't need the key, but still require the parameter
+            api_key = "EMPTY"
 
         model_litellm = f"{self.MODEL_PROVIDER}/{model}"
         # Passed to litellm every time we call it

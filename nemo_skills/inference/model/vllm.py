@@ -28,10 +28,6 @@ class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
-        # Self-hosted models don't need the key, but still require the parameter
-        return "EMPTY"
-
     def _get_tokenizer_endpoint(self):
         """
         Returns the tokenizer endpoint if available, otherwise returns None.
