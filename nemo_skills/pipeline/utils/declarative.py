@@ -251,7 +251,7 @@ class CommandGroup:
         name: Optional[str] = None,
         log_dir: Optional[str] = None,
     ):
-        self.components = commands
+        self.commands = commands
         self.hardware = hardware or HardwareConfig()
         self.name = name
         self.log_dir = log_dir
@@ -533,7 +533,7 @@ class Pipeline:
         shared_env_vars: Dict[str, str] = {}
         if heterogeneous:
             for het_idx, group in enumerate(groups):
-                for command in group.components:
+                for command in group.commands:
                     _, exec_config_probe = command.prepare_for_execution(cluster_config)
                     shared_env_vars.update(exec_config_probe.get("environment", {}))
 
@@ -542,9 +542,9 @@ class Pipeline:
 
         # Build commands and executors
         for het_idx, group in enumerate(groups):
-            has_multiple_components = len(group.components) > 1
+            has_multiple_components = len(group.commands) > 1
             total_het_groups = (
-                len(groups) if heterogeneous else (len(group.components) if has_multiple_components else 1)
+                len(groups) if heterogeneous else (len(group.commands) if has_multiple_components else 1)
             )
 
             # For single-group jobs with multiple components, allow job-level GPU override for sbatch allocation
@@ -552,7 +552,7 @@ class Pipeline:
                 group.hardware.num_gpus if (not heterogeneous and has_multiple_components and group.hardware) else None
             )
 
-            for comp_idx, command in enumerate(group.components):
+            for comp_idx, command in enumerate(group.commands):
                 # Assign het_group_index ONLY for heterogeneous jobs (per-job, not global)
                 # Non-heterogeneous jobs use localhost, so het_group_index should remain None
                 if heterogeneous:
@@ -584,7 +584,7 @@ class Pipeline:
                     heterogeneous,
                     het_idx if heterogeneous else comp_idx,
                     total_het_groups,
-                    (len(group.components) > 1),
+                    (len(group.commands) > 1),
                 )
 
                 # Share packager across executors for single-group jobs

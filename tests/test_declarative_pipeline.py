@@ -155,7 +155,7 @@ class TestCommandGroup:
         group = CommandGroup(commands=[cmd1, cmd2], name="test_group")
 
         assert group.name == "test_group"
-        assert len(group.components) == 2
+        assert len(group.commands) == 2
         assert group.hardware is not None
 
     def test_commandgroup_with_hardware(self):
