@@ -512,18 +512,14 @@ def add_task(
             "LISTEN_PORT": sandbox_port,
             "NGINX_PORT": sandbox_port,
         }
-        current_env_vars = cluster_config.get("env_vars", []).copy()
-        for override in current_env_vars:
-            if "PYTHONPATH" in override:
-                if override.startswith("PYTHONPATH="):
-                    override = override[11:]
-                    sandbox_env_updates["PYTHONPATH"] = override + ":/app"
-            elif override.startswith("UWSGI_CPU_AFFINITY="):
-                sandbox_env_updates["UWSGI_CPU_AFFINITY"] = override.split("=", 1)[1]
-            elif override.startswith("UWSGI_PROCESSES="):
-                sandbox_env_updates["UWSGI_PROCESSES"] = override.split("=", 1)[1]
-            elif override.startswith("NUM_WORKERS="):
-                sandbox_env_updates["NUM_WORKERS"] = override.split("=", 1)[1]
+        for override in cluster_config.get("module_env_vars", []):
+            if "=" not in override:
+                continue
+            key, value = override.split("=", 1)
+            if key == "PYTHONPATH":
+                sandbox_env_updates[key] = f"{value}:/app"
+            else:
+                sandbox_env_updates.setdefault(key, value)
 
         with temporary_env_update(cluster_config, sandbox_env_updates):
             commands.append(get_sandbox_command(cluster_config))
