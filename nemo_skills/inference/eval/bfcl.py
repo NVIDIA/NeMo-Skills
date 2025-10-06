@@ -230,6 +230,9 @@ class BFCLGenerationTask(GenerationTask):
 
         return_dict = {}
         if self.cfg.count_prompt_tokens:
+            LOG.info("Counting prompt tokens")
+            LOG.info(f"Prompt: {input_dict['prompt']}")
+            LOG.info(f"Type of prompt: {type(input_dict['prompt'])}")
             num_input_tokens = get_token_count(self.hf_tokenizer, input_dict["prompt"])
             return_dict["num_input_tokens"] = num_input_tokens
 
