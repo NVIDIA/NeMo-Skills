@@ -574,7 +574,7 @@ class GenerationTask:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
         LOG.info("Calling LLM generate_async for position: %s", data_point.get(self.cfg.async_position_key))
-        result = await self.llm.generate_async(**generation_params)
+        result = await self._generate_with_semaphore(**generation_params)
         LOG.info("LLM generation complete for position: %s", data_point.get(self.cfg.async_position_key))
 
         if self.cfg.count_prompt_tokens:
@@ -582,6 +582,11 @@ class GenerationTask:
             input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
             result["input_sequence_length"] = input_sequence_length
         return result
+
+    async def _generate_with_semaphore(self, **generation_params):
+        """Generate with semaphore control - ensures max_concurrent_requests LLM calls system-wide."""
+        async with self.semaphore:
+            return await self.llm.generate_async(**generation_params)
 
     async def apply_evaluation_hook(self, data_point):
         if self.evaluator:
@@ -595,32 +600,31 @@ class GenerationTask:
         return data_point
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
-        """Process a single data point with semaphore control."""
+        """Process a single data point without datapoint-level semaphore (LLM calls are controlled individually)."""
         position = data_point.get(self.cfg.async_position_key)
-        LOG.info("Waiting for semaphore for position: %s", position)
-        async with self.semaphore:
-            LOG.info("Acquired semaphore for position: %s", position)
-            # Generate output for this single data point
-            start_time = time.time()
-            output = await self.process_single_datapoint(data_point, all_data)
-            end_time = time.time()
+        LOG.info("Processing datapoint at position: %s", position)
 
-            if self.cfg.add_generation_stats:
-                output["generation_start_time"] = start_time
-                output["generation_end_time"] = end_time
-                output["generation_time"] = end_time - start_time
+        # Generate output for this single data point (semaphore control moved to _generate_with_semaphore)
+        start_time = time.time()
+        output = await self.process_single_datapoint(data_point, all_data)
+        end_time = time.time()
 
-            # Apply evaluation hook if configured
-            LOG.info("Applying evaluation hook for position: %s", position)
-            output = await self.apply_evaluation_hook({**data_point, **output})
+        if self.cfg.add_generation_stats:
+            output["generation_start_time"] = start_time
+            output["generation_end_time"] = end_time
+            output["generation_time"] = end_time - start_time
 
-            # Thread-safe output writing
-            LOG.info("Waiting for output lock for position: %s", position)
-            async with self.output_lock:
-                LOG.info("Acquired output lock, writing output for position: %s", position)
-                self.dump_outputs([output], [data_point], fout)
-                pbar.update(1)
-                LOG.info("Output written and lock released for position: %s", position)
+        # Apply evaluation hook if configured
+        LOG.info("Applying evaluation hook for position: %s", position)
+        output = await self.apply_evaluation_hook({**data_point, **output})
+
+        # Thread-safe output writing
+        LOG.info("Waiting for output lock for position: %s", position)
+        async with self.output_lock:
+            LOG.info("Acquired output lock, writing output for position: %s", position)
+            self.dump_outputs([output], [data_point], fout)
+            pbar.update(1)
+            LOG.info("Output written and lock released for position: %s", position)
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""

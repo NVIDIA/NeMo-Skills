@@ -146,10 +146,11 @@ class CheckContaminationTask(GenerationTask):
         query_data = self._create_query_data(data_point)
         LOG.info("Created %d queries to process", len(query_data))
 
-        # Create tasks for all queries using super().process_single_datapoint
+        # Create tasks for all queries using the semaphore-controlled generate method
         tasks = []
         for idx, query_point in enumerate(query_data):
             LOG.info("Creating task %d/%d", idx + 1, len(query_data))
+            # Call the parent's process_single_datapoint which now uses _generate_with_semaphore
             tasks.append(super().process_single_datapoint(query_point, all_data))
 
         LOG.info("Gathering results from %d tasks...", len(tasks))

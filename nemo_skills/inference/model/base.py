@@ -253,7 +253,11 @@ class BaseModel:
             try:
                 if isinstance(prompt, list):
                     request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
-                    LOG.info("Sending the request")
+                    LOG.info(
+                        "Sending the request to %s with params: %s",
+                        self.litellm_kwargs.get("base_url"),
+                        {k: v for k, v in request_params.items() if k != "messages"},
+                    )
                     response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
                     LOG.info("Received the response")
                     if stream:
@@ -265,7 +269,13 @@ class BaseModel:
 
                 elif isinstance(prompt, str):
                     request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
+                    LOG.info(
+                        "Sending the completion request to %s with params: %s",
+                        self.litellm_kwargs.get("base_url"),
+                        {k: v for k, v in request_params.items() if k != "prompt"},
+                    )
                     response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
+                    LOG.info("Received the completion response")
                     if stream:
                         result = self._stream_completion_chunks_async(response)
                     else:
