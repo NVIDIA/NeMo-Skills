@@ -636,7 +636,8 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
         mount_sources = [m.split(":")[0] for m in mounts]
 
         LOG.info("Checking mount paths: %s", mount_sources)
-        check_remote_mount_directories(mount_sources, cluster_config, exit_on_failure=True)
+        exit_if_failure = not cluster_config.get("NEMO_SKILLS_DISABLE_MOUNT_CHECK", False)
+        check_remote_mount_directories(mount_sources, cluster_config, exit_on_failure=exit_if_failure)
 
     if cluster_config["executor"] != "slurm":
         exp.run(detach=False, tail_logs=True, sequential=sequential)
