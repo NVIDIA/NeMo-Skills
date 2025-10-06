@@ -260,17 +260,17 @@ class CommandGroup:
 class Pipeline:
     """Top-level pipeline that composes command groups with dependency support.
 
-    Supports two modes:
-    1. Groups: groups=[cmdgroup1, cmdgroup2] - combines all into one job
-    2. Jobs: jobs=[{...}, {...}] - supports dependencies and multi-group jobs
+    Supports two input formats (both converted to jobs internally):
+    1. Groups: groups=[cmdgroup1, cmdgroup2] - shorthand, each becomes a job
+    2. Jobs: jobs=[{...}, {...}] - full control with dependencies and multi-group jobs
     """
 
     def __init__(
         self,
         name: str,
         cluster_config: Dict,
-        groups: Optional[List[CommandGroup]] = None,  # Legacy mode
-        jobs: Optional[List[Dict]] = None,  # New mode with dependencies
+        groups: Optional[List[CommandGroup]] = None,
+        jobs: Optional[List[Dict]] = None,
         reuse_code: bool = True,
         reuse_code_exp: Optional[str] = None,
         skip_hf_home_check: bool = False,
@@ -290,10 +290,8 @@ class Pipeline:
 
         if groups is not None:
             self.jobs = [{"group": g} for g in groups]
-            self._legacy_mode = True
         elif jobs is not None:
             self.jobs = jobs
-            self._legacy_mode = False
         else:
             raise ValueError("Must specify either 'groups' or 'jobs'")
 

@@ -180,8 +180,8 @@ class TestCommandGroup:
 class TestPipeline:
     """Test Pipeline class functionality."""
 
-    def test_pipeline_with_groups_legacy_mode(self):
-        """Test Pipeline with groups parameter (legacy mode)."""
+    def test_pipeline_with_groups(self):
+        """Test Pipeline with groups parameter (shorthand format)."""
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group")
         cluster_config = {"executor": "local", "containers": {}}
@@ -189,12 +189,11 @@ class TestPipeline:
         pipeline = Pipeline(name="test_pipeline", cluster_config=cluster_config, groups=[group])
 
         assert pipeline.name == "test_pipeline"
-        assert pipeline._legacy_mode is True
         assert len(pipeline.jobs) == 1
         assert "group" in pipeline.jobs[0]
 
     def test_pipeline_with_jobs(self):
-        """Test Pipeline with jobs parameter."""
+        """Test Pipeline with jobs parameter (full format with dependencies)."""
         cmd1 = Command(command="echo 1", name="cmd1")
         group1 = CommandGroup(commands=[cmd1], name="group1", log_dir="/logs")
 
@@ -210,7 +209,6 @@ class TestPipeline:
         pipeline = Pipeline(name="test_pipeline", cluster_config=cluster_config, jobs=jobs)
 
         assert pipeline.name == "test_pipeline"
-        assert pipeline._legacy_mode is False
         assert len(pipeline.jobs) == 2
 
     def test_pipeline_cannot_specify_both_groups_and_jobs(self):
