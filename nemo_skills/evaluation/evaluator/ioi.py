@@ -251,7 +251,7 @@ class IOIEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 10):
         super().__init__(config, num_parallel_requests)
         self.eval_cfg = IOIEvaluatorConfig(_init_nested=True, **config)
-        self.split = "ioi25"  # todo: this needs to be exposed to run both ioi24 and ioi25.
+        self.split = self.eval_cfg.split
         self.data_dir = self.eval_cfg.data_dir
 
         # Heavy runtime resources are lazily initialized within _evaluate_entry.
@@ -276,7 +276,8 @@ class IOIEvaluator(BaseEvaluator):
             if not (os.path.isabs(self.eval_cfg.test_file) and os.path.exists(self.eval_cfg.test_file)):
                 fname = self.eval_cfg.test_file.format(split=self.split)
                 search_dir = self.eval_cfg.test_dir or (
-                    os.path.join(self.data_dir, self.split) if (self.data_dir and self.split) else None
+                    # todo: this needs to be exposed someway to run both ioi24 and ioi25..
+                    os.path.join(self.data_dir, "ioi25") if self.data_dir else None
                 )
                 if search_dir is None:
                     raise ValueError("Either data_dir or eval_config.test_dir must be specified.")
