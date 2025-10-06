@@ -184,8 +184,9 @@ class TestPipeline:
         """Test Pipeline with groups parameter (legacy mode)."""
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group")
+        cluster_config = {"executor": "local", "containers": {}}
 
-        pipeline = Pipeline(name="test_pipeline", cluster="local", groups=[group])
+        pipeline = Pipeline(name="test_pipeline", cluster_config=cluster_config, groups=[group])
 
         assert pipeline.name == "test_pipeline"
         assert pipeline._legacy_mode is True
@@ -204,8 +205,9 @@ class TestPipeline:
             {"name": "job1", "group": group1},
             {"name": "job2", "group": group2, "dependencies": ["job1"]},
         ]
+        cluster_config = {"executor": "local", "containers": {}}
 
-        pipeline = Pipeline(name="test_pipeline", cluster="local", jobs=jobs)
+        pipeline = Pipeline(name="test_pipeline", cluster_config=cluster_config, jobs=jobs)
 
         assert pipeline.name == "test_pipeline"
         assert pipeline._legacy_mode is False
@@ -216,21 +218,24 @@ class TestPipeline:
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group")
         jobs = [{"name": "job", "group": group}]
+        cluster_config = {"executor": "local", "containers": {}}
 
         with pytest.raises(ValueError, match="Cannot specify both 'groups' and 'jobs'"):
-            Pipeline(name="test", cluster="local", groups=[group], jobs=jobs)
+            Pipeline(name="test", cluster_config=cluster_config, groups=[group], jobs=jobs)
 
     def test_pipeline_must_specify_either_groups_or_jobs(self):
         """Test that Pipeline raises error when neither groups nor jobs are specified."""
+        cluster_config = {"executor": "local", "containers": {}}
         with pytest.raises(ValueError, match="Must specify either 'groups' or 'jobs'"):
-            Pipeline(name="test", cluster="local")
+            Pipeline(name="test", cluster_config=cluster_config)
 
     def test_pipeline_with_run_after(self):
         """Test Pipeline with run_after parameter."""
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group")
+        cluster_config = {"executor": "local", "containers": {}}
 
-        pipeline = Pipeline(name="test", cluster="local", groups=[group], run_after="other_exp")
+        pipeline = Pipeline(name="test", cluster_config=cluster_config, groups=[group], run_after="other_exp")
 
         assert pipeline.run_after == "other_exp"
 
@@ -238,35 +243,22 @@ class TestPipeline:
         """Test Pipeline with run_after as list."""
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group")
+        cluster_config = {"executor": "local", "containers": {}}
 
-        pipeline = Pipeline(name="test", cluster="local", groups=[group], run_after=["exp1", "exp2"])
+        pipeline = Pipeline(name="test", cluster_config=cluster_config, groups=[group], run_after=["exp1", "exp2"])
 
         assert pipeline.run_after == ["exp1", "exp2"]
 
-    @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
-    def test_pipeline_get_cluster_config(self, mock_get_config):
-        """Test _get_cluster_config method."""
-        mock_config = {"executor": "local", "containers": {}}
-        mock_get_config.return_value = mock_config
-
+    def test_pipeline_cluster_config_passed_directly(self):
+        """Test that cluster_config is passed directly (no more string resolution)."""
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group")
-        pipeline = Pipeline(name="test", cluster="local", groups=[group])
+        cluster_config = {"executor": "local", "containers": {}}
 
-        config = pipeline._get_cluster_config()
+        pipeline = Pipeline(name="test", cluster_config=cluster_config, groups=[group])
 
-        assert config == mock_config
-        mock_get_config.assert_called_once_with("local")
-
-    @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
-    def test_pipeline_missing_cluster_config(self, mock_get_config):
-        """Test that Pipeline raises error when cluster is not specified."""
-        cmd = Command(command="echo test", name="cmd")
-        group = CommandGroup(commands=[cmd], name="group")
-        pipeline = Pipeline(name="test", groups=[group])  # No cluster specified
-
-        with pytest.raises(ValueError, match="Must specify cluster"):
-            pipeline._get_cluster_config()
+        # cluster_config is stored as-is
+        assert pipeline.cluster_config == cluster_config
 
 
 class TestPipelineExecution:
@@ -293,10 +285,10 @@ class TestPipelineExecution:
         # Create pipeline
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group", log_dir="/logs")
-        pipeline = Pipeline(name="test", cluster="local", groups=[group], skip_hf_home_check=True)
+        pipeline = Pipeline(name="test", cluster_config=mock_config, groups=[group], skip_hf_home_check=True)
 
         # Run pipeline
-        result = pipeline.run(cluster_config=mock_config, dry_run=True)
+        result = pipeline.run(dry_run=True)
 
         # Verify
         assert result == mock_exp
@@ -331,10 +323,10 @@ class TestPipelineExecution:
             {"name": "job1", "group": group1},
             {"name": "job2", "group": group2, "dependencies": ["job1"]},
         ]
-        pipeline = Pipeline(name="test", cluster="local", jobs=jobs, skip_hf_home_check=True)
+        pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=jobs, skip_hf_home_check=True)
 
         # Run pipeline
-        pipeline.run(cluster_config=mock_config, dry_run=True)
+        pipeline.run(dry_run=True)
 
         # Verify both jobs were added
         assert mock_exp.add.call_count == 2
@@ -364,10 +356,10 @@ class TestPipelineExecution:
 
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group", log_dir="/logs")
-        pipeline = Pipeline(name="test", cluster="local", groups=[group])
+        pipeline = Pipeline(name="test", cluster_config=mock_config, groups=[group])
 
         # Should not raise
-        pipeline.run(cluster_config=mock_config, dry_run=True)
+        pipeline.run(dry_run=True)
 
         # Verify executor was created
         assert mock_get_executor.called
@@ -382,10 +374,10 @@ class TestPipelineExecution:
 
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group", log_dir="/logs")
-        pipeline = Pipeline(name="test", cluster="local", groups=[group])
+        pipeline = Pipeline(name="test", cluster_config=mock_config, groups=[group])
 
         with pytest.raises(RuntimeError, match="HF_HOME is missing"):
-            pipeline.run(cluster_config=mock_config, dry_run=True)
+            pipeline.run(dry_run=True)
 
     @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
@@ -399,10 +391,10 @@ class TestPipelineExecution:
 
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group", log_dir="/logs")
-        pipeline = Pipeline(name="test", cluster="local", groups=[group])
+        pipeline = Pipeline(name="test", cluster_config=mock_config, groups=[group])
 
         with pytest.raises(RuntimeError, match="is not a mounted path"):
-            pipeline.run(cluster_config=mock_config, dry_run=True)
+            pipeline.run(dry_run=True)
 
 
 class TestHetGroupIndices:
@@ -427,8 +419,8 @@ class TestHetGroupIndices:
         cmd2 = Command(command="echo 2", name="cmd2")
         group = CommandGroup(commands=[cmd1, cmd2], name="group", log_dir="/logs")
 
-        pipeline = Pipeline(name="test", cluster="local", groups=[group], skip_hf_home_check=True)
-        pipeline.run(cluster_config=mock_config, dry_run=True)
+        pipeline = Pipeline(name="test", cluster_config=mock_config, groups=[group], skip_hf_home_check=True)
+        pipeline.run(dry_run=True)
 
         # Both commands should have None het_group_index (localhost communication)
         assert cmd1.het_group_index is None
@@ -458,8 +450,8 @@ class TestHetGroupIndices:
         group2 = CommandGroup(commands=[cmd2], name="group2", log_dir="/logs")
 
         jobs = [{"name": "hetjob", "groups": [group1, group2]}]
-        pipeline = Pipeline(name="test", cluster="local", jobs=jobs, skip_hf_home_check=True)
-        pipeline.run(cluster_config=mock_config, dry_run=True)
+        pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=jobs, skip_hf_home_check=True)
+        pipeline.run(dry_run=True)
 
         # Commands should have het_group_index 0 and 1
         assert cmd1.het_group_index == 0
@@ -498,8 +490,8 @@ class TestHetGroupIndices:
             {"name": "hetjob1", "groups": [group1, group2]},
             {"name": "hetjob2", "groups": [group3, group4]},
         ]
-        pipeline = Pipeline(name="test", cluster="local", jobs=jobs, skip_hf_home_check=True)
-        pipeline.run(cluster_config=mock_config, dry_run=True)
+        pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=jobs, skip_hf_home_check=True)
+        pipeline.run(dry_run=True)
 
         # Both jobs should have het_group_index starting from 0
         assert cmd1.het_group_index == 0
@@ -529,10 +521,10 @@ class TestDependencyResolution:
         group = CommandGroup(commands=[cmd], name="group", log_dir="/logs")
 
         jobs = [{"name": "job", "group": group, "dependencies": None}]
-        pipeline = Pipeline(name="test", cluster="local", jobs=jobs, skip_hf_home_check=True)
+        pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=jobs, skip_hf_home_check=True)
 
         # Should not raise
-        pipeline.run(cluster_config=mock_config, dry_run=True)
+        pipeline.run(dry_run=True)
 
     @patch("nemo_skills.pipeline.utils.declarative.get_exp")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
@@ -552,11 +544,11 @@ class TestDependencyResolution:
         group = CommandGroup(commands=[cmd], name="group", log_dir="/logs")
 
         pipeline = Pipeline(
-            name="test", cluster="local", groups=[group], run_after="other_exp", skip_hf_home_check=True
+            name="test", cluster_config=mock_config, groups=[group], run_after="other_exp", skip_hf_home_check=True
         )
 
         # Should not raise and should apply run_after
-        pipeline.run(cluster_config=mock_config, dry_run=True)
+        pipeline.run(dry_run=True)
 
 
 class TestErrorHandling:
@@ -564,23 +556,23 @@ class TestErrorHandling:
 
     def test_pipeline_job_missing_group_or_groups(self):
         """Test that job spec without group or groups raises error."""
+        mock_config = {"executor": "none", "containers": {}}
         jobs = [{"name": "bad_job"}]  # Missing 'group' or 'groups'
 
         with pytest.raises(ValueError, match="must have either 'group' or 'groups'"):
-            pipeline = Pipeline(name="test", cluster="local", jobs=jobs)
-            mock_config = {"executor": "none", "containers": {}}
-            pipeline.run(cluster_config=mock_config, dry_run=True)
+            pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=jobs)
+            pipeline.run(dry_run=True)
 
     def test_commandgroup_missing_log_dir(self):
         """Test that CommandGroup without log_dir raises error during execution."""
+        mock_config = {"executor": "none", "containers": {}}
         cmd = Command(command="echo test", name="cmd")
         group = CommandGroup(commands=[cmd], name="group")  # No log_dir
 
-        pipeline = Pipeline(name="test", cluster="local", groups=[group])
-        mock_config = {"executor": "none", "containers": {}}
+        pipeline = Pipeline(name="test", cluster_config=mock_config, groups=[group])
 
         with pytest.raises(ValueError, match="must have log_dir set"):
-            pipeline.run(cluster_config=mock_config, dry_run=True)
+            pipeline.run(dry_run=True)
 
 
 if __name__ == "__main__":

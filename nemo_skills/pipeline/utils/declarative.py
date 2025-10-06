@@ -44,7 +44,7 @@ Basic Example (Single job with multiple commands):
     # Create and run pipeline
     pipeline = Pipeline(
         name="my_inference",
-        cluster="local",
+        cluster_config=cluster_config,
         groups=[inference_group]
     )
     pipeline.run()
@@ -93,7 +93,7 @@ Advanced Example (Multiple jobs with dependencies and heterogeneous components):
     # Create pipeline with dependency graph
     pipeline = Pipeline(
         name="full_pipeline",
-        cluster="slurm",
+        cluster_config=cluster_config,
         jobs=[
             {"name": "prep", "group": prep_group},
 
@@ -114,7 +114,6 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 import nemo_run as run
 
 from nemo_skills.pipeline.utils import (
-    get_cluster_config,
     get_env_variables,
     get_executor,
     get_exp,
@@ -269,7 +268,7 @@ class Pipeline:
     def __init__(
         self,
         name: str,
-        cluster: Optional[str] = None,
+        cluster_config: Dict,
         groups: Optional[List[CommandGroup]] = None,  # Legacy mode
         jobs: Optional[List[Dict]] = None,  # New mode with dependencies
         reuse_code: bool = True,
@@ -279,13 +278,12 @@ class Pipeline:
         run_after: Optional[Union[str, List[str]]] = None,  # Pipeline-level dependency on other experiments
     ):
         self.name = name
-        self.cluster = cluster
+        self.cluster_config = cluster_config
         self.reuse_code = reuse_code
         self.reuse_code_exp = reuse_code_exp
         self.skip_hf_home_check = skip_hf_home_check
         self.with_ray = with_ray
         self.run_after = run_after
-        self._cluster_config: Optional[Dict] = None
 
         if groups is not None and jobs is not None:
             raise ValueError("Cannot specify both 'groups' and 'jobs'.")
@@ -301,19 +299,8 @@ class Pipeline:
 
         # Note: het_group_indices are assigned per-job in _plan_and_add_job, not globally
 
-    def _get_cluster_config(self) -> Dict:
-        """Get cluster configuration, loading it if necessary."""
-        if self._cluster_config is None:
-            if self.cluster is None:
-                raise ValueError("Must specify cluster either in Pipeline() or run() method")
-
-            self._cluster_config = get_cluster_config(self.cluster)
-        return self._cluster_config
-
     def run(
         self,
-        cluster_config: Optional[Dict] = None,
-        cluster: Optional[str] = None,
         dry_run: bool = False,
         log_dir: Optional[str] = None,
         _reuse_exp=None,
@@ -321,8 +308,6 @@ class Pipeline:
         """Execute the pipeline by calling NeMo-Run directly.
 
         Args:
-            cluster_config: Cluster configuration dict (optional, can use cluster name instead)
-            cluster: Cluster name to load config from (optional if cluster_config provided)
             dry_run: If True, validate without executing
             log_dir: Default log directory for groups that don't specify one (optional)
             _reuse_exp: Internal - reuse existing experiment object (for eval.py integration)
@@ -331,30 +316,22 @@ class Pipeline:
             LOG.info("No jobs to execute")
             return None
 
-        # Determine cluster config to use
-        if cluster_config is not None:
-            final_cluster_config = cluster_config
-        elif cluster is not None:
-            final_cluster_config = get_cluster_config(cluster)
-        else:
-            final_cluster_config = self._get_cluster_config()
-
         # Validate HF_HOME environment variable
-        if final_cluster_config["executor"] != "none" and not self.skip_hf_home_check:
-            env_vars = get_env_variables(final_cluster_config)
+        if self.cluster_config["executor"] != "none" and not self.skip_hf_home_check:
+            env_vars = get_env_variables(self.cluster_config)
             if "HF_HOME" not in env_vars:
                 raise RuntimeError(
                     "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
-                    f"Current env_vars: {final_cluster_config.get('env_vars', [])}\n"
+                    f"Current env_vars: {self.cluster_config.get('env_vars', [])}\n"
                     "Please add a new variable: HF_HOME=/mounted/path/to/your/hf_home"
                 )
-            if not is_mounted_filepath(final_cluster_config, env_vars["HF_HOME"]):
+            if not is_mounted_filepath(self.cluster_config, env_vars["HF_HOME"]):
                 raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
 
         # Track job name -> task handle for dependency resolution
         job_name_to_handle = {}
 
-        with get_exp(self.name, final_cluster_config, _reuse_exp) as exp:
+        with get_exp(self.name, self.cluster_config, _reuse_exp) as exp:
             # Process each job in order
             for job_spec in self.jobs:
                 job_name = job_spec.get("name", "unnamed")
@@ -383,7 +360,7 @@ class Pipeline:
                         else:
                             # Could be external experiment name OR task handle from _reuse_exp case
                             # Try to get as experiment name first
-                            if final_cluster_config["executor"] == "slurm":
+                            if self.cluster_config["executor"] == "slurm":
                                 exp_handles = get_exp_handles(dep)
                                 if len(exp_handles) == 0:
                                     LOG.warning(
@@ -420,7 +397,7 @@ class Pipeline:
                         task_handle = self._add_single_group_job(
                             exp,
                             job_spec["groups"][0],
-                            final_cluster_config,
+                            self.cluster_config,
                             default_log_dir=log_dir,
                             run_after=run_after_deps if run_after_deps else None,
                         )
@@ -429,7 +406,7 @@ class Pipeline:
                         task_handle = self._add_multi_group_job(
                             exp,
                             job_spec["groups"],
-                            final_cluster_config,
+                            self.cluster_config,
                             default_log_dir=log_dir,
                             run_after=run_after_deps if run_after_deps else None,
                         )
@@ -438,7 +415,7 @@ class Pipeline:
                     task_handle = self._add_single_group_job(
                         exp,
                         job_spec["group"],
-                        final_cluster_config,
+                        self.cluster_config,
                         default_log_dir=log_dir,
                         run_after=run_after_deps if run_after_deps else None,
                     )
@@ -451,11 +428,11 @@ class Pipeline:
 
             # Only run if not using existing experiment (matching generate_v0.py line 331)
             if not dry_run and not _reuse_exp:
-                run_exp(exp, final_cluster_config)
+                run_exp(exp, self.cluster_config)
 
                 # Cache experiment for code reuse in future runs
-                if final_cluster_config["executor"] != "none":
-                    tunnel = get_tunnel(final_cluster_config)
+                if self.cluster_config["executor"] != "none":
+                    tunnel = get_tunnel(self.cluster_config)
                     cur_tunnel_hash = tunnel_hash(tunnel)
                     if cur_tunnel_hash not in REUSE_CODE_EXP:
                         REUSE_CODE_EXP[cur_tunnel_hash] = exp

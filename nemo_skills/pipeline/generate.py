@@ -464,7 +464,7 @@ def generate(
     # Create and run pipeline
     pipeline = Pipeline(
         name=expname,
-        cluster=cluster,
+        cluster_config=cluster_config,
         jobs=jobs,
         reuse_code=reuse_code,
         reuse_code_exp=reuse_code_exp,
@@ -472,7 +472,7 @@ def generate(
     )
 
     # Pass _reuse_exp to pipeline.run() to add jobs to existing experiment
-    result = pipeline.run(cluster_config=cluster_config, dry_run=dry_run, _reuse_exp=_reuse_exp)
+    result = pipeline.run(dry_run=dry_run, _reuse_exp=_reuse_exp)
     return result
 
 
