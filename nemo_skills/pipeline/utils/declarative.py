@@ -142,8 +142,6 @@ class Command:
     The command can be either:
     - A string: evaluated immediately
     - A callable (lambda): evaluated lazily when the task is prepared
-    - A tuple (command, metadata): command with metadata like port
-    - A callable returning (command, metadata): lazy evaluation with metadata
 
     Lambdas are needed for cross-component references (hostname_ref, meta_ref).
     The het_group_index isn't assigned until pipeline execution, so these must be lazy:
@@ -152,14 +150,9 @@ class Command:
         client = Command(command=lambda: f"curl {server.hostname_ref()}:{server.meta_ref('port')}")
     """
 
-    command: Union[
-        str,
-        Callable[[], str],  # Lambda for cross-group refs
-        Callable[[Dict], str],  # Lambda needing cluster_config (e.g., sandbox)
-        Tuple[Optional[str], Dict],  # Command builder result
-        Callable[[], Tuple[Optional[str], Dict]],  # Lambda returning command builder result
-        None,
-    ]
+    # Command can be a string or callable (lambda).
+    # Lambdas are primarily used for cross-component references (hostname_ref, meta_ref).
+    command: Union[str, Callable]
     container: str = "nemo-skills"
     gpus: Optional[int] = None
     nodes: int = 1
@@ -176,19 +169,9 @@ class Command:
         if self.name is None:
             self.name = "command"
 
-        # Extract metadata if command is a tuple
-        self._extract_metadata()
-
         # Wrap plain strings with environment setup
         if isinstance(self.command, str) and (self.env_vars or self.working_dir):
             self.command = wrap_command(self.command, self.working_dir, self.env_vars)
-
-    def _extract_metadata(self):
-        """Extract metadata from command if it's a tuple."""
-        if not callable(self.command):
-            if isinstance(self.command, tuple):
-                cmd, self.metadata = self.command
-                self.command = cmd  # Can be None for sandbox
 
     def hostname_ref(self) -> str:
         """Get hostname reference for hetjob cross-component communication."""

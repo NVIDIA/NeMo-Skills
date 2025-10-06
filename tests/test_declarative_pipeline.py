@@ -33,8 +33,8 @@ class TestCommand:
         assert cmd.nodes == 1
 
     def test_command_with_metadata(self):
-        """Test Command with metadata tuple."""
-        cmd = Command(command=("echo hello", {"port": 8080, "log_prefix": "server"}), name="server")
+        """Test Command with metadata passed separately."""
+        cmd = Command(command="echo hello", name="server", metadata={"port": 8080, "log_prefix": "server"})
         assert cmd.metadata["port"] == 8080
         assert cmd.metadata["log_prefix"] == "server"
         # Command gets wrapped with working_dir by default
@@ -43,7 +43,7 @@ class TestCommand:
     def test_command_with_callable(self):
         """Test Command with callable that returns tuple."""
 
-        def make_cmd():
+        def make_cmd(cfg):
             return ("echo world", {"port": 5000})
 
         cmd = Command(command=make_cmd, name="dynamic")
@@ -65,7 +65,7 @@ class TestCommand:
     def test_command_prepare_for_execution_callable(self):
         """Test prepare_for_execution with callable command."""
 
-        def make_cmd():
+        def make_cmd(cfg):
             return "echo test"
 
         cmd = Command(command=make_cmd, name="test")
@@ -78,7 +78,7 @@ class TestCommand:
     def test_command_prepare_for_execution_callable_with_metadata(self):
         """Test prepare_for_execution with callable returning tuple."""
 
-        def make_cmd():
+        def make_cmd(cfg):
             return ("echo metadata", {"num_tasks": 4, "environment": {"VAR": "value"}})
 
         cmd = Command(command=make_cmd, name="test")
@@ -105,7 +105,7 @@ class TestCommand:
 
     def test_command_meta_ref(self):
         """Test meta_ref for accessing metadata."""
-        cmd = Command(command=("echo test", {"port": 8080, "host": "localhost"}), name="server")
+        cmd = Command(command="echo test", name="server", metadata={"port": 8080, "host": "localhost"})
 
         assert cmd.meta_ref("port") == "8080"
         assert cmd.meta_ref("host") == "localhost"
