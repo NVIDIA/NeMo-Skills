@@ -250,8 +250,9 @@ def add_includes(code: str, problem_id: str) -> str:
 class IOIEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 10):
         super().__init__(config, num_parallel_requests)
-        self.split = config.get("split", "val")
-        self.data_dir = config.get("data_dir")
+        print(config)
+        self.split = config["split"]
+        self.data_dir = config["data_dir"]
 
         cfg_copy = dict(config)
         cfg_copy.pop("split", None)
