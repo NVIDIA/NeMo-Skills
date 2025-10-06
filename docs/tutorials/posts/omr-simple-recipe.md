@@ -206,26 +206,6 @@ ns convert \
     --hf_model_name=Qwen/Qwen2.5-14B-Instruct
 ```
 
-For the NeMo-Aligner backend, use the following training command. Add `--disable_wandb` to disable W&B logging.
-
-```shell
-ns train \
-    --cluster=local \
-    --expname=training \
-    --run_after=convert-14b-nemo \
-    --run_after=prepare-sft-data \
-    --output_dir=/workspace/training \
-    --nemo_model=/workspace/qwen2.5-14b-instruct-nemo \
-    --num_nodes=1 \
-    --num_gpus=8 \
-    --training_data=/workspace/sft-data.jsonl \
-    ++model.data.train_ds.max_seq_length=8192 \
-    ++model.data.train_ds.global_batch_size=32 \
-    ++model.tensor_model_parallel_size=4 \
-    ++model.context_parallel_size=2 \
-    ++model.optim.lr=1e-5 \
-    ++trainer.sft.max_epochs=2
-```
 
 For the NeMo-RL backend, use the following training command. Add `--disable_wandb` to disable W&B logging. Only run one of the training commands, not both (or change the paths and `expnames` accordingly).
 
@@ -258,18 +238,6 @@ To learn more about SFT configuration, see the [NeMo-Skills training](https://nv
 To check model improvement, let's run another evaluation. Convert the checkpoint back into Hugging Face format for faster evaluation. You can skip the conversion step if you’re using the NeMo-RL backend for training.
 
 ```shell
-# converting back to HF format
-ns convert \
-   --cluster=local \
-   --expname=convert-14b-hf \
-   --run_after=training \
-   --input_model=/workspace/training/model-averaged-nemo \
-   --output_model=/workspace/training/qwen2.5-14b-improved-hf \
-   --convert_from=nemo \
-   --convert_to=hf \
-   --num_gpus=8 \
-   --model_type=qwen \
-   --hf_model_name=Qwen/Qwen2.5-14B-Instruct
 # launching evaluation
 ns eval \
     --cluster=local \
