@@ -156,7 +156,7 @@ class Command:
     container: str = "nemo-skills"
     gpus: Optional[int] = None
     nodes: int = 1
-    name: Optional[str] = None
+    name: str = "command"
     working_dir: str = "/nemo_run/code"
     env_vars: Dict[str, str] = field(default_factory=dict)
     installation_command: Optional[str] = None
@@ -165,10 +165,6 @@ class Command:
     het_group_index: Optional[int] = None  # Set per-job by Pipeline (not global)
 
     def __post_init__(self):
-        # Initialize defaults
-        if self.name is None:
-            self.name = "command"
-
         # Wrap plain strings with environment setup
         if isinstance(self.command, str) and (self.env_vars or self.working_dir):
             self.command = wrap_command(self.command, self.working_dir, self.env_vars)
