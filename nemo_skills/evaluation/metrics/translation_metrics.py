@@ -70,7 +70,7 @@ class TranslationMetrics(BaseMetrics):
         self.aggregation_dict = defaultdict(list)
 
     def evaluations_to_print(self):
-        """We will log all majority/rm/pass/pass@1[avg-of-k] up to k, but only report the kth one."""
+        """Returns all translation pairs and aggregated multilingual dictionaries."""
         return list(self.translation_dict.keys()) + list(self.aggregation_dict.keys())
 
     def metrics_to_print(self):
