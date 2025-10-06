@@ -253,7 +253,9 @@ class BaseModel:
             try:
                 if isinstance(prompt, list):
                     request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
+                    LOG.info("Sending the request")
                     response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
+                    LOG.info("Received the response")
                     if stream:
                         result = self._stream_chat_chunks_async(response)
                     else:
