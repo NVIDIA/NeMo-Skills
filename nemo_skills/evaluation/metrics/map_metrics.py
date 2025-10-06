@@ -20,6 +20,7 @@ from nemo_skills.evaluation.metrics.bfcl_metrics import BFCLMetrics
 from nemo_skills.evaluation.metrics.code_metrics import (
     BigCodeBenchMetrics,
     EvalPlusMetrics,
+    HumanEvalInfillingMetrics,
     LiveCodeBenchMetrics,
     OJBenchMetrics,
     SciCodeMetrics,
@@ -57,6 +58,7 @@ METRICS_MAP = {
     "livebench_coding": LiveCodeBenchMetrics,
     "ojbench": OJBenchMetrics,
     "translation": TranslationMetrics,
+    "human_eval_infilling": HumanEvalInfillingMetrics,
 }
 
 
