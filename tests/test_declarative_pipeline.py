@@ -265,17 +265,15 @@ class TestPipelineExecution:
     """Test Pipeline execution and job management."""
 
     @patch("nemo_skills.pipeline.utils.declarative.get_exp")
-    @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
     @patch("nemo_skills.pipeline.utils.declarative.run_exp")
-    def test_pipeline_run_basic(self, mock_run_exp, mock_env_vars, mock_get_config, mock_get_exp):
+    def test_pipeline_run_basic(self, mock_run_exp, mock_env_vars, mock_get_exp):
         """Test basic pipeline execution."""
         # Setup mocks
         mock_config = {
             "executor": "none",
             "containers": {"nemo-skills": "container:latest"},
         }
-        mock_get_config.return_value = mock_config
         mock_env_vars.return_value = {"HF_HOME": "/hf"}
 
         mock_exp = MagicMock()
@@ -295,17 +293,15 @@ class TestPipelineExecution:
         mock_exp.add.assert_called_once()
 
     @patch("nemo_skills.pipeline.utils.declarative.get_exp")
-    @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
     @patch("nemo_skills.pipeline.utils.declarative.run_exp")
-    def test_pipeline_run_with_dependencies(self, mock_run_exp, mock_env_vars, mock_get_config, mock_get_exp):
+    def test_pipeline_run_with_dependencies(self, mock_run_exp, mock_env_vars, mock_get_exp):
         """Test pipeline execution with job dependencies."""
         # Setup mocks
         mock_config = {
             "executor": "none",
             "containers": {"nemo-skills": "container:latest"},
         }
-        mock_get_config.return_value = mock_config
         mock_env_vars.return_value = {"HF_HOME": "/hf"}
 
         mock_exp = MagicMock()
@@ -332,20 +328,16 @@ class TestPipelineExecution:
         assert mock_exp.add.call_count == 2
 
     @patch("nemo_skills.pipeline.utils.declarative.get_exp")
-    @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
     @patch("nemo_skills.pipeline.utils.declarative.is_mounted_filepath")
     @patch("nemo_skills.pipeline.utils.declarative.get_executor")
-    def test_pipeline_hf_home_validation(
-        self, mock_get_executor, mock_is_mounted, mock_env_vars, mock_get_config, mock_get_exp
-    ):
+    def test_pipeline_hf_home_validation(self, mock_get_executor, mock_is_mounted, mock_env_vars, mock_get_exp):
         """Test HF_HOME validation."""
         mock_config = {
             "executor": "slurm",
             "containers": {"nemo-skills": "container:latest"},
             "account": "test_account",
         }
-        mock_get_config.return_value = mock_config
         mock_env_vars.return_value = {"HF_HOME": "/hf"}
         mock_is_mounted.return_value = True
         mock_get_executor.return_value = MagicMock()
@@ -364,12 +356,10 @@ class TestPipelineExecution:
         # Verify executor was created
         assert mock_get_executor.called
 
-    @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
-    def test_pipeline_hf_home_missing(self, mock_env_vars, mock_get_config):
+    def test_pipeline_hf_home_missing(self, mock_env_vars):
         """Test that missing HF_HOME raises error."""
         mock_config = {"executor": "slurm", "containers": {}}
-        mock_get_config.return_value = mock_config
         mock_env_vars.return_value = {}  # No HF_HOME
 
         cmd = Command(command="echo test", name="cmd")
@@ -379,13 +369,11 @@ class TestPipelineExecution:
         with pytest.raises(RuntimeError, match="HF_HOME is missing"):
             pipeline.run(dry_run=True)
 
-    @patch("nemo_skills.pipeline.utils.declarative.get_cluster_config")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
     @patch("nemo_skills.pipeline.utils.declarative.is_mounted_filepath")
-    def test_pipeline_hf_home_not_mounted(self, mock_is_mounted, mock_env_vars, mock_get_config):
+    def test_pipeline_hf_home_not_mounted(self, mock_is_mounted, mock_env_vars):
         """Test that non-mounted HF_HOME raises error."""
         mock_config = {"executor": "slurm", "containers": {}}
-        mock_get_config.return_value = mock_config
         mock_env_vars.return_value = {"HF_HOME": "/hf"}
         mock_is_mounted.return_value = False
 
