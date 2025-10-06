@@ -22,6 +22,10 @@ class MegatronModel(BaseModel):
         # Megatron uses a non-standard base URL (no /v1) and a fixed model name.
         super().__init__(use_v1_endpoint=False, **kwargs)
 
+    def _get_api_key(self, api_key: str | None, api_key_env_var: str | None, base_url: str) -> str | None:
+        # Self-hosted models don't need the key, but still require the parameter
+        return "EMPTY"
+
     def _build_chat_request_params(self, **kwargs) -> dict:
         raise NotImplementedError("Megatron server does not support chat completions.")
 
