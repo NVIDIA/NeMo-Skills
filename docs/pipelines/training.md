@@ -95,11 +95,11 @@ We also support sequence packing and context parallel, espeically for training s
 (By default, our sft config set sequence_packing as True)
 ```bash
    ++policy.sequence_packing.enabled=True \
-   ++++policy.megatron_cfg.context_parallel_size=4
+   ++policy.context_parallel_size=4
 ```
 
 
-The training script will automatically convert the final saved checkpoint into the Hugging Face format and average all generated checkpoints upon completion.
+The training script will automatically convert the final saved checkpoint into the Hugging Face format and average all generated checkpoints upon completion (**checkpoints average TBD**)).
 
 
 ## Chaining pipelines with Python
