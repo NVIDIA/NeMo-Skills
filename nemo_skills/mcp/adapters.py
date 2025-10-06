@@ -108,3 +108,16 @@ def format_tool_response_by_completion_type(tool_call, result, completion_type: 
         }
     else:
         raise ValueError(f"Unsupported completion type for tool call: {completion_type}")
+
+
+def get_tool_details_by_completion_type(tool_call, completion_type: CompletionType):
+    if completion_type == CompletionType.chat:
+        tool_name = tool_call["function"]["name"]
+        tool_args = tool_call["function"]["arguments"]
+    elif completion_type == CompletionType.responses:
+        assert tool_call["type"] == "function_call", "Tool call must be a function call"
+        tool_name = tool_call["name"]
+        tool_args = tool_call["arguments"]
+    else:
+        raise ValueError(f"Unsupported completion type for tool call: {completion_type}")
+    return tool_name, tool_args

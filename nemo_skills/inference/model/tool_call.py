@@ -23,6 +23,7 @@ from typing import Dict, List
 from nemo_skills.mcp.adapters import (
     format_tool_list_by_completion_type,
     format_tool_response_by_completion_type,
+    get_tool_details_by_completion_type,
 )
 from nemo_skills.mcp.tool_manager import ToolManager
 from nemo_skills.utils import get_logger_name
@@ -61,15 +62,7 @@ class ToolCallingWrapper:
 
     async def _execute_tool_call(self, tool_call, request_id: str, completion_type: CompletionType):
         ## TODO(sanyamk): The correct key format needs to be cohesive with other formatters.
-        if completion_type == CompletionType.chat:
-            tool_name = tool_call["function"]["name"]
-            tool_args = tool_call["function"]["arguments"]
-        elif completion_type == CompletionType.responses:
-            assert tool_call["type"] == "function_call", "Tool call must be a function call"
-            tool_name = tool_call["name"]
-            tool_args = tool_call["arguments"]
-        else:
-            raise ValueError(f"Unsupported completion type for tool call: {completion_type}")
+        tool_name, tool_args = get_tool_details_by_completion_type(tool_call, completion_type)
 
         ##
         # TODO(sanyamk): Not all tool arguments might necessarily be in JSON format.
