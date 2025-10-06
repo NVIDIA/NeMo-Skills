@@ -251,7 +251,7 @@ class IOIEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 10):
         super().__init__(config, num_parallel_requests)
         self.eval_cfg = IOIEvaluatorConfig(_init_nested=True, **config)
-        self.split = self.eval_cfg.split
+        self.split = "ioi25"  # todo: this needs to be exposed to run both ioi24 and ioi25.
         self.data_dir = self.eval_cfg.data_dir
 
         # Heavy runtime resources are lazily initialized within _evaluate_entry.
