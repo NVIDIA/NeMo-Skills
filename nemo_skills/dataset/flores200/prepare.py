@@ -13,16 +13,11 @@
 # limitations under the License.
 
 import argparse
-import importlib.util
 import json
-import tempfile
-import urllib.request
 from pathlib import Path
 
-from langcodes import Language
-
 from datasets import load_dataset
-from tqdm import tqdm
+from langcodes import Language
 
 
 def write_data_to_file(output_file, datasets, src_languages, tgt_languages):
@@ -44,37 +39,35 @@ def write_data_to_file(output_file, datasets, src_languages, tgt_languages):
 
 
 def main(args):
-    
     all_languages = list(set(args.source_languages).union(set(args.target_languages)))
-    
+
     datasets = {}
     for lang in all_languages:
         iso_639_3 = Language(lang).to_alpha3()
         iso_15924 = Language(lang).maximize().script
         lang_code = f"{iso_639_3}_{iso_15924}"
-        datasets[lang] = load_dataset("openlanguagedata/flores_plus", lang_code, split=args.split)['text']
+        datasets[lang] = load_dataset("openlanguagedata/flores_plus", lang_code, split=args.split)["text"]
 
     data_dir = Path(__file__).absolute().parent
     data_dir.mkdir(exist_ok=True)
     output_file = data_dir / f"{args.split}.jsonl"
-    write_data_to_file(
-        output_file,
-        datasets,
-        src_languages=args.source_languages,
-        tgt_languages=args.target_languages
-    )
+    write_data_to_file(output_file, datasets, src_languages=args.source_languages, tgt_languages=args.target_languages)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--split", default="dev", choices=("dev", "devtest"), help="Dataset split to process.")
     parser.add_argument(
-        "--source_languages", default=["en", "de", "es", "fr", "it", "ja"],
-        nargs="+", help="Languages to translate from."
+        "--source_languages",
+        default=["en", "de", "es", "fr", "it", "ja"],
+        nargs="+",
+        help="Languages to translate from.",
     )
     parser.add_argument(
-        "--target_languages", default=["en", "de", "es", "fr", "it", "ja"],
-        nargs="+", help="Languages to translate to."
+        "--target_languages",
+        default=["en", "de", "es", "fr", "it", "ja"],
+        nargs="+",
+        help="Languages to translate to.",
     )
     args = parser.parse_args()
     main(args)
