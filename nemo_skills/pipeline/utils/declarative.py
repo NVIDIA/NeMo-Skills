@@ -65,20 +65,18 @@ Advanced Example (Multiple jobs with dependencies and heterogeneous components):
     )
 
     # Job 2: Two different model servers (HETEROGENEOUS SLURM job with 2 het components)
-    server_8b = Command(
-        command=lambda cfg: vllm_server_command(cfg, model="Qwen/Qwen3-8B"),
-        gpus=8,
-        name="server_8b"
-    )
-    sandbox_8b = Command(command=lambda cfg: sandbox_command(cfg), name="sandbox_8b")
+    # Build commands with cluster_config
+    server_8b_cmd, server_8b_meta = vllm_server_command(cluster_config, model="Qwen/Qwen3-8B")
+    sandbox_8b_cmd, sandbox_8b_meta = sandbox_command(cluster_config)
+    server_32b_cmd, server_32b_meta = vllm_server_command(cluster_config, model="Qwen/Qwen3-32B")
+    sandbox_32b_cmd, sandbox_32b_meta = sandbox_command(cluster_config)
+
+    server_8b = Command(command=server_8b_cmd, gpus=8, name="server_8b", metadata=server_8b_meta)
+    sandbox_8b = Command(command=sandbox_8b_cmd, name="sandbox_8b", metadata=sandbox_8b_meta)
     eval_8b = Command(command="python eval.py --model 8b", gpus=1, name="eval_8b")
 
-    server_32b = Command(
-        command=lambda cfg: vllm_server_command(cfg, model="Qwen/Qwen3-32B"),
-        gpus=8,
-        name="server_32b"
-    )
-    sandbox_32b = Command(command=lambda cfg: sandbox_command(cfg), name="sandbox_32b")
+    server_32b = Command(command=server_32b_cmd, gpus=8, name="server_32b", metadata=server_32b_meta)
+    sandbox_32b = Command(command=sandbox_32b_cmd, name="sandbox_32b", metadata=sandbox_32b_meta)
     eval_32b = Command(command="python eval.py --model 32b", gpus=1, name="eval_32b")
 
     group_8b = CommandGroup(commands=[server_8b, sandbox_8b, eval_8b], name="eval_8b", log_dir=log_dir)
@@ -107,7 +105,6 @@ Advanced Example (Multiple jobs with dependencies and heterogeneous components):
     pipeline.run()
 """
 
-import inspect
 import logging
 import shlex
 from contextlib import nullcontext
@@ -143,10 +140,9 @@ class Command:
     - A string: evaluated immediately
     - A callable (lambda): evaluated lazily when the task is prepared
 
-    Lambdas are needed for cross-component references (hostname_ref, meta_ref).
+    Lambdas are ONLY needed for cross-component references (hostname_ref, meta_ref).
     The het_group_index isn't assigned until pipeline execution, so these must be lazy:
-        server = Command(command=lambda cfg: vllm_server_command(cfg, ...))
-        # This lambda is ESSENTIAL - server.hostname_ref() and meta_ref() don't exist yet
+        # Lambda is ESSENTIAL here - server.hostname_ref() and meta_ref() don't exist yet
         client = Command(command=lambda: f"curl {server.hostname_ref()}:{server.meta_ref('port')}")
     """
 
@@ -189,24 +185,15 @@ class Command:
         """Prepare command for execution.
 
         This method:
-        1. Evaluates callables (resolves cross-group references and cluster_config-dependent commands)
-        2. Adds cross-group environment variables
-        3. Wraps with installation_command if provided
+        1. Evaluates callables (resolves cross-component references)
+        2. Wraps with installation_command if provided
 
         Returns:
             Tuple of (final_command, execution_config)
         """
-        # 1. Evaluate if callable (resolves cross-group references or cluster_config needs)
+        # 1. Evaluate if callable (for cross-component references like hostname_ref)
         if callable(self.command):
-            # Check if lambda needs cluster_config (for sandbox)
-
-            sig = inspect.signature(self.command)
-            if len(sig.parameters) > 0:
-                # Lambda expects cluster_config
-                result = self.command(cluster_config)
-            else:
-                # Regular lambda (cross-group refs)
-                result = self.command()
+            result = self.command()
 
             if isinstance(result, tuple):
                 final_command, runtime_metadata = result

@@ -43,7 +43,7 @@ class TestCommand:
     def test_command_with_callable(self):
         """Test Command with callable that returns tuple."""
 
-        def make_cmd(cfg):
+        def make_cmd():
             return ("echo world", {"port": 5000})
 
         cmd = Command(command=make_cmd, name="dynamic")
@@ -65,7 +65,7 @@ class TestCommand:
     def test_command_prepare_for_execution_callable(self):
         """Test prepare_for_execution with callable command."""
 
-        def make_cmd(cfg):
+        def make_cmd():
             return "echo test"
 
         cmd = Command(command=make_cmd, name="test")
@@ -78,7 +78,7 @@ class TestCommand:
     def test_command_prepare_for_execution_callable_with_metadata(self):
         """Test prepare_for_execution with callable returning tuple."""
 
-        def make_cmd(cfg):
+        def make_cmd():
             return ("echo metadata", {"num_tasks": 4, "environment": {"VAR": "value"}})
 
         cmd = Command(command=make_cmd, name="test")
@@ -89,19 +89,6 @@ class TestCommand:
         assert final_cmd == "echo metadata"
         assert exec_config["num_tasks"] == 4
         assert exec_config["environment"]["VAR"] == "value"
-
-    def test_command_prepare_for_execution_with_cluster_config(self):
-        """Test prepare_for_execution with callable needing cluster_config."""
-
-        def make_cmd(cfg):
-            return f"echo {cfg['test_param']}"
-
-        cmd = Command(command=make_cmd, name="test")
-        cluster_config = {"executor": "local", "containers": {}, "test_param": "value123"}
-
-        final_cmd, exec_config = cmd.prepare_for_execution(cluster_config)
-
-        assert final_cmd == "echo value123"
 
     def test_command_meta_ref(self):
         """Test meta_ref for accessing metadata."""
