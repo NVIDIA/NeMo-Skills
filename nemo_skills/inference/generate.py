@@ -226,8 +226,7 @@ class GenerateSolutionsConfig:
 
     def _post_init_deprecated_params(self):
         if self.use_completions_api:
-            self.inference.completion_type = CompletionType.text
-            LOG.warning("use_completions_api is deprecated, please use ++inference.completion_type=text instead.")
+            raise ValueError("use_completions_api is deprecated, please use ++inference.completion_type=text instead.")
 
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
