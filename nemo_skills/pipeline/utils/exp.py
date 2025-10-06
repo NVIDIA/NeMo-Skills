@@ -634,6 +634,8 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
         # Can only check cluster mounts here, not those added to add_task
         mounts = get_mounts_from_config(cluster_config)
         mount_sources = [m.split(":")[0] for m in mounts]
+
+        LOG.info("Checking mount paths: %s", mount_sources)
         check_remote_mount_directories(mount_sources, cluster_config, exit_on_failure=True)
 
     if cluster_config["executor"] != "slurm":
