@@ -68,7 +68,7 @@ def format_tool_list_by_completion_type(tools, completion_type: CompletionType):
                 "name": t["name"],
                 "description": t["description"],
                 "parameters": t["input_schema"],
-                "strict": True,
+                "strict": True,  # Less vllm errors through structured output
             }
             for t in tools
         ]

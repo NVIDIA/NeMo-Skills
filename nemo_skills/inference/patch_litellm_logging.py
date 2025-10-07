@@ -15,6 +15,9 @@
 """
 Patch for litellm.litellm_core_utils.logging_worker.LoggingWorker
 to disable its functionality and make all methods no-op.
+
+Currently, the async_loop function in generate.py sometimes gets stuck forever because some of the coroutines in the litellm logging worker are not finished.
+Debugging why the logger is not finished is non-trivial, so we just patch it to disable its functionality.
 """
 
 from typing import Coroutine
