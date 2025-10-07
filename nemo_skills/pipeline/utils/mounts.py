@@ -56,6 +56,18 @@ def check_if_mounted(cluster_config, path_to_check):
         raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
 
 
+def _resolve_path_placeholders(path: str) -> str:
+    """Resolve environment variable placeholders in a path."""
+    if path is not None and "${" in path and "}" in path:
+        path = os.path.expandvars(path)
+        if "$" in path or "{" in path or "}" in path:
+            raise ValueError(
+                f"Path `{path}` contains env variable placeholders, but the required env var is "
+                f"not provided in the environment to resolve."
+            )
+    return path
+
+
 def check_mounts(
     cluster_config,
     log_dir: str,
@@ -92,15 +104,7 @@ def check_mounts(
     if check_mounted_paths:
         for path, default_mount in mount_map.items():
             # Check if path contains ${} env variables placeholders
-            if path is not None and "${" in path and "}" in path:
-                path = os.path.expandvars(path)
-
-                # Replace ${VAR} with the value from env_vars
-                if "$" in path:
-                    raise ValueError(
-                        f"Cluster config item `{path}` contains env variable placeholders, but the required env var is "
-                        f"not provided in the cluster config or environment to resolve."
-                    )
+            path = _resolve_path_placeholders(path)
 
             if not is_mounted_filepath(cluster_config, path):
                 # check if the path is a file or a directory
@@ -129,15 +133,7 @@ def check_mounts(
         # Just check if the paths are mounted
         for path in mount_map.keys():
             if path is not None:
-                if "${" in path and "}" in path:
-                    path = os.path.expandvars(path)
-
-                    # Replace ${VAR} with the value from env_vars
-                    if "$" in path:
-                        raise ValueError(
-                            f"Cluster config item `{path}` contains env variable placeholders, but the required env var is "
-                            f"not provided in the cluster config or environment to resolve."
-                        )
+                path = _resolve_path_placeholders(path)
 
                 check_if_mounted(cluster_config, path)
 
