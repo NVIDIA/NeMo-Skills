@@ -1,0 +1,29 @@
+cluster: local
+base_output_dir: ""
+expname: ""
+suffix: ""  # Suffix for experiment names
+
+
+# Input file for the first stage (generate_solutions)
+
+# It must include the field "problem"
+# All the data in this file will be processed with the same prompt
+# Make sure the problems fit the prompt you are using
+input_file: ""
+
+# Can define initial dependency for the `generate_solutions` stage to run after
+initial_dependency: ""
+
+# Define the full sequence of stages for this mode
+pipeline_stages:
+  - filter_problems          # Filter problems based on format
+
+# Directory structure configuration
+directories:
+  step-0-filter-problems: ${base_output_dir}/solution-sdg/step-0-filter-problems
+  
+# Stage-specific configurations
+stages:
+  filter_problems:
+    output_dir: ${directories.step-0-filter-problems}
+    input_file: ${input_file}
