@@ -106,7 +106,7 @@ ns nemo_rl sft \
 
 If you have a job timeout, it's necessary to set the maximum time per run to 40 minutes
 before the timeout to allow for the final checkpoint to be saved. E.g. if your timeout is 4 hours,
-add `++checkpointing.checkpoint_must_save_by=00:03:20:00 `
+add `++checkpointing.checkpoint_must_save_by=00:03:20:00`
 
 
 If you want to follow up with evaluation, see

@@ -69,7 +69,7 @@ nav:
     - LLM-as-a-judge: pipelines/llm-as-a-judge.md
     - Decontamination: pipelines/decontamination.md
     - Training (NeMo-RL): pipelines/training.md
-    - Training (verl, OpenRLHF): pipelines/training-verl-openrlhf.md
+    - Training (verl): pipelines/training-verl.md
     - Arbitrary commands: pipelines/run-cmd.md
   - Evaluation:
     - evaluation/index.md

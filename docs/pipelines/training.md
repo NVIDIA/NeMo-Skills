@@ -67,7 +67,7 @@ The training will finish earlier once either the specified number of epochs or s
 
 ```bash
     ++sft.max_num_epochs=2 \
-    ++sft.max_num_stepss=1000 \
+    ++sft.max_num_steps=1000 \
 ```
 
 It is also recommended to tune the micro batch size and tensor parallel parameters for optimal performance.
