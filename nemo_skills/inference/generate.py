@@ -308,7 +308,10 @@ class GenerationTask:
         # Setup evaluator if specified
         self.evaluator = None
         if self.cfg.eval_type:
-            from nemo_skills.evaluation.evaluator import get_evaluator_class, supports_single_eval
+            from nemo_skills.evaluation.evaluator import (
+                get_evaluator_class,
+                supports_single_eval,
+            )
 
             if not supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
                 raise ValueError(
@@ -527,15 +530,20 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        result = await self._generate_with_semaphore(**generation_params)
+        result = await self.generate_with_semaphore(**generation_params)
 
         if self.cfg.count_prompt_tokens:
             input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
             result["input_sequence_length"] = input_sequence_length
         return result
 
-    async def _generate_with_semaphore(self, **generation_params):
-        """Generate with semaphore control - ensures max_concurrent_requests LLM calls system-wide."""
+    async def generate_with_semaphore(self, **generation_params):
+        """Generate with semaphore control.
+
+        Ensures no more than max_concurrent_requests LLM calls can be run at the same time.
+        Should work even if process_single_datapoint is doing multiple requests in parallel
+        as long as those requests also use this function.
+        """
         async with self.semaphore:
             return await self.llm.generate_async(**generation_params)
 
@@ -548,9 +556,9 @@ class GenerationTask:
             data_point.update(eval_results)
         return data_point
 
-    async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
-        """Process a single data point without datapoint-level semaphore (LLM calls are controlled individually)."""
-        # Generate output for this single data point (semaphore control moved to _generate_with_semaphore)
+    async def _generate_and_save_datapoint(self, data_point, all_data, fout, pbar):
+        """Starts generation, evaluation and saves the output for a single data point."""
+        # Generate output for this single data point
         start_time = time.time()
         output = await self.process_single_datapoint(data_point, all_data)
         end_time = time.time()
@@ -602,7 +610,7 @@ class GenerationTask:
             # Create tasks for all remaining data points
             tasks = []
             for data_point in remaining_data_points:
-                task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
+                task = asyncio.create_task(self._generate_and_save_datapoint(data_point, data, fout, pbar))
                 tasks.append(task)
 
             # Wait for all tasks to complete
