@@ -20,18 +20,9 @@ from dataclasses import field
 
 import hydra
 
-from nemo_skills.inference.generate import (
-    GenerateSolutionsConfig,
-    GenerationTask,
-    InferenceConfig,
-)
+from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
-from nemo_skills.utils import (
-    get_help_message,
-    get_logger_name,
-    nested_dataclass,
-    setup_logging,
-)
+from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -73,27 +64,19 @@ cs.store(name="base_check_contamination_config", node=CheckContaminationConfig)
 
 class CheckContaminationTask(GenerationTask):
     def __init__(self, cfg: CheckContaminationConfig):
-        LOG.info("Initializing CheckContaminationTask")
         super().__init__(cfg)
-        LOG.info("CheckContaminationTask initialized successfully")
 
     def load_data(self):
-        LOG.info("Loading data...")
         # Load the data as done in the base class
         data = super().load_data()
-        LOG.info("Data loaded: %d data points", len(data))
 
         # Adjust the batch size to account for the number of similar items
         if self.cfg.top_k is None:
             self.cfg.top_k = len(data[0]["similar_items"])
-            LOG.info("Set top_k to %d based on first data point", self.cfg.top_k)
-        else:
-            LOG.info("Using configured top_k: %d", self.cfg.top_k)
 
         return data
 
     def log_example_prompt(self, data):
-        LOG.info("Logging example prompt...")
         data_point = data[0]
         query_item = data_point[self.cfg.retrieve_key]
         similar_item = data_point["similar_items"][0]
@@ -109,7 +92,6 @@ class CheckContaminationTask(GenerationTask):
 
     def _create_query_data(self, data_point):
         """Create query instances given the original instance"""
-        LOG.info("Creating query data for data point with %d similar items", len(data_point["similar_items"]))
         query_data = []
         for similar_item in data_point["similar_items"][: self.cfg.top_k]:
             query_data.append(
@@ -127,52 +109,39 @@ class CheckContaminationTask(GenerationTask):
                     }
                 )
 
-        LOG.info("Created %d query instances", len(query_data))
         return query_data
 
     def prefill_generation(self, data_point):
         """Prefill contamination if there is a string match between the problem and the similar items"""
-        LOG.info("Checking for string match prefill...")
         for similar_item in data_point["similar_items"]:
             if data_point[self.cfg.retrieve_key].strip().lower() == similar_item.strip().lower():
-                LOG.info("Found exact string match - prefilling as contaminated")
                 return {"generation": True}
-        LOG.info("No exact string match found")
         return None
 
     async def process_single_datapoint(self, data_point, all_data):
         """Process a single data point by running contamination checks on all similar items."""
-        LOG.info("Processing single datapoint...")
         query_data = self._create_query_data(data_point)
-        LOG.info("Created %d queries to process", len(query_data))
 
-        # Create tasks for all queries using the semaphore-controlled generate method
+        # Create tasks for all queries using super().process_single_datapoint
         tasks = []
-        for idx, query_point in enumerate(query_data):
-            LOG.info("Creating task %d/%d", idx + 1, len(query_data))
-            # Call the parent's process_single_datapoint which now uses _generate_with_semaphore
+        for query_point in query_data:
             tasks.append(super().process_single_datapoint(query_point, all_data))
 
-        LOG.info("Gathering results from %d tasks...", len(tasks))
         query_results = await asyncio.gather(*tasks)
-        LOG.info("All tasks completed, processing results...")
 
         # Process results to determine if contaminated
         all_generations = []
         contaminated = False
-        for idx, result in enumerate(query_results):
+        for result in query_results:
             generation = result["generation"]
             all_generations.append(generation)
-            LOG.info("Result %d/%d: %s", idx + 1, len(query_results), generation)
             if generation.strip() == "True":
                 contaminated = True
 
-        LOG.info("Datapoint processing complete. Contaminated: %s", contaminated)
         return {"all_generations": all_generations, "generation": contaminated}
 
     def postprocess(self):
         """Postprocess the output file to calculate the contamination portion."""
-        LOG.info("Starting postprocessing of output file: %s", self.cfg.output_file)
         num_contaminated, total = 0, 0
         with open(self.cfg.output_file, "r", encoding="utf-8", buffering=1) as fin:
             for line in fin:
@@ -180,12 +149,9 @@ class CheckContaminationTask(GenerationTask):
                 data_point = json.loads(line)
                 if data_point[self.cfg.generation_key]:
                     num_contaminated += 1
-                if total % 100 == 0:
-                    LOG.info("Processed %d lines so far...", total)
 
         if total > 0:
             LOG.info("Contamination portion: %.2f%% (%d/%d)", 100 * num_contaminated / total, num_contaminated, total)
-        LOG.info("Postprocessing complete")
 
 
 GENERATION_TASK_CLASS = CheckContaminationTask
@@ -194,15 +160,11 @@ GENERATION_TASK_CLASS = CheckContaminationTask
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name="base_check_contamination_config")
 def check_contamination(cfg: CheckContaminationConfig):
-    LOG.info("Starting check_contamination with config")
     cfg = CheckContaminationConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
-    LOG.info("Creating CheckContaminationTask...")
     task = CheckContaminationTask(cfg)
-    LOG.info("Starting generation...")
     task.generate()
-    LOG.info("Generation complete")
 
 
 HELP_MESSAGE = get_help_message(

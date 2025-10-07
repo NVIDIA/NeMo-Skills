@@ -257,7 +257,6 @@ class GenerationTask:
         Args:
             cfg: GenerateSolutionsConfig object with the configuration parameters or subclass.
         """
-        LOG.info("Initializing GenerationTask")
         self.cfg = cfg
 
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
@@ -273,7 +272,6 @@ class GenerationTask:
                 self.cfg.chat_template_kwargs = None
 
         # Setup tokenizer
-        LOG.info("Setting up tokenizer")
         if (
             self.cfg.use_completions_api
             or self.cfg.server.get("enable_soft_fail", False)
@@ -283,46 +281,34 @@ class GenerationTask:
             self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
         else:
             self.tokenizer = None
-        LOG.info("Tokenizer setup complete: %s", self.tokenizer)
 
         # Setup litellm cache
-        LOG.info("Setting up litellm cache")
         self.setup_litellm_cache()
 
         if self.cfg.use_completions_api and self.cfg.inference.tokens_to_generate is None:
             raise ValueError("When using completions API, tokens_to_generate must be specified!")
 
         # Setup prompt formatter and LLM
-        LOG.info("Setting up prompt formatter")
         self.prompt = self.setup_prompt()
-        LOG.info("Setting up LLM")
         self.llm = self.setup_llm()
-        LOG.info("LLM setup complete")
 
         # Setup hf_tokenizer for counting prompt tokens
-        LOG.info("Setting up HF tokenizer for prompt token counting")
         self.hf_tokenizer = None
         if self.cfg.count_prompt_tokens:
             self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
 
             if self.hf_tokenizer is None:
                 raise ValueError("Tokenizer could not be initialized. Needed for counting prompt tokens.")
-        LOG.info("HF tokenizer setup complete")
 
         if self.cfg.code_execution:
-            LOG.info("Getting code execution args from prompt")
             self.extra_generate_params = self.prompt.get_code_execution_args()
         else:
             self.extra_generate_params = {}
 
         # Setup evaluator if specified
-        LOG.info("Setting up evaluator if specified")
         self.evaluator = None
         if self.cfg.eval_type:
-            from nemo_skills.evaluation.evaluator import (
-                get_evaluator_class,
-                supports_single_eval,
-            )
+            from nemo_skills.evaluation.evaluator import get_evaluator_class, supports_single_eval
 
             if not supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
                 raise ValueError(
@@ -331,7 +317,6 @@ class GenerationTask:
                 )
 
             self.evaluator = get_evaluator_class(self.cfg.eval_type, self.cfg.eval_config)
-        LOG.info("Evaluator setup complete: %s", self.evaluator)
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
@@ -340,7 +325,6 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        LOG.info("Initializing semaphore for concurrent requests")
         if self.cfg.parallel_thinking.mode is not None:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
             self.semaphore = asyncio.Semaphore(
@@ -348,14 +332,11 @@ class GenerationTask:
             )
         else:
             self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
-        LOG.info("Semaphore initialized")
 
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
-        LOG.info("GenerationTask initialization complete")
 
     def setup_prompt(self):
-        LOG.info("Setting up prompt with format: %s", self.cfg.prompt_format)
         if self.cfg.prompt_format == "openai":
             return None
 
@@ -371,16 +352,11 @@ class GenerationTask:
         return prompt
 
     def setup_llm(self):
-        LOG.info("Setting up sandbox if required")
         self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
-        LOG.info("Sandbox setup complete: %s", self.sandbox)
 
-        LOG.info("Setting up LLM model")
         if self.cfg.code_execution:
-            LOG.info("Using code execution model")
             llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
         elif self.cfg.tool_modules is not None:
-            LOG.info("Using tool calling model with modules: %s", self.cfg.tool_modules)
             llm = get_tool_calling_model(
                 **self.cfg.server,
                 tool_modules=self.cfg.tool_modules,
@@ -389,11 +365,9 @@ class GenerationTask:
                 additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
-            LOG.info("Using standard model")
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
         if self.cfg.parallel_thinking.mode is not None:
-            LOG.info("Wrapping model with parallel thinking")
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
                 "remove_thinking": self.cfg.parallel_thinking.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
@@ -408,26 +382,21 @@ class GenerationTask:
                 inference_override_config=inference_override_config,
             )
 
-        LOG.info("LLM model setup complete")
         return llm
 
     def log_example_prompt(self, data):
-        LOG.info("Logging example prompt")
         data_point = deepcopy(data[0])
 
         LOG.info("Example prompt:\nData dictionary: %s\nPrompt: %s", data_point, self.fill_prompt(data_point, data))
 
     def load_data(self):
-        LOG.info("Loading data from: %s", self.cfg.input_file)
         data = []
         with open(self.cfg.input_file, "rt", encoding="utf-8") as fin:
             for line in fin:
                 data.append(json.loads(line))
-        LOG.info("Loaded %d data points", len(data))
 
         # chunk the dataset if required
         if self.cfg.num_chunks is not None and self.cfg.chunk_id is not None:
-            LOG.info("Chunking data into %d chunks, processing chunk %d", self.cfg.num_chunks, self.cfg.chunk_id)
             data, self.cfg.output_file = chunk_data(data, self.cfg.output_file, self.cfg.chunk_id, self.cfg.num_chunks)
             LOG.info(
                 f"Chunking the data into {self.cfg.num_chunks} chunks and processing chunk {self.cfg.chunk_id}.\n"
@@ -435,15 +404,12 @@ class GenerationTask:
             )
 
         if self.cfg.max_samples > 0:
-            LOG.info("Limiting to max_samples: %d", self.cfg.max_samples)
             data = data[: self.cfg.max_samples]
 
-        LOG.info("Data loading complete, final count: %d", len(data))
         return data
 
     def preprocess_data(self, data):
         """A placeholder for any data preprocessing that needs to be done before generation."""
-        LOG.info("Preprocessing data (default: no-op)")
         return data
 
     def postprocess(self):
@@ -451,19 +417,15 @@ class GenerationTask:
 
         Data is already saved to self.cfg.output_file, so it can be read and re-saved from there.
         """
-        LOG.info("Postprocessing data (default: no-op)")
         pass
 
     def skip_completed_samples(self, data):
-        LOG.info("Checking for completed samples to skip")
         # if non-async file exists and we are asked to skip filled, then there is no more data to process
         if self.cfg.skip_filled and Path(self.cfg.output_file).exists():
-            LOG.info("Output file exists and skip_filled is True, no data to process")
             return []
 
         filled_positions = set()
         if self.cfg.skip_filled:
-            LOG.info("skip_filled is True, checking for async file")
             if self.cfg.num_chunks:
                 chunk_index = self.cfg.output_file.rfind("_chunk")
                 base_output_file = self.cfg.output_file[:chunk_index] + ".jsonl"
@@ -471,15 +433,12 @@ class GenerationTask:
                     LOG.warning(f"File `{base_output_file}` exists, skipping generation")
                     return []
             try:
-                LOG.info("Loading filled positions from async file: %s", self.cfg.output_file + "-async")
                 with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
                     for line in fin:
                         filled_positions.add(int(json.loads(line)[self.cfg.async_position_key]))
-                LOG.info("Found %d filled positions", len(filled_positions))
             except FileNotFoundError:
                 LOG.warning(f"File `{self.cfg.output_file}-async` not found, starting from scratch")
 
-        LOG.info("Building remaining data list")
         remaining_data = []
         for idx, dp in enumerate(data):
             if idx in filled_positions:
@@ -490,7 +449,6 @@ class GenerationTask:
             dp[self.cfg.async_position_key] = idx
             remaining_data.append(dp)
 
-        LOG.info("Remaining data points to process: %d (skipped %d)", len(remaining_data), len(filled_positions))
         return remaining_data
 
     # TODO: data will not include any samples skipped after restart
@@ -526,7 +484,6 @@ class GenerationTask:
         return filled_prompt
 
     def dump_outputs(self, outputs, data_points, fout):
-        LOG.info("Dumping %d outputs to file", len(outputs))
         for output, original_data_point in zip(outputs, data_points):
             # to make it easier to follow up with evaluation and limit accidental errors, we are adding
             # all of the ground-truth data to the output file alongside the generated solutions
@@ -545,7 +502,6 @@ class GenerationTask:
             if self.cfg.remove_thinking:
                 remove_thinking(output, self.cfg.generation_key, self.cfg.thinking_begin, self.cfg.thinking_end)
             fout.write(json.dumps(output) + "\n")
-        LOG.info("Output dumping complete")
 
     def prefill_generation(self, data_point) -> dict | None:
         """Prefill generation in case LLM is not required."""
@@ -553,7 +509,6 @@ class GenerationTask:
         return None
 
     async def process_single_datapoint(self, data_point, all_data):
-        LOG.info("Processing single datapoint at position: %s", data_point.get(self.cfg.async_position_key))
         # Handle inference config - check if it's a dataclass or already a dict
         if is_dataclass(self.cfg.inference):
             inference_params = asdict(self.cfg.inference)
@@ -561,7 +516,6 @@ class GenerationTask:
             # Already a dict from Hydra
             inference_params = dict(self.cfg.inference)
 
-        LOG.info("Filling prompt for datapoint")
         generation_params = {
             **inference_params,
             **self.extra_generate_params,
@@ -573,12 +527,9 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        LOG.info("Calling LLM generate_async for position: %s", data_point.get(self.cfg.async_position_key))
         result = await self._generate_with_semaphore(**generation_params)
-        LOG.info("LLM generation complete for position: %s", data_point.get(self.cfg.async_position_key))
 
         if self.cfg.count_prompt_tokens:
-            LOG.info("Counting prompt tokens")
             input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
             result["input_sequence_length"] = input_sequence_length
         return result
@@ -590,20 +541,15 @@ class GenerationTask:
 
     async def apply_evaluation_hook(self, data_point):
         if self.evaluator:
-            LOG.info("Applying evaluation hook for position: %s", data_point.get(self.cfg.async_position_key))
             eval_start_time = time.time()
             eval_results = await self.evaluator.eval_single(data_point)
             eval_end_time = time.time()
             data_point["interleaved_eval_single_time_s"] = eval_end_time - eval_start_time
             data_point.update(eval_results)
-            LOG.info("Evaluation complete for position: %s", data_point.get(self.cfg.async_position_key))
         return data_point
 
     async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
         """Process a single data point without datapoint-level semaphore (LLM calls are controlled individually)."""
-        position = data_point.get(self.cfg.async_position_key)
-        LOG.info("Processing datapoint at position: %s", position)
-
         # Generate output for this single data point (semaphore control moved to _generate_with_semaphore)
         start_time = time.time()
         output = await self.process_single_datapoint(data_point, all_data)
@@ -615,28 +561,25 @@ class GenerationTask:
             output["generation_time"] = end_time - start_time
 
         # Apply evaluation hook if configured
-        LOG.info("Applying evaluation hook for position: %s", position)
+        # TODO: note that this currently only evaluates independently--if there
+        # is any post-processing that needs to be done on the full set of
+        # generations, this will not work correctly, and we might need another
+        # hook at the end of generation to make it work properly
         output = await self.apply_evaluation_hook({**data_point, **output})
 
         # Thread-safe output writing
-        LOG.info("Waiting for output lock for position: %s", position)
         async with self.output_lock:
-            LOG.info("Acquired output lock, writing output for position: %s", position)
             self.dump_outputs([output], [data_point], fout)
             pbar.update(1)
-            LOG.info("Output written and lock released for position: %s", position)
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
-        LOG.info("Starting async loop for %d data points", len(data))
 
         # Initialize output lock for thread-safe writing
         if self.output_lock is None:
-            LOG.info("Initializing output lock")
             self.output_lock = asyncio.Lock()
 
         # We first segregate the data into prefilled and non-prefilled data points
-        LOG.info("Segregating prefilled and non-prefilled data points")
         prefilled_data_points, prefilled_outputs = [], []
         remaining_data_points = []
 
@@ -648,115 +591,79 @@ class GenerationTask:
             else:
                 remaining_data_points.append(data_point)
 
-        LOG.info(
-            "Prefilled data points: %d, Remaining data points: %d",
-            len(prefilled_data_points),
-            len(remaining_data_points),
-        )
-
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
 
-        LOG.info("Opening output file: %s", self.cfg.output_file + "-async")
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
-                LOG.info("Writing %d prefilled data points", len(prefilled_data_points))
                 async with self.output_lock:
                     self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
-                LOG.info("Prefilled data points written")
 
             # Create tasks for all remaining data points
-            LOG.info("Creating tasks for %d remaining data points", len(remaining_data_points))
             tasks = []
             for data_point in remaining_data_points:
                 task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
                 tasks.append(task)
-            LOG.info("Created %d tasks", len(tasks))
 
             # Wait for all tasks to complete
             if tasks:
-                LOG.info("Waiting for all tasks to complete")
                 await asyncio.gather(*tasks)
-                LOG.info("All tasks completed")
 
             pbar.close()
 
-        LOG.info("Restoring async order")
         self.restore_async_order()
-        LOG.info("Async loop complete")
 
     def restore_async_order(self):
-        LOG.info("Restoring async order from file: %s", self.cfg.output_file + "-async")
         # After we are done, need to restore the order and resave without position ids
         with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
             generations = [json.loads(line) for line in fin]
-        LOG.info("Read %d generations from async file", len(generations))
 
-        LOG.info("Reordering generations")
         ordered_generations = [None] * len(generations)
         for gen_dict in generations:
             async_pos = gen_dict.pop(self.cfg.async_position_key)
             ordered_generations[async_pos] = gen_dict
 
-        LOG.info("Writing ordered generations to: %s", self.cfg.output_file)
         with open(self.cfg.output_file, "wt", encoding="utf-8") as fout:
             for gen_dict in ordered_generations:
                 fout.write(json.dumps(gen_dict) + "\n")
-        LOG.info("Ordered generations written")
 
-        LOG.info("Removing async file")
         Path(self.cfg.output_file + "-async").unlink()
-        LOG.info("Cleaning up litellm cache")
         self.cleanup_litellm_cache()
-        LOG.info("Restore async order complete")
 
     def wait_for_server(self):
-        LOG.info("Waiting for server to be ready")
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
         if not server_address:
             LOG.info("Skipping server wait as no server address is provided.")
             return
-        LOG.info("Running server wait command for address: %s", server_address)
         server_start_cmd = get_server_wait_cmd(server_address)
         subprocess.run(server_start_cmd, shell=True, check=True)
-        LOG.info("Server is ready")
 
     def setup_litellm_cache(self):
         if self.cfg.enable_litellm_cache:
-            LOG.info("Setting up litellm cache")
             # One cache per (output_file_name, chunk_id) pair
             output_file_name = Path(self.cfg.output_file).name
             self.litellm_cache_dir = (
                 Path(self.cfg.output_file).parent / "litellm_cache" / f"{output_file_name}_{self.cfg.chunk_id or 0}"
             )
             litellm.cache = litellm.Cache(type="disk", disk_cache_dir=self.litellm_cache_dir)
-            LOG.info("Litellm cache setup at: %s", self.litellm_cache_dir)
 
     def cleanup_litellm_cache(self):
         if self.cfg.enable_litellm_cache:
-            LOG.info("Cleaning up litellm cache at: %s", self.litellm_cache_dir)
             shutil.rmtree(self.litellm_cache_dir)
-            LOG.info("Litellm cache cleaned up")
 
     def generate(self):
-        LOG.info("Starting generation process")
-        LOG.info("Output file: %s", self.cfg.output_file)
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
 
-        LOG.info("Loading data")
         data = self.load_data()
 
-        LOG.info("Skipping completed samples")
         data = self.skip_completed_samples(data)
 
         if len(data) == 0:
             LOG.info("No data to process, exiting.")
             return
 
-        LOG.info("Preprocessing data")
         data = self.preprocess_data(data)
 
-        LOG.info("Logging example prompt")
         self.log_example_prompt(data)
 
         if self.cfg.dry_run:
@@ -764,19 +671,14 @@ class GenerationTask:
             return
 
         if not self.cfg.skip_filled:
-            LOG.info("Removing existing output files as skip_filled is False")
             for output_path in [Path(self.cfg.output_file), Path(self.cfg.output_file + "-async")]:
                 if output_path.exists():
-                    LOG.info("Removing file: %s", output_path)
                     output_path.unlink()
 
         self.wait_for_server()
-        LOG.info("Starting async loop")
         asyncio.run(self.async_loop(data))
 
-        LOG.info("Running postprocessing")
         self.postprocess()
-        LOG.info("Generation process complete")
 
 
 GENERATION_TASK_CLASS = GenerationTask
@@ -785,15 +687,11 @@ GENERATION_TASK_CLASS = GenerationTask
 # Update the hydra main to use the class method
 @hydra.main(version_base=None, config_name="base_generation_config")
 def generate(cfg: GenerateSolutionsConfig):
-    LOG.info("Hydra main function called")
     cfg = GenerateSolutionsConfig(_init_nested=True, **cfg)
     LOG.info("Config used: %s", cfg)
 
-    LOG.info("Creating GenerationTask instance")
     task = GenerationTask(cfg)
-    LOG.info("Starting generation")
     task.generate()
-    LOG.info("Generation complete")
 
 
 HELP_MESSAGE = get_help_message(
@@ -807,7 +705,5 @@ if __name__ == "__main__":
     if "--help" in sys.argv or "-h" in sys.argv:
         print(HELP_MESSAGE)
     else:
-        LOG.info("Setting up logging")
         setup_logging()
-        LOG.info("Calling generate function")
         generate()
