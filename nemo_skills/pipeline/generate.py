@@ -104,6 +104,9 @@ def generate(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(
+        None, help="Can specify if need interactive jobs or a specific non-default partition for GB200 GPU"
+    ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     eval_args: str = typer.Option(
         None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
@@ -310,6 +313,7 @@ def generate(
                         container=cluster_config["containers"]["nemo-skills"],
                         cluster_config=cluster_config,
                         partition=partition,
+                        qos=qos,
                         time_min=time_min,
                         server_config=server_config,
                         with_sandbox=with_sandbox,

@@ -129,6 +129,9 @@ def eval(
         "Can provide a list directly when using through Python",
     ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
+    qos: str = typer.Option(
+        None, help="Can specify if need interactive jobs or a specific non-default partition for GB200 GPU"
+    ),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
@@ -354,6 +357,7 @@ def eval(
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,
                     partition=partition,
+                    qos=qos,
                     time_min=time_min,
                     server_config=job_server_config,
                     with_sandbox=job_needs_sandbox or with_sandbox,
@@ -422,6 +426,7 @@ def eval(
                 log_dir=log_dir + "/judge",
                 cluster=cluster,
                 partition=partition,
+                qos=qos,
                 time_min=time_min,
                 with_sandbox=with_sandbox,
                 keep_mounts_for_sandbox=keep_mounts_for_sandbox,

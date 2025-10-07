@@ -46,6 +46,9 @@ def prepare_data(
     ),
     expname: str = typer.Option("prepare-data", help="Experiment name for data preparation"),
     partition: str = typer.Option(None, help="Slurm partition to use"),
+    qos: str = typer.Option(
+        None, help="Can specify if need interactive jobs or a specific non-default partition for GB200 GPU"
+    ),
     time_min: str = typer.Option(None, help="Time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
@@ -134,6 +137,7 @@ def prepare_data(
         command=command,
         expname=expname,
         partition=partition,
+        qos=qos,
         time_min=time_min,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
