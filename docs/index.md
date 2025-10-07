@@ -24,7 +24,7 @@ Here are some of the features we support:
         - [**Multilingual capabilities**](./evaluation/multilingual.md): e.g. [mmlu-prox](./evaluation/multilingual.md#mmlu-prox), [flores-200](./evaluation/multilingual.md#FLORES-200), [wmt24pp](./evaluation/multilingual.md#wmt24pp)
         - [**Robustness evaluation**](./evaluation/robustness.md): Evaluate model sensitvity against changes in prompt.
     - Easily parallelize each evaluation across many Slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
-- [Model training](pipelines/training.md): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
+- [Model training](pipelines/training.md): Train models using [NeMo-RL](https://github.com/NVIDIA-NeMo/RL/), or [verl](https://github.com/volcengine/verl).
 
 
 To get started, follow these [steps](basics/index.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
