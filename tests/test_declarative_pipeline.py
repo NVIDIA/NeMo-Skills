@@ -200,13 +200,12 @@ class TestPipeline:
         cmd2 = Command(command="echo 2", name="cmd2")
         group2 = CommandGroup(commands=[cmd2], name="group2", log_dir="/logs")
 
-        jobs = [
-            {"name": "job1", "group": group1},
-            {"name": "job2", "group": group2, "dependencies": ["job1"]},
-        ]
+        job1 = {"name": "job1", "group": group1}
+        job2 = {"name": "job2", "group": group2, "dependencies": [job1]}
+
         cluster_config = {"executor": "local", "containers": {}}
 
-        pipeline = Pipeline(name="test_pipeline", cluster_config=cluster_config, jobs=jobs)
+        pipeline = Pipeline(name="test_pipeline", cluster_config=cluster_config, jobs=[job1, job2])
 
         assert pipeline.name == "test_pipeline"
         assert len(pipeline.jobs) == 2
@@ -313,11 +312,10 @@ class TestPipelineExecution:
         cmd2 = Command(command="echo 2", name="cmd2")
         group2 = CommandGroup(commands=[cmd2], name="group2", log_dir="/logs")
 
-        jobs = [
-            {"name": "job1", "group": group1},
-            {"name": "job2", "group": group2, "dependencies": ["job1"]},
-        ]
-        pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=jobs, skip_hf_home_check=True)
+        job1 = {"name": "job1", "group": group1, "dependencies": []}
+        job2 = {"name": "job2", "group": group2, "dependencies": [job1]}
+
+        pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=[job1, job2], skip_hf_home_check=True)
 
         # Run pipeline
         pipeline.run(dry_run=True)

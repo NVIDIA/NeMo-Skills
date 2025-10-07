@@ -63,6 +63,7 @@ Advanced Example (Multiple jobs with dependencies and heterogeneous components):
         name="prep",
         log_dir=log_dir
     )
+    prep_job = {"name": "prep", "group": prep_group}
 
     # Job 2: Two different model servers (HETEROGENEOUS SLURM job with 2 het components)
     # Build commands with cluster_config
@@ -82,6 +83,8 @@ Advanced Example (Multiple jobs with dependencies and heterogeneous components):
     group_8b = CommandGroup(commands=[server_8b, sandbox_8b, eval_8b], name="eval_8b", log_dir=log_dir)
     group_32b = CommandGroup(commands=[server_32b, sandbox_32b, eval_32b], name="eval_32b", log_dir=log_dir)
 
+    evals_job = {"name": "evals", "groups": [group_8b, group_32b], "dependencies": [prep_job]}
+
     # Job 3: Report generation (depends on both evaluations)
     report = Command(
         command="python generate_report.py --output report.txt",
@@ -95,13 +98,12 @@ Advanced Example (Multiple jobs with dependencies and heterogeneous components):
         name="full_pipeline",
         cluster_config=cluster_config,
         jobs=[
-            {"name": "prep", "group": prep_group},
-
-            # Multi-group heterogeneous job (both eval groups in ONE SLURM job with 2 het components)
-            {"name": "evals", "groups": [group_8b, group_32b], "dependencies": ["prep"]},
-
-            # Report depends on the multi-group eval job
-            {"name": "report", "group": report_group, "dependencies": ["evals"]},
+            prep_job,
+            evals_job,
+            # Report depends on the eval job (internal) and some external experiment (string)
+            {"name": "report", "group": report_group, "dependencies": [evals_job, "external_training_exp"]},
+        ]
+    )
     pipeline.run()
 """
 
@@ -263,6 +265,10 @@ class Pipeline:
     Supports two input formats (both converted to jobs internally):
     1. Groups: groups=[cmdgroup1, cmdgroup2] - shorthand, each becomes a job
     2. Jobs: jobs=[{...}, {...}] - full control with dependencies and multi-group jobs
+
+    Dependency types:
+    - Job dict objects: Internal dependencies on jobs in the same pipeline
+    - Strings: External dependencies on other experiments
     """
 
     def __init__(
@@ -289,7 +295,8 @@ class Pipeline:
             raise ValueError("Cannot specify both 'groups' and 'jobs'.")
 
         if groups is not None:
-            self.jobs = [{"group": g} for g in groups]
+            # Auto-generate job names from group names
+            self.jobs = [{"name": g.name or f"job_{idx}", "group": g} for idx, g in enumerate(groups)]
         elif jobs is not None:
             self.jobs = jobs
         else:
@@ -332,7 +339,9 @@ class Pipeline:
         with get_exp(self.name, self.cluster_config, _reuse_exp) as exp:
             # Process each job in order
             for job_spec in self.jobs:
-                job_name = job_spec.get("name", "unnamed")
+                job_name = job_spec.get("name")
+                if not job_name:
+                    raise ValueError(f"Job spec must have a 'name' field: {job_spec}")
 
                 # Resolve dependencies to task handles
                 run_after_deps = []
@@ -350,37 +359,45 @@ class Pipeline:
 
                 for dep in job_dependencies:
                     if isinstance(dep, str):
-                        # String dependency - could be job name, task handle, or experiment name
-                        if dep in job_name_to_handle:
-                            # Internal pipeline dependency - add the handle
-                            run_after_deps.append(job_name_to_handle[dep])
-                            LOG.info(f"Job '{job_name}' depends on '{dep}' (handle: {job_name_to_handle[dep]})")
-                        else:
-                            # Could be external experiment name OR task handle from _reuse_exp case
-                            # Try to get as experiment name first
-                            if self.cluster_config["executor"] == "slurm":
-                                exp_handles = get_exp_handles(dep)
-                                if len(exp_handles) == 0:
-                                    LOG.warning(
-                                        f"No pending or running tasks found for experiment {dep}, cannot set dependencies."
-                                    )
-                                    # If no experiment found, treat as direct task handle (for _reuse_exp case)
-                                    if _reuse_exp:
-                                        run_after_deps.append(dep)
-                                        LOG.info(
-                                            f"Job '{job_name}' depends on task handle '{dep}' (from reused experiment)"
-                                        )
-                                else:
-                                    run_after_deps.extend(exp_handles)
+                        # String dependency = external experiment name
+                        if self.cluster_config["executor"] == "slurm":
+                            exp_handles = get_exp_handles(dep)
+                            if len(exp_handles) == 0:
+                                LOG.warning(
+                                    f"No pending or running tasks found for experiment {dep}, cannot set dependencies."
+                                )
+                                # If no experiment found, treat as direct task handle (for _reuse_exp case)
+                                if _reuse_exp:
+                                    run_after_deps.append(dep)
                                     LOG.info(
-                                        f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
+                                        f"Job '{job_name}' depends on task handle '{dep}' (from reused experiment)"
                                     )
-                            elif _reuse_exp:
-                                # For non-SLURM executors with _reuse_exp, treat as task handle
-                                run_after_deps.append(dep)
-                                LOG.info(f"Job '{job_name}' depends on task handle '{dep}'")
+                            else:
+                                run_after_deps.extend(exp_handles)
+                                LOG.info(
+                                    f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
+                                )
+                        elif _reuse_exp:
+                            # For non-SLURM executors with _reuse_exp, treat as task handle
+                            run_after_deps.append(dep)
+                            LOG.info(f"Job '{job_name}' depends on task handle '{dep}'")
+                    elif isinstance(dep, dict):
+                        # Dict dependency = internal job reference (by job spec object)
+                        dep_name = dep.get("name")
+                        if not dep_name:
+                            raise ValueError(f"Job dependency must have a 'name' field: {dep}")
+                        if dep_name in job_name_to_handle:
+                            run_after_deps.append(job_name_to_handle[dep_name])
+                            LOG.info(
+                                f"Job '{job_name}' depends on internal job '{dep_name}' (handle: {job_name_to_handle[dep_name]})"
+                            )
+                        else:
+                            raise ValueError(
+                                f"Job '{job_name}' depends on job '{dep_name}' which hasn't been processed yet. "
+                                f"Make sure dependencies are listed before the jobs that depend on them in the jobs list."
+                            )
                     else:
-                        # Direct task handle object (not string)
+                        # Direct task handle object (not string or dict)
                         run_after_deps.append(dep)
                         LOG.info(f"Job '{job_name}' depends on task handle (object)")
 

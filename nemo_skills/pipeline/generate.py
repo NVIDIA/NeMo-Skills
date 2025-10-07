@@ -412,6 +412,7 @@ def generate(
 
             # Handle dependent_jobs chain
             dependencies = _task_dependencies.copy() if _task_dependencies else []
+            prev_job = None
 
             for dep_idx in range(dependent_jobs + 1):
                 # Create CommandGroup for this task
@@ -444,16 +445,16 @@ def generate(
                         job_deps.extend(run_after_list)
                     job_deps = job_deps if job_deps else None
                 else:
-                    # Subsequent jobs in chain depend on previous job
-                    job_deps = [f"{task_name}-dep{dep_idx - 1}"]
+                    # Subsequent jobs in chain depend on previous job (use job object, not string)
+                    job_deps = [prev_job]
 
-                jobs.append(
-                    {
-                        "name": internal_job_name,
-                        "group": cmd_group,
-                        "dependencies": job_deps,
-                    }
-                )
+                job_spec = {
+                    "name": internal_job_name,
+                    "group": cmd_group,
+                    "dependencies": job_deps,
+                }
+                jobs.append(job_spec)
+                prev_job = job_spec  # Track for next iteration
 
                 all_job_names.append(internal_job_name)
 
