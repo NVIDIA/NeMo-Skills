@@ -321,7 +321,9 @@ class SweBenchGenerationTask(GenerationTask):
         )
 
         # Execute SWE-agent command
-        search_path = os.path.join(self.output_dir / "trajectories", "**", f"{data_point['instance_id']}.pred")
+        search_path = os.path.join(
+            self.output_dir, "trajectories", "*", "*", data_point["instance_id"], f"{data_point['instance_id']}.pred"
+        )
         pred_file = await self._execute_container_command(data_point, swe_agent_cmd, search_path, mode="agent")
 
         with open(pred_file, "r") as f:
@@ -426,7 +428,7 @@ class SweBenchGenerationTask(GenerationTask):
         )
 
         # Execute OpenHands command
-        search_path = os.path.join(self.output_dir / "trajectories", "**", data_point["instance_id"], "output.jsonl")
+        search_path = os.path.join(self.output_dir, "trajectories", data_point["instance_id"], "output.jsonl")
         out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
 
         with open(out_file, "r") as f:
@@ -516,9 +518,7 @@ class SweBenchGenerationTask(GenerationTask):
             )
 
             # Execute SWE-bench evaluation command
-            search_path = os.path.join(
-                self.output_dir, "eval-outputs", "**", f"{data_point['instance_id']}/report.json"
-            )
+            search_path = os.path.join(self.output_dir, "eval-outputs", "*", data_point["instance_id"], "report.json")
             # TODO: should we fail on errors here? Seems that json isn't always generated
             try:
                 report_file = await self._execute_container_command(
