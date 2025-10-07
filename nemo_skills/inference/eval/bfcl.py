@@ -388,10 +388,7 @@ class BFCLGenerationTask(GenerationTask):
 
         output_dict["num_generated_tokens"] = sum(output_dict["num_generated_tokens_list"])
         if self.cfg.count_prompt_tokens:
-            # Filter out cases where token count is not available
-            output_dict["num_input_tokens"] = sum(
-                [token_count for token_count in output_dict["num_input_tokens_list"] if token_count is not None]
-            )
+            output_dict["num_input_tokens"] = sum(output_dict["num_input_tokens_list"])
 
         return output_dict
 
