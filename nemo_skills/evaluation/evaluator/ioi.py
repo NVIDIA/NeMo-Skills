@@ -18,12 +18,13 @@ import os
 import re
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
+from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
 from nemo_skills.file_utils import jdump
 from nemo_skills.utils import nested_dataclass, unroll_files
 
 
 @nested_dataclass(kw_only=True)
-class IOIEvaluatorConfig:
+class IOIEvaluatorConfig(BaseEvaluatorConfig):
     # Directory where metadata files are located.
     test_dir: str = ""
 

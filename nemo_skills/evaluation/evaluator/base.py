@@ -20,7 +20,20 @@ from typing import Any, Dict, List
 
 import tqdm
 
-from nemo_skills.utils import unroll_files
+from nemo_skills.utils import nested_dataclass, unroll_files
+
+
+@nested_dataclass(kw_only=True)
+class BaseEvaluatorConfig:
+    # whether to remove the thinking part from the final output
+    remove_thinking: bool = True
+    thinking_begin: str = "<think>"
+    thinking_end: str = "</think>"
+    # generation key in the jsonl file
+    generation_key: str = "generation"
+
+    data_dir: str | None = None
+    split: str = "test"
 
 
 class BaseEvaluator(ABC):
