@@ -532,7 +532,6 @@ def add_task(
                 tasks_per_node=1,
                 gpus_per_node=0,
                 partition=partition,
-                qos=qos,
                 time_min=time_min,
                 mounts=None if keep_mounts_for_sandbox else [],
                 dependencies=dependencies,
