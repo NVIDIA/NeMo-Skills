@@ -20,12 +20,11 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import httpx
-from mcp import StdioServerParameters
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult
 from pydantic import Field
 
-from nemo_skills.mcp.clients import MCPStdioClient, MCPStreamableHttpClient
+from nemo_skills.mcp.clients import MCPStreamableHttpClient
 from nemo_skills.mcp.tool_providers import MCPClientTool
 
 logger = logging.getLogger(__name__)
@@ -49,10 +48,6 @@ async def answer(
 ) -> ExecutionResult:
     """Search the web using Exa. Provide relevant links in your answer."""
 
-    # Ensure API key is provided via CLI argument
-    if not EXA_API_KEY:
-        return {"error": "Missing Exa API key."}
-
     url = "https://api.exa.ai/answer"
     headers = {
         "x-api-key": EXA_API_KEY,
@@ -72,27 +67,21 @@ async def answer(
 def main():
     # Parse CLI arguments
     parser = argparse.ArgumentParser(description="MCP server for Exa web search tool")
-    parser.add_argument("--api-key", type=str, required=False, help="Exa API key")
+    parser.add_argument("--api-key", type=str, default=os.getenv("EXA_API_KEY"), help="Exa API key")
     args = parser.parse_args()
 
+    if not args.api_key:
+        raise ValueError("Missing Exa API key.")
+
     global EXA_API_KEY
-    # Prefer CLI arg; do not fall back to environment unless explicitly desired
     EXA_API_KEY = args.api_key
 
-    # Initialize and run the server
     mcp.run(transport="stdio")
 
 
 # ==============================
 # Module-based tool implementation
 # ==============================
-
-
-def exa_stdio_connector(client: MCPStdioClient):
-    client.server_params = StdioServerParameters(
-        command=client.server_params.command,
-        args=list(client.server_params.args) + ["--api-key", os.getenv("EXA_API_KEY", "")],
-    )
 
 
 class ExaTool(MCPClientTool):
@@ -107,7 +96,7 @@ class ExaTool(MCPClientTool):
                     "args": ["-m", "nemo_skills.mcp.servers.exa_tool"],
                 },
                 "hide_args": {},
-                "init_hook": "nemo_skills.mcp.servers.exa_tool.exa_stdio_connector",
+                "init_hook": "hydra",
             }
         )
 

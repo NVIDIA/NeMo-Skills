@@ -5,11 +5,9 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import httpx
-from mcp import StdioServerParameters
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-from nemo_skills.mcp.clients import MCPStdioClient
 from nemo_skills.mcp.tool_providers import MCPClientTool
 
 logger = logging.getLogger(__name__)
@@ -33,9 +31,6 @@ async def summarize(
     query: Annotated[str, Field(description="Search query.")],
 ) -> ExecutionResult:
     """Get a summary of search results from the web using Brave."""
-
-    if not BRAVE_API_KEY:
-        return {"error": "Missing Brave API key"}
 
     base_url = "https://api.search.brave.com/res/v1"
 
@@ -74,25 +69,20 @@ class BraveSearchTool(MCPClientTool):
                     "args": ["-m", "nemo_skills.mcp.servers.brave_tool"],
                 },
                 "hide_args": {},
-                "init_hook": "nemo_skills.mcp.servers.brave_tool.stdio_connector",
+                "init_hook": "hydra",
             }
         )
 
 
-def stdio_connector(client: MCPStdioClient):
-    client.server_params = StdioServerParameters(
-        command=client.server_params.command,
-        args=list(client.server_params.args) + ["--api-key", os.getenv("BRAVE_API_KEY", "")],
-    )
-
-
 def main():
     parser = argparse.ArgumentParser(description="MCP server for Brave web search tool")
-    parser.add_argument("--api-key", type=str, required=False, help="Brave API Key")
+    parser.add_argument("--api-key", type=str, default=os.getenv("BRAVE_API_KEY"), help="Brave API Key")
     args = parser.parse_args()
 
+    if not args.api_key:
+        raise ValueError("Missing Brave API key.")
+
     global BRAVE_API_KEY
-    # Prefer CLI arg; do not fall back to environment unless explicitly desired
     BRAVE_API_KEY = args.api_key
 
     mcp.run(transport="stdio")
