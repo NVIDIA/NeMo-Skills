@@ -34,7 +34,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 patch_litellm_logging_worker()
 
 
-class CompletionType(str, Enum):
+class EndpointType(str, Enum):
     text = "text"
     chat = "chat"
     responses = "responses"
@@ -209,7 +209,7 @@ class BaseModel:
     async def generate_async(
         self,
         prompt: str | list[dict],
-        completion_type: CompletionType = None,
+        endpoint_type: EndpointType = None,
         tokens_to_generate: int | None = None,
         temperature: float = 0.0,
         top_p: float = 0.95,
@@ -227,9 +227,9 @@ class BaseModel:
         include_response: bool = False,
         extra_body: dict = None,
     ) -> dict:
-        if completion_type is None:
+        if endpoint_type is None:
             # Infering completion type from prompt
-            completion_type = CompletionType.chat if isinstance(prompt, list) else CompletionType.text
+            endpoint_type = EndpointType.chat if isinstance(prompt, list) else EndpointType.text
         # Check tool calls are a list of dict
         if tools is not None:
             for tool in tools:
@@ -259,7 +259,7 @@ class BaseModel:
 
         while retry_count <= max_retries:
             try:
-                if completion_type == CompletionType.chat:
+                if endpoint_type == EndpointType.chat:
                     assert isinstance(prompt, list), "Chat completion requests must be a list of messages."
                     request_params = self._build_chat_request_params(messages=prompt, stream=stream, **kwargs)
                     response = await litellm.acompletion(**request_params, **self.litellm_kwargs)
@@ -269,7 +269,7 @@ class BaseModel:
                         result = self._parse_chat_completion_response(
                             response, include_response=include_response, **kwargs
                         )
-                elif completion_type == CompletionType.text:
+                elif endpoint_type == EndpointType.text:
                     assert isinstance(prompt, str), "Text completion requests must be a string."
                     request_params = self._build_completion_request_params(prompt=prompt, stream=stream, **kwargs)
                     response = await litellm.atext_completion(**request_params, **self.litellm_kwargs)
@@ -277,7 +277,7 @@ class BaseModel:
                         result = self._stream_completion_chunks_async(response)
                     else:
                         result = self._parse_completion_response(response, include_response=include_response, **kwargs)
-                elif completion_type == CompletionType.responses:
+                elif endpoint_type == EndpointType.responses:
                     assert isinstance(prompt, list), "Responses completion requests must be a list."
                     request_params = self._build_responses_request_params(input=prompt, stream=stream, **kwargs)
                     response = await litellm.aresponses(**request_params, **self.litellm_kwargs)
@@ -288,7 +288,7 @@ class BaseModel:
                             response, include_response=include_response, **kwargs
                         )
                 else:
-                    raise TypeError(f"Unsupported completion type: {completion_type}")
+                    raise TypeError(f"Unsupported completion type: {endpoint_type}")
                 if not stream:
                     self._maybe_apply_stop_phrase_removal(result, remove_stop_phrases, stop_phrases)
                 return result

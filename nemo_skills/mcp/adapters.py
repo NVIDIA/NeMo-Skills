@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 
 from litellm.types.utils import ChatCompletionMessageToolCall
 
-from nemo_skills.inference.model.base import CompletionType
+from nemo_skills.inference.model.base import EndpointType
 
 
 # ==============================
@@ -48,8 +48,8 @@ class ToolResponseFormatter(ABC):
 # ==============================
 
 
-def format_tool_list_by_completion_type(tools, completion_type: CompletionType):
-    if completion_type == CompletionType.chat:
+def format_tool_list_by_endpoint_type(tools, endpoint_type: EndpointType):
+    if endpoint_type == EndpointType.chat:
         return [
             {
                 "type": "function",
@@ -61,7 +61,7 @@ def format_tool_list_by_completion_type(tools, completion_type: CompletionType):
             }
             for t in tools
         ]
-    elif completion_type == CompletionType.responses:
+    elif endpoint_type == EndpointType.responses:
         return [
             {
                 "type": "function",
@@ -73,7 +73,7 @@ def format_tool_list_by_completion_type(tools, completion_type: CompletionType):
             for t in tools
         ]
     else:
-        raise ValueError(f"Unsupported completion type for tool list: {completion_type}")
+        raise ValueError(f"Unsupported completion type for tool list: {endpoint_type}")
 
 
 class OpenAICallInterpreter(ToolCallInterpreter):
@@ -93,32 +93,32 @@ class CompletionResponseFormatter(ToolResponseFormatter):
         }
 
 
-def format_tool_response_by_completion_type(tool_call, result, completion_type: CompletionType):
-    if completion_type == CompletionType.chat:
+def format_tool_response_by_endpoint_type(tool_call, result, endpoint_type: EndpointType):
+    if endpoint_type == EndpointType.chat:
         return {
             "role": "tool",
             "name": tool_call["function"]["name"],
             "tool_call_id": tool_call["id"],
             "content": json.dumps(result) if not isinstance(result, str) else result,
         }
-    elif completion_type == CompletionType.responses:
+    elif endpoint_type == EndpointType.responses:
         return {
             "type": "function_call_output",
             "call_id": tool_call["call_id"],
             "output": json.dumps(result) if not isinstance(result, str) else result,
         }
     else:
-        raise ValueError(f"Unsupported completion type for tool call: {completion_type}")
+        raise ValueError(f"Unsupported completion type for tool call: {endpoint_type}")
 
 
-def get_tool_details_by_completion_type(tool_call, completion_type: CompletionType):
-    if completion_type == CompletionType.chat:
+def get_tool_details_by_endpoint_type(tool_call, endpoint_type: EndpointType):
+    if endpoint_type == EndpointType.chat:
         tool_name = tool_call["function"]["name"]
         tool_args = tool_call["function"]["arguments"]
-    elif completion_type == CompletionType.responses:
+    elif endpoint_type == EndpointType.responses:
         assert tool_call["type"] == "function_call", "Tool call must be a function call"
         tool_name = tool_call["name"]
         tool_args = tool_call["arguments"]
     else:
-        raise ValueError(f"Unsupported completion type for tool call: {completion_type}")
+        raise ValueError(f"Unsupported completion type for tool call: {endpoint_type}")
     return tool_name, tool_args

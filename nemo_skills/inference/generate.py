@@ -40,7 +40,7 @@ from nemo_skills.inference.model import (
     get_tool_calling_model,
     server_params,
 )
-from nemo_skills.inference.model.base import CompletionType
+from nemo_skills.inference.model.base import EndpointType
 from nemo_skills.prompt.utils import get_prompt, get_token_count
 from nemo_skills.utils import (
     chunk_data,
@@ -63,7 +63,7 @@ class InferenceConfig:
     # take the tokenizer from the model and apply it to the prompt before sending it.
     # You can override tokenizer with tokenizer parameter.
     # "responses": for responses api format.
-    completion_type: CompletionType = CompletionType.chat
+    endpoint_type: EndpointType = EndpointType.chat
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
     top_k: int = -1
     top_p: float = 0.95
@@ -85,7 +85,7 @@ class GenerateSolutionsConfig:
     output_file: str  # Where to save the generations
     prompt_config: str | None = None  # How to format the data into prompts
 
-    # Deprecated, please use completion_type in the InferenceConfig instead
+    # Deprecated, please use endpoint_type in the InferenceConfig instead
     use_completions_api: bool = False
 
     # path or name of the tokenizer to use for completions API. By default uses server.model
@@ -208,7 +208,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.inference.completion_type = CompletionType.text
+            self.inference.endpoint_type = EndpointType.text
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -226,7 +226,7 @@ class GenerateSolutionsConfig:
 
     def _post_init_deprecated_params(self):
         if self.use_completions_api:
-            raise ValueError("use_completions_api is deprecated, please use ++inference.completion_type=text instead.")
+            raise ValueError("use_completions_api is deprecated, please use ++inference.endpoint_type=text instead.")
 
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
@@ -274,7 +274,7 @@ class GenerationTask:
 
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
         if self.cfg.chat_template_kwargs:
-            if self.cfg.inference.completion_type != CompletionType.text:
+            if self.cfg.inference.endpoint_type != EndpointType.text:
                 if "chat_template_kwargs" in self.cfg.inference.extra_body:
                     raise ValueError(
                         "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
@@ -286,7 +286,7 @@ class GenerationTask:
 
         # Setup tokenizer
         if (
-            self.cfg.inference.completion_type == CompletionType.text
+            self.cfg.inference.endpoint_type == EndpointType.text
             or self.cfg.server.get("enable_soft_fail", False)
             or self.cfg.count_prompt_tokens
         ):
@@ -298,7 +298,7 @@ class GenerationTask:
         # Setup litellm cache
         self.setup_litellm_cache()
 
-        if self.cfg.inference.completion_type == CompletionType.text and self.cfg.inference.tokens_to_generate is None:
+        if self.cfg.inference.endpoint_type == EndpointType.text and self.cfg.inference.tokens_to_generate is None:
             raise ValueError("When using completions API, tokens_to_generate must be specified!")
 
         # Setup prompt formatter and LLM
@@ -355,7 +355,7 @@ class GenerationTask:
 
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
-            tokenizer=self.tokenizer if self.cfg.inference.completion_type == CompletionType.text else None,
+            tokenizer=self.tokenizer if self.cfg.inference.endpoint_type == EndpointType.text else None,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
             system_message=self.cfg.system_message,

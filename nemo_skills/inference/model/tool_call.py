@@ -21,14 +21,14 @@ from collections import defaultdict
 from typing import Dict, List
 
 from nemo_skills.mcp.adapters import (
-    format_tool_list_by_completion_type,
-    format_tool_response_by_completion_type,
-    get_tool_details_by_completion_type,
+    format_tool_list_by_endpoint_type,
+    format_tool_response_by_endpoint_type,
+    get_tool_details_by_endpoint_type,
 )
 from nemo_skills.mcp.tool_manager import ToolManager
 from nemo_skills.utils import get_logger_name
 
-from .base import BaseModel, CompletionType
+from .base import BaseModel, EndpointType
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -60,9 +60,9 @@ class ToolCallingWrapper:
             context=additional_config,
         )
 
-    async def _execute_tool_call(self, tool_call, request_id: str, completion_type: CompletionType):
+    async def _execute_tool_call(self, tool_call, request_id: str, endpoint_type: EndpointType):
         ## TODO(sanyamk): The correct key format needs to be cohesive with other formatters.
-        tool_name, tool_args = get_tool_details_by_completion_type(tool_call, completion_type)
+        tool_name, tool_args = get_tool_details_by_endpoint_type(tool_call, endpoint_type)
 
         ##
         # TODO(sanyamk): Not all tool arguments might necessarily be in JSON format.
@@ -84,21 +84,21 @@ class ToolCallingWrapper:
 
         return result
 
-    async def _execute_tool_calls(self, tool_calls: List, request_id: str, completion_type: CompletionType):
+    async def _execute_tool_calls(self, tool_calls: List, request_id: str, endpoint_type: EndpointType):
         tasks = [
-            self._execute_tool_call(tool_call, request_id=request_id, completion_type=completion_type)
+            self._execute_tool_call(tool_call, request_id=request_id, endpoint_type=endpoint_type)
             for tool_call in tool_calls
         ]
         tool_results = await asyncio.gather(*tasks)
         return [
-            format_tool_response_by_completion_type(tool_call, tool_result, completion_type)
+            format_tool_response_by_endpoint_type(tool_call, tool_result, endpoint_type)
             for tool_call, tool_result in zip(tool_calls, tool_results)
         ]
 
     async def generate_async(
         self,
         prompt: List,
-        completion_type: CompletionType,
+        endpoint_type: EndpointType,
         tools: List[dict] = None,
         tokens_to_generate: int = None,
         **generation_kwargs,
@@ -109,7 +109,7 @@ class ToolCallingWrapper:
 
         # This assumes that the available tools do not change during the generation.
         raw_tools = await self.tool_manager.list_all_tools(use_cache=True)
-        tools = format_tool_list_by_completion_type(raw_tools, completion_type)
+        tools = format_tool_list_by_endpoint_type(raw_tools, endpoint_type)
         LOG.info("Available Tools: %s", tools)
 
         result_steps = defaultdict(list)
@@ -125,7 +125,7 @@ class ToolCallingWrapper:
                 prompt=conversation,
                 tools=tools,
                 tokens_to_generate=tokens_to_generate,
-                completion_type=completion_type,
+                endpoint_type=endpoint_type,
                 **generation_kwargs,
             )
             if isinstance(tokens_to_generate, int):
@@ -141,7 +141,7 @@ class ToolCallingWrapper:
             if tool_calls:
                 tool_calls = [tool_call.model_dump() for tool_call in tool_calls]
                 tool_calls_output_messages = await self._execute_tool_calls(
-                    tool_calls, request_id=request_id, completion_type=completion_type
+                    tool_calls, request_id=request_id, endpoint_type=endpoint_type
                 )
                 LOG.info("Sending tool calls: %s", tool_calls_output_messages)
                 conversation.extend(tool_calls_output_messages)

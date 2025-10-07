@@ -31,7 +31,7 @@ from nemo_skills.inference.eval.bfcl_utils import (
 )
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
-from nemo_skills.inference.model.base import CompletionType
+from nemo_skills.inference.model.base import EndpointType
 from nemo_skills.inference.model.utils import is_context_window_exceeded_error
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
@@ -127,7 +127,7 @@ class ClientMessageParser:
             raise e
         kwargs = asdict(self.cfg.inference)
         # Replace the completion type with text
-        kwargs["completion_type"] = CompletionType.text
+        kwargs["endpoint_type"] = EndpointType.text
         return {
             "prompt": fmted_prompt,
             "include_response": True,
