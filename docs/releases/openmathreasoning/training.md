@@ -92,30 +92,6 @@ timeout policy, you can run multiple dependent jobs with `--num_training_jobs=N`
 ```bash
 ns nemo_rl sft \
     --cluster=slurm \
-    --expname=openmathinstruct2-repro-70b \
-     --output_dir=/workspace/openmathinstruct2-repro-70b/checkpoints \
-    --hf_model=/workspace/Llama-3.1-70B  \
-    --num_nodes=32 \
-    --num_gpus=8 \
-    --backend=megatron \
-    --training_data=/workspace/openmathinstruct2-sft-5M.jsonl \
-    ++policy.train_micro_batch_size=1 \
-    ++policy.train_global_batch_size=512 \
-    ++policy.tensor_model_parallel_size=8 \
-    ++policy.pipeline_model_parallel_size=2 \
-    ++policy.lr=1e-5 \
-    ++checkpointing.save_period=3330 \
-    ++sft.max_num_stepss=20000 \
-    ++sft.max_num_epochs=100 \
-    ++policy.sequence_packing.enabled=False \
-    ++checkpointing.checkpoint_must_save_by=00:03:20:00
-```
-
-
-
-```bash
-ns nemo_rl sft \
-    --cluster=slurm \
     --expname=openmathreasoning-repro-1.5b \
     --output_dir=/workspace/openmathreasoning-sft/checkpoints \
     --hf_model=/workspace/Qwen2.5-Math-1.5B  \
@@ -129,7 +105,7 @@ ns nemo_rl sft \
     ++policy.tensor_model_parallel_size=1 \
     ++policy.context_parallel_size=2 \
     ++policy.lr=3e-4 \
-    ++policy.megatron_cfg.optimizer.min_lr=3e-7 \
+    ++policy.min_lr=3e-7 \
     ++policy.megatron_cfg.scheduler.lr_warmup_iters=3000 \
     ++policy.megatron_cfg.scheduler.lr_warmup_init=0 \
     ++checkpointing.save_period=7500 \
