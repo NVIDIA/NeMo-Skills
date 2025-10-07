@@ -18,6 +18,8 @@ to disable its functionality and make all methods no-op.
 
 Currently, the async_loop function in generate.py sometimes gets stuck forever because some of the coroutines in the litellm logging worker are not finished.
 Debugging why the logger is not finished is non-trivial, so we just patch it to disable its functionality.
+The behavior is that it keeps slurm jobs from existing and we waste gpus.
+It always happens in docker containers, but does not happen locally.
 """
 
 from typing import Coroutine
