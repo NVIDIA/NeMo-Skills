@@ -173,7 +173,7 @@ class Sandbox(abc.ABC):
         try:
             output = await self._send_request(request, timeout)
         except httpx.TimeoutException:
-            output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+            output = {"process_status": "timeout", "stdout": "", "stderr": "Client timed out\n"}
         new_session_created = output.pop("new_session_created", False)
 
         # Rebuild state by re-executing history first, then execute the new code.
@@ -202,7 +202,7 @@ class Sandbox(abc.ABC):
                     try:
                         restore_output = await self._send_request(restore_request, timeout)
                     except httpx.TimeoutException:
-                        restore_output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+                        restore_output = {"process_status": "timeout", "stdout": "", "stderr": "Client timed out\n"}
 
                     if restore_output.get("process_status") != "completed":
                         LOG.error(
@@ -246,7 +246,7 @@ class Sandbox(abc.ABC):
                 try:
                     output = await self._send_request(exec_request, timeout)
                 except httpx.TimeoutException:
-                    output = {"process_status": "timeout", "stdout": "", "stderr": "Timed out during re-execution\n"}
+                    output = {"process_status": "timeout", "stdout": "", "stderr": "Client timed out\n"}
 
         # Append to history if successful execution (process_status == 'completed')
         if output.get("process_status") == "completed" and request_session_id_str is not None:
