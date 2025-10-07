@@ -1,10 +1,8 @@
-# Training using NeMo-Aligner
+# Training using NeMo-RL
 
 !!! info
 
-    This pipeline starting script is [nemo_skills/pipeline/train.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/train.py)
-
-    All extra parameters are passed to either [nemo_skills/training/start_sft.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/start_sft.py) or [nemo_skills/training/start_dpo.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/training/start_dpo.py)
+    This pipeline starting script is [nemo_skills/pipeline/nemo_rl/sft.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/nemo_rl/sft.py)
 
 
 ## Preparing the data
