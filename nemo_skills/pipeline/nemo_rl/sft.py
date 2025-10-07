@@ -219,9 +219,7 @@ def sft_nemo_rl(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
-    qos: str = typer.Option(
-        None, help="Can specify if need interactive jobs or a specific non-default partition for GB200 GPU"
-    ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     backend: SupportedBackends = typer.Option(
         ...,

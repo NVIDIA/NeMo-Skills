@@ -57,9 +57,7 @@ def start_server(
     ),
     server_container: str = typer.Option(None, help="Override container image for the hosted server"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
-    qos: str = typer.Option(
-        None, help="Can specify if need interactive jobs or a specific non-default partition for GB200 GPU"
-    ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     with_sandbox: bool = typer.Option(

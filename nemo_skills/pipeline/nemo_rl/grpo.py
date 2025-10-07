@@ -222,9 +222,7 @@ def grpo_nemo_rl(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
-    qos: str = typer.Option(
-        None, help="Can specify if need interactive jobs or a specific non-default partition for GB200 GPU"
-    ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     backend: SupportedBackends = typer.Option(
         ...,
@@ -319,7 +317,6 @@ def grpo_nemo_rl(
     train_cmd = get_training_cmd(
         cluster_config=cluster_config,
         partition=partition,
-        qos=qos,
         hf_model=hf_model,
         output_dir=output_dir,
         prompt_data=training_data,
