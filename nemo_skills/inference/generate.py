@@ -452,7 +452,7 @@ class GenerationTask:
         return remaining_data
 
     # TODO: data will not include any samples skipped after restart
-    def fill_prompt(self, data_point, data):
+    def fill_prompt(self, data_point, data, prompt=None):
         """Passing in full data in case it's needed to fill the prompt in subclasses."""
         if self.cfg.prompt_format == "openai":
             if self.cfg.prompt_suffix:
@@ -471,7 +471,8 @@ class GenerationTask:
                 total_code_executions_in_prompt = random.randint(min_val, max_val)
             data_point["total_code_executions"] = total_code_executions_in_prompt
         data_point = deepcopy(data_point)
-        filled_prompt = self.prompt.fill(
+        prompt = prompt or self.prompt
+        filled_prompt = prompt.fill(
             data_point,
             start_assistant_response_key=self.cfg.start_assistant_response_key,
             chat_template_kwargs=self.cfg.chat_template_kwargs,
@@ -508,7 +509,7 @@ class GenerationTask:
         # Override this method to customize the prefilling behavior.
         return None
 
-    async def process_single_datapoint(self, data_point, all_data):
+    async def process_single_datapoint(self, data_point, all_data, prompt=None):
         # Handle inference config - check if it's a dataclass or already a dict
         if is_dataclass(self.cfg.inference):
             inference_params = asdict(self.cfg.inference)
@@ -519,7 +520,7 @@ class GenerationTask:
         generation_params = {
             **inference_params,
             **self.extra_generate_params,
-            "prompt": self.fill_prompt(data_point, all_data),
+            "prompt": self.fill_prompt(data_point, all_data, prompt),
             "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
         }
 
