@@ -231,6 +231,9 @@ class BFCLGenerationTask(GenerationTask):
         return_dict = {}
         if self.cfg.count_prompt_tokens:
             try:
+                # Try/catch is needed here because the prompt here can be a list of messages
+                # where some of the messages are in the ChatCompletion object format which is
+                # not supported by the tokenizer.
                 num_input_tokens = get_token_count(self.hf_tokenizer, input_dict["prompt"])
                 return_dict["num_input_tokens"] = num_input_tokens
             except ValueError as e:
