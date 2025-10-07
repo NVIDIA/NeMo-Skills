@@ -175,7 +175,7 @@ You can find the page by opening one experiment, switching to the Files tab, and
 
 ## Model Training
 
-With the synthetic data generated, you can use it to fine-tune the model. The following sections will show how to use either [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/) or [NeMo-RL](https://github.com/NVIDIA/NeMo-RL) to do this.
+With the synthetic data generated, you can use it to fine-tune the model. The following sections will show how to use [NeMo-RL](https://github.com/NVIDIA-NeMo/RL/) to do this.
 
 First, prepare the data in the required format:
 
@@ -189,21 +189,6 @@ ns run_cmd --log_dir=/workspace/prepare-sft-data --expname=prepare-sft-data --ru
       ++filters.remove_contaminated=false \
       ++add_unlabeled=true \
       ++filters.remove_no_think_tags=true
-```
-
-Next, [convert the model](https://nvidia.github.io/NeMo-Skills/pipelines/checkpoint-conversion/) to NeMo format. You can skip this step for NeMo-RL training.
-
-```shell
-ns convert \
-    --cluster=local \
-    --expname=convert-14b-nemo \
-    --input_model=Qwen/Qwen2.5-14B-Instruct \
-    --output_model=/workspace/qwen2.5-14b-instruct-nemo \
-    --convert_from=hf \
-    --convert_to=nemo \
-    --num_gpus=8 \
-    --model_type=qwen \
-    --hf_model_name=Qwen/Qwen2.5-14B-Instruct
 ```
 
 
@@ -223,8 +208,8 @@ ns nemo_rl sft \
     --final_hf_path=/workspace/training/qwen2.5-14b-improved-hf \
     ++policy.max_total_sequence_length=8192 \
     ++policy.train_global_batch_size=32 \
-    ++policy.megatron_cfg.tensor_model_parallel_size=4 \
-    ++policy.megatron_cfg.context_parallel_size=2 \
+    ++policy.tensor_model_parallel_size=4 \
+    ++policy.context_parallel_size=2 \
     ++policy.lr=1e-5 \
     ++sft.max_num_epochs=2
 ```
@@ -242,7 +227,6 @@ To check model improvement, let's run another evaluation. Convert the checkpoint
 ns eval \
     --cluster=local \
     --expname=final-eval \
-    --run_after=convert-14b-hf \
     --run_after=training \
     --model=/workspace/training/qwen2.5-14b-improved-hf \
     --server_type=vllm \

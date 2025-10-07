@@ -101,7 +101,7 @@ ns nemo_rl sft \
     --training_data=/workspace/openmathreasoning-sft/omr-all.jsonl \
     ++policy.max_total_sequence_length=32768 \
     ++policy.train_micro_batch_size=1 \
-    ++policy.train_global_batch_size=256 \
+    ++policy.train_global_batch_size=1024 \
     ++policy.tensor_model_parallel_size=1 \
     ++policy.context_parallel_size=2 \
     ++policy.lr=3e-4 \
@@ -113,8 +113,7 @@ ns nemo_rl sft \
     ++sft.max_num_epochs=100
 ```
 
-Note that while we set batch size to be 256, the *real* batch size is about 4 times bigger as there are approximately
-4 examples packed together in each element of the packed data.
+
 
 For other models change the above parameters according to this table. Don't forget to re-pack the data when changing CP!
 
@@ -149,7 +148,7 @@ instead of 30000 used in the first-round SFT.
 
 ```bash
     --hf_model=/workspace/openmathreasoning-sft/final_hf_model \
-    --training_data=<path to the new packed data> \
+    --training_data=<path to the new data> \
     ++model.optim.sched.warmup_steps=300 \
     ++policy.megatron_cfg.scheduler.lr_warmup_init=0 \
     ++sft.max_num_steps=3000

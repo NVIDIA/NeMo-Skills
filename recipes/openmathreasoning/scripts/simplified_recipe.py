@@ -114,8 +114,8 @@ def run_training(workspace, cluster, num_gpus, expname_prefix, wandb_params):
         ctx=wrap_arguments(
             "++policy.max_total_sequence_length=8192 "
             "++policy.train_global_batch_size=32 "
-            "++policy.megatron_cfg.tensor_model_parallel_size=4 "
-            "++policy.megatron_cfg.context_parallel_size=2 "
+            "++policy.tensor_model_parallel_size=4 "
+            "++policy.context_parallel_size=2 "
             "++policy.lr=1e-5 "
             "++sft.max_num_epochs=2 "
         ),
@@ -146,7 +146,7 @@ def final_eval(workspace, cluster, num_gpus, expname_prefix, wandb_params):
         output_dir=f"{workspace}/evals/after-training",
         num_jobs=1,
         expname=f"{expname_prefix}-final-eval",
-        run_after=[f"{expname_prefix}-convert-back-to-hf", f"{expname_prefix}-training"],
+        run_after=f"{expname_prefix}-training",
         wandb_name=f"{expname_prefix}-final-eval" if not wandb_params["disable_wandb"] else None,
         wandb_project=wandb_params["wandb_project"],
     )
