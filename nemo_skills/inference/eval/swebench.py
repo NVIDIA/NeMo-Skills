@@ -112,7 +112,7 @@ class SweBenchGenerationConfig:
     max_retries: int = 3
 
     # Interval between retries, in seconds.
-    # Selected randomly between min_retry_interval and max_retry_interval for each instance,
+    # Selected randomly between min_retry_interval and max_retry_interval every time an instance is retried,
     # in order to avoid too many instances making network requests at the same time.
     min_retry_interval: int = 60
     max_retry_interval: int = 180
