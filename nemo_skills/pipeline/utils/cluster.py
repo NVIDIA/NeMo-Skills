@@ -198,7 +198,8 @@ def get_env_variables(cluster_config):
                 LOG.info(f"Optional environment variable {env_var_name} not found in user environment; skipping.")
                 _logged_optional_env_vars.add(env_var_name)
 
-    # replace placeholders with actual env var values
+    # replace placeholders with actual env var values from the environment where
+    # the job is being launched, not where its being run.
     for key, value in env_vars.items():
         if isinstance(value, str) and "$" in value:
             if key in os.environ:
@@ -208,6 +209,9 @@ def get_env_variables(cluster_config):
                 )
             else:
                 raise ValueError(f"Cannot resolve environment variable {key} inside the placeholder value: {value}")
+
+    # Inject env_vars into os.environ for resolution via os.path.expandvars in other parts of the code
+    os.environ.update(env_vars)
 
     return env_vars
 

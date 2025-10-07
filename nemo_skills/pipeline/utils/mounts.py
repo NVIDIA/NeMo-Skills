@@ -18,7 +18,7 @@ from typing import Dict, Optional
 
 import nemo_run as run
 
-from nemo_skills.pipeline.utils.cluster import get_env_variables, get_tunnel
+from nemo_skills.pipeline.utils.cluster import get_tunnel
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -88,27 +88,19 @@ def check_mounts(
     # Compute directory of all files
     remote_dir_list = []
 
-    # Get environment variables from cluster config to resolve any env var mounts
-    # Maybe can be optimized in the future to not do this every time
-    env_vars = None
-
     # Check paths and add to mount list if not mounted
     if check_mounted_paths:
         for path, default_mount in mount_map.items():
             # Check if path contains ${} env variables placeholders
             if path is not None and "${" in path and "}" in path:
-                if env_vars is None:
-                    env_vars = get_env_variables(cluster_config)
+                path = os.path.expandvars(path)
 
                 # Replace ${VAR} with the value from env_vars
-                for var in env_vars:
-                    if var not in env_vars:
-                        raise ValueError(
-                            f"Cluster config item `{path}` contains env variable placeholders, but the required env var is "
-                            f"not provided in the cluster config or environment to resolve."
-                        )
-
-                    path = path.replace(f"${{{var}}}", env_vars[var])
+                if "$" in path:
+                    raise ValueError(
+                        f"Cluster config item `{path}` contains env variable placeholders, but the required env var is "
+                        f"not provided in the cluster config or environment to resolve."
+                    )
 
             if not is_mounted_filepath(cluster_config, path):
                 # check if the path is a file or a directory
@@ -138,18 +130,14 @@ def check_mounts(
         for path in mount_map.keys():
             if path is not None:
                 if "${" in path and "}" in path:
-                    if env_vars is None:
-                        env_vars = get_env_variables(cluster_config)
+                    path = os.path.expandvars(path)
 
                     # Replace ${VAR} with the value from env_vars
-                    for var in env_vars:
-                        if var not in env_vars:
-                            raise ValueError(
-                                f"Cluster config item `{path}` contains env variable placeholders, but the required env var is "
-                                f"not provided in the cluster config or environment to resolve."
-                            )
-
-                        path = path.replace(f"${{{var}}}", env_vars[var])
+                    if "$" in path:
+                        raise ValueError(
+                            f"Cluster config item `{path}` contains env variable placeholders, but the required env var is "
+                            f"not provided in the cluster config or environment to resolve."
+                        )
 
                 check_if_mounted(cluster_config, path)
 
