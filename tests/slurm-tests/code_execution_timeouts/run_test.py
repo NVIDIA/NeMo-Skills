@@ -18,10 +18,8 @@ import argparse
 from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 
 
-def eval_gpt_oss_hmmt(
-    workspace: str, cluster: str, expname_prefix: str, wandb_project: str | None, num_jobs: int
-) -> str:
-    """Submit hmmt_feb25 evaluation with code execution enabled."""
+def eval_gpt_oss_hmmt(workspace: str, cluster: str, expname_prefix: str, wandb_project: str | None) -> str:
+    """Submit code execution timeouts evaluation."""
 
     eval(
         ctx=wrap_arguments(
@@ -42,7 +40,7 @@ def eval_gpt_oss_hmmt(
         benchmarks="hmmt_feb25:16",
         model="openai/gpt-oss-120b",
         server_gpus=8,
-        num_jobs=num_jobs,
+        num_jobs=1,
         server_type="vllm",
         output_dir=workspace,
         server_args="--async-scheduling",
@@ -65,30 +63,24 @@ def main():
 
     prepare_data(ctx=wrap_arguments("hmmt_feb25"))
 
-    # Run with 1 sandbox per random seed AND with 1 sandbox for 16 random seeds
-    for num_jobs in [-1, 1]:
-        expname_suffix = f"{num_jobs=}"
+    eval_expname = eval_gpt_oss_hmmt(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        expname_prefix=args.expname_prefix,
+        wandb_project=args.wandb_project,
+    )
 
-        eval_expname = eval_gpt_oss_hmmt(
-            workspace=args.workspace + expname_suffix,
-            cluster=args.cluster,
-            expname_prefix=args.expname_prefix + expname_suffix,
-            wandb_project=args.wandb_project,
-            num_jobs=num_jobs,
-        )
+    checker_cmd = (
+        "python tests/slurm-tests/code_execution_timeouts/check_results.py " + f"--workspace {args.workspace}"
+    )
 
-        checker_cmd = (
-            "python tests/slurm-tests/hmmt_code_timeout_baseline/check_results.py "
-            f"--workspace {args.workspace + expname_suffix} "
-        )
-
-        run_cmd(
-            ctx=wrap_arguments(checker_cmd),
-            cluster=args.cluster,
-            expname=args.expname_prefix + expname_suffix + "-check-results",
-            log_dir=f"{args.workspace + expname_suffix}/check-results-logs",
-            run_after=eval_expname,
-        )
+    run_cmd(
+        ctx=wrap_arguments(checker_cmd),
+        cluster=args.cluster,
+        expname=args.expname_prefix + "-check-results",
+        log_dir=f"{args.workspace}/check-results-logs",
+        run_after=eval_expname,
+    )
 
 
 if __name__ == "__main__":
