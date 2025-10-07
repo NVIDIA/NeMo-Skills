@@ -230,7 +230,9 @@ class BFCLGenerationTask(GenerationTask):
 
         return_dict = {}
         if self.cfg.count_prompt_tokens:
-            num_input_tokens = get_token_count(self.hf_tokenizer, input_dict["prompt"])
+            num_input_tokens = get_token_count(
+                self.hf_tokenizer, messages=input_dict["prompt"], tools=input_dict.get("tools", None)
+            )
             return_dict["num_input_tokens"] = num_input_tokens
 
         # Step 2: Query the LLM server
