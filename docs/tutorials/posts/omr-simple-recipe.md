@@ -192,7 +192,7 @@ ns run_cmd --log_dir=/workspace/prepare-sft-data --expname=prepare-sft-data --ru
 ```
 
 
-For the NeMo-RL backend, use the following training command. Add `--disable_wandb` to disable W&B logging. Only run one of the training commands, not both (or change the paths and `expnames` accordingly).
+For the NeMo-RL with megatron backend, use the following training command. Add `--disable_wandb` to disable W&B logging. Only run one of the training commands, not both (or change the paths and `expnames` accordingly).
 
 ```shell
 ns nemo_rl sft \
