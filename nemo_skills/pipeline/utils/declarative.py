@@ -45,7 +45,7 @@ Basic Example (Single job with multiple commands):
     pipeline = Pipeline(
         name="my_inference",
         cluster_config=cluster_config,
-        groups=[inference_group]
+        jobs=[{"name": "inference", "group": inference_group}]
     )
     pipeline.run()
 
@@ -262,9 +262,7 @@ class CommandGroup:
 class Pipeline:
     """Top-level pipeline that composes command groups with dependency support.
 
-    Supports two input formats (both converted to jobs internally):
-    1. Groups: groups=[cmdgroup1, cmdgroup2] - shorthand, each becomes a job
-    2. Jobs: jobs=[{...}, {...}] - full control with dependencies and multi-group jobs
+    Jobs format: jobs=[{...}, {...}] - list of job dicts with dependencies and groups
 
     Dependency types:
     - Job dict objects: Internal dependencies on jobs in the same pipeline
@@ -275,8 +273,7 @@ class Pipeline:
         self,
         name: str,
         cluster_config: Dict,
-        groups: Optional[List[CommandGroup]] = None,
-        jobs: Optional[List[Dict]] = None,
+        jobs: List[Dict],
         reuse_code: bool = True,
         reuse_code_exp: Optional[str] = None,
         skip_hf_home_check: bool = False,
@@ -290,19 +287,41 @@ class Pipeline:
         self.skip_hf_home_check = skip_hf_home_check
         self.with_ray = with_ray
         self.run_after = run_after
+        self.jobs = jobs
 
-        if groups is not None and jobs is not None:
-            raise ValueError("Cannot specify both 'groups' and 'jobs'.")
-
-        if groups is not None:
-            # Auto-generate job names from group names
-            self.jobs = [{"name": g.name or f"job_{idx}", "group": g} for idx, g in enumerate(groups)]
-        elif jobs is not None:
-            self.jobs = jobs
-        else:
-            raise ValueError("Must specify either 'groups' or 'jobs'")
+        # Validate configuration early
+        self._validate()
 
         # Note: het_group_indices are assigned per-job in _plan_and_add_job, not globally
+
+    def _validate(self):
+        """Validate pipeline configuration early in __init__."""
+        # Validate jobs
+        if not self.jobs:
+            raise ValueError("Pipeline requires at least one job")
+
+        for idx, job_spec in enumerate(self.jobs):
+            job_name = job_spec.get("name")
+            if not job_name:
+                raise ValueError(f"Job at index {idx} must have a 'name' field: {job_spec}")
+
+        # Validate cluster_config has required fields
+        if "executor" not in self.cluster_config:
+            raise ValueError("cluster_config must have 'executor' field")
+        if "containers" not in self.cluster_config:
+            raise ValueError("cluster_config must have 'containers' field")
+
+        # Validate HF_HOME if needed
+        if self.cluster_config["executor"] != "none" and not self.skip_hf_home_check:
+            env_vars = get_env_variables(self.cluster_config)
+            if "HF_HOME" not in env_vars:
+                raise RuntimeError(
+                    "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
+                    f"Current env_vars: {self.cluster_config.get('env_vars', [])}\n"
+                    "Please add a new variable: HF_HOME=/mounted/path/to/your/hf_home"
+                )
+            if not is_mounted_filepath(self.cluster_config, env_vars["HF_HOME"]):
+                raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
 
     def run(
         self,
@@ -317,31 +336,13 @@ class Pipeline:
             log_dir: Default log directory for groups that don't specify one (optional)
             _reuse_exp: Internal - reuse existing experiment object (for eval.py integration)
         """
-        if not self.jobs:
-            LOG.info("No jobs to execute")
-            return None
-
-        # Validate HF_HOME environment variable
-        if self.cluster_config["executor"] != "none" and not self.skip_hf_home_check:
-            env_vars = get_env_variables(self.cluster_config)
-            if "HF_HOME" not in env_vars:
-                raise RuntimeError(
-                    "Invalid cluster_config: HF_HOME is missing from env_vars while skip_hf_home_check=False.\n"
-                    f"Current env_vars: {self.cluster_config.get('env_vars', [])}\n"
-                    "Please add a new variable: HF_HOME=/mounted/path/to/your/hf_home"
-                )
-            if not is_mounted_filepath(self.cluster_config, env_vars["HF_HOME"]):
-                raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
-
         # Track job name -> task handle for dependency resolution
         job_name_to_handle = {}
 
         with get_exp(self.name, self.cluster_config, _reuse_exp) as exp:
             # Process each job in order
             for job_spec in self.jobs:
-                job_name = job_spec.get("name")
-                if not job_name:
-                    raise ValueError(f"Job spec must have a 'name' field: {job_spec}")
+                job_name = job_spec["name"]  # Already validated in _validate()
 
                 # Resolve dependencies to task handles
                 run_after_deps = []
