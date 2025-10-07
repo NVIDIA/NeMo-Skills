@@ -20,6 +20,9 @@ from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float
 
 
 class TranslationMetrics(BaseMetrics):
+    # TODO: refactor BLEU computation so it reuses parent method functions from pass@k
+    # TODO: add support for other translation metrics, such as COMET and MetricX
+
     def get_metrics(self):
         metrics_dict = {}
         for key in self.translation_dict:

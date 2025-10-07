@@ -84,6 +84,65 @@ Some reference numbers for devtest split (xx corresponds to average over 5 langu
 | Qwen3-30B-A3B          | 33.3 | 35.5 | 27.1 |
 | gpt-oss-20B            | 32.4 | 34.1 |  25  |
 
+=== "Nemotron-NanoV2-9B-v2"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=NVIDIA/Nemotron-Nano-9B-v2 \
+        --benchmarks flores200 \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=devtest \
+        ++inference.tokens_to_generate=512
+        ++system_message='/no_think'
+    ```
+
+=== "Qwen3-8B"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=Qwen/Qwen3-8B \
+        --benchmarks flores200 \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=devtest \
+        ++inference.tokens_to_generate=512
+        ++prompt_suffix='/no_think'
+    ```
+
+=== "Qwen3-30B-A3B"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=Qwen/Qwen3-30B-A3B \
+        --benchmarks flores200 \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=devtest \
+        ++inference.tokens_to_generate=512
+        ++prompt_suffix='/no_think'
+    ```
+
+=== "gpt-oss-20B"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=openai/gpt-oss-20b \
+        --benchmarks flores200 \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=devtest \
+        ++inference.tokens_to_generate=2048
+    ```
+
 ### wmt24pp
 
 - Benchmark is defined in [`nemo_skills/dataset/wmt24pp/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/wmt24pp/__init__.py)
@@ -97,3 +156,62 @@ Some reference numbers for test split (xx corresponds to average over 5 language
 | Qwen3-8B               | 26.2 | 38.5 | 33.1 | 33.1 | 21.7 | 30.5 |
 | Qwen3-30B-A3B          | 28.5 |  40  | 35.1 |  36  | 23.2 | 32.5 |
 | gpt-oss-20B            | 27.3 | 42.3 | 32.8 | 34.9 | 25.2 | 32.5 |
+
+=== "Nemotron-NanoV2-9B-v2"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=NVIDIA/Nemotron-Nano-9B-v2 \
+        --benchmarks wmt24pp \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=test \
+        ++inference.tokens_to_generate=512
+        ++system_message='/no_think'
+    ```
+
+=== "Qwen3-8B"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=Qwen/Qwen3-8B \
+        --benchmarks wmt24pp \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=test \
+        ++inference.tokens_to_generate=512
+        ++prompt_suffix='/no_think'
+    ```
+
+=== "Qwen3-30B-A3B"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=Qwen/Qwen3-30B-A3B \
+        --benchmarks wmt24pp \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=test \
+        ++inference.tokens_to_generate=512
+        ++prompt_suffix='/no_think'
+    ```
+
+=== "gpt-oss-20B"
+
+    ```bash
+    ns eval \
+        --cluster=[cluster] \
+        --model=openai/gpt-oss-20b \
+        --benchmarks wmt24pp \
+        --output_dir=[output dir] \
+        --server_type=vllm \
+        --server_gpus=8 \
+        --split=test \
+        ++inference.tokens_to_generate=2048
+    ```
