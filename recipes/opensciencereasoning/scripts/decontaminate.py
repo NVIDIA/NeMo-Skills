@@ -30,7 +30,7 @@ def main():
         help="file to decontaminate",
     )
     parser.add_argument(
-        "-d", "--dec_path", required=True, help="file with the decontamination demo"
+        "-d", "--dec_path", required=True, help="file with the 'contaminated' field"
     )
     parser.add_argument(
         "-s", "--save_path", required=True, help="save path"
