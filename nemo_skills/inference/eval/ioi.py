@@ -107,10 +107,12 @@ class IOIExecutionGenerationTask(GenerationTask):
         solution_response = await self._call_llm(data_point, all_data, "initial")
         latest_generation_response = solution_response["generation"]
         chat_history.append(solution_response)
+        print("[Initial] Generated initial solution.")
         try:
             solution = extract_code_block(latest_generation_response)
 
-            for _ in range(self.cfg.num_self_improve):
+            for improve_idx in range(self.cfg.num_self_improve):
+                print(f"[Self-Improve] Attempt {improve_idx + 1}/{self.cfg.num_self_improve}")
                 improve_response = await self._call_llm(
                     data_point,
                     all_data,
@@ -122,7 +124,8 @@ class IOIExecutionGenerationTask(GenerationTask):
                 if not solution:
                     raise ValueError(f"Failed to generate an improved solution: {improve_response}")
 
-            for _ in range(self.cfg.total_steps):
+            for step_num in range(self.cfg.total_steps):
+                print(f"[Step {step_num + 1}/{self.cfg.total_steps}] Starting verification phase")
                 consecutive_yes = 0
                 first_fail_report = None
 
@@ -137,6 +140,13 @@ class IOIExecutionGenerationTask(GenerationTask):
                     for _ in range(self.cfg.num_verify)
                 ]
                 verify_responses = await asyncio.gather(*verify_tasks)
+                yes_votes = sum(
+                    1
+                    for ver in verify_responses
+                    if (m := re.search(r"\\boxed\{([^}]+)\}", ver["generation"], re.IGNORECASE))
+                    and m.group(1).strip().lower().startswith("y")
+                )
+                print(f"[Step {step_num + 1}] Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
 
                 for verify_resp in verify_responses:
                     chat_history.append(verify_resp)
@@ -149,6 +159,9 @@ class IOIExecutionGenerationTask(GenerationTask):
                     if verdict.startswith("y"):
                         consecutive_yes += 1
                         if consecutive_yes >= 5:
+                            print(
+                                f"[Success] Solution verified correct with {consecutive_yes} consecutive 'yes' votes."
+                            )
                             latest_generation_response = solution
                             return {
                                 "generation": latest_generation_response,
