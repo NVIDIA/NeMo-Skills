@@ -339,8 +339,14 @@ a dependent [run_cmd command](./run-cmd.md).
 !!! warning
     Currently preprocess_cmd doesn't work correctly with `num_chunks>1`
 
-### Context-Window Limits
+### Soft Failure
 
+Generation/Evaluation jobs can fail due to a myriad of server-side errors while processing requests. By default, the job will just crash at the point of failure. While this is a good default to have to force the user to diagnose the reason for error, it can be annoying to restart such jobs.
+
+By passing in `++server.enable_soft_fail=True`, we allow for a soft failure mode wherein the examples causing issues will have their output dictionary:
+```python
+{"generation": "", "error": "context_window_exceeded"}
+```
 Certain input-output combinations can exceed a model's context window limits. By default, such generation/evaluation jobs will fail.
 
 By passing in `++server.enable_soft_fail=True`, any context length errors will be caught during the generation, and the output dictionary would have an

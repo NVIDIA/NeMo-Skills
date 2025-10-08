@@ -213,15 +213,17 @@ async def handle_context_retries_async(
                 modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
                 if modified_kwargs is None:
                     return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+
                 try:
                     result = await func(self, *args, **modified_kwargs)
                     return result
                 except Exception as error:
                     LOG.warning(f"Caught an error. Returning empty generation. {error}")
-                    return return_empty_generation_with_error(f"{error}")
+                    # This error most likely is not related to the context window exceeded error.
+                    return return_empty_generation_with_error(f"{error}", error_reason="other")
             else:
                 LOG.warning(f"Caught an error. Returning empty generation. {error}")
-                return return_empty_generation_with_error(f"{error}")
+                return return_empty_generation_with_error(f"{error}", error_reason="other")
 
 
 def handle_context_retries_sync(
@@ -249,10 +251,11 @@ def handle_context_retries_sync(
                     return result
                 except Exception as error:
                     LOG.warning(f"Caught an error. Returning empty generation. {error}")
-                    return return_empty_generation_with_error(f"{error}")
+                    # This error most likely is not related to the context window exceeded error.
+                    return return_empty_generation_with_error(f"{error}", error_reason="other")
             else:
                 LOG.warning(f"Caught an error. Returning empty generation. {error}")
-                return return_empty_generation_with_error(f"{error}")
+                return return_empty_generation_with_error(f"{error}", error_reason="other")
 
 
 def _prepare_context_error_retry(
@@ -529,10 +532,10 @@ def get_trimmed_content(
         return None
 
 
-def return_empty_generation_with_error(detailed_error: str):
+def return_empty_generation_with_error(detailed_error: str, error_reason: str = "context_window_exceeded"):
     return {
         "generation": "",
         "num_generated_tokens": 0,
-        "error": "context_window_exceeded",
+        "error": error_reason,
         "detailed_error": detailed_error,
     }
