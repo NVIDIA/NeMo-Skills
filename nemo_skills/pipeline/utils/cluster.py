@@ -210,9 +210,6 @@ def get_env_variables(cluster_config):
             else:
                 raise ValueError(f"Cannot resolve environment variable {key} inside the placeholder value: {value}")
 
-    # Inject env_vars into os.environ for resolution via os.path.expandvars in other parts of the code
-    os.environ.update(env_vars)
-
     return env_vars
 
 
