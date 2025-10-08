@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from dataclasses import field
 from typing import Any, Dict, List, Tuple
 
-from nemo_skills.code_execution.sandbox import BaseSandbox, get_sandbox
+from nemo_skills.code_execution.sandbox import Sandbox, get_sandbox
 from nemo_skills.evaluation.evaluator.code import preprocess_code
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
@@ -89,7 +89,7 @@ def _postprocess_results(jsonl_file: str, samples: List[Dict[str, Any]]):
     LOG.info(f"Finished processing {jsonl_file}, results saved.")
 
 
-async def _install_packages_in_sandbox(sandbox: BaseSandbox, interpreter: str) -> bool:
+async def _install_packages_in_sandbox(sandbox: Sandbox, interpreter: str) -> bool:
     """Installs required packages in the provided sandbox."""
     LOG.info(f"Installing livecodebench with {interpreter} in sandbox...")
     pip_cmd = "pip" if interpreter == "python" else "pypy3 -m pip"
