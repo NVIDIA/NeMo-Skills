@@ -420,7 +420,7 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     env_vars = get_env_variables(cluster_config)
-    # If not set by env variable, try to resolve from config
+    # If not explicitly set, resolve from cluster config
     if skip_hf_home_check is None:
         skip_hf_home_check = cluster_config.get("skip_hf_home_check", False)
 
