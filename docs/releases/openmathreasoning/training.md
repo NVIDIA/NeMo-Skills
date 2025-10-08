@@ -147,7 +147,7 @@ instead of 30000 used in the first-round SFT.
 ```bash
     --hf_model=/workspace/openmathreasoning-sft/final_hf_model \
     --training_data=<path to the new data> \
-    ++model.optim.sched.warmup_steps=300 \
+    ++policy.megatron_cfg.scheduler.lr_warmup_iters=300 \
     ++policy.megatron_cfg.scheduler.lr_warmup_init=0 \
     ++sft.max_num_steps=3000
 ```
