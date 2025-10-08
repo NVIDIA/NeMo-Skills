@@ -22,7 +22,7 @@ from typing import Callable, Dict, Union
 
 from nemo_skills.utils import get_logger_name
 
-from .utils import ServerTokenizer, WrapperAutoTokenizer, is_context_window_exceeded_error, is_internal_server_error
+from .utils import ServerTokenizer, WrapperAutoTokenizer, is_context_window_exceeded_error
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -129,7 +129,9 @@ class ContextLimitRetryConfig:
     """Configuration for context limit retry behavior, i.e., when the context limit is exceeded."""
 
     enable_soft_fail: bool = False  # If True, will enable soft fail or try to reduce the context by reducing the number of tokens to generate/prompt and perform the task
-    strategy: str = None  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
+    strategy: str | None = (
+        None  # Strategy to use when reducing the context - reduce_generation, reduce_prompt_from_start, reduce_prompt_from_end
+    )
     num_special_tokens_budget: int = 50  # To account for the discrepancy when tokenizing a message content standalone and when tokenizing it as part of a message list. Keep it high to be safe.
 
     def __post_init__(self):
@@ -218,7 +220,8 @@ async def handle_context_retries_async(
 
             return await func(self, *args, **modified_kwargs)
         else:
-            raise error
+            LOG.info(f"Soft fail is enabled. Caught an error: {error}")
+            raise return_empty_generation_with_error(f"{error}")
 
 
 def handle_context_retries_sync(
@@ -229,29 +232,21 @@ def handle_context_retries_sync(
         result = func(self, *args, **kwargs)
         return result
     except Exception as error:
-        if is_context_window_exceeded_error(error):
-            if not config.enable_soft_fail:
-                raise error
-
-            # Soft fail is enabled
-            LOG.info(f"Soft fail is enabled. Caught context window exceeded error: {error}")
-
-            # No strategy configured
-            if config.strategy is None:
-                return return_empty_generation_with_error(f"No strategy configured. {error}")
-
-            # Try to apply the prompt/generation budget reduction strategy
-            modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
-            if modified_kwargs is None:
-                return return_empty_generation_with_error(f"Could not apply strategy. {error}")
-
-            return func(self, *args, **modified_kwargs)
-        elif config.enable_soft_fail and is_internal_server_error(error):
-            # Soft fail is enabled and the error is an internal server error
-            LOG.info(f"Soft fail is enabled. Caught internal server error: {error}")
-            return return_empty_generation_with_error(f"Internal server error. {error}")
-        else:
+        if not config.enable_soft_fail:
             raise error
+        else:
+            LOG.info("Soft fail is enabled.")
+            if is_context_window_exceeded_error(error):
+                LOG.info(f"Caught context window exceeded error: {error}")
+                if config.strategy is None:
+                    return return_empty_generation_with_error(f"No strategy configured. {error}")
+                modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
+                if modified_kwargs is None:
+                    return return_empty_generation_with_error(f"Could not apply strategy. {error}")
+                return func(self, *args, **modified_kwargs)
+            else:
+                LOG.info(f"Caught an error: {error}")
+                return return_empty_generation_with_error(f"{error}")
 
 
 def _prepare_context_error_retry(
