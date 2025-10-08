@@ -51,14 +51,6 @@ def is_context_window_exceeded_error(error: Exception) -> bool:
         return False
 
 
-def is_internal_server_error(error: Exception) -> bool:
-    """Check if the error is an internal server error."""
-    if "InternalServerError: OpenAIException - Error code: 500" in str(error):
-        return True
-    else:
-        return False
-
-
 class ServerTokenizer:
     """Class to encode and decode prompts via POST requests to the tokenizer endpoint."""
 
