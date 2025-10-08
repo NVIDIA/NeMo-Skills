@@ -22,7 +22,7 @@ from typing import Callable, Dict, Union
 
 from nemo_skills.utils import get_logger_name
 
-from .utils import ServerTokenizer, WrapperAutoTokenizer, is_context_window_exceeded_error
+from .utils import ServerTokenizer, WrapperAutoTokenizer, is_context_window_exceeded_error, is_internal_server_error
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -246,6 +246,10 @@ def handle_context_retries_sync(
                 return return_empty_generation_with_error(f"Could not apply strategy. {error}")
 
             return func(self, *args, **modified_kwargs)
+        elif config.enable_soft_fail and is_internal_server_error(error):
+            # Soft fail is enabled and the error is an internal server error
+            LOG.info(f"Soft fail is enabled. Caught internal server error: {error}")
+            return return_empty_generation_with_error(f"Internal server error. {error}")
         else:
             raise error
 
