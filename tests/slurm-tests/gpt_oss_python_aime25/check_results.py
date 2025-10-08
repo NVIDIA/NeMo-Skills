@@ -46,7 +46,7 @@ def parse_timeout_counts(eval_file: Path) -> int:
 
 
 def check_timeouts(eval_dir: str):
-    eval_dir = Path(eval_dir)
+    eval_dir = Path(eval_dir) / "eval-results" / "aime25"
     timeout_files = sorted(
         eval_dir.glob("output-rs*.jsonl"), key=lambda p: int(re.search(r"output-rs(\d+)\.jsonl", p.name).group(1))
     )
