@@ -217,10 +217,10 @@ async def handle_context_retries_async(
                     result = await func(self, *args, **modified_kwargs)
                     return result
                 except Exception as error:
-                    LOG.info(f"Caught an error: {error}")
+                    LOG.warning(f"Caught an error. Returning empty generation. {error}")
                     return return_empty_generation_with_error(f"{error}")
             else:
-                LOG.info(f"Caught an error: {error}")
+                LOG.warning(f"Caught an error. Returning empty generation. {error}")
                 return return_empty_generation_with_error(f"{error}")
 
 
@@ -248,10 +248,10 @@ def handle_context_retries_sync(
                     result = func(self, *args, **modified_kwargs)
                     return result
                 except Exception as error:
-                    LOG.info(f"Caught an error: {error}")
+                    LOG.warning(f"Caught an error. Returning empty generation. {error}")
                     return return_empty_generation_with_error(f"{error}")
             else:
-                LOG.info(f"Caught an error: {error}")
+                LOG.warning(f"Caught an error. Returning empty generation. {error}")
                 return return_empty_generation_with_error(f"{error}")
 
 
