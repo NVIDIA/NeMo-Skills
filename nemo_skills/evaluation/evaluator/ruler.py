@@ -121,7 +121,7 @@ def eval_ruler2(cfg):
         preds = [preds]
         refs = [refs]
         score = [
-            sum([1.0 if r.lower() in pred.lower() else 0.0 for r in ref]) / len(ref) for pred, ref in zip(preds, refs)
+            sum([max(1.0 if r.lower() in pred.lower() else 0.0, 1 - wer([pred.lower()], [r.lower()])) for r in ref]) / len(ref) for pred, ref in zip(preds, refs)
         ][0]
         return score
 
@@ -131,7 +131,7 @@ def eval_ruler2(cfg):
         preds = [preds]
         refs = [refs]
         score = [
-            sum([max(1.0 if r.lower() in pred.lower() else 0.0, 1 - wer([pred], [r])) for r in ref]) / len(ref) for pred, ref in zip(preds, refs)
+            sum([max(1.0 if r.lower() in pred.lower() else 0.0, 1 - wer([pred.lower()], [r.lower()])) for r in ref]) / len(ref) for pred, ref in zip(preds, refs)
         ][0]
         return score
 
@@ -142,7 +142,7 @@ def eval_ruler2(cfg):
         preds = [preds]
         refs = [refs]
         score = [
-            sum([max([max(1.0 if r.lower() in pred.lower() else 0.0, 1 - wer([pred], [r])) for r in ref]) for pred, ref in zip(preds, refs)])
+            sum([max([max(1.0 if r.lower() in pred.lower() else 0.0, 1 - wer([pred.lower()], [r.lower()])) for r in ref]) for pred, ref in zip(preds, refs)])
         ][0]
         return score
 
