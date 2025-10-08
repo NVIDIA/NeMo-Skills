@@ -47,9 +47,14 @@ def parse_timeout_counts(eval_file: Path) -> int:
 
 def check_timeouts(eval_dir: str):
     eval_dir = Path(eval_dir) / "eval-results" / "aime25"
-    timeout_files = sorted(
-        eval_dir.glob("output-rs*.jsonl"), key=lambda p: int(re.search(r"output-rs(\d+)\.jsonl", p.name).group(1))
-    )
+
+    def extract_seed(p: Path) -> int:
+        match = re.search(r"output-rs(\d+)\.jsonl", p.name)
+        if not match:
+            raise ValueError(f"Unexpected filename format: {p.name}")
+        return int(match.group(1))
+
+    timeout_files = sorted(eval_dir.glob("output-rs*.jsonl"), key=extract_seed)
 
     total_timeouts = 0
     for output_path in timeout_files:
@@ -68,8 +73,6 @@ def check_timeouts(eval_dir: str):
                 f"({len(timeout_files)} files * {MAX_TIMEOUTS_PER_FILE} max each)"
             ),
         )
-
-    assert_all()
 
 
 def check_results(eval_dir: str):
