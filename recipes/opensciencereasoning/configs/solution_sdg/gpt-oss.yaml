@@ -1,6 +1,6 @@
 cluster: local
-base_output_dir: ""
-expname: ""
+base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
+expname: "gpt-oss-generate-solutions"
 suffix: ""  # Suffix for experiment names
 
 
@@ -9,7 +9,7 @@ suffix: ""  # Suffix for experiment names
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
 # Make sure the problems fit the prompt you are using
-input_file: ""
+input_file: "/nemo_run/code/recipes/opensciencereasoning/configs/solution_sdg/example-data.jsonl"
 
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: ""
@@ -17,13 +17,31 @@ initial_dependency: ""
 # Define the full sequence of stages for this mode
 pipeline_stages:
   - filter_problems          # Filter problems based on format
+  - decontaminate          # Decontaminate problems
 
 # Directory structure configuration
 directories:
   step-0-filter-problems: ${base_output_dir}/solution-sdg/step-0-filter-problems
+  step-1-decontaminate: ${base_output_dir}/solution-sdg/step-1-decontaminate
   
 # Stage-specific configurations
 stages:
   filter_problems:
     output_dir: ${directories.step-0-filter-problems}
     input_file: ${input_file}
+
+  decontaminate:
+    output_dir: ${directories.step-1-decontaminate}
+    # input_file: ${directories.step-0-filter-problems}/final_result.jsonl
+    input_file: /nemo_run/code/recipes/opensciencereasoning/configs/solution_sdg/example-data.jsonl
+    test_sets:
+      - ["hle", "text"]
+      - ["mmlu", "test"]
+      - ["mmlu-pro", "test"]
+      - ["gpqa", "diamond"]
+    model: /hf_models/Qwen2.5-32B-Instruct
+    server_type: sglang
+    server_gpus: 1
+    server_nodes: 1
+    dependent_jobs: 1
+    num_chunks: 20

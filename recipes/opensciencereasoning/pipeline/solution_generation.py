@@ -41,9 +41,76 @@ def filter_problems(cluster, expname, run_after, stage_config, **kwargs):
     output_dir = stage_config["output_dir"]
     return
 
+def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
+    input_file = stage_config.get("input_file")
+    output_dir = stage_config["output_dir"]
+    test_sets = stage_config.get("test_sets", [])
+    model = stage_config.get("model")
+    server_type = stage_config.get("server_type")
+    server_gpus = stage_config.get("server_gpus")
+    server_nodes = stage_config.get("server_nodes")
+    dependent_jobs = stage_config.get("dependent_jobs")
+    num_chunks = stage_config.get("num_chunks")
+
+    retrieve_from = ",".join(
+        f"/nemo_run/code/nemo_skills/dataset/{test_set}/{split}.jsonl" for test_set, split in test_sets
+    )
+    cmd = (
+        f"python -m nemo_skills.inference.retrieve_similar "
+        f"    ++retrieve_from=\\'{retrieve_from}\\' "
+        f"    ++compare_to='{input_file}' "
+        f"    ++output_file='{output_dir}/contamination-retrieved.jsonl' "
+        f"    ++top_k=5 "
+    )
+
+    run_cmd(
+        cluster=cluster,
+        container="nemo",
+        expname=f"retrieve_similar",
+        exclusive=False,
+        ctx=wrap_arguments(cmd),
+    )
+
+    generate(
+        cluster=cluster,
+        generation_type="check_contamination",
+        input_file=f"{output_dir}/contamination-retrieved.jsonl",
+        output_dir=f"{output_dir}/decontaminate/",
+        server_type=server_type,
+        server_gpus=server_gpus,
+        server_nodes=server_nodes,
+        model=model,
+        expname=f"check_contamination",
+        run_after=f"retrieve_similar",
+        exclusive=False,
+        dependent_jobs=dependent_jobs,
+        num_chunks=num_chunks,
+        ctx=wrap_arguments(
+            f"++check_both_ways=True "
+        ),
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(
+            (
+                f"python /scripts/decontaminate.py "
+                f"    --input_path '{input_file}' "
+                f"    --dec_path '{output_dir}/decontaminate/output.jsonl' "
+                f"    --save_path {output_dir}/final_result.jsonl "
+                f"    --with_duplicates False "
+            )
+        ),
+        cluster=cluster,
+        exclusive=False,
+        run_after=f"check_contamination",
+        expname=f"decontaminate",
+    )
+
+
 
 stages_map = {
     "filter_problems": filter_problems,
+    "decontaminate": decontaminate,
 }
 
 
