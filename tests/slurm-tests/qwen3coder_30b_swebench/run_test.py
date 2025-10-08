@@ -72,7 +72,7 @@ def main():
 
         # schedule a dependent check job on the cluster and check if the results are as expected
         checker_cmd = (
-            f"python tests/slurm-tests/qwen3coder_swebench/check_results.py "
+            f"python tests/slurm-tests/qwen3coder_30b_swebench/check_results.py "
             f"  --workspace {workspace} "
             f"  --agent_framework {agent_framework} "
         )
