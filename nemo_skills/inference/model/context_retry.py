@@ -213,7 +213,12 @@ async def handle_context_retries_async(
                 modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
                 if modified_kwargs is None:
                     return return_empty_generation_with_error(f"Could not apply strategy. {error}")
-                return await func(self, *args, **modified_kwargs)
+                try:
+                    result = await func(self, *args, **modified_kwargs)
+                    return result
+                except Exception as error:
+                    LOG.info(f"Caught an error: {error}")
+                    return return_empty_generation_with_error(f"{error}")
             else:
                 LOG.info(f"Caught an error: {error}")
                 return return_empty_generation_with_error(f"{error}")
@@ -238,7 +243,13 @@ def handle_context_retries_sync(
                 modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
                 if modified_kwargs is None:
                     return return_empty_generation_with_error(f"Could not apply strategy. {error}")
-                return func(self, *args, **modified_kwargs)
+
+                try:
+                    result = func(self, *args, **modified_kwargs)
+                    return result
+                except Exception as error:
+                    LOG.info(f"Caught an error: {error}")
+                    return return_empty_generation_with_error(f"{error}")
             else:
                 LOG.info(f"Caught an error: {error}")
                 return return_empty_generation_with_error(f"{error}")
