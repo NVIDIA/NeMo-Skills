@@ -93,7 +93,7 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
     run_cmd(
         ctx=wrap_arguments(
             (
-                f"python /scripts/decontaminate.py "
+                f"python /nemo_run/code/recipes/opensciencereasoning/scripts/decontaminate.py "
                 f"    --input_path '{input_file}' "
                 f"    --dec_path '{output_dir}/decontaminate/output.jsonl' "
                 f"    --save_path {output_dir}/final_result.jsonl "

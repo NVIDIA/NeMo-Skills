@@ -9,7 +9,7 @@ suffix: ""  # Suffix for experiment names
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
 # Make sure the problems fit the prompt you are using
-input_file: "/nemo_run/code/recipes/opensciencereasoning/configs/solution_sdg/example-data.jsonl"
+input_file: "/nemo_run/code/nemo_skills/dataset/mmlu/val.jsonl"
 
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: ""
