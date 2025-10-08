@@ -330,7 +330,7 @@ def _try_reduce_prompt_tokens(
     """Try to reduce the number of tokens in the prompt."""
     if "message_tokens_overflow" in parsed_error:
         # We can just use this information to reduce the prompt tokens
-        orig_prompt_num_tokens = get_token_count(okenizer=tokenizer, messages=kwargs["prompt"])
+        orig_prompt_num_tokens = get_token_count(tokenizer=tokenizer, messages=kwargs["prompt"])
         num_prompt_tokens_to_keep = orig_prompt_num_tokens - (
             parsed_error["message_tokens_overflow"] + kwargs["tokens_to_generate"] + config.num_special_tokens_budget
         )
