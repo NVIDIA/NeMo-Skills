@@ -22,16 +22,19 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from nemo_skills.dataset.bfcl_v3.constants import (
+from nemo_skills.dataset.bfcl_v4.constants import (
     DATA_FOLDER_PATH,
     MULTI_TURN_FUNC_DOC_FILE_MAPPING,
     MULTI_TURN_FUNC_DOC_PATH,
 )
-from nemo_skills.dataset.bfcl_v3.utils import (
+from nemo_skills.dataset.bfcl_v4.utils import (
     convert_to_tool,
     func_doc_language_specific_pre_processing,
     is_multi_turn,
     load_file,
+    clean_up_memory_prereq_entries,
+    populate_initial_settings_for_memory_test_cases,
+    populate_initial_settings_for_web_search_test_cases,
 )
 from nemo_skills.utils import get_logger_name
 
@@ -89,7 +92,7 @@ def process_multi_turn_test_case(instance, repo_root_dir):
     return instance
 
 
-def process_file(repo_root_dir, input_file, output_file, model_type="llama-nemotron"):
+def process_file(repo_root_dir, input_file, output_file):
     """Preprocess the functions and convert them to tool format.
     Also mark whether the instance is single-turn or multi-turn which is used during inference.
     """
@@ -101,9 +104,14 @@ def process_file(repo_root_dir, input_file, output_file, model_type="llama-nemot
             if idx == 0:
                 LOG.info(f"Processing {test_category}")
 
-            # TODO: Current preprocessing can be model dependent. This could be moved to inference time as well
-            # Convert class-based method calls to function calls
-            instance = process_multi_turn_test_case(instance, repo_root_dir)
+
+                test_cases_to_generate = clean_up_memory_prereq_entries(test_cases_to_generate)
+                test_cases_to_generate = populate_initial_settings_for_memory_test_cases(
+                    test_cases_to_generate, repo_root_dir,
+                )
+                test_cases_to_generate = populate_initial_settings_for_web_search_test_cases(
+                    test_cases_to_generate
+                )
 
             # Convert function calls to tools format and add them to the system prompt
             if "function" in instance:
@@ -114,7 +122,11 @@ def process_file(repo_root_dir, input_file, output_file, model_type="llama-nemot
             f_out.write(json.dumps(instance) + "\n")
 
 
-def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_prefix="BFCL_v3", model_type="nemotron"):
+
+
+
+
+def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_prefix="BFCL_v4"):
     """
     Download JSON files from the BFCL GitHub repo via cloning
 
@@ -129,9 +141,8 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
         try:
             # Clone repository with minimal depth
             LOG.info(f"Cloning repository {repo_url} to {temp_dir}")
-            # v1.3 corresponds the release version for BFCL v3
             subprocess.run(
-                ["git", "clone", "-b", "v1.3", "--depth=1", repo_url, temp_dir], check=True, capture_output=True
+                ["git", "clone", "--depth=1", repo_url, temp_dir], check=True, capture_output=True
             )
 
             # Find the target folder
@@ -155,7 +166,7 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
             processed_files = 0
             for input_file in json_files:
                 filename = os.path.basename(input_file)
-                split_dirname = os.path.join(output_dir, filename.lstrip("BFCL_v3_").replace(".json", ""))
+                split_dirname = os.path.join(output_dir, filename.lstrip("BFCL_v4_").replace(".json", ""))
                 if not os.path.exists(split_dirname):
                     os.makedirs(split_dirname)
 
@@ -163,7 +174,7 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
                     f.write(DEFAULT_SETTINGS)
 
                 output_file = os.path.join(split_dirname, "test.jsonl")
-                process_file(temp_dir, input_file, output_file, model_type=model_type)
+                process_file(temp_dir, input_file, output_file)
 
                 # Copy the original json file to the split directory
                 shutil.copy(input_file, os.path.join(split_dirname, filename))
@@ -182,7 +193,7 @@ def main(args):
     )
 
     download_and_process_bfcl_data(
-        REPO_URL, DATA_FOLDER_PATH, output_dir=os.path.join(os.path.dirname(__file__)), model_type=args.model_type
+        REPO_URL, DATA_FOLDER_PATH, output_dir=os.path.join(os.path.dirname(__file__)),
     )
 
 

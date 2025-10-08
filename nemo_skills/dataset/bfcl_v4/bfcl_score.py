@@ -17,9 +17,9 @@
 
 
 SIMPLE_AST = [
-    "simple",
-    "java",
-    "javascript",
+    "simple_python",
+    "simple_java",
+    "simple_javascript",
 ]
 
 OTHER_SINGLE_TURN_AST = [
@@ -47,6 +47,20 @@ MULTI_TURN_AST = [
     "multi_turn_miss_param",
     "multi_turn_long_context",
 ]
+
+MEMORY = [
+    "memory_kv",
+    "memory_vector",
+    "memory_rec_sum",
+]
+
+WEB_SEARCH = [
+    "web_search_base",
+    "web_search_no_snippet",
+]
+
+FORMAT_SENSITIVITY = "format_sensitivity"
+
 
 # Global to track the expected max k across all subsets (None until set)
 GLOBAL_MAX_K = None
@@ -77,9 +91,11 @@ def calculate_combined_accuracy(accuracy_dict_list: list[dict], weighted=False):
         return {"accuracy": total_accuracy / total_div_count, "num_entries": total_count}
 
 
-def get_accuracy_dict(metrics, category):
+def get_accuracy_dict(metrics, category, optional=False):
     # reporting aggregation for pass@1[avg-of-k] (for highest k) if available
-    category_dict = metrics[f"bfcl_v3.{category}"]
+    if optional and f"bfcl_v4.{category}" not in metrics:
+        category_dict = {}
+    category_dict = metrics[f"bfcl_v4.{category}"]
 
     # Find all keys that match "pass@1[avg-of-{k}]"
     avg_keys = [key for key in category_dict.keys() if key.startswith("pass@1[avg-of-") and key.endswith("]")]
@@ -167,24 +183,52 @@ def calculate_multi_turn_accuracy(metrics):
         "overall_multi_turn": overall_accuracy_multi_turn,
     }
 
+def calculate_agentic_accuracy(metrics):
+    memory_accuracy_list = [get_accuracy_dict(metrics, category) for category in MEMORY]
+    overall_accuracy_memory = calculate_combined_accuracy(memory_accuracy_list, weighted=False)
+    web_search_accuracy_list = [get_accuracy_dict(metrics, category) for category in WEB_SEARCH]
+    overall_accuracy_web_search = calculate_combined_accuracy(web_search_accuracy_list, weighted=False)
+
+    format_sensitivity = get_accuracy_dict(metrics, FORMAT_SENSITIVITY, optional=True)
+
+    result_dict = {
+        "overall_memory": overall_accuracy_memory,
+        "overall_web_search": overall_accuracy_web_search,
+    }
+
+    # This metric is only calculated for BFCL prompt-mode
+    if len(format_sensitivity) > 0:
+        result_dict["format_sensitivity"] = format_sensitivity
+
+    return result_dict
 
 def compute_score(metrics: dict):
     non_live_single_turn_accuracy = calculate_non_live_single_turn_accuracy(metrics)
     live_single_turn_accuracy = calculate_live_single_turn_accuracy(metrics)
     multi_turn_accuracy = calculate_multi_turn_accuracy(metrics)
+    agentic_accuracy = calculate_agentic_accuracy(metrics)
 
     overall_accuracy = calculate_combined_accuracy(
         [
             non_live_single_turn_accuracy["overall_non_live"],
             live_single_turn_accuracy["overall_live"],
             multi_turn_accuracy["overall_multi_turn"],
+            agentic_accuracy["overall_memory"],
+            agentic_accuracy["overall_web_search"],
         ],
         weighted=False,
     )
 
-    return {
+    res = {
         "overall_accuracy": overall_accuracy,
         "non_live_single_turn": non_live_single_turn_accuracy,
         "live_single_turn": live_single_turn_accuracy,
         "multi_turn": multi_turn_accuracy,
+        "memory": agentic_accuracy["overall_memory"],
+        "web_search": agentic_accuracy["overall_web_search"],
     }
+
+    if "format_sensitivity" in agentic_accuracy:
+        res["format_sensistivity"] = agentic_accuracy["format_sensitivity"]
+
+    return res

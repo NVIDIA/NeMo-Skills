@@ -14,85 +14,72 @@
 
 from pathlib import Path
 
+
+ALL_AVAILABLE_MEMORY_BACKENDS = [
+    "kv",
+    "vector",
+    "rec_sum",
+]
+
+NON_LIVE_CATEGORY = [
+    "simple_python",
+    "simple_java",
+    "simple_javascript",
+    "multiple",
+    "parallel",
+    "parallel_multiple",
+    "irrelevance",
+    # "exec_simple",
+    # "exec_parallel",
+    # "exec_multiple",
+    # "exec_parallel_multiple",
+    # "rest",
+    # "sql",
+    # "chatable",
+]
+LIVE_CATEGORY = [
+    "live_simple",
+    "live_multiple",
+    "live_parallel",
+    "live_parallel_multiple",
+    "live_irrelevance",
+    "live_relevance",
+]
+MULTI_TURN_CATEGORY = [
+    "multi_turn_base",
+    "multi_turn_miss_func",
+    "multi_turn_miss_param",
+    "multi_turn_long_context",
+    # "multi_turn_composite",
+]
+WEB_SEARCH_CATEGORY = [
+    "web_search_base",
+    "web_search_no_snippet",
+]
+
+MEMORY_CATEGORY = [f"memory_{backend}" for backend in ALL_AVAILABLE_MEMORY_BACKENDS]
+
+
+SINGLE_TURN_CATEGORY = NON_LIVE_CATEGORY + LIVE_CATEGORY
+AGENTIC_CATEGORY = MEMORY_CATEGORY + WEB_SEARCH_CATEGORY
+NON_SCORING_CATEGORY = ["format_sensitivity"]
+
+ALL_SCORING_CATEGORIES = SINGLE_TURN_CATEGORY + MULTI_TURN_CATEGORY + AGENTIC_CATEGORY
+ALL_CATEGORIES = ALL_SCORING_CATEGORIES + NON_SCORING_CATEGORY
+
 TEST_COLLECTION_MAPPING = {
-    "all": [
-        "simple",
-        "irrelevance",
-        "parallel",
-        "multiple",
-        "parallel_multiple",
-        "java",
-        "javascript",
-        "live_simple",
-        "live_multiple",
-        "live_parallel",
-        "live_parallel_multiple",
-        "live_irrelevance",
-        "live_relevance",
-        "multi_turn_base",
-        "multi_turn_miss_func",
-        "multi_turn_miss_param",
-        "multi_turn_long_context",
-    ],
-    "multi_turn": [
-        "multi_turn_base",
-        "multi_turn_miss_func",
-        "multi_turn_miss_param",
-        "multi_turn_long_context",
-    ],
-    "single_turn": [
-        "simple",
-        "irrelevance",
-        "parallel",
-        "multiple",
-        "parallel_multiple",
-        "java",
-        "javascript",
-        "live_simple",
-        "live_multiple",
-        "live_parallel",
-        "live_parallel_multiple",
-        "live_irrelevance",
-        "live_relevance",
-    ],
-    "live": [
-        "live_simple",
-        "live_multiple",
-        "live_parallel",
-        "live_parallel_multiple",
-        "live_irrelevance",
-        "live_relevance",
-    ],
-    "non_live": [
-        "simple",
-        "irrelevance",
-        "parallel",
-        "multiple",
-        "parallel_multiple",
-        "java",
-        "javascript",
-    ],
-    "ast": [
-        "simple",
-        "irrelevance",
-        "parallel",
-        "multiple",
-        "parallel_multiple",
-        "java",
-        "javascript",
-        "live_simple",
-        "live_multiple",
-        "live_parallel",
-        "live_parallel_multiple",
-        "live_irrelevance",
-        "live_relevance",
-    ],
+    "all": ALL_CATEGORIES,
+    "all_scoring": ALL_SCORING_CATEGORIES,
+    "multi_turn": MULTI_TURN_CATEGORY,
+    "single_turn": SINGLE_TURN_CATEGORY,
+    "live": LIVE_CATEGORY,
+    "non_live": NON_LIVE_CATEGORY,
     "non_python": [
-        "java",
-        "javascript",
+        "simple_java",
+        "simple_javascript",
     ],
     "python": [
-        "simple",
+        "simple_python",
         "irrelevance",
         "parallel",
         "multiple",
@@ -104,7 +91,11 @@ TEST_COLLECTION_MAPPING = {
         "live_irrelevance",
         "live_relevance",
     ],
+    "memory": MEMORY_CATEGORY,
+    "web_search": WEB_SEARCH_CATEGORY,
+    "agentic": AGENTIC_CATEGORY,
 }
+
 
 MULTI_TURN_FUNC_DOC_FILE_MAPPING = {
     "GorillaFileSystem": "gorilla_file_system.json",

@@ -41,14 +41,14 @@ def eval_bfcl(cfg):
     # model_name = eval_config.model.split("/")[-1]
     for jsonl_file in unroll_files(cfg.input_files):
         # Output files are structures as bfcl_v3/TEST_CATEGORY/jsonl_file
-        test_category = str(Path(jsonl_file).absolute().parent.name).removeprefix("bfcl_v3.")
+        test_category = str(Path(jsonl_file).absolute().parent.name).removeprefix("bfcl_v4.")
 
         # Convert NeMo-Skills output file to BFCL format
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
         score_file = (
             Path("/opt/gorilla/berkeley-function-call-leaderboard")
             / f"score/{model_name}"
-            / f"BFCL_v3_{test_category}_score.json"
+            / f"BFCL_v4_{test_category}_score.json"
         )
 
         bfcl_input_file = _convert_to_bfcl_format(jsonl_file, output_dir=output_dir, test_category=test_category)
@@ -76,7 +76,7 @@ def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
     if not Path(output_dir).exists():
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    bfcl_file = Path(output_dir, f"BFCL_v3_{test_category}_result.json")
+    bfcl_file = Path(output_dir, f"BFCL_v4_{test_category}_result.json")
     with open(jsonl_file, "rt", encoding="utf-8") as fin, open(bfcl_file, "wt", encoding="utf-8") as fout:
         for line in fin:
             sample = json.loads(line)
