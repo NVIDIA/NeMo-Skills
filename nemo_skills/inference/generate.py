@@ -543,11 +543,12 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        result = await self.generate_with_semaphore(**generation_params)
-
+        result = {}
         if self.cfg.count_prompt_tokens:
             num_input_tokens = get_token_count(self.hf_tokenizer, generation_params["prompt"])
             result["num_input_tokens"] = num_input_tokens
+
+        result.update(await self.generate_with_semaphore(**generation_params))
         return result
 
     async def generate_with_semaphore(self, **generation_params):
