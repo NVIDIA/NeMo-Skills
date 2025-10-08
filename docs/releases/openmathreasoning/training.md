@@ -5,8 +5,7 @@ that data and models will be downloaded to that folder.
 
 ## Download data and convert to SFT format
 
-Get the data from [HuggingFace](https://huggingface.co/datasets/nvidia/OpenMathReasoning) and convert
-to the SFT format that NeMo-Aligner understands.
+Get the data from [HuggingFace](https://huggingface.co/datasets/nvidia/OpenMathReasoning) and convert it to the SFT JSONL format expected by the NeMo-RL SFT.
 This might take a while (depending on your network connection) and will use a significant amount of RAM.
 
 ```python
@@ -60,7 +59,7 @@ shuf -o omr-all.jsonl omr-all.jsonl
 
 ## Prepare base model
 
-Download the base model and convert it to NeMo format. We used the following base models
+Download the base model. We used the following base models
 
 * [Qwen2.5-Math-1.5B](https://huggingface.co/Qwen/Qwen2.5-Math-1.5B)
 * [Qwen2.5-Math-7B](https://huggingface.co/Qwen/Qwen2.5-Math-7B)
