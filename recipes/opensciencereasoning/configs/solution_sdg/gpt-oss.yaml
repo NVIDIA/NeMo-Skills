@@ -17,7 +17,7 @@ initial_dependency: ""
 # Define the full sequence of stages for this mode
 pipeline_stages:
   - filter_problems          # Filter problems based on format
-  - decontaminate          # Decontaminate problems
+  - decontaminate            # Decontaminate problems
 
 # Directory structure configuration
 directories:
@@ -32,8 +32,7 @@ stages:
 
   decontaminate:
     output_dir: ${directories.step-1-decontaminate}
-    # input_file: ${directories.step-0-filter-problems}/final_result.jsonl
-    input_file: ${input_file}
+    input_file: ${directories.step-0-filter-problems}/final_result.jsonl
     test_sets:
       - ["hle", "text"]
       - ["mmlu", "test"]
