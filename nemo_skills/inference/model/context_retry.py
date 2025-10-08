@@ -195,7 +195,9 @@ async def handle_context_retries_async(
             if is_context_window_exceeded_error(error):
                 LOG.info(f"Caught context window exceeded error: {error}")
                 if config.strategy is None:
-                    return return_empty_generation_with_error(f"No strategy configured. {error}")
+                    return return_empty_generation_with_error(
+                        f"No strategy configured. {error}", error_reason="context_window_exceeded"
+                    )
                 modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
                 if modified_kwargs is None:
                     return return_empty_generation_with_error(f"Could not apply strategy. {error}")
@@ -206,10 +208,10 @@ async def handle_context_retries_async(
                 except Exception as error:
                     LOG.warning(f"Caught an error. Returning empty generation. {error}")
                     # This error most likely is not related to the context window exceeded error.
-                    return return_empty_generation_with_error(f"{error}", error_reason="other")
+                    return return_empty_generation_with_error(f"{error}")
             else:
                 LOG.warning(f"Caught an error. Returning empty generation. {error}")
-                return return_empty_generation_with_error(f"{error}", error_reason="other")
+                return return_empty_generation_with_error(f"{error}")
 
 
 def handle_context_retries_sync(
@@ -227,7 +229,9 @@ def handle_context_retries_sync(
             if is_context_window_exceeded_error(error):
                 LOG.info(f"Caught context window exceeded error: {error}")
                 if config.strategy is None:
-                    return return_empty_generation_with_error(f"No strategy configured. {error}")
+                    return return_empty_generation_with_error(
+                        f"No strategy configured. {error}", error_reason="context_window_exceeded"
+                    )
                 modified_kwargs = _prepare_context_error_retry(kwargs, config, self.tokenizer, error)
                 if modified_kwargs is None:
                     return return_empty_generation_with_error(f"Could not apply strategy. {error}")
@@ -238,10 +242,10 @@ def handle_context_retries_sync(
                 except Exception as error:
                     LOG.warning(f"Caught an error. Returning empty generation. {error}")
                     # This error most likely is not related to the context window exceeded error.
-                    return return_empty_generation_with_error(f"{error}", error_reason="other")
+                    return return_empty_generation_with_error(f"{error}")
             else:
                 LOG.warning(f"Caught an error. Returning empty generation. {error}")
-                return return_empty_generation_with_error(f"{error}", error_reason="other")
+                return return_empty_generation_with_error(f"{error}")
 
 
 def _prepare_context_error_retry(
@@ -518,7 +522,7 @@ def get_trimmed_content(
         return None
 
 
-def return_empty_generation_with_error(detailed_error: str, error_reason: str = "context_window_exceeded"):
+def return_empty_generation_with_error(detailed_error: str, error_reason: str = "See detailed_error"):
     return {
         "generation": "",
         "num_generated_tokens": 0,
