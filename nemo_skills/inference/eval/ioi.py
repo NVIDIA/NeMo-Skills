@@ -80,7 +80,6 @@ class IOIExecutionGenerationTask(GenerationTask):
     def __init__(self, cfg: IOIExecutionConfig):
         super().__init__(cfg)
         prompt_kwargs = {
-            "prompt_template": cfg.prompt_template,
             "code_tags": cfg.code_tags,
             "examples_type": cfg.examples_type,
         }
