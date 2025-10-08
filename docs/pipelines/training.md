@@ -53,7 +53,7 @@ ns nemo_rl sft \
     --cluster=slurm \
     --expname=my-training-job \
     --output_dir=/workspace/my-training-job/checkpoints \
-    --hf_model=/hf_models/llama3.1-8b-base \
+    --hf_model=meta-llama/Llama-3.1-8B \
     --num_nodes=8 \
     --num_gpus=8 \
     --num_training_jobs=4 \
@@ -97,7 +97,7 @@ We also support sequence packing and context parallel, espeically for training s
 ```
 
 
-The training script will automatically convert the final saved checkpoint into the Hugging Face format and average all generated checkpoints upon completion (**checkpoints average TBD**)).
+The training script will automatically convert the final saved checkpoint into the Hugging Face format.
 
 
 ## Chaining pipelines with Python
@@ -120,7 +120,7 @@ sft_nemo_rl(
     cluster=cluster,
     expname=expname,
     output_dir=output_dir,
-    hf_model="/hf_models/llama3.1-8b-base",
+    hf_model="meta-llama/Llama-3.1-8B",
     num_nodes=8,
     num_gpus=8,
     num_training_jobs=4,

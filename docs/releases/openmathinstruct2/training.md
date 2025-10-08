@@ -60,7 +60,7 @@ ns nemo_rl sft \
     --cluster=slurm \
     --expname=openmathinstruct2-repro-8b \
     --output_dir=/workspace/openmathinstruct2-repro/checkpoints \
-    --hf_model=/workspace/Llama-3.1-8B  \
+    --hf_model=meta-llama/Llama-3.1-8B  \
     --num_nodes=8 \
     --num_gpus=8 \
     --backend=megatron \
@@ -86,7 +86,7 @@ ns nemo_rl sft \
     --cluster=slurm \
     --expname=openmathinstruct2-repro-70b \
      --output_dir=/workspace/openmathinstruct2-repro-70b/checkpoints \
-    --hf_model=/workspace/Llama-3.1-70B  \
+    --hf_model=meta-llama/Llama-3.1-70B  \
     --num_nodes=32 \
     --num_gpus=8 \
     --backend=megatron \
@@ -109,6 +109,6 @@ before the timeout to allow for the final checkpoint to be saved. E.g. if your t
 add `++checkpointing.checkpoint_must_save_by=00:03:20:00`
 
 
-If you want to follow up with evaluation, see
-[training docs](../../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it
-through a convenient Python API.
+If you want to follow up with evaluation, see [training docs](../../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it through a convenient Python API.
+
+⚠️ Note: In our original paper, we used checkpoint averaging, but this is not implemented in the current code, so the results may differ slightly. We plan to add support for checkpoint averaging soon.

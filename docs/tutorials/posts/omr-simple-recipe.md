@@ -192,7 +192,7 @@ ns run_cmd --log_dir=/workspace/prepare-sft-data --expname=prepare-sft-data --ru
 ```
 
 
-For the NeMo-RL with megatron backend, use the following training command. Add `--disable_wandb` to disable W&B logging. Only run one of the training commands, not both (or change the paths and `expnames` accordingly).
+For the NeMo-RL with megatron backend, use the following training command. Add `--disable_wandb` to disable W&B logging.
 
 ```shell
 ns nemo_rl sft \
@@ -200,7 +200,7 @@ ns nemo_rl sft \
     --expname=training \
     --run_after=prepare-sft-data \
     --output_dir=/workspace/training \
-    --hf_model=/workspace/Qwen2.5-14B-Instruct \
+    --hf_model=Qwen/Qwen2.5-14B-Instruct \
     --num_nodes=1 \
     --num_gpus=8 \
     --training_data=/workspace/sft-data.jsonl \
@@ -220,7 +220,7 @@ To learn more about SFT configuration, see the [NeMo-Skills training](https://nv
 
 ## Final Evaluation
 
-To check model improvement, let's run another evaluation. Convert the checkpoint back into Hugging Face format for faster evaluation. You can skip the conversion step if you’re using the NeMo-RL backend for training.
+To check model improvement, let's run another evaluation.
 
 ```shell
 # launching evaluation

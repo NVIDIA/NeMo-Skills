@@ -115,8 +115,6 @@ ns nemo_rl sft \
 
 
 
-For other models change the above parameters according to this table. Don't forget to re-pack the data when changing CP!
-
 |                       | **lr** | **min_lr** | **TP** | **CP** |
 | --------------------- | ------ | ---------- | ------ | ------ |
 | **Qwen2.5-Math-1.5B** | 3e-4   | 3e-7       | 1      | 2      |
@@ -128,7 +126,7 @@ For other models change the above parameters according to this table. Don't forg
 If you want to follow up with checkpoint conversion and evaluation, see
 [training docs](../../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it
 through a convenient Python API.
-
+⚠️ Note: In our original paper, we used checkpoint averaging, but this is not implemented in the current code, so the results may differ slightly. We plan to add support for checkpoint averaging soon.
 
 ## Second-round SFT
 

@@ -24,10 +24,8 @@ from nemo_skills.pipeline.cli import wrap_arguments, ppo_verl
 
 ppo_verl(
     ctx=wrap_arguments(
-        '++trainer.save_freq=0 '
+        '++trainer.save_freq=10 '
         '++data.train_batch_size=32 '
-        '++reward_model.compute_score=math-judge '
-        '++reward_model.reward_manager=batched '
         '++data.filter_prompts=False '
         '++actor_rollout_ref.rollout.gpu_memory_utilization=0.7 '
         '++data.max_response_length=12000 '
@@ -41,10 +39,6 @@ ppo_verl(
     prompt_data="/data/rl-data.parquet",
     num_gpus=8,
     num_nodes=2,
-    # this is used for the LLM judge
-    server_gpus=8,
-    server_type='trtllm',
-    server_model='/hf_models/Qwen2.5-32B-Instruct',
     num_training_jobs=1,
 )
 ```
