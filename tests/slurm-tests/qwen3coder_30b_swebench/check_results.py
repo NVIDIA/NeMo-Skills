@@ -22,12 +22,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))  # for utils.py
 from utils import assert_all, get_nested_value, load_json, soft_assert  # noqa: E402
 
 METRIC_RANGES = {
-    # TODO: based on +/- 2 pts from past evals but the scores seem to be lower with the new containers and/or harness
+    # +/- 3 pts from scores measured on 2025-10-08 (avg of 6 runs for OpenHands, 3 for SWE-agent)
     "openhands": {
-        ("swe-bench", "pass@1", "issues_resolved"): (48.4, 52.4),
+        ("swe-bench", "pass@1", "issues_resolved"): (41.9, 47.9),
     },
     "swe_agent": {
-        ("swe-bench", "pass@1", "issues_resolved"): (47.6, 51.6),
+        ("swe-bench", "pass@1", "issues_resolved"): (46.4, 52.4),
     },
 }
 
