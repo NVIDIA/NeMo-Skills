@@ -272,17 +272,11 @@ class IOIEvaluator(BaseEvaluator):
             # Remember the thread id that owns this sandbox instance.
             sbox._owner_tid = threading.get_ident()
 
-            # Resolve metadata path for the current split
-            if not (os.path.isabs(self.eval_cfg.test_file) and os.path.exists(self.eval_cfg.test_file)):
-                fname = self.eval_cfg.test_file.format(split=self.split)
-                search_dir = self.eval_cfg.test_dir or (
-                    # todo: this needs to be exposed someway to run both ioi24 and ioi25..
-                    os.path.join(self.data_dir, "ioi25") if self.data_dir else None
+            if not os.path.exists(self.eval_cfg.test_file):
+                raise FileNotFoundError(
+                    f"Metadata file {self.eval_cfg.test_file} does not exist. "
+                    "please provide a valid parameter for ++eval_config.test_file=x when running IOI Evaluation."
                 )
-                if search_dir is None:
-                    raise ValueError("Either data_dir or eval_config.test_dir must be specified.")
-                self.eval_cfg.test_file = os.path.join(search_dir, fname)
-
             with open(self.eval_cfg.test_file, "r") as f:
                 metadata_local = json.load(f)
             pool_local = multiprocessing.Pool(
@@ -301,22 +295,28 @@ class IOIEvaluator(BaseEvaluator):
         completion = add_includes(extract_final_cpp_block(entry["generation"]), entry["ioi_id"])
 
         pid = entry["ioi_id"]
+
+        # Retrieve helper scripts and grader resources from metadata instead of the dataset entry.
+        problem_metadata = self.metadata[entry["name"]]
+        subtask_meta = problem_metadata[entry["subtask"]]
+        compile_code = subtask_meta["compile"]
+        run_code = subtask_meta["run"]
+        grader_files = subtask_meta["grader_files"]
+
         if pid not in self.precompiled_cache:
             self.precompiled_cache[pid] = await asyncio.to_thread(
                 _precompile_grader,
                 pid,
-                entry["grader_files"],
-                entry["compile"],
-                entry["run"],
+                grader_files,
+                compile_code,
+                run_code,
                 self.sandbox,
             )
         pre_dir = self.precompiled_cache[pid]
 
-        problem_metadata = self.metadata[entry["name"]]
-
         subtask_state = {
             st: {
-                "score": data["score"],
+                "score": data["subtask_score"],
                 "precision": data["score_precision"],
                 "outputs": [],
                 "scores": [],
