@@ -32,45 +32,38 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
     Extract token information from LiteLLM context window error messages.
 
     Returns:
-        Dict with keys: max_context_length, message_tokens, completion_tokens
+        Dict with keys: max_context_length, message_tokens or message_tokens_overflow if the prompt tokens overflow the context limit
         None if parsing fails
     """
 
     error_str = str(error)
 
-    # "maximum context length is 40960 tokens and your request has 142 input tokens (1000000 > 40960 - 142)"
+    # Pattern 1
+    # - maximum context length is 40960 tokens and your request has 142 input tokens (1000000 > 40960 - 142)"
+    # - This model's maximum context length is 40960 tokens. However, your request has 3000009 input tokens.
     pattern1 = re.compile(
         r"maximum context length is (\d+) tokens.*?"
-        r"request has (\d+) input tokens.*?"
-        r"\((\d+) > \d+ - \d+\)",
+        r"request has (\d+) input tokens",
         re.IGNORECASE | re.DOTALL,
     )
 
-    # Pattern 2: This model's maximum context length is 40960 tokens. However, your request has 3000009 input tokens.
+    # Check pattern 1
+    match = pattern1.search(error_str)
+    if match:
+        max_context = int(match.group(1))
+        message_tokens = int(match.group(2))
+        return {
+            "max_context_length": max_context,
+            "message_tokens": message_tokens,
+        }
+
+    # Pattern 2: "The input (187537 tokens) is longer than the model's context length (131072 tokens)."
     pattern2 = re.compile(
-        r"maximum context length is (\d+) tokens.*?"
-        r"your request has (\d+) input tokens",
-        re.IGNORECASE | re.DOTALL,
-    )
-
-    # Try patterns 1 and 2
-    for pattern in [pattern1, pattern2]:
-        match = pattern.search(error_str)
-        if match:
-            max_context = int(match.group(1))
-            message_tokens = int(match.group(2))
-            return {
-                "max_context_length": max_context,
-                "message_tokens": message_tokens,
-            }
-
-    # Pattern 3: "The input (187537 tokens) is longer than the model's context length (131072 tokens)."
-    pattern3 = re.compile(
         r"The input \((\d+) tokens\) is longer than the model's context length \((\d+) tokens\)", re.IGNORECASE
     )
 
-    # Try pattern 3
-    match = pattern3.search(error_str)
+    # Check pattern 2
+    match = pattern2.search(error_str)
     if match:
         return {
             # Context length is the second group
@@ -78,24 +71,16 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
             "message_tokens": int(match.group(1)),
         }
 
-    # Pattern 4: Handle format like "45008 in the messages, 2048 in the completion"
-    pattern4 = re.compile(
+    # Pattern 3: Handle format like "45008 in the messages, 2048 in the completion"
+    pattern3 = re.compile(
         r"maximum context length is (\d+) tokens.*?"
         r"you requested (\d+) tokens.*?"
         r"(\d+) in the messages, (\d+) in the completion",
         re.IGNORECASE | re.DOTALL,
     )
 
-    # Try pattern 4
-    match = pattern4.search(error_str)
-    if match:
-        return {
-            "max_context_length": int(match.group(1)),
-            "message_tokens": int(match.group(3)),
-        }
-
-    # Pattern 5: "Requested token count exceeds the model's maximum context length of 131072 tokens. You requested a total of 1000159 tokens: 159 tokens from the input messages and 1000000 tokens for the completion."
-    pattern5 = re.compile(
+    # Pattern 4: "Requested token count exceeds the model's maximum context length of 131072 tokens. You requested a total of 1000159 tokens: 159 tokens from the input messages and 1000000 tokens for the completion."
+    pattern4 = re.compile(
         r"maximum context length of (\d+) tokens.*?"
         r"total of (\d+) tokens.*?"
         r"(\d+) tokens from the input messages.*?"
@@ -103,19 +88,20 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         re.IGNORECASE | re.DOTALL,
     )
 
+    # Try patterns 3 and 4
+    for pattern in [pattern3, pattern4]:
+        match = pattern.search(error_str)
+        if match:
+            return {
+                "max_context_length": int(match.group(1)),
+                "message_tokens": int(match.group(3)),
+            }
+
+    # Pattern 5: "max_tokens must be at least 1, got -37673"
+    pattern5 = re.compile(r"max_tokens must be at least 1, got (-\d+)", re.IGNORECASE)
+
     # Try pattern 5
     match = pattern5.search(error_str)
-    if match:
-        return {
-            "max_context_length": int(match.group(1)),
-            "message_tokens": int(match.group(3)),
-        }
-
-    # Pattern 6: "max_tokens must be at least 1, got -37673"
-    pattern6 = re.compile(r"max_tokens must be at least 1, got (-\d+)", re.IGNORECASE)
-
-    # Try pattern 6
-    match = pattern6.search(error_str)
     if match:
         return {
             "message_tokens_overflow": abs(int(match.group(1))),
