@@ -20,7 +20,6 @@ import re
 from dataclasses import dataclass
 from typing import Callable, Dict, Union
 
-from nemo_skills.prompt.utils import get_token_count
 from nemo_skills.utils import get_logger_name
 
 from .utils import ServerTokenizer, WrapperAutoTokenizer, is_context_window_exceeded_error
@@ -330,7 +329,7 @@ def _try_reduce_prompt_tokens(
     """Try to reduce the number of tokens in the prompt."""
     if "message_tokens_overflow" in parsed_error:
         # We can just use this information to reduce the prompt tokens
-        orig_prompt_num_tokens = get_token_count(tokenizer=tokenizer, messages=kwargs["prompt"])
+        orig_prompt_num_tokens = len(tokenizer.encode(kwargs["prompt"], tools=kwargs.get("tools", None)))
         num_prompt_tokens_to_keep = orig_prompt_num_tokens - (
             parsed_error["message_tokens_overflow"] + kwargs["tokens_to_generate"] + config.num_special_tokens_budget
         )
@@ -357,9 +356,9 @@ def _try_reduce_prompt_tokens(
     LOG.info(f"Num tokens to keep: {num_prompt_tokens_to_keep}")
 
     if isinstance(prompt, str):
-        return _trim_string_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer)
+        return _trim_string_prompt(kwargs, num_prompt_tokens_to_keep, config, tokenizer)
     elif isinstance(prompt, list):
-        return _trim_list_prompt(kwargs, prompt, num_prompt_tokens_to_keep, config, tokenizer, original_error)
+        return _trim_list_prompt(kwargs, num_prompt_tokens_to_keep, config, tokenizer, original_error)
     else:
         LOG.warning(f"Unsupported prompt type: {type(prompt)}")
         return None
@@ -367,13 +366,12 @@ def _try_reduce_prompt_tokens(
 
 def _trim_string_prompt(
     kwargs: dict,
-    prompt: str,
     num_tokens_to_keep: int,
     config: ContextLimitRetryConfig,
     tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> dict:
     """Trim a string prompt to fit within token limits."""
-    encoded_prompt = tokenizer.encode(prompt)
+    encoded_prompt = tokenizer.encode(kwargs["prompt"])
 
     if config.reduce_prompt_from_start:
         trimmed_encoded = encoded_prompt[-num_tokens_to_keep:]
@@ -388,19 +386,19 @@ def _trim_string_prompt(
 
 def _trim_list_prompt(
     kwargs: dict,
-    prompt_list: list,
     num_tokens_to_keep: int,
     config: ContextLimitRetryConfig,
     tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
     original_error: Exception,
 ) -> dict:
     """Trim a list-based prompt to fit within token limits."""
-    prompt_copy = copy.deepcopy(prompt_list)
+    prompt_copy = copy.deepcopy(kwargs["prompt"])
+    tools = kwargs.get("tools", None)
 
     if config.reduce_prompt_from_start:
-        trimmed_messages = _trim_messages_from_start(prompt_copy, num_tokens_to_keep, tokenizer)
+        trimmed_messages = _trim_messages_from_start(prompt_copy, tools, num_tokens_to_keep, tokenizer)
     else:  # reduce_prompt_from_end
-        trimmed_messages = _trim_messages_from_end(prompt_copy, num_tokens_to_keep, tokenizer)
+        trimmed_messages = _trim_messages_from_end(prompt_copy, tools, num_tokens_to_keep, tokenizer)
 
     if not trimmed_messages:
         detailed_error = f"Not able to trim the prompt. Returning empty generation.\n\n{original_error}"
@@ -414,6 +412,7 @@ def _trim_list_prompt(
 
 def _trim_messages_from_end(
     messages: list,
+    tools: Union[list[dict], None],
     remaining_token_budget: int,
     tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> list:
@@ -424,7 +423,7 @@ def _trim_messages_from_end(
     for idx, message in enumerate(messages):
         # Check if adding this full message would exceed the limit
         test_messages = messages[: idx + 1]
-        encoded = tokenizer.encode(test_messages)
+        encoded = tokenizer.encode(test_messages, tools=tools)
         if encoded is None:
             continue
 
@@ -455,6 +454,7 @@ def _trim_messages_from_end(
 
 def _trim_messages_from_start(
     messages: list,
+    tools: Union[list[dict], None],
     remaining_token_budget: int,
     tokenizer: Union[ServerTokenizer, WrapperAutoTokenizer],
 ) -> list:
@@ -467,7 +467,7 @@ def _trim_messages_from_start(
         # Test messages from this index to the end
         suffix_start_idx = -(idx + 1)
         test_messages = messages[suffix_start_idx:]
-        encoded = tokenizer.encode(test_messages)
+        encoded = tokenizer.encode(test_messages, tools=tools)
 
         if encoded is None:
             continue

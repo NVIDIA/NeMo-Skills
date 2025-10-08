@@ -88,12 +88,12 @@ class WrapperAutoTokenizer:
         LOG.info(f"Initializing tokenizer from string: {model_name}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    def encode(self, prompt: str | list[dict]) -> list[int]:
+    def encode(self, prompt: str | list[dict], tools=None) -> list[int]:
         """Encode the prompt using the tokenizer."""
         if isinstance(prompt, str):
             return self.tokenizer.encode(prompt)
         elif isinstance(prompt, list):
-            return self.tokenizer.apply_chat_template(prompt, add_generation_prompt=True)
+            return self.tokenizer.apply_chat_template(prompt, add_generation_prompt=True, tools=tools)
 
     def decode(self, tokens: list[int]) -> str:
         """Decode a list of tokens using the tokenizer."""
