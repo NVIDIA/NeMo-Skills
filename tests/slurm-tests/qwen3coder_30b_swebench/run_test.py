@@ -40,8 +40,6 @@ def eval_qwen3coder(workspace, cluster, expname_prefix, wandb_project, agent_fra
         wandb_name=expname_prefix,
     )
 
-    return expname_prefix
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -61,11 +59,12 @@ def main():
 
     for agent_framework in ["openhands", "swe_agent"]:
         workspace = f"{args.workspace}/{agent_framework}"
+        expname_prefix = f"{args.expname_prefix}_{agent_framework}"
 
-        eval_expname = eval_qwen3coder(
+        eval_qwen3coder(
             workspace=workspace,
             cluster=args.cluster,
-            expname_prefix=args.expname_prefix,
+            expname_prefix=expname_prefix,
             wandb_project=args.wandb_project,
             agent_framework=agent_framework,
         )
@@ -80,9 +79,9 @@ def main():
         run_cmd(
             ctx=wrap_arguments(checker_cmd),
             cluster=args.cluster,
-            expname=args.expname_prefix + "-check-results",
+            expname=f"{expname_prefix}-check-results",
             log_dir=f"{workspace}/check-results-logs",
-            run_after=eval_expname,
+            run_after=expname_prefix,
         )
 
 
