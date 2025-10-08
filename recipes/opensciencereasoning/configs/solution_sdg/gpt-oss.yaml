@@ -33,7 +33,7 @@ stages:
   decontaminate:
     output_dir: ${directories.step-1-decontaminate}
     # input_file: ${directories.step-0-filter-problems}/final_result.jsonl
-    input_file: /nemo_run/code/recipes/opensciencereasoning/configs/solution_sdg/example-data.jsonl
+    input_file: ${input_file}
     test_sets:
       - ["hle", "text"]
       - ["mmlu", "test"]
