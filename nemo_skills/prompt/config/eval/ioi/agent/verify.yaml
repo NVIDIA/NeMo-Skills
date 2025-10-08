@@ -17,7 +17,7 @@ system: |-
 user: |-
   ### Verification Task Reminder ###
 
-  Generate the Summary and the Detailed Verification Log per the instructions above. Justify each correct block of code; explain any issues in detail.
+  Generate the Summary and the Detailed Verification Log per the instructions above. Justify each correct block of code; explain any issues in detail. Write the final verdict (whether the solution is correct or contains errors) as a \\boxed{{yes/no}} answer.
 
   # Proposed Solution
   {solution}
