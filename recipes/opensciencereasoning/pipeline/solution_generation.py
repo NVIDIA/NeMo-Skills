@@ -19,7 +19,10 @@ import json
 from omegaconf import OmegaConf
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
-from nemo_skills.recipes.opensciencereasoning.few_shots import few_shots
+import sys
+
+sys.path.append(str(Path(__file__).resolve().parents[3]))
+from recipes.opensciencereasoning.few_shots import few_shots
 
 def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"

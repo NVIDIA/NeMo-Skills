@@ -59,11 +59,11 @@ def prepare_topics(input_file: str, output_file: str, topics_to_choose: Union[di
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_file", required=True, type=str)
-    parser.add_argument("--output_file", required=True, type=str)
-    parser.add_argument("--topics_to_choose", required=True, type=json.loads)
-    parser.add_argument("--prompt_examples", required=True, type=json.loads)
-    parser.add_argument("--topic_key", default=None, type=str)
-    parser.add_argument("--generation_key", default="topic", type=str)
+    parser.add_argument("--input_file", required=True, type=str, help="Path to input JSONL with problems (and prior labels if any)")
+    parser.add_argument("--output_file", required=True, type=str, help="Path to write JSONL prepared for the next labeling round")
+    parser.add_argument("--topics_to_choose", required=True, type=json.loads, help="JSON: flat list of labels or dict mapping previous label → list of labels")
+    parser.add_argument("--prompt_examples", required=True, type=json.loads, help="JSON: few-shot examples; flat mapping or mapping keyed by previous label")
+    parser.add_argument("--topic_key", default=None, type=str, help="Name of the prior label key (e.g., 'topics') used to select next-level choices")
+    parser.add_argument("--generation_key", default="topic", type=str, help="Name of the label key to generate in this round (e.g., 'subtopics')")
     args = parser.parse_args()
     prepare_topics(args.input_file, args.output_file, args.topics_to_choose, args.prompt_examples, args.topic_key, args.generation_key)
