@@ -205,23 +205,17 @@ class DummyTool(Tool):
         return {"unknown": tool_name, "args": arguments}
 
 
+# Shared state for CountingTool - must be a module-level mutable object
+# so that instances created via locate() will reference the same object
+_counting_tool_state = {"call_count": 0}
+
+
 # Helper class for test_tool_manager_cache_and_duplicate_detection
 # Defined at module level so it can be imported via locate()
 class CountingTool(DummyTool):
-    # Class variable to track calls across instances
-    _call_count = 0
-
     async def list_tools(self):
-        CountingTool._call_count += 1
+        _counting_tool_state["call_count"] += 1
         return await super().list_tools()
-
-    @classmethod
-    def reset_count(cls):
-        cls._call_count = 0
-
-    @classmethod
-    def get_count(cls):
-        return cls._call_count
 
 
 # Helper class for duplicate tool detection test
@@ -246,16 +240,16 @@ async def test_tool_manager_list_and_execute_with_class_locator():
 @pytest.mark.asyncio
 async def test_tool_manager_cache_and_duplicate_detection():
     # Reset counter before test
-    CountingTool.reset_count()
+    _counting_tool_state["call_count"] = 0
 
     tm = ToolManager(module_specs=["tests.test_mcp_clients::CountingTool"], overrides={}, context={})
     _ = await tm.list_all_tools(use_cache=True)
     _ = await tm.list_all_tools(use_cache=True)
-    assert CountingTool.get_count() == 1
+    assert _counting_tool_state["call_count"] == 1
     with pytest.raises(ValueError) as excinfo:
         _ = await tm.list_all_tools(use_cache=False)
     assert "Duplicate raw tool name across providers: 'execute'" in str(excinfo.value)
-    assert CountingTool.get_count() == 2
+    assert _counting_tool_state["call_count"] == 2
 
     tm2 = ToolManager(module_specs=["tests.test_mcp_clients::DupTool"], overrides={}, context={})
     tools2 = await tm2.list_all_tools(use_cache=False)
