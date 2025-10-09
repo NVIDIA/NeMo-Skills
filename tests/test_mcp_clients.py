@@ -245,7 +245,8 @@ class DupTool(DummyTool):
 @pytest.mark.asyncio
 async def test_tool_manager_list_and_execute_with_class_locator():
     # Register this test module's DummyTool via module locator
-    tm = ToolManager(module_specs=["tests.test_mcp_clients::DummyTool"], overrides={}, context={})
+    # Use __name__ to get actual module path (works in both local and CI)
+    tm = ToolManager(module_specs=[f"{__name__}::DummyTool"], overrides={}, context={})
     tools = await tm.list_all_tools(use_cache=False)
     names = sorted(t["name"] for t in tools)
     assert names == ["echo", "execute"]
@@ -256,7 +257,6 @@ async def test_tool_manager_list_and_execute_with_class_locator():
 
 @pytest.mark.asyncio
 async def test_tool_manager_cache_and_duplicate_detection():
-    import importlib
     import sys
 
     # Reset counter before test - access via sys.modules to ensure we get the right class
@@ -264,25 +264,18 @@ async def test_tool_manager_cache_and_duplicate_detection():
     CountingToolClass = getattr(this_module, "CountingTool")
     CountingToolClass.call_count = 0
 
-    # Debug: Check what locate() will see
-    imported_module = importlib.import_module("tests.test_mcp_clients")
-    imported_class = getattr(imported_module, "CountingTool")
-    print(f"DEBUG: Same module? {this_module is imported_module}")
-    print(f"DEBUG: Same class? {CountingToolClass is imported_class}")
-    print(f"DEBUG: Class IDs: {id(CountingToolClass)} vs {id(imported_class)}")
-
-    tm = ToolManager(module_specs=["tests.test_mcp_clients::CountingTool"], overrides={}, context={})
+    # Use __name__ to get the actual module path (works in both local and CI environments)
+    module_path = __name__
+    tm = ToolManager(module_specs=[f"{module_path}::CountingTool"], overrides={}, context={})
     _ = await tm.list_all_tools(use_cache=True)
     _ = await tm.list_all_tools(use_cache=True)
-    print(f"DEBUG: Count after cached calls: {CountingToolClass.call_count}")
-    print(f"DEBUG: Imported class count: {imported_class.call_count}")
     assert CountingToolClass.call_count == 1, f"Expected 1 call, got {CountingToolClass.call_count}"
     with pytest.raises(ValueError) as excinfo:
         _ = await tm.list_all_tools(use_cache=False)
     assert "Duplicate raw tool name across providers: 'execute'" in str(excinfo.value)
     assert CountingToolClass.call_count == 2, f"Expected 2 calls, got {CountingToolClass.call_count}"
 
-    tm2 = ToolManager(module_specs=["tests.test_mcp_clients::DupTool"], overrides={}, context={})
+    tm2 = ToolManager(module_specs=[f"{module_path}::DupTool"], overrides={}, context={})
     tools2 = await tm2.list_all_tools(use_cache=False)
     names2 = sorted(t["name"] for t in tools2)
     assert names2 == ["execute"]
