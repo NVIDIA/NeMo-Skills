@@ -372,7 +372,7 @@ class Pipeline:
                                 )
                                 # If no experiment found, treat as direct task handle (for _reuse_exp case)
                                 if _reuse_exp:
-                                    external_deps.append(dep)
+                                    internal_deps.append(dep)
                                     LOG.info(
                                         f"Job '{job_name}' depends on task handle '{dep}' (from reused experiment)"
                                     )
@@ -382,9 +382,9 @@ class Pipeline:
                                     f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
                                 )
                         elif _reuse_exp:
-                            # For non-SLURM executors with _reuse_exp, treat as task handle
-                            external_deps.append(dep)
-                            LOG.info(f"Job '{job_name}' depends on task handle '{dep}'")
+                            # For non-SLURM executors with _reuse_exp, string deps are internal task handles
+                            internal_deps.append(dep)
+                            LOG.info(f"Job '{job_name}' depends on task handle '{dep}' (from reused experiment)")
                     elif isinstance(dep, dict):
                         # Dict dependency = internal job reference (by job spec object)
                         dep_name = dep.get("name")
