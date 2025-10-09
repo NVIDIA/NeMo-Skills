@@ -71,16 +71,6 @@ def parse_eval_args(eval_args: str) -> tuple[str | None, dict]:
                 else:
                     eval_config[key] = value
 
-    # Handle any top-level overrides in the form ++key=value
-    for part in eval_arg_parts:
-        direct_override_match = re.match(r"^\+{2}([A-Za-z0-9_]+)=(.+)$", part)
-        if direct_override_match:
-            key, value = direct_override_match.group(1), direct_override_match.group(2)
-            # Skip ones we already processed (eval_type and eval_config.*)
-            if key in {"eval_type", "eval_config"}:
-                continue
-            eval_config[key] = value
-
     return eval_type, eval_config
 
 
