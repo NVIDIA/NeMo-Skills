@@ -46,6 +46,8 @@ stages:
     server_nodes: 1
     dependent_jobs: 1
     num_chunks: 20
+    dependencies:
+      - filter_problems
 
   topics_labeling:
     output_dir: ${directories.step-2-topics-labeling}
@@ -88,3 +90,5 @@ stages:
         - Molecular Biology
         - General Biology
         - Other
+    dependencies:
+      - decontaminate
