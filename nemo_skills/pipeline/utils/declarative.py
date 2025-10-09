@@ -344,8 +344,11 @@ class Pipeline:
             for job_spec in self.jobs:
                 job_name = job_spec["name"]  # Already validated in _validate()
 
-                # Resolve dependencies to task handles
-                run_after_deps = []
+                # Separate internal and external dependencies from the start
+                # - Internal deps (task handles from current experiment) go to exp.add()
+                # - External deps (SLURM job IDs from other experiments) go to executor
+                internal_deps = []
+                external_deps = []
 
                 # Handle dependencies from job spec
                 job_dependencies = job_spec.get("dependencies", [])
@@ -369,18 +372,18 @@ class Pipeline:
                                 )
                                 # If no experiment found, treat as direct task handle (for _reuse_exp case)
                                 if _reuse_exp:
-                                    run_after_deps.append(dep)
+                                    external_deps.append(dep)
                                     LOG.info(
                                         f"Job '{job_name}' depends on task handle '{dep}' (from reused experiment)"
                                     )
                             else:
-                                run_after_deps.extend(exp_handles)
+                                external_deps.extend(exp_handles)
                                 LOG.info(
                                     f"Job '{job_name}' depends on external experiment '{dep}' ({len(exp_handles)} tasks)"
                                 )
                         elif _reuse_exp:
                             # For non-SLURM executors with _reuse_exp, treat as task handle
-                            run_after_deps.append(dep)
+                            external_deps.append(dep)
                             LOG.info(f"Job '{job_name}' depends on task handle '{dep}'")
                     elif isinstance(dep, dict):
                         # Dict dependency = internal job reference (by job spec object)
@@ -388,7 +391,7 @@ class Pipeline:
                         if not dep_name:
                             raise ValueError(f"Job dependency must have a 'name' field: {dep}")
                         if dep_name in job_name_to_handle:
-                            run_after_deps.append(job_name_to_handle[dep_name])
+                            internal_deps.append(job_name_to_handle[dep_name])
                             LOG.info(
                                 f"Job '{job_name}' depends on internal job '{dep_name}' (handle: {job_name_to_handle[dep_name]})"
                             )
@@ -399,12 +402,12 @@ class Pipeline:
                             )
                     else:
                         # Direct task handle object (not string or dict)
-                        run_after_deps.append(dep)
+                        internal_deps.append(dep)
                         LOG.info(f"Job '{job_name}' depends on task handle (object)")
 
-                # Convert empty list to None for cleaner handling
-                if len(run_after_deps) == 0:
-                    run_after_deps = None
+                # Convert empty lists to None for cleaner handling
+                internal_deps = internal_deps if internal_deps else None
+                external_deps = external_deps if external_deps else None
 
                 # Check if this is a multi-group job or single group
                 if "groups" in job_spec:
@@ -415,7 +418,8 @@ class Pipeline:
                             job_spec["groups"][0],
                             self.cluster_config,
                             default_log_dir=log_dir,
-                            run_after=run_after_deps if run_after_deps else None,
+                            internal_deps=internal_deps,
+                            external_deps=external_deps,
                         )
                     else:
                         # True multi-group: combine multiple groups into one heterogeneous SLURM job
@@ -424,7 +428,8 @@ class Pipeline:
                             job_spec["groups"],
                             self.cluster_config,
                             default_log_dir=log_dir,
-                            run_after=run_after_deps if run_after_deps else None,
+                            internal_deps=internal_deps,
+                            external_deps=external_deps,
                         )
                 elif "group" in job_spec:
                     # Single group job
@@ -433,7 +438,8 @@ class Pipeline:
                         job_spec["group"],
                         self.cluster_config,
                         default_log_dir=log_dir,
-                        run_after=run_after_deps if run_after_deps else None,
+                        internal_deps=internal_deps,
+                        external_deps=external_deps,
                     )
                 else:
                     raise ValueError(f"Job spec must have either 'group' or 'groups': {job_spec}")
@@ -490,6 +496,7 @@ class Pipeline:
         het_group: int,
         total_het_groups: int,
         overlap: bool,
+        dependencies: Optional[List] = None,
     ):
         """Create executor with optional environment update."""
         env_context = (
@@ -518,6 +525,7 @@ class Pipeline:
                 mounts=exec_config.get("mounts"),
                 with_ray=self.with_ray,
                 slurm_kwargs={"exclusive": hardware.exclusive} if (hardware and hardware.exclusive) else None,
+                dependencies=dependencies,
             )
 
     def _plan_and_add_job(
@@ -526,17 +534,19 @@ class Pipeline:
         groups: List[CommandGroup],
         cluster_config: Dict,
         default_log_dir: Optional[str] = None,
-        run_after: Optional[List] = None,
+        internal_deps: Optional[List] = None,
+        external_deps: Optional[List] = None,
         heterogeneous: bool = False,
     ) -> str:
         """Plan commands/executors for one or more groups and add to experiment.
 
         This encapsulates shared logic between single-group and multi-group jobs. Behavior
         differences are controlled by the 'heterogeneous' flag and the provided 'groups'.
-        """
 
-        # Pass dependencies through (nemo-run handles executor-specific behavior)
-        dependencies = run_after if run_after else None
+        Args:
+            internal_deps: Task handles from same experiment (passed to exp.add())
+            external_deps: SLURM job IDs from other experiments (passed to executor)
+        """
 
         # Resolve log directory (use first group's log_dir if present)
         log_dir = groups[0].log_dir or default_log_dir
@@ -592,6 +602,8 @@ class Pipeline:
 
                 # Resolve container and create executor
                 container_image = self._resolve_container(exec_config, command, cluster_config)
+                # Pass external dependencies only to the first executor (SLURM doesn't support per-component dependencies in hetjobs)
+                exec_dependencies = external_deps if (het_idx == 0 and comp_idx == 0) else None
                 executor = self._create_executor(
                     command,
                     exec_config,
@@ -603,6 +615,7 @@ class Pipeline:
                     het_idx if heterogeneous else comp_idx,
                     total_het_groups,
                     (len(group.commands) > 1),
+                    dependencies=exec_dependencies,
                 )
 
                 # Share packager across executors for single-group jobs
@@ -664,12 +677,14 @@ class Pipeline:
             metadata = None
 
         # Add to experiment and return task ID
+        # Note: Internal dependencies (task handles from same experiment) go to exp.add()
+        #       External dependencies (SLURM job IDs from other experiments) go to executor
         if (not heterogeneous) and len(commands) == 1:
             task_id = exp.add(
                 run.Script(inline=commands[0], metadata=metadata),
                 executor=executors[0],
                 name="nemo-run",
-                dependencies=dependencies,
+                dependencies=internal_deps,
             )
         else:
             task_id = exp.add(
@@ -679,7 +694,7 @@ class Pipeline:
                 ],
                 executor=executors,
                 name="nemo-run",
-                dependencies=dependencies,
+                dependencies=internal_deps,
             )
 
         return task_id
@@ -690,7 +705,8 @@ class Pipeline:
         group: CommandGroup,
         cluster_config: Dict,
         default_log_dir: Optional[str] = None,
-        run_after: Optional[List] = None,
+        internal_deps: Optional[List] = None,
+        external_deps: Optional[List] = None,
     ) -> str:
         """Add a single CommandGroup as one job and return its task handle."""
 
@@ -699,7 +715,8 @@ class Pipeline:
             groups=[group],
             cluster_config=cluster_config,
             default_log_dir=default_log_dir,
-            run_after=run_after,
+            internal_deps=internal_deps,
+            external_deps=external_deps,
             heterogeneous=False,
         )
 
@@ -709,7 +726,8 @@ class Pipeline:
         groups: List[CommandGroup],
         cluster_config: Dict,
         default_log_dir: Optional[str] = None,
-        run_after: Optional[List] = None,
+        internal_deps: Optional[List] = None,
+        external_deps: Optional[List] = None,
     ) -> str:
         """Add multiple CommandGroups as a single heterogeneous SLURM job and return task handle."""
 
@@ -718,6 +736,7 @@ class Pipeline:
             groups=groups,
             cluster_config=cluster_config,
             default_log_dir=default_log_dir,
-            run_after=run_after,
+            internal_deps=internal_deps,
+            external_deps=external_deps,
             heterogeneous=True,
         )
