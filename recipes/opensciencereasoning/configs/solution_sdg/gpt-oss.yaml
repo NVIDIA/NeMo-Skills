@@ -59,8 +59,8 @@ stages:
     dependent_jobs: 1
     num_chunks: 5
     generation_keys:
-      - topics
-      - subtopics
+      - topic
+      - subtopic
     few_shots_name: stem_topics
     topics:
       - Mathematics

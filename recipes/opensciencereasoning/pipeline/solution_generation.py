@@ -15,6 +15,7 @@
 import argparse
 from pathlib import Path
 import json
+import shlex
 
 from omegaconf import OmegaConf
 
@@ -140,23 +141,26 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
     prev_name = None
     save_paths = {}
     topics_structure = {}
+    first_dep = run_after or None
     for i, name in enumerate(generation_keys):
         topics_structure[name] = stage_config[name]
-        extra_args = f"    --topic_key '{prev_name}' " if prev_name else ""
+        topics_json = json.dumps(stage_config[name], ensure_ascii=False)
+        examples_json = json.dumps(few_shots[few_shots_name][name], ensure_ascii=False)
+        extra_args = f"    --topic_key {shlex.quote(str(prev_name))} " if prev_name else ""
         run_cmd(
             ctx=wrap_arguments(
                 f"python /nemo_run/code/recipes/opensciencereasoning/scripts/prepare_topics.py "
                 f"    --input_file '{input_file}' "
                 f"    --output_file '{output_dir}/tmp/prepared_for_{name}_labeling.jsonl' "
-                f"    --topics_to_choose '{json.dumps(stage_config[name])}' "
-                f"    --prompt_examples '{json.dumps(few_shots[few_shots_name][name])}' "
-                f"    --generation_key '{name}' "
+                f"    --topics_to_choose {shlex.quote(topics_json)} "
+                f"    --prompt_examples {shlex.quote(examples_json)} "
+                f"    --generation_key {shlex.quote(name)} "
                 f"{extra_args}"
             ),
             cluster=cluster,
             exclusive=False,
             expname=f"{expname}-prepare-for-{name}-labeling-{i}",
-            run_after=run_after if i == 0 else f"{expname}-{name}-labeling-{i-1}",
+            run_after=first_dep if i == 0 else f"{expname}-{name}-labeling-{i-1}",
         )
         generate(
             ctx=wrap_arguments(
@@ -183,10 +187,10 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
     run_cmd(
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_topics.py "
-            f"    --input_files '{json.dumps(save_paths)}' "
+            f"    --input_files {shlex.quote(json.dumps(save_paths, ensure_ascii=False))} "
             f"    --output_file '{output_dir}/final_result.jsonl' "
-            f"    --topics_structure '{json.dumps(topics_structure)}' "
-            f"    --names '{json.dumps(generation_keys)}' "
+            f"    --topics_structure {shlex.quote(json.dumps(topics_structure, ensure_ascii=False))} "
+            f"    --names {shlex.quote(json.dumps(generation_keys, ensure_ascii=False))} "
         ),
         cluster=cluster,
         exclusive=False,
