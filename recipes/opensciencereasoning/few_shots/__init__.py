@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.recipes.opensciencereasoning.few_shots.topics import few_shots_topics
+from .topics import few_shots_topics
 
 few_shots = {}
 
