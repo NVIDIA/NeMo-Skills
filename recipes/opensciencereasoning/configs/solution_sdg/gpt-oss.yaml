@@ -23,6 +23,7 @@ pipeline_stages:
 directories:
   step-0-filter-problems: ${base_output_dir}/solution-sdg/step-0-filter-problems
   step-1-decontaminate: ${base_output_dir}/solution-sdg/step-1-decontaminate
+  step-2-topics-labeling: ${base_output_dir}/solution-sdg/step-2-topics-labeling
   
 # Stage-specific configurations
 stages:
@@ -44,3 +45,45 @@ stages:
     server_nodes: 1
     dependent_jobs: 1
     num_chunks: 20
+
+  topics_labeling:
+    output_dir: ${directories.step-2-topics-labeling}
+    input_file: ${directories.step-1-decontaminate}/final_result.jsonl
+    model: /hf_models/Qwen2.5-32B-Instruct
+    server_type: sglang
+    server_gpus: 8
+    server_nodes: 1
+    dependent_jobs: 1
+    num_chunks: 5
+    generation_keys:
+      - topics
+      - subtopics
+    few_shots_name: topics
+    topics:
+      - Mathematics
+      - Chemistry
+      - Physics
+      - Biology
+      - Other
+    subtopics:
+      - Chemistry:
+        - Organic Chemistry
+        - Inorganic Chemistry
+        - General Chemistry
+        - Other
+      - Physics:
+        - Quantum Mechanics
+        - Classical Mechanics
+        - General Physics
+        - Relativistic Mechanics
+        - Electromagnetism and Photonics
+        - Optics and Acoustics
+        - Condensed Matter Physics
+        - High-energy Particle Physics
+        - Astrophysics
+        - Other
+      - Biology:
+        - Genetics
+        - Molecular Biology
+        - General Biology
+        - Other

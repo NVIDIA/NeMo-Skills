@@ -14,17 +14,18 @@
 
 import argparse
 from pathlib import Path
+import json
 
 from omegaconf import OmegaConf
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
+from nemo_skills.recipes.opensciencereasoning.few_shots import few_shots
 
-
-def get_stage_expname(base_expname, stage_name, suffix):
+def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
 
 
-def get_available_configs(config_dir):
+def get_available_configs(config_dir: Path):
     """Get available YAML configuration files from the config directory."""
     config_dir = Path(config_dir)
     if not config_dir.exists() or not config_dir.is_dir():
@@ -36,12 +37,18 @@ def get_available_configs(config_dir):
     return config_names
 
 
-def filter_problems(cluster, expname, run_after, stage_config, **kwargs):
+def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
     return
 
-def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
+def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
+    """Run contamination retrieval and checking, then write decontaminated data.
+
+    1) Retrieve near-duplicates from specified test sets against the input file.
+    2) Run a model-driven contamination check on retrieved candidates.
+    3) Execute a postprocess script to filter and save final results.
+    """
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
     test_sets = stage_config.get("test_sets", [])
@@ -66,7 +73,8 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
     run_cmd(
         cluster=cluster,
         container="nemo",
-        expname=f"retrieve_similar",
+        expname=f"{expname}_retrieve_similar",
+        run_after=run_after,
         exclusive=False,
         ctx=wrap_arguments(cmd),
     )
@@ -80,8 +88,8 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
         server_gpus=server_gpus,
         server_nodes=server_nodes,
         model=model,
-        expname=f"check_contamination",
-        run_after=f"retrieve_similar",
+        expname=f"{expname}_check_contamination",
+        run_after=f"{expname}_retrieve_similar",
         exclusive=False,
         dependent_jobs=dependent_jobs,
         num_chunks=num_chunks,
@@ -102,15 +110,87 @@ def decontaminate(cluster, expname, run_after, stage_config, **kwargs):
         ),
         cluster=cluster,
         exclusive=False,
-        run_after=f"check_contamination",
-        expname=f"decontaminate",
+        run_after=f"{expname}_check_contamination",
+        expname=expname,
     )
 
+
+def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
+    """Multi-round labeling of topics and subtopics.
+
+    For each key in `generation_keys` (e.g., topics → subtopics):
+      - Prepare inputs with allowed choices and few-shot examples.
+      - Run generation using the labeling prompt for that key.
+    Finally, aggregate per-level outputs and validate the hierarchy.
+    """
+    input_file = stage_config.get("input_file")
+    output_dir = stage_config["output_dir"]
+    model = stage_config.get("model")
+    server_type = stage_config.get("server_type")
+    server_gpus = stage_config.get("server_gpus")
+    server_nodes = stage_config.get("server_nodes")
+    dependent_jobs = stage_config.get("dependent_jobs")
+    num_chunks = stage_config.get("num_chunks")
+    few_shots_name = stage_config.get("few_shots_name")
+    generation_keys = stage_config.get("generation_keys", [])
+
+    prev_name = None
+    save_paths = {}
+    topics_structure = {}
+    for i, name in enumerate(generation_keys):
+        topics_structure[name] = stage_config[name]
+        run_cmd(
+            ctx=wrap_arguments(
+                f"python /nemo_run/code/recipes/opensciencereasoning/scripts/prepare_topics.py "
+                f"    --input_file '{input_file}' "
+                f"    --output_file '{output_dir}/tmp/prepared_for_{name}_labeling.jsonl' "
+                f"    --topics_to_choose '{json.dumps(stage_config[name])}' "
+                f"    --prompt_examples '{json.dumps(few_shots[few_shots_name][name])}' "
+                f"    --topic_key '{prev_name}' "
+                f"    --generation_key '{name}' "
+            ),
+            expname=f"{expname}_prepare_for_{name}_labeling_{i}",
+            run_after=run_after if i == 0 else f"{expname}_{name}_labeling_{i-1}",
+        )
+        generate(
+            ctx=wrap_arguments(
+                f"++prompt_config=/nemo_run/code/recipes/opensciencereasoning/prompts/topics_labeling.yaml "
+                f"++generation_key={name} ",
+            ),
+            cluster=cluster,
+            input_file=f"{output_dir}/tmp/prepared_for_{name}_labeling.jsonl",
+            output_dir=f"{output_dir}/{name}",
+            model=model,
+            server_type=server_type,
+            num_chunks=num_chunks,
+            exclusive=False,
+            dependent_jobs=dependent_jobs,
+            server_gpus=server_gpus,
+            server_nodes=server_nodes,
+            expname=f"{expname}_{name}_labeling_{i}",
+            run_after=f"{expname}_prepare_for_{name}_labeling_{i}",
+        )
+        input_file = f"{output_dir}/{name}/output.jsonl"
+        prev_name = name
+        save_paths[name] = f"{output_dir}/{name}/output.jsonl"
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_topics.py "
+            f"    --input_files '{json.dumps(save_paths)}' "
+            f"    --output_file '{output_dir}/final_result.jsonl' "
+            f"    --topics_structure '{json.dumps(topics_structure)}' "
+            f"    --names '{json.dumps(generation_keys)}' "
+        ),
+        expname=expname,
+        run_after=f"{expname}_labeling_{i}",
+    )
 
 
 stages_map = {
     "filter_problems": filter_problems,
     "decontaminate": decontaminate,
+    "topics_labeling": topics_labeling,
 }
 
 
