@@ -58,12 +58,14 @@ class ServerTokenizer:
         self.tokenizer_url = url
         self.detokenizer_url = url.replace("/tokenize", "/detokenize")
 
-    def encode(self, prompt: str | list[dict]) -> list[int]:
+    def encode(self, prompt: str | list[dict], tools=None) -> list[int]:
         """Encode the prompt using the tokenizer endpoint."""
         if isinstance(prompt, str):
             payload = {"prompt": prompt}
         elif isinstance(prompt, list):
             payload = {"messages": prompt}
+            if tools is not None:
+                payload["tools"] = tools
 
         response = requests.post(self.tokenizer_url, json=payload, timeout=30)
         response.raise_for_status()
