@@ -160,7 +160,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
             cluster=cluster,
             exclusive=False,
             expname=f"{expname}-prepare-for-{name}-labeling-{i}",
-            run_after=first_dep if i == 0 else f"{expname}-{name}-labeling-{i-1}",
+            run_after=first_dep if i == 0 else f"{expname}-{prev_name}-labeling-{i-1}",
         )
         generate(
             ctx=wrap_arguments(
