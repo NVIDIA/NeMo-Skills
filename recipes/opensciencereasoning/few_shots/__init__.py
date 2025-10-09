@@ -14,6 +14,6 @@
 
 from .topics import few_shots_topics
 
-few_shots = {}
-
-few_shots.update(few_shots_topics)
+few_shots = {
+    "stem_topics": few_shots_topics,
+}

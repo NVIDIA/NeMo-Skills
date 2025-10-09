@@ -59,7 +59,7 @@ stages:
     generation_keys:
       - topics
       - subtopics
-    few_shots_name: topics
+    few_shots_name: stem_topics
     topics:
       - Mathematics
       - Chemistry
