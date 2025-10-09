@@ -16,7 +16,6 @@ import json
 import logging
 import shutil
 import subprocess
-import uuid
 from pathlib import Path
 
 from nemo_skills.utils import get_logger_name, unroll_files
@@ -27,8 +26,8 @@ LOG = logging.getLogger(get_logger_name(__file__))
 def eval_if(cfg):
     for jsonl_file in unroll_files(cfg.input_files):
         jsonl_path = Path(jsonl_file).resolve()
-        output_dir = jsonl_path.parent / f"{jsonl_path.stem}_ifeval_{uuid.uuid4().hex}"
-        output_dir.mkdir(parents=True, exist_ok=False)
+        output_dir = jsonl_path.parent / f"{jsonl_path.stem}_metrics_tmp"
+        output_dir.mkdir(parents=True, exist_ok=True)
         cmd = (
             "cd /opt/benchmarks/google-research && python -m instruction_following_eval.evaluation_main "
             f"--input_data={jsonl_file} "
