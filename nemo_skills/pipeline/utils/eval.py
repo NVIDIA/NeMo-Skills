@@ -185,6 +185,11 @@ def get_benchmark_args_from_module(
         benchmark_module, "KEEP_MOUNTS_FOR_SANDBOX", False, override_dict
     )
 
+    # Add any benchmark-specific environment variables to cluster config
+    env_vars_from_module = getattr(benchmark_module, "ENV_VARS", getattr(benchmark_module, "env_vars", []))
+    if env_vars_from_module:
+        cluster_config["module_env_vars"] = list(env_vars_from_module)
+
     generation_module = get_arg_from_module_or_dict(
         benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate", override_dict
     )
