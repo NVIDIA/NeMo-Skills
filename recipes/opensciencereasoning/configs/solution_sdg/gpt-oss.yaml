@@ -68,11 +68,11 @@ stages:
       - Physics
       - Biology
     subtopic:
-      - Chemistry:
+      Chemistry:
         - Organic Chemistry
         - Inorganic Chemistry
         - General Chemistry
-      - Physics:
+      Physics:
         - Quantum Mechanics
         - Classical Mechanics
         - General Physics
@@ -82,7 +82,7 @@ stages:
         - Condensed Matter Physics
         - High-energy Particle Physics
         - Astrophysics
-      - Biology:
+      Biology:
         - Genetics
         - Molecular Biology
         - General Biology
