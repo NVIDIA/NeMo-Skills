@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
 
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "code"
-METRICS_TYPE = "ojbench"
-EVAL_SPLIT = "test_python"
-EVAL_ARGS = "++eval_type=ojbench"
+METRICS_TYPE = "livecodebench"
+EVAL_SPLIT = "v6_2408_2505"
+EVAL_ARGS = "++eval_type=livecodebench ++eval_config.language=cpp"
 REQUIRES_SANDBOX = True
 KEEP_MOUNTS_FOR_SANDBOX = True
-GENERATION_ARGS = "++prompt_config=generic/default"
+GENERATION_ARGS = "++prompt_config=eval/livecodebench/cpp_codegen"

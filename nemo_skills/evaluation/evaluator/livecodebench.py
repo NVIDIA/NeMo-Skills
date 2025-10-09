@@ -37,7 +37,7 @@ LIVECODEBENCH_PYPY3_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.gi
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
-    language: str = "python"  # "cpp" is another option now
+    language: str = "python"
     test_file: str = None
     interpreter: str = "python"  # use either "python" or "pypy3"
     timeout: int = 6
@@ -160,7 +160,7 @@ async def eval_livecodebench_async(cfg, eval_config: LiveCodeBenchEvaluatorConfi
                 from livecodebench.evaluate import evaluate
                 evaluate(
                     custom_output_file='{jsonl_file}',
-                    release_version='release_{release_version}',
+                    release_version='{release_version}',
                     test_file={test_file_arg},
                     k_list=[1],
                     language='{eval_config.language}',
