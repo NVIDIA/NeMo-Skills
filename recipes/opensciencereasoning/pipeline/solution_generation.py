@@ -149,8 +149,8 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
                 f"    --output_file '{output_dir}/tmp/prepared_for_{name}_labeling.jsonl' "
                 f"    --topics_to_choose '{json.dumps(stage_config[name])}' "
                 f"    --prompt_examples '{json.dumps(few_shots[few_shots_name][name])}' "
-                f"    --topic_key '{prev_name}' "
                 f"    --generation_key '{name}' "
+                f"    --topic_key '{prev_name}' " if prev_name else ""
             ),
             cluster=cluster,
             exclusive=False,
