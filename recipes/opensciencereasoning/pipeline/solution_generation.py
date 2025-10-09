@@ -152,6 +152,8 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
                 f"    --topic_key '{prev_name}' "
                 f"    --generation_key '{name}' "
             ),
+            cluster=cluster,
+            exclusive=False,
             expname=f"{expname}_prepare_for_{name}_labeling_{i}",
             run_after=run_after if i == 0 else f"{expname}_{name}_labeling_{i-1}",
         )
@@ -185,6 +187,8 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
             f"    --topics_structure '{json.dumps(topics_structure)}' "
             f"    --names '{json.dumps(generation_keys)}' "
         ),
+        cluster=cluster,
+        exclusive=False,
         expname=expname,
         run_after=f"{expname}_labeling_{i}",
     )
