@@ -221,12 +221,10 @@ ns eval \
 
 ##### Pypy3 Evaluation
 
-To run with the Pypy3 interpreter, modify the `--extra_eval_args` flag as shown below.
+To run with the Pypy3 interpreter, we need to use sandbox. Therefore, pass these flags `--with_sandbox --keep_mounts_for_sandbox` and modify the `--extra_eval_args` flag as shown below.
 ```
 --extra_eval_args="++eval_config.interpreter=pypy3 ++eval_config.test_file=<DATA_DIR>/livecodebench/test_v6_2408_2505.jsonl"
 ```
-
-Also, pass the flags `--with_sandbox --keep_mounts_for_sandbox`.
 
 ##### Verifying Results
 
