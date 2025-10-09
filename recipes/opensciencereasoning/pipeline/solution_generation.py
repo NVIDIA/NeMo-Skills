@@ -142,6 +142,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
     topics_structure = {}
     for i, name in enumerate(generation_keys):
         topics_structure[name] = stage_config[name]
+        extra_args = f"    --topic_key '{prev_name}' " if prev_name else ""
         run_cmd(
             ctx=wrap_arguments(
                 f"python /nemo_run/code/recipes/opensciencereasoning/scripts/prepare_topics.py "
@@ -150,7 +151,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
                 f"    --topics_to_choose '{json.dumps(stage_config[name])}' "
                 f"    --prompt_examples '{json.dumps(few_shots[few_shots_name][name])}' "
                 f"    --generation_key '{name}' "
-                f"    --topic_key '{prev_name}' " if prev_name else ""
+                f"{extra_args}"
             ),
             cluster=cluster,
             exclusive=False,
