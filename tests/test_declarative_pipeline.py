@@ -15,6 +15,7 @@
 """Tests for the declarative pipeline system."""
 
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -315,7 +316,7 @@ class TestPipelineExecution:
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
     @patch("nemo_skills.pipeline.utils.declarative.run_exp")
     def test_pipeline_run_with_dependencies(self, mock_run_exp, mock_env_vars, mock_get_exp):
-        """Test pipeline execution with job dependencies."""
+        """Test pipeline execution with internal job dependencies."""
         # Setup mocks
         mock_config = {
             "executor": "none",
@@ -327,7 +328,7 @@ class TestPipelineExecution:
         mock_exp.add.side_effect = ["handle_1", "handle_2"]
         mock_get_exp.return_value.__enter__.return_value = mock_exp
 
-        # Create pipeline with dependencies
+        # Create pipeline with internal dependencies
         cmd1 = Command(command="echo 1", name="cmd1")
         group1 = CommandGroup(commands=[cmd1], name="group1", log_dir="/logs")
 
@@ -335,7 +336,7 @@ class TestPipelineExecution:
         group2 = CommandGroup(commands=[cmd2], name="group2", log_dir="/logs")
 
         job1 = {"name": "job1", "group": group1, "dependencies": []}
-        job2 = {"name": "job2", "group": group2, "dependencies": [job1]}
+        job2 = {"name": "job2", "group": group2, "dependencies": [job1]}  # Internal dependency
 
         pipeline = Pipeline(name="test", cluster_config=mock_config, jobs=[job1, job2], skip_hf_home_check=True)
 
@@ -344,6 +345,16 @@ class TestPipelineExecution:
 
         # Verify both jobs were added
         assert mock_exp.add.call_count == 2
+
+        # Verify job1 has no dependencies
+        call1_kwargs = mock_exp.add.call_args_list[0][1]
+        assert call1_kwargs["dependencies"] is None or call1_kwargs["dependencies"] == []
+
+        # Verify job2 has internal dependency on job1 (handle_1)
+        call2_kwargs = mock_exp.add.call_args_list[1][1]
+        assert call2_kwargs["dependencies"] == ["handle_1"], (
+            f"Job2 should depend on job1's handle, got {call2_kwargs['dependencies']}"
+        )
 
     @patch("nemo_skills.pipeline.utils.declarative.get_exp")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
@@ -590,6 +601,74 @@ class TestErrorHandling:
 class TestJobDependencies:
     """Test job dependencies across experiments."""
 
+    def test_multiple_internal_dependencies(self):
+        """Test that a job can depend on multiple internal jobs."""
+        import nemo_run as run
+
+        with patch("nemo_skills.pipeline.utils.declarative.get_exp") as mock_get_exp:
+            mock_exp = MagicMock(spec=run.Experiment)
+            mock_exp.__enter__ = MagicMock(return_value=mock_exp)
+            mock_exp.__exit__ = MagicMock(return_value=False)
+            # Return handles for 3 jobs
+            mock_exp.add = MagicMock(side_effect=["handle_1", "handle_2", "handle_3"])
+            mock_get_exp.return_value = mock_exp
+
+            with patch("nemo_skills.pipeline.utils.declarative.get_executor") as mock_executor:
+                mock_executor.return_value = MagicMock(packager=MagicMock())
+
+                with patch("nemo_skills.pipeline.utils.declarative.run_exp"):
+                    cluster_config = {
+                        "executor": "slurm",
+                        "containers": {"nemo-skills": "test/container"},
+                        "account": "test",
+                        "env_vars": {"HF_HOME": "/mounted/hf_home"},
+                        "mounts": ["/mounted/hf_home:/mounted/hf_home"],
+                    }
+
+                    # Job 1 and Job 2: independent
+                    cmd1 = Command(command="echo job1", name="job1")
+                    group1 = CommandGroup(commands=[cmd1], name="group1", log_dir="/tmp/logs")
+
+                    cmd2 = Command(command="echo job2", name="job2")
+                    group2 = CommandGroup(commands=[cmd2], name="group2", log_dir="/tmp/logs")
+
+                    # Job 3: depends on both job1 and job2
+                    cmd3 = Command(command="echo job3", name="job3")
+                    group3 = CommandGroup(commands=[cmd3], name="group3", log_dir="/tmp/logs")
+
+                    job1_spec = {"name": "job1", "group": group1}
+                    job2_spec = {"name": "job2", "group": group2}
+                    job3_spec = {
+                        "name": "job3",
+                        "group": group3,
+                        "dependencies": [job1_spec, job2_spec],  # Multiple internal dependencies
+                    }
+
+                    pipeline = Pipeline(
+                        name="test_pipeline",
+                        cluster_config=cluster_config,
+                        jobs=[job1_spec, job2_spec, job3_spec],
+                        skip_hf_home_check=True,
+                        reuse_code=False,  # Disable code reuse to avoid mock issues
+                    )
+
+                    pipeline.run(dry_run=True)
+
+                    # Verify all jobs were added
+                    assert mock_exp.add.call_count == 3
+
+                    # Job 1 and 2 should have no internal dependencies
+                    call1_kwargs = mock_exp.add.call_args_list[0][1]
+                    call2_kwargs = mock_exp.add.call_args_list[1][1]
+                    assert call1_kwargs["dependencies"] is None
+                    assert call2_kwargs["dependencies"] is None
+
+                    # Job 3 should depend on both job1 and job2
+                    call3_kwargs = mock_exp.add.call_args_list[2][1]
+                    assert call3_kwargs["dependencies"] == ["handle_1", "handle_2"], (
+                        f"Job3 should depend on both handle_1 and handle_2, got {call3_kwargs['dependencies']}"
+                    )
+
     def test_dependencies_separated_internal_vs_external(self):
         """Test that internal and external dependencies are handled differently.
 
@@ -660,10 +739,11 @@ class TestJobDependencies:
                             cluster_config=cluster_config,
                             jobs=[job1_spec, job2_spec],
                             skip_hf_home_check=True,
+                            reuse_code=False,  # Disable code reuse to avoid mock issues
                         )
 
                         # Run the pipeline (mocked)
-                        pipeline.run(dry_run=False)
+                        pipeline.run(dry_run=True)
 
                         # Verify executor calls
                         assert len(captured_executor_calls) == 2
@@ -703,11 +783,15 @@ class TestJobDependencies:
         with open(input_file, "w") as f:
             f.write(json.dumps({"problem": "test"}) + "\n")
 
+        # Use test-local cluster config for CI compatibility
+        test_config_dir = os.path.join(os.path.dirname(__file__), "gpu-tests")
+
         # Step 1: First generation task
         # Without the fix, this would work (no external deps)
         exp1 = generate(
             ctx=wrap_arguments("++max_samples=1"),
-            cluster="local",
+            cluster="test-local",
+            config_dir=test_config_dir,
             input_file=input_file,
             output_dir=f"{output_dir}/step1/",
             model="nvidia/nvidia-nemotron-nano-9b-v2",
@@ -722,7 +806,8 @@ class TestJobDependencies:
         # This tests that dependencies work across separate function calls
         exp2 = run_cmd(
             ctx=wrap_arguments("echo 'processing'"),
-            cluster="local",
+            cluster="test-local",
+            config_dir=test_config_dir,
             log_dir=f"{output_dir}/step2-logs",
             expname="test_exp2",
             run_after=["test_exp1"],
@@ -734,7 +819,8 @@ class TestJobDependencies:
         # This further tests chaining of dependencies
         exp3 = generate(
             ctx=wrap_arguments("++max_samples=1"),
-            cluster="local",
+            cluster="test-local",
+            config_dir=test_config_dir,
             input_file=f"{output_dir}/step1/output.jsonl",
             output_dir=f"{output_dir}/step3/",
             model="nvidia/nvidia-nemotron-nano-9b-v2",
