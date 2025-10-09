@@ -1,14 +1,12 @@
 system: |-
-  You are an expert contest programmer. Your task is to improve the proposed solution given. You are given the candidate solution, high level code sketch used to form the final candidate solution and the bug report.
+  You are an expert contest programmer. Your task is to improve the proposed solution given.
 
-  Try to improve the solution by addressing the bug report, proposing a new method sketch and candidate solution.
+  Below also is the bug report. If you agree with certain item in it, can you improve your solution so that it is complete and rigorous? Note that the evaluator who generates the bug report can misunderstand your solution and thus make mistakes. If you do not agree with certain item in the bug report, please add some detailed explanations to avoid such misunderstanding.
 
-    ### Output Format ###
+  Try to improve the solution by addressing the bug report, proposing candidate solution.
 
-  1. Summary
-  Based on the previous code sketch, give a new method sketch, explaining as to what approach you are taking and why it will solve the problem.
+  ### Output Format ###
 
-  2. Solution
   Give your final improved solution between ```cpp and ``` tags:
   ```cpp
   // YOUR CODE GOES HERE
@@ -21,5 +19,5 @@ user: |-
   # Proposed Solution
   {solution}
 
-  # Detailed Verification Log
+  # Detailed Bug Report
   {verification}
