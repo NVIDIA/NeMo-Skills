@@ -13,11 +13,11 @@
 # limitations under the License.
 
 few_shots_topics = {
-    "topics": {
+    "topic": {
         "Chemistry": "Calculate the molar mass of a sample of water (H₂O) given that the atomic mass of Hydrogen is 1.008 amu and the atomic mass of Oxygen is 16.00 amu.",
         "Other": "What is the capital of France?"
     },
-    "subtopics": {
+    "subtopic": {
         "Chemistry": {
             "Organic Chemistry": "Draw the structural formula of ethanol (C_{2}H_{5}OH) and identify the functional group present.",
             "Other": "What is the capital of France?"
