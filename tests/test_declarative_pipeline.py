@@ -14,10 +14,14 @@
 
 """Tests for the declarative pipeline system."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from nemo_skills.pipeline.cli import wrap_arguments
+from nemo_skills.pipeline.generate import generate
+from nemo_skills.pipeline.run_cmd import run_cmd
 from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
 
 
@@ -581,6 +585,202 @@ class TestErrorHandling:
 
         with pytest.raises(ValueError, match="must have log_dir set"):
             pipeline.run(dry_run=True)
+
+
+class TestJobDependencies:
+    """Test job dependencies across experiments."""
+
+    def test_dependencies_separated_internal_vs_external(self):
+        """Test that internal and external dependencies are handled differently.
+
+        This verifies the fix for the bug where exp.add() was receiving external
+        experiment dependencies, causing an assertion error.
+
+        The fix:
+        - Internal deps (task handles from same experiment) → passed to exp.add()
+        - External deps (SLURM job IDs from other experiments) → passed to executor
+        """
+        import nemo_run as run
+
+        # Mock get_exp_handles to return fake SLURM job IDs
+        with patch("nemo_skills.pipeline.utils.declarative.get_exp_handles") as mock_get_handles:
+            mock_get_handles.return_value = ["slurm_job_12345"]
+
+            # Mock get_exp to avoid actually creating experiments
+            with patch("nemo_skills.pipeline.utils.declarative.get_exp") as mock_get_exp:
+                mock_exp = MagicMock(spec=run.Experiment)
+                mock_exp.__enter__ = MagicMock(return_value=mock_exp)
+                mock_exp.__exit__ = MagicMock(return_value=False)
+                # Return different handles for each job
+                mock_exp.add = MagicMock(side_effect=["task_handle_1", "task_handle_2"])
+                mock_get_exp.return_value = mock_exp
+
+                # Mock get_executor to capture what dependencies are passed to it
+                captured_executor_calls = []
+
+                def mock_get_executor(**kwargs):
+                    captured_executor_calls.append(kwargs.get("dependencies"))
+                    mock_executor = MagicMock()
+                    mock_executor.packager = MagicMock()
+                    return mock_executor
+
+                with patch("nemo_skills.pipeline.utils.declarative.get_executor", side_effect=mock_get_executor):
+                    # Mock run_exp to avoid actually running
+                    with patch("nemo_skills.pipeline.utils.declarative.run_exp"):
+                        cluster_config = {
+                            "executor": "slurm",
+                            "containers": {"nemo-skills": "test/container"},
+                            "account": "test",
+                            "env_vars": {"HF_HOME": "/mounted/hf_home"},
+                            "mounts": ["/mounted/hf_home:/mounted/hf_home"],
+                        }
+
+                        # Job 1: depends on external experiment
+                        cmd1 = Command(command="echo job1", name="job1")
+                        group1 = CommandGroup(commands=[cmd1], name="group1", log_dir="/tmp/logs")
+
+                        # Job 2: depends on job1 (internal) AND external experiment
+                        cmd2 = Command(command="echo job2", name="job2")
+                        group2 = CommandGroup(commands=[cmd2], name="group2", log_dir="/tmp/logs")
+
+                        job1_spec = {
+                            "name": "job1",
+                            "group": group1,
+                            "dependencies": ["external_experiment"],  # External only
+                        }
+
+                        job2_spec = {
+                            "name": "job2",
+                            "group": group2,
+                            "dependencies": [job1_spec, "another_external_experiment"],  # Both internal and external
+                        }
+
+                        pipeline = Pipeline(
+                            name="test_pipeline",
+                            cluster_config=cluster_config,
+                            jobs=[job1_spec, job2_spec],
+                            skip_hf_home_check=True,
+                        )
+
+                        # Run the pipeline (mocked)
+                        pipeline.run(dry_run=False)
+
+                        # Verify executor calls
+                        assert len(captured_executor_calls) == 2
+
+                        # Job 1: should have external deps passed to executor
+                        assert captured_executor_calls[0] == ["slurm_job_12345"]
+
+                        # Job 2: should have external deps passed to executor (from another_external_experiment)
+                        assert captured_executor_calls[1] == ["slurm_job_12345"]  # From another_external_experiment
+
+                        # Verify exp.add calls
+                        assert mock_exp.add.call_count == 2
+
+                        # Job 1: should have no internal deps
+                        call1_kwargs = mock_exp.add.call_args_list[0][1]
+                        assert call1_kwargs["dependencies"] is None
+
+                        # Job 2: should have internal deps (task_handle_1 from job1)
+                        call2_kwargs = mock_exp.add.call_args_list[1][1]
+                        assert call2_kwargs["dependencies"] == ["task_handle_1"]
+
+    def test_run_after_dependencies_across_experiments(self, tmp_path):
+        """Test that run_after dependencies work when chaining multiple generate/run_cmd calls.
+
+        This test verifies that when you call:
+        1. generate() with expname="exp1"
+        2. run_cmd() with expname="exp2" and run_after=["exp1"]
+        3. generate() with expname="exp3" and run_after=["exp2"]
+
+        The dependencies are correctly set up and exp3 waits for exp2, which waits for exp1.
+        """
+        # Setup
+        output_dir = str(tmp_path)
+        input_file = f"{tmp_path}/input.jsonl"
+
+        # Create dummy input file
+        with open(input_file, "w") as f:
+            f.write(json.dumps({"problem": "test"}) + "\n")
+
+        # Step 1: First generation task
+        # Without the fix, this would work (no external deps)
+        exp1 = generate(
+            ctx=wrap_arguments("++max_samples=1"),
+            cluster="local",
+            input_file=input_file,
+            output_dir=f"{output_dir}/step1/",
+            model="nvidia/nvidia-nemotron-nano-9b-v2",
+            server_type="openai",
+            server_address="https://integrate.api.nvidia.com/v1",
+            expname="test_exp1",
+            reuse_code=False,  # Disable code reuse for simpler test
+            dry_run=True,
+        )
+
+        # Step 2: Run command that depends on exp1
+        # This tests that dependencies work across separate function calls
+        exp2 = run_cmd(
+            ctx=wrap_arguments("echo 'processing'"),
+            cluster="local",
+            log_dir=f"{output_dir}/step2-logs",
+            expname="test_exp2",
+            run_after=["test_exp1"],
+            reuse_code=False,  # Disable code reuse for simpler test
+            dry_run=True,
+        )
+
+        # Step 3: Second generation that depends on exp2
+        # This further tests chaining of dependencies
+        exp3 = generate(
+            ctx=wrap_arguments("++max_samples=1"),
+            cluster="local",
+            input_file=f"{output_dir}/step1/output.jsonl",
+            output_dir=f"{output_dir}/step3/",
+            model="nvidia/nvidia-nemotron-nano-9b-v2",
+            server_type="openai",
+            server_address="https://integrate.api.nvidia.com/v1",
+            expname="test_exp3",
+            run_after=["test_exp2"],
+            reuse_code=False,  # Disable code reuse for simpler test
+            dry_run=True,
+        )
+
+        # Verify all experiments were created successfully
+        # The key test is that NO errors were raised above
+        # (Detailed dependency routing is verified in test_dependencies_separated_internal_vs_external)
+        assert exp1 is not None
+        assert exp2 is not None
+        assert exp3 is not None
+
+    def test_run_after_with_nonexistent_experiment(self):
+        """Test that using run_after with a non-existent experiment gives a proper warning."""
+        from nemo_skills.pipeline.utils.exp import get_exp_handles
+
+        # This should return an empty list and log a warning
+        handles = get_exp_handles("nonexistent_experiment_12345", ignore_exp_not_exists=True)
+        assert handles == []
+
+    def test_run_after_with_experiment_object(self):
+        """Test that run_after can accept an experiment object directly."""
+        import nemo_run as run
+
+        from nemo_skills.pipeline.utils.exp import get_exp_handles
+
+        # Create a mock experiment
+        mock_exp = MagicMock(spec=run.Experiment)
+        mock_exp.status.return_value = {"task1": {"status": "RUNNING", "handle": "slurm_job_123"}}
+
+        # Test that we can get handles from an experiment object
+        with patch("nemo_skills.pipeline.utils.exp.AppState") as mock_app_state:
+            mock_app_state.RUNNING = "RUNNING"
+            mock_app_state.PENDING = "PENDING"
+            mock_app_state.SUBMITTED = "SUBMITTED"
+            mock_app_state.UNKNOWN = "UNKNOWN"
+
+            handles = get_exp_handles(mock_exp, ignore_finished=True)
+            assert len(handles) == 1
+            assert handles[0] == "slurm_job_123"
 
 
 if __name__ == "__main__":
