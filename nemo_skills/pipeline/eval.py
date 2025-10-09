@@ -361,7 +361,6 @@ def eval(
                     server_config=job_server_config,
                     with_sandbox=job_needs_sandbox or with_sandbox,
                     keep_mounts_for_sandbox=job_needs_sandbox_to_keep_mounts or keep_mounts_for_sandbox,
-                    with_search_server=with_search_server,
                     sandbox_port=None if get_random_port else 6000,
                     with_search_server=with_search_server,
                     run_after=run_after,
