@@ -21,17 +21,14 @@ import time
 from typing import Dict
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
-from nemo_skills.evaluation.evaluator.base import BaseEvaluator, BaseEvaluatorConfig
+from nemo_skills.evaluation.evaluator.base import BaseEvaluator
 from nemo_skills.file_utils import jdump
 from nemo_skills.utils import nested_dataclass, unroll_files
 
 
 @nested_dataclass(kw_only=True)
-class IOIEvaluatorConfig(BaseEvaluatorConfig):
-    # Directory where metadata files are located.
-    test_dir: str = ""
-    # Metadata file name or absolute path (default: {split}_metadata.json).
-    test_file: str = "{split}_metadata.json"
+class IOIEvaluatorConfig:
+    test_file: str = "test_metadata.json"
     num_workers: int = 16  # number of test workers
     test_batch_size: int = 16  # number of tests to run concurrently
     overwrite: bool = False
@@ -251,8 +248,6 @@ class IOIEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 10):
         super().__init__(config, num_parallel_requests)
         self.eval_cfg = IOIEvaluatorConfig(_init_nested=True, **config)
-        self.split = self.eval_cfg.split
-        self.data_dir = self.eval_cfg.data_dir
 
         # Heavy runtime resources are lazily initialized within _evaluate_entry.
         self.sandbox = None  # type: ignore
@@ -274,8 +269,9 @@ class IOIEvaluator(BaseEvaluator):
 
             if not os.path.exists(self.eval_cfg.test_file):
                 raise FileNotFoundError(
-                    f"Metadata file {self.eval_cfg.test_file} does not exist. "
-                    "please provide a valid parameter for ++eval_config.test_file=x when running IOI Evaluation."
+                    f"Metadata file {self.eval_cfg.test_file} does not exist."
+                    " This file is generated when preparing the IOI dataset, and found in the dataset directory. "
+                    " Please provide a valid parameter for ++eval_config.test_file=x when running IOI Evaluation."
                 )
             with open(self.eval_cfg.test_file, "r") as f:
                 metadata_local = json.load(f)

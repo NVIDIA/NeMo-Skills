@@ -20,13 +20,7 @@ from typing import Any, Dict, List
 
 import tqdm
 
-from nemo_skills.utils import nested_dataclass, unroll_files
-
-
-@nested_dataclass(kw_only=True)
-class BaseEvaluatorConfig:
-    split: str = ""
-    data_dir: str = ""
+from nemo_skills.utils import unroll_files
 
 
 class BaseEvaluator(ABC):
