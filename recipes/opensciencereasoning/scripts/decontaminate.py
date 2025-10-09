@@ -16,6 +16,14 @@ import argparse
 import logging
 
 def main():
+    """Filter the input dataset based on contamination check results.
+
+    Reads contamination decisions from `--dec_path` (expects a JSONL with
+    fields `problem` and boolean `contaminated`). Keeps only problems marked
+    non-contaminated, writing the filtered set to `--save_path`.
+
+    If `--with_duplicates` is False, repeated problems are emitted once.
+    """
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
