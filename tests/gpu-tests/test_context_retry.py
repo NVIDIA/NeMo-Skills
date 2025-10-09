@@ -76,13 +76,14 @@ def test_context_retry(server_type):
         f"  --server_gpus 1 "
         f"  --server_nodes 1 "
     )
+
     if server_type == "trtllm":
         server_cmd += " --server_args '--backend pytorch'"
 
     server_proc = subprocess.Popen(server_cmd, shell=True)
 
     # Wait for server to be ready
-    time.sleep(60)
+    time.sleep(120)
 
     try:
         # (1) With no soft fail, the generation should fail
@@ -104,7 +105,8 @@ def test_context_retry(server_type):
         # (2) With soft fail, the eval should succeed
         docker_rm([eval_dir])
 
-        eval_cmd = base_eval_cmd + " ++server.enable_soft_fail=True"
+        eval_cmd = base_eval_cmd + " ++server.enable_soft_fail=True "
+        print(eval_cmd)
         subprocess.run(eval_cmd, shell=True, check=True)
 
         # Check that the eval output is created

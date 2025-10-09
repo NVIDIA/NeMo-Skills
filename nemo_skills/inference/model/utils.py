@@ -44,6 +44,7 @@ def is_context_window_exceeded_error(error: Exception) -> bool:
         or "should not exceed max_seq_len" in str(error)
         or "reduce the length of the input messages" in str(error)
         or "'max_completion_tokens' is too large" in str(error)
+        or "max_tokens must be at least 1, got -" in str(error)
     ):
         return True
     else:

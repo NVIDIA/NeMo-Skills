@@ -75,6 +75,9 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         re.IGNORECASE | re.DOTALL,
     )
 
+    # Pattern 6: "max_tokens must be at least 1, got -37673"
+    pattern6 = re.compile(r"max_tokens must be at least 1, got (-\d+)", re.IGNORECASE)
+
     # Try patterns 1, 3, and 4
     for pattern in [pattern1, pattern3]:
         match = pattern.search(error_str)
@@ -109,6 +112,13 @@ def parse_context_window_exceeded_error(error) -> Union[Dict[str, int], None]:
         return {
             "max_context_length": int(match.group(1)),
             "message_tokens": int(match.group(3)),
+        }
+
+    # Try pattern 6
+    match = pattern6.search(error_str)
+    if match:
+        return {
+            "message_tokens_overflow": abs(int(match.group(1))),
         }
 
     return None
@@ -260,7 +270,13 @@ def _prepare_context_error_retry(
 
     # Apply the configured strategy
     if config.reduce_generate_tokens:
+        if "message_tokens_overflow" in parsed_error:
+            detailed_error = f"Prompt tokens overflow. Reducing generation tokens will not help. Returning empty generation.\n\n{error}"
+            LOG.warning(detailed_error)
+            return None
+
         return _try_reduce_generation_tokens(kwargs, parsed_error, config, error)
+
     elif config.reduce_prompt_from_start or config.reduce_prompt_from_end:
         if tokenizer is None:
             # Without tokenizer, we can't trim the prompt.
@@ -311,20 +327,30 @@ def _try_reduce_prompt_tokens(
     original_error: Exception,
 ) -> dict:
     """Try to reduce the number of tokens in the prompt."""
-    max_context_length = parsed_error["max_context_length"]
-    completion_tokens = kwargs["tokens_to_generate"]
+    if "message_tokens_overflow" in parsed_error:
+        # We can just use this information to reduce the prompt tokens
+        orig_prompt_num_tokens = len(tokenizer.encode(kwargs["prompt"]))
+        num_prompt_tokens_to_keep = orig_prompt_num_tokens - (
+            parsed_error["message_tokens_overflow"] + kwargs["tokens_to_generate"] + config.num_special_tokens_budget
+        )
+        LOG.warning(f"Prompt tokens overflow. Reducing prompt tokens to {num_prompt_tokens_to_keep}.")
 
-    if completion_tokens is None:
-        detailed_error = f"tokens_to_generate is not set. Cannot reduce prompt tokens.\n\n{original_error}"
-        raise ValueError(detailed_error)
+    else:
+        max_context_length = parsed_error["max_context_length"]
+        completion_tokens = kwargs["tokens_to_generate"]
 
-    # Assume the num_special_tokens_budget to be part of the calculation for safety. SGLang has thrown error for exact equality.
-    safe_remaining_budget = max_context_length - config.num_special_tokens_budget
-    if completion_tokens >= safe_remaining_budget:
-        detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
-        raise ValueError(detailed_error)
+        if completion_tokens is None:
+            detailed_error = f"tokens_to_generate is not set. Cannot reduce prompt tokens.\n\n{original_error}"
+            raise ValueError(detailed_error)
 
-    num_prompt_tokens_to_keep = safe_remaining_budget - completion_tokens
+        # Assume the num_special_tokens_budget to be part of the calculation for safety. SGLang has thrown error for exact equality.
+        safe_remaining_budget = max_context_length - config.num_special_tokens_budget
+        if completion_tokens >= safe_remaining_budget:
+            detailed_error = f"Completion tokens are already at the max context length. Cannot reduce prompt tokens.\n\n{original_error}"
+            raise ValueError(detailed_error)
+
+        num_prompt_tokens_to_keep = safe_remaining_budget - completion_tokens
+
     prompt = kwargs["prompt"]
 
     LOG.info(f"Num tokens to keep: {num_prompt_tokens_to_keep}")
