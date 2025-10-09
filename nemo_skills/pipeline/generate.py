@@ -69,16 +69,15 @@ def _create_commandgroup_from_config(
         server_container = server_config.pop("container", cluster_config["containers"][server_type])
 
         # Call server command builder directly with cluster_config
-        cmd, metadata = get_server_command_fn(**server_config, cluster_config=cluster_config)
+        cmd, num_tasks = get_server_command_fn(**server_config, cluster_config=cluster_config)
 
-        # Add additional metadata
-        metadata.update(
-            {
-                "gpus": server_config["num_gpus"],
-                "nodes": server_config["num_nodes"],
-                "log_prefix": "server",
-            }
-        )
+        # Create metadata dict
+        metadata = {
+            "num_tasks": num_tasks,
+            "gpus": server_config["num_gpus"],
+            "nodes": server_config["num_nodes"],
+            "log_prefix": "server",
+        }
 
         server_cmd = Command(
             command=cmd,
