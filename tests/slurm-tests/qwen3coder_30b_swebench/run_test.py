@@ -34,6 +34,7 @@ def eval_qwen3coder(workspace, cluster, expname_prefix, wandb_project, agent_fra
         benchmarks="swe-bench",
         num_chunks=8,
         dependent_jobs=2,  # automatically rerun 2 times because it's common for some instances to fail
+        reuse_code=False,  # otherwise the second run (swe-agent) tries to read the config file from the absolute cluster path and fails
         output_dir=workspace,
         expname=expname_prefix,
         wandb_project=wandb_project,
