@@ -67,13 +67,11 @@ stages:
       - Chemistry
       - Physics
       - Biology
-      - Other
     subtopics:
       - Chemistry:
         - Organic Chemistry
         - Inorganic Chemistry
         - General Chemistry
-        - Other
       - Physics:
         - Quantum Mechanics
         - Classical Mechanics
@@ -84,11 +82,9 @@ stages:
         - Condensed Matter Physics
         - High-energy Particle Physics
         - Astrophysics
-        - Other
       - Biology:
         - Genetics
         - Molecular Biology
         - General Biology
-        - Other
     dependencies:
       - decontaminate
