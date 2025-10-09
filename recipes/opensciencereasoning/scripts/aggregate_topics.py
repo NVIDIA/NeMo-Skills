@@ -17,31 +17,47 @@ import json
 import logging
 
 def check_topic_structure(sample: dict, topics_structure: dict, names: list):
-    """Validate that each hierarchical label in `sample` is allowed by `topics_structure`.
+    """Stepwise validate and normalize hierarchical labels in `sample`.
 
-    Expected `topics_structure` shape for two levels:
-      {
-        "topics": ["Chemistry", "Physics", ...],
-        "subtopics": {"Chemistry": [..], "Physics": [..], ...}
-      }
-    This function also works if deeper levels follow the same pattern: each level
-    after the first is a dict keyed by the previous level's selected value.
+    Rules:
+      - At each level, if the predicted value is "Other", keep it and set all
+        subsequent levels to "undefined".
+      - If the predicted value is not in the allowed set for that level, set
+        the current and all subsequent levels to "undefined".
+      - Otherwise, keep the value and continue to the next level.
+
+    This function mutates `sample` in place and always returns True, allowing
+    the caller to write out the normalized sample.
     """
     if not names:
-        return True
+        return
 
-    # First level is a flat list of allowed values
+    def set_undefined_from(index: int):
+        for j in range(index, len(names)):
+            sample[names[j]] = "undefined"
+
+    # First level: list of allowed values
     first_name = names[0]
     first_allowed = topics_structure.get(first_name, [])
-    if sample.get(first_name) not in first_allowed:
-        return False
+    first_value = sample.get(first_name)
+    if first_value == "Other":
+        set_undefined_from(1)
+        return
+    if first_value not in first_allowed:
+        sample[first_name] = "undefined"
+        set_undefined_from(1)
+        return
 
-    # Each subsequent level is a mapping from the previous selection to allowed values
+    # Subsequent levels: mapping from previous selection to allowed values
     for i in range(1, len(names)):
         prev_name = names[i - 1]
         curr_name = names[i]
         prev_value = sample.get(prev_name)
         curr_value = sample.get(curr_name)
+
+        if curr_value == "Other":
+            set_undefined_from(i + 1)
+            return
 
         mapping_or_list = topics_structure.get(curr_name, {})
         if isinstance(mapping_or_list, dict):
@@ -50,9 +66,10 @@ def check_topic_structure(sample: dict, topics_structure: dict, names: list):
             allowed = mapping_or_list
 
         if curr_value not in allowed:
-            return False
+            sample[curr_name] = "undefined"
+            set_undefined_from(i + 1)
+            return
 
-    return True
 
 def aggregate_topics(input_files: dict, output_file: str, topics_structure: dict, names: list):
     """Merge per-level classification outputs into a single JSONL.
@@ -71,8 +88,8 @@ def aggregate_topics(input_files: dict, output_file: str, topics_structure: dict
                 data[sample['problem']][topic_key] = sample[topic_key]
     with open(output_file, "w") as f:
         for sample in data.values():
-            if check_topic_structure(sample, topics_structure, names):
-                f.write(json.dumps(sample) + "\n")
+            check_topic_structure(sample, topics_structure, names)
+            f.write(json.dumps(sample) + "\n")
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
