@@ -258,6 +258,7 @@ class GenerationTask:
             cfg: GenerateSolutionsConfig object with the configuration parameters or subclass.
         """
         self.cfg = cfg
+
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
         if self.cfg.chat_template_kwargs:
             if not self.cfg.use_completions_api:
