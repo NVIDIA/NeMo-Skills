@@ -77,11 +77,11 @@ def aggregate_topics(input_files: dict, output_file: str, topics_structure: dict
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    parser = argparse.ArgumentParser(description="Aggregate topics.")
-    parser.add_argument("--input_files", required=True, type=json.loads)
-    parser.add_argument("--output_file", required=True, type=str)
-    parser.add_argument("--topics_structure", default=None, type=json.loads)
-    parser.add_argument("--names", default=None, type=json.loads)
+    parser = argparse.ArgumentParser(description="Aggregate per-level topic labeling outputs into a single JSONL.")
+    parser.add_argument("--input_files", required=True, type=json.loads, help="JSON: mapping from label key (e.g., 'topics') to its output.jsonl path")
+    parser.add_argument("--output_file", required=True, type=str, help="Path to write aggregated JSONL after structure validation")
+    parser.add_argument("--topics_structure", default=None, type=json.loads, help="JSON: allowed labels per level; dict-of-lists/dicts controlling valid pairs")
+    parser.add_argument("--names", default=None, type=json.loads, help="JSON: ordered list of hierarchy keys (e.g., ['topics','subtopics'])")
     args = parser.parse_args()
     aggregate_topics(args.input_files, args.output_file, args.topics_structure, args.names)
 

@@ -29,22 +29,31 @@ def main():
     )
 
     parser = argparse.ArgumentParser(
-        description="Decontaminate the input file."
+        description="Decontaminate the input file. Reads contamination decisions and filters the input JSONL."
     )
     parser.add_argument(
         "-i",
         "--input_path",
         required=True,
-        help="file to decontaminate",
+        help="Path to input JSONL to be filtered (original dataset)",
     )
     parser.add_argument(
-        "-d", "--dec_path", required=True, help="file with the 'contaminated' field"
+        "-d",
+        "--dec_path",
+        required=True,
+        help="Path to JSONL with contamination decisions ('problem' and boolean 'contaminated')",
     )
     parser.add_argument(
-        "-s", "--save_path", required=True, help="save path"
+        "-s",
+        "--save_path",
+        required=True,
+        help="Path to write filtered JSONL (non-contaminated problems)",
     )
     parser.add_argument(
-        "-f", "--with_duplicates", default=False, help="flag to leave duplicated problems"
+        "-f",
+        "--with_duplicates",
+        default=False,
+        help="If set, allow duplicate problems in output; otherwise emit each once",
     )
     args = parser.parse_args()
 
