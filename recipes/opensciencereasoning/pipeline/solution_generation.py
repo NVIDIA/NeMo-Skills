@@ -154,8 +154,8 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
             ),
             cluster=cluster,
             exclusive=False,
-            expname=f"{expname}_prepare_for_{name}_labeling_{i}",
-            run_after=run_after if i == 0 else f"{expname}_{name}_labeling_{i-1}",
+            expname=f"{expname}-prepare-for-{name}-labeling-{i}",
+            run_after=run_after if i == 0 else f"{expname}-{name}-labeling-{i-1}",
         )
         generate(
             ctx=wrap_arguments(
@@ -172,8 +172,8 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
             dependent_jobs=dependent_jobs,
             server_gpus=server_gpus,
             server_nodes=server_nodes,
-            expname=f"{expname}_{name}_labeling_{i}",
-            run_after=f"{expname}_prepare_for_{name}_labeling_{i}",
+            expname=f"{expname}-{name}-labeling-{i}",
+            run_after=f"{expname}-prepare-for-{name}-labeling-{i}",
         )
         input_file = f"{output_dir}/{name}/output.jsonl"
         prev_name = name
@@ -190,7 +190,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         cluster=cluster,
         exclusive=False,
         expname=expname,
-        run_after=f"{expname}_labeling_{i}",
+        run_after=f"{expname}-{name}-labeling-{i}",
     )
 
 
