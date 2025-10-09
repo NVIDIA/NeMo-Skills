@@ -18,6 +18,7 @@ initial_dependency: ""
 pipeline_stages:
   - filter_problems          # Filter problems based on format
   - decontaminate            # Decontaminate problems
+  - topics_labeling          # Label topics and subtopics
 
 # Directory structure configuration
 directories:
