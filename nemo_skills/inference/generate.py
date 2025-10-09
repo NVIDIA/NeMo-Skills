@@ -272,17 +272,31 @@ class GenerationTask:
         """
         self.cfg = cfg
 
+        # get the extra body and chat template kwargs as dicts
+        extra_body = OmegaConf.to_container(self.cfg.inference.extra_body, resolve=True) if self.cfg.inference.extra_body else {}
+        chat_template_kwargs = OmegaConf.to_container(self.cfg.chat_template_kwargs, resolve=True) if self.cfg.chat_template_kwargs else {}
+
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
-        if self.cfg.chat_template_kwargs:
+        if chat_template_kwargs:
             if self.cfg.inference.endpoint_type != EndpointType.text:
-                if "chat_template_kwargs" in self.cfg.inference.extra_body:
+                if "chat_template_kwargs" in extra_body:
                     raise ValueError(
                         "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
                         "You can only use one of them!"
                     )
-                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
-                self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
-                self.cfg.chat_template_kwargs = None
+                extra_body["chat_template_kwargs"] = chat_template_kwargs
+                self.cfg.inference.extra_body = extra_body
+
+                # Make sure chat_template_kwargs stays available for local formatting
+                if not self.cfg.chat_template_kwargs:
+                    self.cfg.chat_template_kwargs = chat_template_kwargs
+        else:
+            if "chat_template_kwargs" in extra_body:
+                # Copy from extra_body to cfg for local prompt formatting
+                chat_template_kwargs = extra_body["chat_template_kwargs"]
+                self.cfg.chat_template_kwargs = chat_template_kwargs
+                self.cfg.inference.extra_body = extra_body
+
 
         # Setup tokenizer
         if (
