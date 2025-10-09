@@ -62,12 +62,12 @@ stages:
       - topic
       - subtopic
     few_shots_name: stem_topics
-    topics:
+    topic:
       - Mathematics
       - Chemistry
       - Physics
       - Biology
-    subtopics:
+    subtopic:
       - Chemistry:
         - Organic Chemistry
         - Inorganic Chemistry
