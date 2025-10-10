@@ -165,7 +165,7 @@ data:
   output_key: output
   force_reprocess: false
   shuffle: true
-  num_workers: 1
+  num_workers: 10
 
 logger:
   log_dir: "logs"  # Base directory for all logs
