@@ -52,6 +52,7 @@ def run_cmd(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
@@ -106,8 +107,8 @@ def run_cmd(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
@@ -185,6 +186,7 @@ def run_cmd(
                 container=containers,
                 cluster_config=cluster_config,
                 partition=partition,
+                qos=qos,
                 time_min=time_min,
                 server_config=server_config,
                 with_sandbox=with_sandbox,
