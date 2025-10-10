@@ -105,13 +105,18 @@ def process_file(repo_root_dir, input_file, output_file):
                 LOG.info(f"Processing {test_category}")
 
 
-                test_cases_to_generate = clean_up_memory_prereq_entries(test_cases_to_generate)
-                test_cases_to_generate = populate_initial_settings_for_memory_test_cases(
-                    test_cases_to_generate, repo_root_dir,
-                )
-                test_cases_to_generate = populate_initial_settings_for_web_search_test_cases(
-                    test_cases_to_generate
-                )
+            instance_list = clean_up_memory_prereq_entries([instance])
+            instance_list = populate_initial_settings_for_memory_test_cases(
+                instance_list, repo_root_dir,
+            )
+            instance = populate_initial_settings_for_web_search_test_cases(
+                instance_list
+            )
+
+            if not instance_list:
+                continue
+
+            instance = instance_list[0]
 
             # Convert function calls to tools format and add them to the system prompt
             if "function" in instance:
@@ -120,9 +125,6 @@ def process_file(repo_root_dir, input_file, output_file):
                 instance["tools"] = convert_to_tool(instance["function"])
 
             f_out.write(json.dumps(instance) + "\n")
-
-
-
 
 
 
