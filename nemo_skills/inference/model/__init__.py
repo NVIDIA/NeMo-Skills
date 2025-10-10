@@ -90,7 +90,7 @@ def get_parallel_thinking_model(
 
     import json
 
-    print("Parallel Thinking config: %s", json.dumps(filtered_config, indent=4))
+    print("Parallel Thinking config: %s", filtered_config)
 
     parallel_thinking_config = ParallelThinkingConfig(**filtered_config)
 
