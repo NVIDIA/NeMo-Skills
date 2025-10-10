@@ -397,6 +397,7 @@ class GenerationTask:
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
                 "remove_thinking": self.cfg.parallel_thinking.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
+                "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
             }
 
             llm = get_parallel_thinking_model(
