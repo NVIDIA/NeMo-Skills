@@ -260,6 +260,7 @@ def ppo_verl(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -294,8 +295,8 @@ def ppo_verl(
     script_module: str = typer.Option("verl.trainer.main_ppo", help="The script module to run. "),
     verl_config_dir: str = typer.Option(None, help="The directory containing the Verl config files. "),
     verl_config_name: str = typer.Option(None, help="The name of the Verl config file to use. "),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
@@ -414,6 +415,7 @@ def ppo_verl(
                 cluster_config=cluster_config,
                 server_config=server_config,
                 partition=partition,
+                qos=qos,
                 time_min=time_min,
                 run_after=run_after,
                 reuse_code=reuse_code,

@@ -70,7 +70,7 @@ There are a few parameters specific to SWE-bench. They have to be specified with
 
 - **++agent_framework_repo:** URL of the repository to use for SWE-agent/OpenHands. Allows you to pass in a custom fork of these repositories. If you do this, you may find it helpful to check [nemo_skills/inference/eval/swebench.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/eval/swebench.py) to understand how the frameworks are used internally. This is passed directly as an argument to `git clone`. Defaults to the official repositories: [`https://github.com/SWE-agent/SWE-agent.git`](https://github.com/SWE-agent/SWE-agent) for SWE-agent, [`https://github.com/All-Hands-AI/OpenHands.git`](https://github.com/All-Hands-AI/OpenHands) for OpenHands.
 
-- **++agent_framework_commit:** The commit hash to use when cloning agent_framework_repo. Allows you to pin SWE-agent/OpenHands to a specific version. Defaults to `HEAD`, i.e. the latest commit.
+- **++agent_framework_commit:** The commit hash, branch or tag to checkout after cloning agent_framework_repo. Allows you to pin SWE-agent/OpenHands to a specific version. Defaults to `HEAD`, i.e. the latest commit.
 
 - **++agent_config:** The config file to use for SWE-agent/OpenHands.
     - For SWE-agent, this is a YAML file. See the [SWE-agent docs](https://swe-agent.com/latest/config/config/).
@@ -80,7 +80,15 @@ There are a few parameters specific to SWE-bench. They have to be specified with
 
 - **++agent_max_turns:** The maximum number of turns the agent is allowed to take before the trajectory is forcibly terminated. Defaults to 100 for both SWE-agent and OpenHands.
 
+- **++eval_harness_repo:** URL of the repository to use for the evaluation harness. This is passed directly as an argument to `git clone`. Defaults to [`https://github.com/Kipok/SWE-bench.git`](https://github.com/Kipok/SWE-bench), our fork of SWE-bench that supports local evaluation.
+
+- **++eval_harness_commit:** The commit hash, branch or tag to checkout after cloning agent_harness_repo. Defaults to `HEAD`, i.e. the latest commit.
+
 - **++swebench_tests_timeout:** The timeout for tests after applying the generated patch during evaluation, in seconds. Defaults to 1800, i.e. 30 minutes.
+
+- **++max_retries:** How many times to try running inference and evaluation until a valid output file is produced. Defaults to 3.
+
+- **++min_retry_interval, ++max_retry_interval:** The interval between retries, in seconds. Selected randomly between min and max on each retry. Defaults to 60 and 180 respectively.
 
 #### Inference parameters
 
@@ -150,9 +158,9 @@ After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-res
     "pass@1": {
       "num_entries": 500,
       "gen_seconds": 7172,
-      "issues_resolved": 50.0,
-      "no_patch": 0.2,
-      "patch_cant_apply": 2.0
+      "issues_resolved": 45.0,
+      "no_patch": 0.4,
+      "patch_cant_apply": 0.8
     }
   }
 }
@@ -177,6 +185,88 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 
 - Benchmark is defined in [`nemo_skills/dataset/livecodebench/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/livecodebench/__init__.py)
 - Original benchmark source is [here](https://github.com/LiveCodeBench/LiveCodeBench).
+
+#### Data Preparation
+
+First, prepare the dataset by running the `ns prepare_data` command. The arguments below will generate `test_v6_2408_2505.jsonl`.
+
+```
+ns prepare_data livecodebench --release_version v6 --start_date 2024-08 --end_date 2025-05
+```
+
+##### For Pypy3 Evaluation:
+If you plan to evaluate using the Pypy3 interpreter, you must add the `--keep_all_columns` flag during data preparation. This will download a larger dataset (~1.9GB) containing the necessary test cases. So, we recommend downloading the dataset into a Slurm cluster location.
+
+```
+ns prepare_data livecodebench --release_version v6 --start_date 2024-08 --end_date 2025-05 --keep_all_columns --cluster=<CLUSTER_NAME> --data_dir=<DATA_DIR>
+```
+
+#### Running the Evaluation
+
+Once the data is prepared, you can run the evaluation. Replace `<...>` placeholders with your cluster and directory paths.
+
+##### Standard Python Evaluation
+
+This command runs an evaluation of [OpenReasoning-Nemotron-32B](https://huggingface.co/nvidia/OpenReasoning-Nemotron-32B) on a Slurm cluster.
+
+```
+ns eval \
+    --cluster=<CLUSTER_NAME> \
+    --model=nvidia/OpenReasoning-Nemotron-32B \
+    --server_type=vllm \
+    --server_args="--async-scheduling" \
+    --server_nodes=1 \
+    --server_gpus=8 \
+    --benchmarks=livecodebench \
+    --split=test_v6_2408_2505 \
+    --data_dir=<DATA_DIR> \
+    --output_dir=<OUTPUT_DIR> \
+    --extra_eval_args="++eval_config.interpreter=python" \
+    --with_sandbox \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95 \
+    ++inference.tokens_to_generate=65536
+```
+
+##### Pypy3 Evaluation
+
+To run with the Pypy3 interpreter, modify the `--extra_eval_args` flag as shown below.
+```
+--extra_eval_args="++eval_config.interpreter=pypy3 ++eval_config.test_file=<DATA_DIR>/livecodebench/test_v6_2408_2505.jsonl"
+```
+
+##### Verifying Results
+
+After all jobs are complete, you can check the results in `<OUTPUT_DIR>/eval-results/livecodebench/metrics.json`. You can also take a look at `<OUTPUT_DIR>/eval-results/livecodebench/summarized-results/main_*` They should look something like this:
+
+```
+-------------------------- livecodebench --------------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 454         | 15995      | 2188        | 71.15%
+
+
+------------------------ livecodebench-easy -----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 110         | 5338       | 1806        | 99.09%
+
+
+------------------------ livecodebench-hard -----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 203         | 23031      | 2188        | 46.31%
+
+
+----------------------- livecodebench-medium ----------------------
+evaluation_mode | num_entries | avg_tokens | gen_seconds | accuracy
+pass@1          | 141         | 14178      | 1889        | 85.11%
+```
+
+##### Advanced: Averaging Multiple Runs
+
+Due to variance between runs, you can automatically repeat the evaluation and average the results. To run the evaluation 3 times, for example, set the `--benchmarks` flag as follows:
+
+```
+--benchmarks=livecodebench:3
+```
 
 ### livecodebench-pro
 
@@ -264,3 +354,8 @@ pass@1          | 79          | 18701      | 2201        | 39.24%
 ```
 
 Keep in mind there is some variance between runs, so we recommend running evaluation multiple times and averaging out the resolve rate. To do that automatically, you can set `--benchmarks=ojbench:N`, where N is your desired number of repeats.
+
+### human-eval-infilling
+
+- Benchmark is defined in [`nemo_skills/dataset/human-eval-infilling/__init__.py`](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/dataset/human-eval-infilling/__init__.py)
+- Original benchmark source is [here](https://github.com/openai/human-eval-infilling).

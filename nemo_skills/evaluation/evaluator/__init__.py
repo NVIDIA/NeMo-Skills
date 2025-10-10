@@ -20,13 +20,14 @@ from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import (
     eval_bigcodebench,
     eval_evalplus,
+    eval_human_eval_infilling,
     eval_livebench_coding,
-    eval_livecodebench,
     eval_livecodebench_pro,
 )
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if
 from nemo_skills.evaluation.evaluator.ioi import eval_ioi
+from nemo_skills.evaluation.evaluator.livecodebench import eval_livecodebench
 from nemo_skills.evaluation.evaluator.math import (
     Lean4ProofEvaluator,
     Lean4StatementEvaluator,
@@ -60,6 +61,7 @@ EVALUATOR_MAP = {
     "ioi": eval_ioi,
     "bigcodebench": eval_bigcodebench,
     "ojbench": eval_ojbench,
+    "human_eval_infilling": eval_human_eval_infilling,
 }
 
 # Evaluator class mapping

@@ -27,7 +27,7 @@ from typing import Dict, List, Optional, Union
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_logger_name, nested_dataclass, remove_thinking
 
-from .base import BaseModel
+from .base import BaseModel, EndpointType
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -52,9 +52,10 @@ class ParallelThinkingConfig:
     remove_thinking: bool = True  # Remove thinking tokens from the solution key
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
-    use_completions_api: bool = False
+    endpoint_type: EndpointType = EndpointType.chat
     tokenizer: str | None = None
     chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
+    start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
     # GenSelect vs GenSynthesis
     mode: str | None = None  # genselect or gensynthesis
@@ -78,24 +79,21 @@ class ParallelThinkingTask:
     to choose the best one or synthesize a new solution.
     """
 
-    def __init__(self, model: BaseModel, orig_prompt_filler, cfg: ParallelThinkingConfig):
+    def __init__(self, model: BaseModel, tokenizer: str | None, orig_prompt_filler, cfg: ParallelThinkingConfig):
         self.model = model
         self.orig_prompt_filler = orig_prompt_filler
         self.cfg = cfg
 
-        if self.cfg.use_completions_api:
-            tokenizer = self.cfg.tokenizer or self.model.model_name_or_path
-        else:
-            tokenizer = None
+        self.tokenizer = tokenizer
 
         # Load GenSelect/GenSynthesis prompt
         if self.cfg.mode == "genselect":
             self.parallel_thinking_prompt = get_prompt(
-                prompt_config=self.cfg.genselect.prompt_config, tokenizer=tokenizer
+                prompt_config=self.cfg.genselect.prompt_config, tokenizer=self.tokenizer
             )
         elif self.cfg.mode == "gensynthesis":
             self.parallel_thinking_prompt = get_prompt(
-                prompt_config=self.cfg.gensynthesis.prompt_config, tokenizer=tokenizer
+                prompt_config=self.cfg.gensynthesis.prompt_config, tokenizer=self.tokenizer
             )
         else:
             raise ValueError(f"Invalid parallel thinking mode: {self.cfg.mode}")
@@ -190,9 +188,6 @@ class ParallelThinkingTask:
 
         return prompt_to_solutions_dict
 
-    def _format_solutions_for_parallel_thinking(self, solutions: List[Dict]) -> str:
-        """Format solutions for parallel thinking prompt."""
-
     async def _generate_parallel_thinking_contraction(
         self, prompt: Union[str, List], solutions: List[Dict], **kwargs
     ) -> Dict:
@@ -213,14 +208,21 @@ class ParallelThinkingTask:
             "max_idx": max_idx,
         }
 
-        parallel_thinking_prompt = self.parallel_thinking_prompt.fill(parallel_thinking_input)
+        parallel_thinking_prompt = self.parallel_thinking_prompt.fill(
+            parallel_thinking_input,
+            start_assistant_response_key=self.cfg.start_assistant_response_key,
+            chat_template_kwargs=self.cfg.chat_template_kwargs,
+        )
+
+        for duplicate_key in ["temperature", "tokens_to_generate", "prompt"]:
+            kwargs.pop(duplicate_key, None)
 
         return await self.model.generate_async(
-            **kwargs,
             prompt=parallel_thinking_prompt,
             # Overriding the tokens_to_generate, temperature
             tokens_to_generate=self.cfg.tokens_to_generate,
             temperature=self.cfg.temperature,
+            **kwargs,
         )
 
     def _extract_selected_solution(self, generation: str, max_idx: int) -> Optional[int]:
@@ -349,6 +351,7 @@ class ParallelThinkingTask:
         if not solutions:
             return {
                 self.cfg.solution_key: "",
+                "generation": "",  # Required by inference/generate.py
                 "solution_list": [],
                 f"{self.cfg.mode}_comparison": "",
                 f"{self.cfg.mode}_num_generated_tokens": 0,
@@ -359,7 +362,7 @@ class ParallelThinkingTask:
 
         # Step 2: Run GenSelect/GenSynthesis
         if self.cfg.mode == "genselect":
-            output_dict = await self._run_genselect(prompt, solutions, local_random)
+            output_dict = await self._run_genselect(prompt, solutions, local_random, **kwargs)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
             result["genselect_comparison"] = parallel_thinking_result["generation"]
             result["genselect_selection_successful"] = parallel_thinking_result["selection_successful"]
