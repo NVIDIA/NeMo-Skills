@@ -88,10 +88,6 @@ def get_parallel_thinking_model(
     valid_params = {field.name for field in dataclasses.fields(ParallelThinkingConfig)}
     filtered_config = {key: value for key, value in merged_config.items() if key in valid_params}
 
-    import json
-
-    print("Parallel Thinking config: %s", filtered_config)
-
     parallel_thinking_config = ParallelThinkingConfig(**filtered_config)
 
     return ParallelThinkingTask(
