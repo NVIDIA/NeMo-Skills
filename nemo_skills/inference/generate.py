@@ -653,6 +653,9 @@ class GenerationTask:
         self.cleanup_litellm_cache()
 
     def wait_for_server(self):
+        if not self.cfg.server.get("base_url") and not self.cfg.server.get("host") and not self.cfg.server.get("port"):
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
         # Hydra sets None parameters to "None" string
         if server_address == "None":
