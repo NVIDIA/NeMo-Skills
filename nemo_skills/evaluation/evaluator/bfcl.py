@@ -47,7 +47,7 @@ def eval_bfcl(cfg):
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
         score_file = (
             Path("/opt/gorilla/berkeley-function-call-leaderboard")
-            / f"score/{model_name}" / ("live" if "live" in test_category else "non_live")
+            / f"score/{model_name}" / ("live" if "live" in test_category else "multi_turn" if "multi_turn" in test_category else "non_live")
             / f"BFCL_v4_{test_category}_score.json"
         )
 
