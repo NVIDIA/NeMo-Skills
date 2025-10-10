@@ -269,7 +269,7 @@ class ParallelThinkingTask:
             num_input_tokens = get_token_count(tokenizer=self.hf_tokenizer, messages=parallel_thinking_prompt)
             output_dict["num_input_tokens"] = num_input_tokens
 
-        for duplicate_key in ["temperature", "tokens_to_generate", "prompt"]:
+        for duplicate_key in ["temperature", "tokens_to_generate", "prompt", "endpoint_type"]:
             kwargs.pop(duplicate_key, None)
 
         output_dict.update(
