@@ -15,7 +15,7 @@ system: |-
   ```
 user: |-
 
-  # Question
+  # Problem Statement
   {question}
 
   # Proposed Solution
