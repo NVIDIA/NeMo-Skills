@@ -276,7 +276,7 @@ class Pipeline:
         jobs: List[Dict],
         reuse_code: bool = True,
         reuse_code_exp: Optional[str] = None,
-        skip_hf_home_check: bool = False,
+        skip_hf_home_check: bool | None = None,
         with_ray: bool = False,
         run_after: Optional[Union[str, List[str]]] = None,  # Pipeline-level dependency on other experiments
     ):
@@ -284,6 +284,9 @@ class Pipeline:
         self.cluster_config = cluster_config
         self.reuse_code = reuse_code
         self.reuse_code_exp = reuse_code_exp
+        # If not explicitly set, resolve from cluster config (matching exp.py behavior)
+        if skip_hf_home_check is None:
+            skip_hf_home_check = cluster_config.get("skip_hf_home_check", False)
         self.skip_hf_home_check = skip_hf_home_check
         self.with_ray = with_ray
         self.run_after = run_after
