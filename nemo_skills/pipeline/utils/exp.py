@@ -361,6 +361,7 @@ def add_task(
     installation_command: str | None = None,
     skip_hf_home_check: bool = False,
     dry_run: bool = False,
+    sandbox_env_overrides: list[str] | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -516,9 +517,10 @@ def add_task(
             "LISTEN_PORT": sandbox_port,
             "NGINX_PORT": sandbox_port,
         }
-        for override in cluster_config.get("module_env_vars", []):
-            key, value = override.split("=", 1)
-            sandbox_env_updates.setdefault(key, value)
+        if sandbox_env_overrides:
+            for override in sandbox_env_overrides:
+                key, value = override.split("=", 1)
+                sandbox_env_updates.setdefault(key, value)
         current_env_vars = cluster_config.get("env_vars", []).copy()
         for override in current_env_vars:
             if "PYTHONPATH" in override:

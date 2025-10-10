@@ -102,6 +102,8 @@ class BenchmarkArgs:
     score_module: str | None = None
     job_ids: list[int] = field(default_factory=list)
     remaining_jobs: list[dict] = field(default_factory=list)
+    # Per-benchmark sandbox environment overrides in KEY=VALUE form
+    sandbox_env_overrides: list[str] = field(default_factory=list)
 
     @property
     def requires_judge(self):
@@ -185,10 +187,9 @@ def get_benchmark_args_from_module(
         benchmark_module, "KEEP_MOUNTS_FOR_SANDBOX", False, override_dict
     )
 
-    # Add any benchmark-specific environment variables to cluster config
+    # Collect any benchmark-specific environment variables (do not persist on cluster_config)
     env_vars_from_module = getattr(benchmark_module, "ENV_VARS", getattr(benchmark_module, "env_vars", []))
-    if env_vars_from_module:
-        cluster_config["module_env_vars"] = list(env_vars_from_module)
+    sandbox_env_overrides = list(env_vars_from_module) if env_vars_from_module else []
 
     generation_module = get_arg_from_module_or_dict(
         benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate", override_dict
@@ -236,6 +237,7 @@ def get_benchmark_args_from_module(
         num_chunks=num_chunks,
         eval_subfolder=eval_subfolder,
         benchmark_group=benchmark_group,
+        sandbox_env_overrides=sandbox_env_overrides,
     )
 
 
@@ -522,6 +524,16 @@ def prepare_eval_commands(
                     job_needs_sandbox_to_keep_mounts = any(
                         benchmarks_dict[b].keep_mounts_for_sandbox for b in job_benchmarks
                     )
+                    # Aggregate per-job sandbox env overrides from participating benchmarks (first key wins)
+                    ordered_benchmarks = [b for b in benchmarks_dict.keys() if b in job_benchmarks]
+                    env_map = {}
+                    for b in ordered_benchmarks:
+                        for override in benchmarks_dict[b].sandbox_env_overrides:
+                            key, value = override.split("=", 1)
+                            if key not in env_map:
+                                env_map[key] = value
+                    job_sandbox_env_overrides = [f"{k}={v}" for k, v in env_map.items()]
+
                     # TODO: move to a dataclass
                     job_batches.append(
                         (
@@ -533,6 +545,7 @@ def prepare_eval_commands(
                             job_server_address,
                             # a check above guarantees that this is the same for all tasks in a job
                             generation_task.get_server_command_fn(),
+                            job_sandbox_env_overrides,
                         )
                     )
                     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
