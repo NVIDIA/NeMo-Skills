@@ -17,6 +17,8 @@ from openai import OpenAI
 client = OpenAI(api_key="EMPTY", base_url="http://0.0.0.0:5000/v1", timeout=None)
 api_model = client.models.list().data[0].id
 
+print("API model: ", api_model)
+
 response = client.chat.completions.create(
     model=api_model,
     messages=[
@@ -28,4 +30,7 @@ response = client.chat.completions.create(
     n=1,
     stream=False,
 )
+
+print("Response: ", response)
+
 print(response.choices[0].message.content)
