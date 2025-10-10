@@ -26,7 +26,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class BFCLEvaluatorConfig:
-    model: str = "o3-mini-2025-01-31-FC"  # Uses the same eval as Llama-Nemotron
+    model: str = "o4-mini-2025-04-16-FC"  # Same config as o3-mini-2025-01-31-FC used previously Llama-Nemotron
     timeout: int = 300
 
 
@@ -41,13 +41,13 @@ def eval_bfcl(cfg):
     # model_name = eval_config.model.split("/")[-1]
     for jsonl_file in unroll_files(cfg.input_files):
         # Output files are structures as bfcl_v3/TEST_CATEGORY/jsonl_file
-        test_category = str(Path(jsonl_file).absolute().parent.name).removeprefix("bfcl_v4.")
+        test_category = str(Path(jsonl_file).absolute().parent.name).removeprefix("bfcl_v3.").removeprefix("bfcl_v4.")
 
         # Convert NeMo-Skills output file to BFCL format
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
         score_file = (
             Path("/opt/gorilla/berkeley-function-call-leaderboard")
-            / f"score/{model_name}"
+            / f"score/{model_name}" / ("live" if "live" in test_category else "non_live")
             / f"BFCL_v4_{test_category}_score.json"
         )
 
