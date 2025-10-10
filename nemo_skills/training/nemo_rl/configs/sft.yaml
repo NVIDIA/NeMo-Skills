@@ -55,7 +55,6 @@ policy:
 
   megatron_cfg:
     enabled: false
-    empty_unused_memory_level: 1
     activation_checkpointing: false
     tensor_model_parallel_size: ${policy.tensor_model_parallel_size}
     expert_tensor_parallel_size: 1
@@ -75,6 +74,7 @@ policy:
     bias_activation_fusion: True
     apply_rope_fusion: True  # Only used if position_embedding_type=rope
     layernorm_epsilon: 1e-6
+    empty_unused_memory_level: 0 # setting it to 0 will maximize performance, but it might lead to OOMs, while setting it to 2 to minimize the peak memory usage to avoid OOMs
 
     optimizer:
       optimizer: "adam"
