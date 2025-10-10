@@ -229,6 +229,6 @@ def compute_score(metrics: dict):
     }
 
     if "format_sensitivity" in agentic_accuracy:
-        res["format_sensistivity"] = agentic_accuracy["format_sensitivity"]
+        res["format_sensitivity"] = agentic_accuracy["format_sensitivity"]
 
     return res
