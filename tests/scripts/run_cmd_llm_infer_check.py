@@ -18,6 +18,7 @@ client = OpenAI(api_key="EMPTY", base_url="http://0.0.0.0:5000/v1", timeout=None
 api_model = client.models.list().data[0].id
 
 print("API model: ", api_model)
+print("client.models.list(): ", client.models.list())
 
 response = client.chat.completions.create(
     model=api_model,
