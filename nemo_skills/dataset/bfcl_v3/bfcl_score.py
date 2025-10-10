@@ -13,13 +13,10 @@
 # limitations under the License.
 
 
-# TODO: refactor this to expose all metrics properly, currently for k>1 the reporting is partial
-
-
 SIMPLE_AST = [
-    "simple",
-    "java",
-    "javascript",
+    "simple_python",
+    "simple_java",
+    "simple_javascript",
 ]
 
 OTHER_SINGLE_TURN_AST = [
@@ -136,7 +133,7 @@ def calculate_non_live_single_turn_accuracy(metrics):
     return {
         "overall_non_live": overall_accuracy_non_live,
         "non_live_ast": non_live_ast_accuracy,
-        "irrelevance": non_live_irrelevance_accuracy,
+        "non_live_irrelevance": non_live_irrelevance_accuracy,
     }
 
 
@@ -183,8 +180,11 @@ def compute_score(metrics: dict):
     )
 
     return {
-        "overall_accuracy": overall_accuracy,
-        "non_live_single_turn": non_live_single_turn_accuracy,
-        "live_single_turn": live_single_turn_accuracy,
-        "multi_turn": multi_turn_accuracy,
+        "bfcl_v3": 
+        {
+            "overall_accuracy": overall_accuracy,
+            **non_live_single_turn_accuracy,
+            **live_single_turn_accuracy,
+            **multi_turn_accuracy,
+        }
     }

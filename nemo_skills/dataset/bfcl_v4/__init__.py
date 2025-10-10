@@ -37,7 +37,8 @@ SPLITS = [
     "memory_kv", # Memory use (KV backend)
     "memory_vector", # Memory use (vector backend)
     "memory_rec_sum", # Memory use (rec_sum backend)
-    "format_sensitivity" # Prompt format sensitivity probe
+    # TODO: Initially remove from the task as it is not graded
+    # "format_sensitivity" # Prompt format sensitivity probe
 ]
 
 IS_BENCHMARK_GROUP = True

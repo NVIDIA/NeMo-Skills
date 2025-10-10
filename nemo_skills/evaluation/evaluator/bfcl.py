@@ -21,12 +21,14 @@ from pathlib import Path
 
 from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
 
+from bfcl_eval.utils import get_directory_structure_by_category, is_memory_prereq
+
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
 class BFCLEvaluatorConfig:
-    model: str = "o3-mini-2025-01-31-FC"  # Uses the same eval as Llama-Nemotron
+    model: str = "o4-mini-2025-04-16-FC"  # Same config as o3-mini-2025-01-31-FC used previously Llama-Nemotron
     timeout: int = 300
 
 
@@ -41,13 +43,14 @@ def eval_bfcl(cfg):
     # model_name = eval_config.model.split("/")[-1]
     for jsonl_file in unroll_files(cfg.input_files):
         # Output files are structures as bfcl_v3/TEST_CATEGORY/jsonl_file
-        test_category = str(Path(jsonl_file).absolute().parent.name).removeprefix("bfcl_v4.")
+        test_category = str(Path(jsonl_file).absolute().parent.name).removeprefix("bfcl_v3.").removeprefix("bfcl_v4.")
 
         # Convert NeMo-Skills output file to BFCL format
         output_dir = Path("/opt/gorilla/berkeley-function-call-leaderboard") / f"result/{model_name}"
+
         score_file = (
             Path("/opt/gorilla/berkeley-function-call-leaderboard")
-            / f"score/{model_name}"
+            / f"score/{model_name}" / get_directory_structure_by_category(test_category)
             / f"BFCL_v4_{test_category}_score.json"
         )
 
@@ -80,6 +83,9 @@ def _convert_to_bfcl_format(jsonl_file, output_dir, test_category):
     with open(jsonl_file, "rt", encoding="utf-8") as fin, open(bfcl_file, "wt", encoding="utf-8") as fout:
         for line in fin:
             sample = json.loads(line)
+            # Remove memory prereq from eval as those are only needed for inference
+            if is_memory_prereq(sample["id"]):
+                continue
             if sample.get("result", None) is None:
                 sample["result"] = sample["generation"]
 

@@ -17,26 +17,34 @@ import glob
 import json
 import logging
 import os
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 from nemo_skills.dataset.bfcl_v4.constants import (
     DATA_FOLDER_PATH,
-    MULTI_TURN_FUNC_DOC_FILE_MAPPING,
-    MULTI_TURN_FUNC_DOC_PATH,
+    VERSION_PREFIX,
 )
-from nemo_skills.dataset.bfcl_v4.utils import (
-    convert_to_tool,
-    func_doc_language_specific_pre_processing,
+from nemo_skills.dataset.bfcl_v4.utils import func_doc_language_specific_pre_processing, convert_to_tool
+from nemo_skills.utils import get_logger_name
+
+from bfcl_eval.constants.category_mapping import ALL_SCORING_CATEGORIES, MEMORY_SCENARIO_NAME
+from bfcl_eval.utils import (
+    is_format_sensitivity,
+    is_web_search,
+    is_memory,
     is_multi_turn,
+    is_agentic,
     load_file,
-    clean_up_memory_prereq_entries,
+    process_web_search_test_case,
+    process_memory_test_case,
+    process_agentic_test_case,
+    populate_test_cases_with_predefined_functions,
+    add_language_specific_hint_to_function_doc,
     populate_initial_settings_for_memory_test_cases,
     populate_initial_settings_for_web_search_test_cases,
 )
-from nemo_skills.utils import get_logger_name
+
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -54,76 +62,79 @@ GENERATION_MODULE = "nemo_skills.inference.eval.bfcl"
 """
 
 
-# Adapted from - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/_llm_response_generation.py#L142
-def process_multi_turn_test_case(instance, repo_root_dir):
+# Adapted from - https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/bfcl_eval/utils.py#L403
+def process_multi_turn_test_case(instance):
     """
     Multi-turn test cases don't have the function doc in the prompt. We need to add them here.
     """
     # Mark whether the instance is single-turn or multi-turn.
     # This is used to determine if the inference should be done in a single turn or multiple turns.
-    if not is_multi_turn(instance["id"]):
+    if not is_multi_turn(instance["id"]) and not is_agentic(instance["id"]):
         instance["single_turn"] = True
-        return instance
     else:
         instance["single_turn"] = False
-
-    involved_classes = instance["involved_classes"]
-    instance["function"] = []
-    for func_collection in involved_classes:
-        # func_doc is a list of dict
-        func_doc = load_file(
-            repo_root_dir / MULTI_TURN_FUNC_DOC_PATH / MULTI_TURN_FUNC_DOC_FILE_MAPPING[func_collection]
-        )
-        instance["function"].extend(func_doc)
-
-    # Handle Miss Func category; we need to remove the holdout function doc
-    if "missed_function" in instance:
-        for turn_index, missed_func_names in instance["missed_function"].items():
-            instance["missed_function"][turn_index] = []
-            for missed_func_name in missed_func_names:
-                for i, func_doc in enumerate(instance["function"]):
-                    if func_doc["name"] == missed_func_name:
-                        # Add the missed function doc to the missed_function list
-                        instance["missed_function"][turn_index].append(func_doc)
-                        # Remove it from the function list
-                        instance["function"].pop(i)
-                        break
 
     return instance
 
 
-def process_file(repo_root_dir, input_file, output_file):
-    """Preprocess the functions and convert them to tool format.
-    Also mark whether the instance is single-turn or multi-turn which is used during inference.
+def load_dataset_entry(
+    target_folder: str,
+    test_category: str,
+    include_prereq: bool = True,
+    include_language_specific_hint: bool = True,
+) -> list[dict]:
     """
+    This function retrieves the dataset entry for a given test category.
+    The input should not be a test category goup, but a specific test category.
+    If `contain_prereq` is True, it will include the pre-requisite entries for the memory test categories.
+    If `include_language_specific_hint` is True, it will include the language-specific hint for the function description (for Java, JavaScript, and Python).
+    """
+    # Skip for now
+    if is_format_sensitivity(test_category):
+        return []
+        # Format sensitivity categories
+        # all_entries = load_format_sensitivity_test_cases()
 
-    with open(input_file, "r") as f, open(output_file, "w") as f_out:
-        for idx, line in enumerate(f):
-            instance = json.loads(line)
-            test_category = instance["id"].rsplit("_", 1)[0]
-            if idx == 0:
-                LOG.info(f"Processing {test_category}")
+    elif is_web_search(test_category):
+        # Web search categories
+        file_name = f"{VERSION_PREFIX}_web_search.json"
+        all_entries = load_file(target_folder / file_name)
+        all_entries = process_web_search_test_case(all_entries, test_category)
 
+    elif is_memory(test_category):
+        # Memory categories
+        all_entries = load_file(target_folder / f"{VERSION_PREFIX}_memory.json")
+        for scenario in MEMORY_SCENARIO_NAME:
+            all_entries = process_memory_test_case(
+                all_entries, test_category, scenario, include_prereq=include_prereq
+            )
+    else:
+        # All other categories, we don't need any special handling
+        file_name = f"{VERSION_PREFIX}_{test_category}.json"
+        all_entries = load_file(target_folder / file_name)
 
-                test_cases_to_generate = clean_up_memory_prereq_entries(test_cases_to_generate)
-                test_cases_to_generate = populate_initial_settings_for_memory_test_cases(
-                    test_cases_to_generate, repo_root_dir,
-                )
-                test_cases_to_generate = populate_initial_settings_for_web_search_test_cases(
-                    test_cases_to_generate
-                )
+    all_entries = process_agentic_test_case(all_entries)
+    all_entries = populate_test_cases_with_predefined_functions(all_entries)
+    all_entries = [process_multi_turn_test_case(entry) for entry in all_entries]
 
-            # Convert function calls to tools format and add them to the system prompt
-            if "function" in instance:
-                # Add the tools to the system prompt
-                instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
-                instance["tools"] = convert_to_tool(instance["function"])
+    if include_language_specific_hint:
+        all_entries = add_language_specific_hint_to_function_doc(all_entries)
 
-            f_out.write(json.dumps(instance) + "\n")
+    all_entries = populate_initial_settings_for_memory_test_cases(
+        all_entries, str(target_folder)
+    )
+    all_entries = populate_initial_settings_for_web_search_test_cases(
+        all_entries
+    )
 
+    # Convert function calls to tools format and add them to the system prompt
+    for instance in all_entries:
+        if "function" in instance:
+            # Add the tools to the system prompt
+            instance["function"] = func_doc_language_specific_pre_processing(instance["function"], test_category)
+            instance["tools"] = convert_to_tool(instance["function"])
 
-
-
+    return all_entries
 
 
 def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_prefix="BFCL_v4"):
@@ -163,10 +174,9 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 
-            processed_files = 0
-            for input_file in json_files:
-                filename = os.path.basename(input_file)
-                split_dirname = os.path.join(output_dir, filename.lstrip("BFCL_v4_").replace(".json", ""))
+            processed_categories = 0
+            for test_category in ALL_SCORING_CATEGORIES:
+                split_dirname = os.path.join(output_dir, test_category)
                 if not os.path.exists(split_dirname):
                     os.makedirs(split_dirname)
 
@@ -174,13 +184,14 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
                     f.write(DEFAULT_SETTINGS)
 
                 output_file = os.path.join(split_dirname, "test.jsonl")
-                process_file(temp_dir, input_file, output_file)
+                test_entries = load_dataset_entry(target_folder, test_category)
+                with open(output_file, "w") as f_out:
+                    for instance in test_entries:
+                        f_out.write(json.dumps(instance) + "\n")
 
-                # Copy the original json file to the split directory
-                shutil.copy(input_file, os.path.join(split_dirname, filename))
-                processed_files += 1
+                processed_categories += 1
 
-            LOG.info(f"Successfully processed {processed_files} JSON files to {output_dir}")
+            LOG.info(f"Successfully processed {processed_categories} BFCLv4 categories to {output_dir}")
 
         except subprocess.CalledProcessError as e:
             LOG.error(f"Git command failed: {e}")
