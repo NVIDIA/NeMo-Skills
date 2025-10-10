@@ -117,6 +117,7 @@ class BaseModel:
         elif base_url == "":
             # We don't want to use base_url if it is an empty string
             base_url = None
+            self.base_url = None
         else:
             self.base_url = base_url
 
