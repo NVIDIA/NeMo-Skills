@@ -534,7 +534,7 @@ def prepare_eval_commands(
                             key, value = override.split("=", 1)
                             if key in env_map and env_map[key] != value:
                                 raise ValueError(
-                                    "Conflicting sandbox environment overrides for key '{key}': "
+                                    f"Conflicting sandbox environment overrides for key '{key}': "
                                     f"'{env_map[key]}' (from {env_source[key]}) vs '{value}' (from {b}). "
                                     "Please submit the benchmarks as separate jobs or increase num_jobs so they do not share a job."
                                 )
