@@ -18,7 +18,7 @@ echo "Configuring nginx for multi-worker load balancing..."
 # defaults that work for most cases.
 
 # shell parameter expansion with default value
-: "${UWSGI_PROCESSES:=2}"   # default to 2 processes per worker if unset
+: "${UWSGI_PROCESSES:=1}"   # default to 1 processes per worker if unset
 : "${UWSGI_CHEAPER:=1}"     # default cheaper value
 
 export UWSGI_PROCESSES UWSGI_CHEAPER

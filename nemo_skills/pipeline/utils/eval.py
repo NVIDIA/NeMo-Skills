@@ -20,6 +20,7 @@ import shlex
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Dict
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import get_dataset_module, import_from_path
@@ -187,8 +188,8 @@ def get_benchmark_args_from_module(
         benchmark_module, "KEEP_MOUNTS_FOR_SANDBOX", False, override_dict
     )
 
-    # Collect any benchmark-specific environment variables (do not persist on cluster_config)
-    env_vars_from_module = getattr(benchmark_module, "ENV_VARS", getattr(benchmark_module, "env_vars", []))
+    # Collect any benchmark-specific environment variables
+    env_vars_from_module = getattr(benchmark_module, "SANDBOX_ENV_VARS")
     sandbox_env_overrides = list(env_vars_from_module) if env_vars_from_module else []
 
     generation_module = get_arg_from_module_or_dict(
@@ -526,12 +527,19 @@ def prepare_eval_commands(
                     )
                     # Aggregate per-job sandbox env overrides from participating benchmarks (first key wins)
                     ordered_benchmarks = [b for b in benchmarks_dict.keys() if b in job_benchmarks]
-                    env_map = {}
+                    env_map: Dict[str, str] = {}
+                    env_source: Dict[str, str] = {}
                     for b in ordered_benchmarks:
                         for override in benchmarks_dict[b].sandbox_env_overrides:
                             key, value = override.split("=", 1)
-                            if key not in env_map:
-                                env_map[key] = value
+                            if key in env_map and env_map[key] != value:
+                                raise ValueError(
+                                    "Conflicting sandbox environment overrides for key '{key}': "
+                                    f"'{env_map[key]}' (from {env_source[key]}) vs '{value}' (from {b}). "
+                                    "Please submit the benchmarks as separate jobs or increase num_jobs so they do not share a job."
+                                )
+                            env_map[key] = value
+                            env_source[key] = b
                     job_sandbox_env_overrides = [f"{k}={v}" for k, v in env_map.items()]
 
                     # TODO: move to a dataclass
