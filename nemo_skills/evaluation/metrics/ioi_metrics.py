@@ -100,7 +100,7 @@ class IOIMetrics(BaseMetrics):
             submissions = self.predictions_by_problem[name]
             max_subtasks = {}
             for sub in submissions:
-                max_subtasks[sub["subtask"]] = sub["score"]
+                max_subtasks[sub["subtask"]] = sub["subtask_score"]
             max_total = sum(max_subtasks.values())
             print(f"# {name}: {achieved_total}/{max_total}")
             for subtask, achieved in achieved_subtasks.items():
