@@ -189,7 +189,7 @@ def get_benchmark_args_from_module(
     )
 
     # Collect any benchmark-specific environment variables
-    env_vars_from_module = getattr(benchmark_module, "SANDBOX_ENV_VARS")
+    env_vars_from_module = getattr(benchmark_module, "SANDBOX_ENV_VARS", [])
     sandbox_env_overrides = list(env_vars_from_module) if env_vars_from_module else []
 
     generation_module = get_arg_from_module_or_dict(
