@@ -121,13 +121,29 @@ class ClientMessageParser:
         # Initialize the model handler - Temperature is not used but required by the model handler
         model_handler = model_handler_class(self.cfg.model_name, temperature=self.cfg.inference.temperature)
         # We only need the response parser from the model handler
-        self.response_parser = model_handler._parse_query_response_prompting
+        native_response_parser = model_handler._parse_query_response_prompting
+        self.response_parser = self.create_response_parser(native_response_parser)
 
         # Initialize the prompt formatter
         # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
         # So we use the tokenizer to format the prompt instead which uses the chat template directly
         tokenizer = AutoTokenizer.from_pretrained(model_handler.model_name_huggingface)
         self.message_formatter = partial(tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
+
+    def create_response_parser(self, native_response_parser):
+        """Create a response parser wrapper around the gorilla implementation that can remove bad tool calls."""
+
+        def wrapper_response_parser(response: dict):
+            parsed_response = native_response_parser(response)["model_responses_message_for_chat_history"]
+            if parsed_response["tool_calls"] is not None:
+                # Remove tool calls which are not dictionaries
+                parsed_response["tool_calls"] = [
+                    tool_call for tool_call in parsed_response["tool_calls"] if isinstance(tool_call, dict)
+                ]
+
+            return parsed_response
+
+        return wrapper_response_parser
 
     def construct_input_dict(self, messages: list[dict], tools: list[dict]):
         try:
@@ -149,7 +165,7 @@ class ClientMessageParser:
 
     def parse_output_dict(self, output_dict: dict):
         """Parse the output dictionary to get the model response."""
-        parsed_response = self.response_parser(output_dict["response"])["model_responses_message_for_chat_history"]
+        parsed_response = self.response_parser(output_dict["response"])
 
         model_response = {
             "role": "assistant",
