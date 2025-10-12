@@ -4,8 +4,8 @@ set -e
 
 export NEMO_SKILLS_TEST_MODEL_TYPE=qwen
 # TRTLLM still doesn't support Qwen3 models, using a smaller Qwen2.5 model for context retry tests
-#export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen2.5-3B-Instruct
-#pytest tests/gpu-tests/test_context_retry.py -s -x
+export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen2.5-3B-Instruct
+pytest tests/gpu-tests/test_context_retry.py -s -x
 
 # Switch to Qwen3 model for other tests
 export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen3-4B
