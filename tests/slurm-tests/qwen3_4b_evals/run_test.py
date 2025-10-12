@@ -30,7 +30,7 @@ def eval_qwen3_bfcl(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         benchmarks="bfcl_v3",
         model=model,
-        server_gpus=2,
+        server_gpus=4,
         num_jobs=1,
         server_type="vllm",
         output_dir=workspace,
