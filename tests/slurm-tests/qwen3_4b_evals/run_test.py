@@ -30,13 +30,14 @@ def eval_qwen3_bfcl(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         benchmarks="bfcl_v3",
         model=model,
-        server_gpus=4,
+        server_gpus=2,
         num_jobs=1,
         server_type="vllm",
         output_dir=workspace,
         expname=expname_prefix,
         wandb_project=wandb_project,
         wandb_name=expname_prefix,
+        server_args="--async_scheduling",
     )
 
     return expname_prefix
