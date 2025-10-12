@@ -138,9 +138,25 @@ class ClientMessageParser:
             parsed_response = native_response_parser(response)["model_responses_message_for_chat_history"]
             if parsed_response.get("tool_calls", None) is not None:
                 # Remove tool calls which are not dictionaries
-                parsed_response["tool_calls"] = [
-                    tool_call for tool_call in parsed_response["tool_calls"] if isinstance(tool_call, dict)
-                ]
+                valid_tool_calls, invalid_tool_calls = [], []
+                for tool_call in parsed_response["tool_calls"]:
+                    if isinstance(tool_call, dict):
+                        valid_tool_calls.append(tool_call)
+                    else:
+                        invalid_tool_calls.append(tool_call)
+
+                if len(valid_tool_calls) == 0:
+                    LOG.warning(f"All tool calls are invalid. Response: {response}")
+                    # Remove tool calls from the parsed response since none are valid
+                    del parsed_response["tool_calls"]
+                else:
+                    if len(valid_tool_calls) != len(parsed_response["tool_calls"]):
+                        LOG.warning(
+                            f"Some tool calls are invalid.\n\n Invalid tool calls: {invalid_tool_calls}.\n\n Response: {response}"
+                        )
+
+                    # Update the tool calls in the parsed response
+                    parsed_response["tool_calls"] = valid_tool_calls
 
             return parsed_response
 
