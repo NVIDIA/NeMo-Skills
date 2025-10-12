@@ -401,7 +401,6 @@ def sft_nemo_rl(
                     final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
                     step=conversion_step,
                     backend=backend,
-                    cleanup=cleanup,
                 ),
                 task_name=f"{expname}-convert-final-ckpt",
                 log_dir=f"{log_dir}/convert-final-ckpt",

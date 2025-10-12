@@ -188,13 +188,13 @@ def main():
 
     if args.cleanup:
         logging.info("Cleaning up original step directories...")
-    for model_dir in model_dirs:
-        full_path = os.path.join(args.checkpoint_dir, model_dir)
-        try:
-            shutil.rmtree(full_path)
-            logging.info("Deleted directory: %s", full_path)
-        except Exception as e:
-            logging.warning("Failed to delete %s: %s", full_path, e)
+        for model_dir in model_dirs:
+            full_path = os.path.join(args.checkpoint_dir, model_dir)
+            try:
+                shutil.rmtree(full_path)
+                logging.info("Deleted directory: %s", full_path)
+            except Exception as e:
+                logging.warning("Failed to delete %s: %s", full_path, e)
 
 
 if __name__ == "__main__":
