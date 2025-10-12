@@ -64,6 +64,7 @@ ns nemo_rl sft \
     --num_nodes=8 \
     --num_gpus=8 \
     --backend=megatron \
+    --average_steps=10000,20000,30000,40000,50000,60000 \
     --training_data=/workspace/openmathinstruct2-sft.jsonl \
     ++policy.train_micro_batch_size=8 \
     ++policy.train_global_batch_size=512 \
@@ -90,6 +91,7 @@ ns nemo_rl sft \
     --num_nodes=32 \
     --num_gpus=8 \
     --backend=megatron \
+    --average_steps=3330,6660,9990,13320,16650,20000 \
     --training_data=/workspace/openmathinstruct2-sft-5M.jsonl \
     ++policy.train_micro_batch_size=1 \
     ++policy.train_global_batch_size=512 \
@@ -111,4 +113,3 @@ add `++checkpointing.checkpoint_must_save_by=00:03:20:00`
 
 If you want to follow up with evaluation, see [training docs](../../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it through a convenient Python API.
 
-⚠️ Note: In our original paper, we used checkpoint averaging, but this is not implemented in the current code, so the results may differ slightly. We plan to add support for checkpoint averaging soon.

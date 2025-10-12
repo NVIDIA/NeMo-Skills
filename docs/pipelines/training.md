@@ -98,6 +98,7 @@ We also support sequence packing and context parallel, espeically for training s
 
 
 The training script will automatically convert the final saved checkpoint into the Hugging Face format.
+If you want to only average a subset of checkpoint, add `--average_steps` parameter (e.g. --average_steps=100,200,300).
 
 
 ## Chaining pipelines with Python

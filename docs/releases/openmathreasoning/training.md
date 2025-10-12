@@ -97,6 +97,7 @@ ns nemo_rl sft \
     --num_nodes=64 \
     --num_gpus=8 \
     --backend=megatron \
+    --average_steps=7500,15000,22500,30000 \
     --training_data=/workspace/openmathreasoning-sft/omr-all.jsonl \
     ++policy.max_total_sequence_length=32768 \
     ++policy.train_micro_batch_size=1 \
@@ -125,7 +126,7 @@ ns nemo_rl sft \
 If you want to follow up with checkpoint conversion and evaluation, see
 [training docs](../../pipelines/training.md#chaining-pipelines-with-python) for an example of how to do it
 through a convenient Python API.
-⚠️ Note: In our original paper, we used checkpoint averaging, but this is not implemented in the current code, so the results may differ slightly. We plan to add support for checkpoint averaging soon.
+
 
 ## Second-round SFT
 
@@ -146,6 +147,7 @@ instead of 30000 used in the first-round SFT.
 ```bash
     --hf_model=/workspace/openmathreasoning-sft/final_hf_model \
     --training_data=<path to the new data> \
+    --average_steps=750,1500,2250,3000 \
     ++policy.megatron_cfg.scheduler.lr_warmup_iters=300 \
     ++policy.megatron_cfg.scheduler.lr_warmup_init=0 \
     ++sft.max_num_steps=3000
