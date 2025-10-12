@@ -184,6 +184,27 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
     return cmd
 
 
+def get_checkpoint_average_cmd(output_dir, average_steps, backend, cleanup):
+    cmd = "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && export UV_PROJECT=/opt/NeMo-RL && cd /nemo_run/code && "
+
+    if backend == "fsdp":
+        raise ValueError("Only support 'megatron' backend now")
+    elif backend == "megatron":
+        cmd += "uv run python -m nemo_skills.pipeline.nemo_rl.average_checkpoints "
+    else:
+        raise ValueError("Invalid backend: must be 'fsdp' or 'megatron'")
+
+    steps = [int(x.strip()) for x in average_steps.split(",") if x.strip()]
+    steps_str = " ".join(map(str, steps))
+
+    cmd += f"--checkpoint_dir {output_dir} "
+    cmd += f"--steps {steps_str} "
+    if cleanup:
+        cmd += "--cleanup "
+
+    return cmd
+
+
 @nemo_rl_app.command(name="sft", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
 def sft_nemo_rl(
@@ -207,6 +228,13 @@ def sft_nemo_rl(
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     conversion_step: int = typer.Option(None, help="The step of checkpoint that needs to be converted"),
+    average_steps: str = typer.Option(
+        None,
+        help="List of commas separated checkpoint steps to average. E.g '1000,2000,3000,4000,5000'. If None, skip average step and only convert last checkpoint",
+    ),
+    cleanup: bool = typer.Option(
+        True, help="Whether to delete original step directories after averaging (default: True)."
+    ),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -278,6 +306,9 @@ def sft_nemo_rl(
     extra_arguments = f"{' '.join(ctx.args)}"
     LOG.info("Starting training job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
+
+    if " " in str(average_steps):
+        raise ValueError("average steps should be separated with commas")
 
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
@@ -361,33 +392,94 @@ def sft_nemo_rl(
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
                 )
+        # if average_steps is not specified, we only save the final checkpoint
+        if average_steps is None:
+            prev_task = add_task(
+                exp,
+                cmd=get_checkpoint_convert_cmd(
+                    output_dir=output_dir,
+                    final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
+                    step=conversion_step,
+                    backend=backend,
+                    cleanup=cleanup,
+                ),
+                task_name=f"{expname}-convert-final-ckpt",
+                log_dir=f"{log_dir}/convert-final-ckpt",
+                container=cluster_config["containers"]["nemo-rl"],
+                cluster_config=cluster_config,
+                partition=partition,
+                qos=qos,
+                time_min=time_min,
+                num_nodes=1,
+                num_tasks=1,
+                num_gpus=num_gpus,
+                run_after=run_after,
+                reuse_code=reuse_code,
+                reuse_code_exp=reuse_code_exp,
+                task_dependencies=[prev_task] if prev_task is not None else None,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
+            )
+        # if average_steps is specified, we first convert to hf format for each step and then do average
+        else:
+            steps = [int(x.strip()) for x in average_steps.split(",") if x.strip()]
+            task_dependencies = []
+            for step in steps:
+                task = add_task(
+                    exp,
+                    cmd=get_checkpoint_convert_cmd(
+                        output_dir=output_dir,
+                        final_hf_path=f"{output_dir}/hf_model_step_{step}",
+                        step=step,
+                        backend=backend,
+                    ),
+                    task_name=f"{expname}-convert-ckpt-step_{step}",
+                    log_dir=f"{log_dir}/convert-ckpt-step",
+                    container=cluster_config["containers"]["nemo-rl"],
+                    cluster_config=cluster_config,
+                    partition=partition,
+                    qos=qos,
+                    time_min=time_min,
+                    num_nodes=1,
+                    num_tasks=1,
+                    num_gpus=num_gpus,
+                    run_after=run_after,
+                    reuse_code=reuse_code,
+                    reuse_code_exp=reuse_code_exp,
+                    task_dependencies=[prev_task] if prev_task is not None else None,
+                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
+                )
+                task_dependencies.append(task)
 
-        prev_task = add_task(
-            exp,
-            cmd=get_checkpoint_convert_cmd(
-                output_dir=output_dir,
-                final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
-                step=conversion_step,
-                backend=backend,
-            ),
-            task_name=f"{expname}-convert-final-ckpt",
-            log_dir=f"{log_dir}/convert-final-ckpt",
-            container=cluster_config["containers"]["nemo-rl"],
-            cluster_config=cluster_config,
-            partition=partition,
-            qos=qos,
-            time_min=time_min,
-            num_nodes=1,
-            num_tasks=1,
-            num_gpus=num_gpus,
-            run_after=run_after,
-            reuse_code=reuse_code,
-            reuse_code_exp=reuse_code_exp,
-            task_dependencies=[prev_task] if prev_task is not None else None,
-            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-            installation_command=installation_command,
-            skip_hf_home_check=skip_hf_home_check,
-        )
+            prev_task = add_task(
+                exp,
+                cmd=get_checkpoint_average_cmd(
+                    output_dir=output_dir,
+                    average_steps=average_steps,
+                    backend=backend,
+                    cleanup=cleanup,
+                ),
+                task_name=f"{expname}-average-ckpt",
+                log_dir=f"{log_dir}/average-ckpt",
+                container=cluster_config["containers"]["nemo-rl"],
+                cluster_config=cluster_config,
+                partition=partition,
+                qos=qos,
+                time_min=time_min,
+                num_nodes=1,
+                num_tasks=1,
+                num_gpus=num_gpus,
+                run_after=run_after,
+                reuse_code=reuse_code,
+                reuse_code_exp=reuse_code_exp,
+                task_dependencies=task_dependencies,
+                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
+            )
 
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
