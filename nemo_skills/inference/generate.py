@@ -271,6 +271,7 @@ class GenerationTask:
             cfg: GenerateSolutionsConfig object with the configuration parameters or subclass.
         """
         self.cfg = cfg
+        self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
 
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
         if self.cfg.chat_template_kwargs:
@@ -280,9 +281,18 @@ class GenerationTask:
                         "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
                         "You can only use one of them!"
                     )
-                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
+
                 self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
+
+        if self.cfg.inference.extra_body.get("chat_template_kwargs"):
+            if self.cfg.chat_template_kwargs:
+                raise ValueError(
+                    "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
+                    "You can only use one of them!"
+                )
+            if self.cfg.inference.endpoint_type == EndpointType.text:
+                self.cfg.chat_template_kwargs = self.cfg.inference.extra_body.pop("chat_template_kwargs")
 
         # Setup tokenizer
         if (
@@ -387,6 +397,12 @@ class GenerationTask:
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
                 "remove_thinking": self.cfg.parallel_thinking.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
+                "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
+                # The following are specific to parallel thinking and we want to defend against any future key overlaps with the main generation config
+                "mode": self.cfg.parallel_thinking.mode,
+                "window_size": self.cfg.parallel_thinking.window_size,
+                "solution_key": self.cfg.parallel_thinking.solution_key,
+                "filter_incomplete_solutions": self.cfg.parallel_thinking.filter_incomplete_solutions,
             }
 
             llm = get_parallel_thinking_model(
@@ -653,8 +669,12 @@ class GenerationTask:
         self.cleanup_litellm_cache()
 
     def wait_for_server(self):
+        if not self.cfg.server.get("base_url") and not self.cfg.server.get("host") and not self.cfg.server.get("port"):
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
-        if not server_address:
+        # Hydra sets None parameters to "None" string
+        if server_address == "None":
             LOG.info("Skipping server wait as no server address is provided.")
             return
         server_start_cmd = get_server_wait_cmd(server_address)
