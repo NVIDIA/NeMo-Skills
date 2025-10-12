@@ -121,8 +121,9 @@ class ClientMessageParser:
         # Initialize the model handler - Temperature is not used but required by the model handler
         model_handler = model_handler_class(self.cfg.model_name, temperature=self.cfg.inference.temperature)
         # We only need the response parser from the model handler
-        native_response_parser = model_handler._parse_query_response_prompting
-        self.response_parser = self.create_response_parser(native_response_parser)
+        self.response_parser = self.create_response_parser(
+            native_response_parser=model_handler._parse_query_response_prompting
+        )
 
         # Initialize the prompt formatter
         # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
@@ -135,7 +136,7 @@ class ClientMessageParser:
 
         def wrapper_response_parser(response: dict):
             parsed_response = native_response_parser(response)["model_responses_message_for_chat_history"]
-            if parsed_response["tool_calls"] is not None:
+            if parsed_response.get("tool_calls", None) is not None:
                 # Remove tool calls which are not dictionaries
                 parsed_response["tool_calls"] = [
                     tool_call for tool_call in parsed_response["tool_calls"] if isinstance(tool_call, dict)
