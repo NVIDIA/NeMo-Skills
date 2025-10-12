@@ -103,7 +103,7 @@ async def is_sandbox_available(sandbox_config: dict) -> bool:
     LOG.info(f"Attempting to connect to sandbox with config: {sandbox_config}")
     try:
         async with sandbox_context(sandbox_config) as sandbox:
-            await _execute_in_sandbox_with_retries(sandbox, num_retries=1, command="true", language="shell", timeout=5)
+            await _execute_in_sandbox_with_retries(sandbox, 1, "true", language="shell", timeout=5)
         LOG.info("Sandbox connection successful. Sandbox is available.")
         return True
     except httpx.NetworkError as e:
@@ -170,7 +170,7 @@ async def _install_packages_in_sandbox(sandbox: Sandbox, eval_config: LiveCodeBe
     cmd = f"{pip_cmd} install {git_url}"
 
     result, _ = await _execute_in_sandbox_with_retries(
-        sandbox, eval_config.num_retries, command=cmd, language="shell", timeout=300
+        sandbox, eval_config.num_retries, cmd, language="shell", timeout=300
     )
     if result.get("process_status") != "completed":
         LOG.warning(f"Failed to install livecodebench: {result.get('stderr', 'Unknown error')}")
@@ -236,7 +236,7 @@ async def eval_livecodebench_async(cfg, eval_config: LiveCodeBenchEvaluatorConfi
             output, _ = await _execute_in_sandbox_with_retries(
                 sandbox,
                 eval_config.num_retries,
-                command=cmd,
+                cmd,
                 language="shell",
                 timeout=eval_config.timeout * len(samples) + eval_config.timeout_buffer,
                 max_output_characters=100_000,
