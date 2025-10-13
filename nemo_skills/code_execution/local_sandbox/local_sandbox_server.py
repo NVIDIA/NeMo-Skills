@@ -502,11 +502,8 @@ def postprocess_output(output, traceback_verbosity):
 
 def cleanup_session(session_id):
     """Clean up and remove a specific session"""
-    ok, msg = shell_manager.stop_shell(session_id)
-    if ok:
-        logging.info(msg)
-    else:
-        logging.error(msg)
+    shell_manager.stop_shell(session_id)
+    logging.info(f"Cleaned up session: {session_id}")
 
 
 def execute_ipython_session(generated_code, session_id, timeout=30, traceback_verbosity="Plain"):
@@ -805,51 +802,14 @@ def list_sessions():
 def delete_session(session_id):
     """Delete a specific IPython session"""
     try:
-        # First, cancel any queued or running jobs tied to this session via JobManager
-        with job_manager.lock:
-            related_jobs = [
-                (jid, job.status)
-                for jid, job in job_manager.jobs.items()
-                if job.request.get("session_id") == session_id and job.status in ("queued", "running")
-            ]
+        with shell_manager.manager_lock:
+            session_exists = session_id in shell_manager.shells
 
-        canceled_queued = 0
-        canceled_running = 0
-        cancel_errors = []
-        for jid, prior_status in related_jobs:
-            res = job_manager.cancel_job(jid)
-            if res.get("status") == "ok":
-                if prior_status == "queued":
-                    canceled_queued += 1
-                elif prior_status == "running":
-                    canceled_running += 1
-            else:
-                cancel_errors.append({"job_id": jid, "error": res})
-
-        # If a running job was canceled, its shell was already stopped by cancel_job.
-        # Preserve the session if we only canceled queued jobs; delete only when there were
-        # no running cancellations AND no queued cancellations (explicit delete request).
-        if canceled_running > 0:
-            ok, msg = True, f"IPython session {session_id} deleted successfully"
-        elif canceled_queued > 0:
-            ok, msg = True, f"Canceled {canceled_queued} queued job(s); session preserved"
+        if session_exists:
+            shell_manager.stop_shell(session_id)
+            return {"message": f"IPython session {session_id} deleted successfully"}
         else:
-            ok, msg = shell_manager.stop_shell(session_id)
-
-        response = {
-            "message": msg,
-            "jobs_canceled": {"queued": canceled_queued, "running": canceled_running},
-        }
-
-        if cancel_errors:
-            response["cancel_errors"] = cancel_errors
-
-        if ok or canceled_queued > 0 or canceled_running > 0:
-            return response
-        else:
-            if "not found" in msg:
-                return {"error": msg}, 404
-            return {"error": msg}, 500
+            return {"error": f"IPython session {session_id} not found"}, 404
     except Exception as e:
         return {"error": f"Error deleting IPython session {session_id}: {e}"}, 500
 
