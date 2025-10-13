@@ -81,9 +81,15 @@ class Sandbox(abc.ABC):
 
     async def _send_request(self, request, timeout):
         session_id = request.pop("session_id", None)
+        affinity_key = request.pop("_affinity_key", None)
+
+        affinity_header = session_id or affinity_key
+        if affinity_header is None:
+            affinity_header = str(uuid.uuid4())
+        else:
+            affinity_header = str(affinity_header)
         extra_headers = {}
-        if session_id is not None:
-            extra_headers["X-Session-ID"] = str(session_id)
+        extra_headers["X-Session-ID"] = affinity_header
 
         if self.ssh_server and self.ssh_key_path:
             # For SSH tunneling, use threads since there's no async version
@@ -225,6 +231,7 @@ class Sandbox(abc.ABC):
                         cell_code, timeout, language, std_input, max_output_characters, traceback_verbosity
                     )
                     restore_request["session_id"] = request_session_id_str
+                    restore_request["_affinity_key"] = session_id_str
                     try:
                         restore_output = await self._send_request(restore_request, timeout)
                     except httpx.TimeoutException:
