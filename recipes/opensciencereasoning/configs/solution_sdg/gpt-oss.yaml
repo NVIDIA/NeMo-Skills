@@ -2,10 +2,12 @@ cluster: local
 base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
 expname: "gpt-oss-generate-solutions"
 suffix: ""  # Suffix for experiment names
+dataset_name: ""  # Optional dataset name for id generation
+is_mcq: False
+
 
 
 # Input file for the first stage (generate_solutions)
-
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
 # Make sure the problems fit the prompt you are using
