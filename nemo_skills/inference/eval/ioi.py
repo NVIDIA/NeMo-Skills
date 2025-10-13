@@ -177,7 +177,7 @@ class IOIExecutionGenerationTask(GenerationTask):
                 if first_fail_report is not None:
                     verification_log = extract_detailed_solution(first_fail_report, "Detailed Verification", False)
                 else:
-                    verification_log = ""
+                    raise ValueError("No fail report found")
 
                 prompt_txt, sol_resp = await self._call_llm(
                     data_point,
