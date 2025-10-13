@@ -12,14 +12,17 @@ echo "Workers: $NUM_WORKERS, Nginx port: $NGINX_PORT"
 # Override nginx config for multi-worker mode (single mode uses original config)
 echo "Configuring nginx for multi-worker load balancing..."
 
-# Respect pre-set environment variables; fall back to sane defaults
-# If the caller exported UWSGI_PROCESSES / UWSGI_CHEAPER (or the helper
-# variables used by start_local_sandbox.sh), keep those.  Otherwise pick
-# defaults that work for most cases.
 
-# shell parameter expansion with default value
-: "${UWSGI_PROCESSES:=1}"   # default to 1 processes per worker if unset
-: "${UWSGI_CHEAPER:=1}"     # default cheaper value
+# Allow callers to opt-out of single-process state-preserving mode where each worker is given one process
+: "${STATEFUL_SANDBOX:=1}"
+if [ "$STATEFUL_SANDBOX" -eq 1 ]; then
+    UWSGI_PROCESSES=1
+    UWSGI_CHEAPER=1
+else
+    # In stateless mode, honour caller-supplied values
+    : "${UWSGI_PROCESSES:=1}"
+    : "${UWSGI_CHEAPER:=1}"
+fi
 
 export UWSGI_PROCESSES UWSGI_CHEAPER
 

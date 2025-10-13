@@ -19,4 +19,10 @@ METRICS_TYPE = "ioi"
 EVAL_ARGS = "++eval_type=ioi"
 
 # environment variables required by this benchmark
-SANDBOX_ENV_VARS = ["UWSGI_PROCESSES=1024", "UWSGI_CPU_AFFINITY=8", "UWSGI_CHEAPER=1023", "NUM_WORKERS=1"]
+SANDBOX_ENV_VARS = [
+    "UWSGI_PROCESSES=1024",
+    "UWSGI_CPU_AFFINITY=8",
+    "UWSGI_CHEAPER=1023",
+    "NUM_WORKERS=1",
+    "STATEFUL_SANDBOX=0",
+]
