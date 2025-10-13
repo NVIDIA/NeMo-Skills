@@ -19,6 +19,8 @@ from omegaconf import OmegaConf
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
+# Final output file name for each stage
+OUTPUT_FILE = "final_result.jsonl"
 
 def get_stage_expname(base_expname, stage_name, suffix):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
@@ -39,7 +41,63 @@ def get_available_configs(config_dir):
 def filter_problems(cluster, expname, run_after, stage_config, **kwargs):
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
-    return
+    cmd = (
+        f"python /nemo_run/code/recipes/opensciencereasoning/scripts/filter_problems.py "
+        f"    --input_file {input_file} "
+        f"    --output_file {output_dir}/{OUTPUT_FILE} "
+        f"    --is_mcq {stage_config.get('is_mcq', False)} "
+        f"    --deduplicate {stage_config.get('deduplicate', False)} "
+        f"    --remove_images {stage_config.get('remove_images', False)} "
+        f"    --dataset_name {stage_config.get('dataset_name', None)} "
+        f"    --num_options {stage_config.get('num_options', None)} "
+        f"    --option_format_regex '{stage_config.get('option_format_regex', None)}'"
+    )
+    wrapped_cmd = wrap_arguments(cmd)
+    run_cmd(cluster, expname, wrapped_cmd, run_after=run_after)
+
+def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
+    input_file = stage_config.get("input_file")
+    output_dir = stage_config["output_dir"]
+    prompt_config = stage_config["mcq_prompt_config"] if stage_config["is_mcq"] else stage_config["openq_prompt_config"]
+    generation_kwargs = stage_config.get("generation_kwargs", {})
+    judge_kwargs = stage_config.get("judge_kwargs", {})
+
+    server_args = generation_kwargs.get("server_args", "")
+
+    expname_1 = f"{expname}-difficulty-generation"
+
+    
+    # run generation
+    generate(
+        ctx=wrap_arguments(
+            f"++prompt_config={prompt_config} " + generation_kwargs.get("inline_args", "")
+        ),
+        cluster=cluster,
+        input_file=input_file,
+        output_dir=output_dir,
+        expname=expname_1,
+        run_after=run_after,
+        **generation_kwargs,
+        **stage_config.get("stage_kwargs", {}),
+    )
+
+    expname_2 = f"{expname}-difficulty-judge"
+
+    generate(
+        ctx=wrap_arguments(
+            f"++prompt_config={prompt_config} " + generation_kwargs.get("inline_args", "")
+        ),
+        cluster=cluster,
+        input_file=f"{output_dir}/{OUTPUT_FILE}",
+        output_dir=output_dir,
+        expname=expname_2,
+        run_after=expname_1,
+        **judge_kwargs,
+    )
+
+
+    # run judging
+
 
 
 stages_map = {
