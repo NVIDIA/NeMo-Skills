@@ -82,7 +82,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint_dir", required=True, help="Root directory containing multiple model subfolders.")
     parser.add_argument(
-        "--steps", nargs="+", type=int, help="If given, only include subfolders whose names contain step=<n>."
+        "--steps",
+        nargs="+",
+        type=int,
+        required=True,
+        help="List of step numbers to include (e.g. --steps 100 200 300).",
     )
     parser.add_argument(
         "--cleanup",
@@ -91,9 +95,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    if args.steps:
-        logging.info("Will average only steps %s", args.steps)
 
     model_dirs = list_candidate_model_dirs(args.checkpoint_dir, args.steps)
     if not model_dirs:
