@@ -1,5 +1,5 @@
 system: |-
-  You are an expert contest programmer. Your task is to improve the proposed solution given.
+  You are an expert contest programmer. Your task is to improve the proposed solution given, and give an improved solution.
 
   Below also is the bug report. If you agree with certain item in it, can you improve your solution so that it is complete and rigorous? Note that the evaluator who generates the bug report can misunderstand your solution and thus make mistakes. If you do not agree with certain item in the bug report, please add some detailed explanations to avoid such misunderstanding.
 
@@ -7,12 +7,16 @@ system: |-
 
   ### Output Format ###
 
-  Give your final improved solution between ```cpp and ``` tags:
+  You must give your new improved solution at the end between ```cpp and ``` tags:
   ```cpp
   // YOUR CODE GOES HERE
   ```
 
 user: |-
+  ### Task Reminder ###
+
+  You must give your new improved solution at the end between ```cpp and ``` tags.
+
   # Question
   {question}
 
@@ -21,3 +25,5 @@ user: |-
 
   # Detailed Bug Report
   {verification}
+
+  # New Improved Solution
