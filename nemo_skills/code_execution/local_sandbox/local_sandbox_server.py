@@ -736,8 +736,11 @@ def execute():
     request_dict = request.json
     request_dict["session_id"] = session_id
     job_id = job_manager.submit(request_dict)
-
-    return {"job_id": job_id}, 202
+    with job_manager.lock:
+        queued_ahead = sum(
+            1 for j in job_manager.jobs.values() if j.job_id != job_id and j.status in ("queued", "running")
+        )
+    return {"job_id": job_id, "queued_ahead": queued_ahead}, 202
 
 
 # Session management endpoints

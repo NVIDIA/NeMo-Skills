@@ -18,6 +18,7 @@ import glob
 import json
 import logging
 import os
+import time
 import traceback
 import uuid
 from collections import defaultdict
@@ -102,15 +103,40 @@ class Sandbox(abc.ABC):
             output = await asyncio.to_thread(ssh_request)
         else:
             output = await self.http_session.post(
-                url=self._get_execute_url(),
+                self._get_execute_url(),
                 content=json.dumps(request),
                 timeout=timeout + 5.0,
                 headers={"Content-Type": "application/json", **extra_headers},
             )
-        # retrying 502 errors
-        if output.status_code == 502:
-            raise httpx.TimeoutException("502 error")
-        return self._parse_request_output(output)
+        j = output.json()
+        if "job_id" not in j:
+            return self._parse_request_output(output)
+        url = f"http://{self.host}:{self.port}/jobs/{j['job_id']}"
+        # Estimate the deadline based on the queued ahead jobs; cut it off at 1200 seconds
+        deadline_seconds = min(1200, (float(j.get("queued_ahead", 0)) + 1) * (timeout + 2))
+        deadline = time.monotonic() + deadline_seconds
+        while True:
+            if time.monotonic() > deadline:
+                raise httpx.TimeoutException("Client timed out")
+            if self.ssh_server and self.ssh_key_path:
+                import sshtunnel_requests
+
+                def s_get():
+                    return sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path).get(
+                        url, timeout=timeout
+                    )
+
+                resp = await asyncio.to_thread(s_get)
+            else:
+                resp = await self.http_session.get(url, timeout=timeout)
+            if getattr(resp, "status_code", 200) != 200:
+                await asyncio.sleep(0.2)
+                continue
+            p = resp.json()
+            if p.get("status") in {"completed", "timeout", "error", "failed", "canceled"}:
+                r = p.get("result") or {}
+                return r if "process_status" in r else {**r, "process_status": p.get("status", "error")}
+            await asyncio.sleep(0.2)
 
     @abc.abstractmethod
     def _parse_request_output(self, output):
