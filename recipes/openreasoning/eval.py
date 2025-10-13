@@ -15,10 +15,10 @@
 from nemo_skills.pipeline.cli import eval, wrap_arguments
 
 size_to_eval_gpus = {
-    "1.5b": 1,
-    "7b": 2,
-    "14b": 4,
-    "32b": 8,
+    "1.5B": 1,
+    "7B": 2,
+    "14B": 4,
+    "32B": 8,
 }
 
 eval_tokens = 65536
@@ -78,17 +78,16 @@ def eval_math(model_size):
                     f"++inference.tokens_to_generate={eval_tokens} "
                     "++inference.temperature=0.6 "
                     "++parallel_thinking.mode=genselect "
-                    "++parallel_thinking.generation_dir=/workspace/OpenReasoning-Nemotron-{model_size}/eval-results/{bench} "
+                    f"++parallel_thinking.generation_dir={output_dir}/{model_size}/eval-results/{bench} "
                 ),
                 cluster=cluster,
                 expname=f"genselect-{bench}-{model_size}",
                 run_after=f"eval-math-{model_size}",
-                output_dir=f"{output_dir}/{model_size}-genselect/{bench}",
+                output_dir=f"{output_dir}/{model_size}-genselect/",
                 model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
                 server_type="sglang",
                 server_gpus=size_to_eval_gpus[model_size],
-                benchmarks=",".join([f"{bench}:{math_seeds}" for bench in math_benchmarks]),
-                num_random_seeds=math_seeds,
+                benchmarks=f"{bench}:{math_seeds}",
             )
 
 
