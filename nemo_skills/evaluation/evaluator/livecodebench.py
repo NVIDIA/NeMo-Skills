@@ -39,7 +39,7 @@ LIVECODEBENCH_PYPY3_GIT_URL = "git+https://github.com/wasiahmad/livecodebench.gi
 @nested_dataclass(kw_only=True)
 class LiveCodeBenchEvaluatorConfig:
     sandbox: dict = field(default_factory=lambda: {"sandbox_type": "local"})
-    language: str = "python"
+    language: str = "python"  # use either "python" or "cpp"
     test_file: str = None
     interpreter: str = "python"  # use either "python" or "pypy3"
     timeout: int = 6
