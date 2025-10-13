@@ -78,39 +78,6 @@ class JobManager:
         with self.lock:
             return self.jobs.get(job_id)
 
-    def cancel_job(self, job_id: str):
-        with self.lock:
-            job = self.jobs.get(job_id)
-            if job is None:
-                return {"status": "not_found"}
-
-            if job.status == "queued":
-                fut = self.futures.get(job_id)
-                # best-effort cancel if not yet started
-                if fut is not None:
-                    fut.cancel()
-                job.status = "canceled"
-                job.finished_at = time.time()
-                return {"status": "ok", "message": "Job canceled from queue."}
-
-            if job.status != "running":
-                return {"status": "error", "message": f"Cannot cancel job in state '{job.status}'."}
-
-            language = job.request.get("language")
-            if language == "ipython":
-                session_id = job.request.get("session_id")
-                if not session_id:
-                    return {"status": "error", "message": "Cannot cancel ipython job without session_id."}
-
-                stopped, msg = self.shell_manager.stop_shell(session_id)
-                if stopped:
-                    job.status = "canceled"
-                    return {"status": "ok", "message": f"Job cancel requested; {msg}"}
-                else:
-                    return {"status": "error", "message": f"Failed to cancel job: {msg}"}
-            else:
-                return {"status": "error", "message": f"Cancellation for language '{language}' is not supported."}
-
     def _run_job(self, job_id: str) -> None:
         with self.lock:
             job = self.jobs.get(job_id)
