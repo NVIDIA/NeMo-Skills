@@ -27,7 +27,6 @@ class PromptConstants:
 
 def parse_data(split):
     data = load_dataset("nvidia/LiveCodeBench-CPP", split=split)
-    print(data)
 
     # data has the following fields
     # question_title: str
