@@ -4,9 +4,11 @@ import os
 import re
 import sys
 import tempfile
+import time
 from dataclasses import field
 
 import hydra
+import litellm
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
@@ -97,29 +99,39 @@ class IOIExecutionGenerationTask(GenerationTask):
     async def _call_llm(self, data_point, all_data, prompt_key, **extra_data):
         combined_dp = {**data_point, **extra_data}
         filled_prompt = self.fill_prompt(combined_dp, all_data, prompt=self.prompts[prompt_key])
-        llm_out = await super().process_single_datapoint(combined_dp, all_data, prompt=self.prompts[prompt_key])
-        return filled_prompt, llm_out
+        start_t = time.time()
+        try:
+            llm_out = await super().process_single_datapoint(combined_dp, all_data, prompt=self.prompts[prompt_key])
+        except (litellm.exceptions.OpenAIError, Exception) as e:
+            print(f"LLM call failed: {e}\nPrompt causing failure:\n{filled_prompt}")
+            raise
+        gen_time = time.time() - start_t
+        return filled_prompt, llm_out, gen_time
 
     async def process_single_datapoint(self, data_point, all_data, prompt=None):
         chat_history = []
         num_steps_completed = 0
 
-        prompt_txt, solution_response = await self._call_llm(data_point, all_data, "initial")
+        prompt_txt, solution_response, gen_time = await self._call_llm(data_point, all_data, "initial")
         latest_generation_response = solution_response["generation"]
-        chat_history.append({"prompt": prompt_txt, "response": latest_generation_response})
+        chat_history.append(
+            {"prompt": prompt_txt, "response": latest_generation_response, "generation_time": gen_time}
+        )
         print("[Initial] Generated initial solution.")
         try:
             solution = extract_code_block(latest_generation_response)
 
             for improve_idx in range(self.cfg.num_self_improve):
                 print(f"[Self-Improve] Attempt {improve_idx + 1}/{self.cfg.num_self_improve}")
-                prompt_txt, improve_response = await self._call_llm(
+                prompt_txt, improve_response, gen_time = await self._call_llm(
                     data_point,
                     all_data,
                     "self_improve_solution",
                     solution=solution,
                 )
-                chat_history.append({"prompt": prompt_txt, "response": improve_response["generation"]})
+                chat_history.append(
+                    {"prompt": prompt_txt, "response": improve_response["generation"], "generation_time": gen_time}
+                )
                 solution = extract_code_block(improve_response["generation"])
                 if not solution:
                     raise ValueError(f"Failed to generate an improved solution: {improve_response}")
@@ -142,14 +154,16 @@ class IOIExecutionGenerationTask(GenerationTask):
                 verify_results = await asyncio.gather(*verify_tasks)
                 yes_votes = sum(
                     1
-                    for _, ver in verify_results
+                    for _, ver, _ in verify_results
                     if (m := re.search(r"\\boxed\{([^}]+)\}", ver["generation"], re.IGNORECASE))
                     and m.group(1).strip().lower().startswith("y")
                 )
                 print(f"[Step {step_num + 1}] Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
 
-                for prompt_txt, verify_resp in verify_results:
-                    chat_history.append({"prompt": prompt_txt, "response": verify_resp["generation"]})
+                for prompt_txt, verify_resp, gen_time in verify_results:
+                    chat_history.append(
+                        {"prompt": prompt_txt, "response": verify_resp["generation"], "generation_time": gen_time}
+                    )
                     ver_out = verify_resp["generation"]
 
                     # Look for boxed{yes/no}
@@ -179,7 +193,7 @@ class IOIExecutionGenerationTask(GenerationTask):
                 else:
                     raise ValueError("No fail report found")
 
-                prompt_txt, sol_resp = await self._call_llm(
+                prompt_txt, sol_resp, gen_time = await self._call_llm(
                     data_point,
                     all_data,
                     "improve_after_verify_solution",
@@ -193,7 +207,9 @@ class IOIExecutionGenerationTask(GenerationTask):
 
                 latest_generation_response = sol_resp["generation"]
                 solution = new_solution
-                chat_history.append({"prompt": prompt_txt, "response": sol_resp["generation"]})
+                chat_history.append(
+                    {"prompt": prompt_txt, "response": sol_resp["generation"], "generation_time": gen_time}
+                )
                 num_steps_completed += 1
         except Exception as e:
             print(f"Agent loop failed: {e}")
