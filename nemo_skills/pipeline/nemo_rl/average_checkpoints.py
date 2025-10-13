@@ -62,7 +62,7 @@ def build_key_to_shard_map(model_dir):
         with safe_open(spath, framework="pt") as f:
             for k in f.keys():
                 key2file[k] = shard
-    return key2file, shards
+    return key2file
 
 
 def copy_side_files(src_model_dir, dst_dir):
@@ -109,7 +109,7 @@ def main():
 
     first_dirname = model_dirs[0]
     first_dir = os.path.join(args.checkpoint_dir, first_dirname)
-    key2file_first, shard_files_first = build_key_to_shard_map(first_dir)
+    key2file_first = build_key_to_shard_map(first_dir)
     keys = sorted(key2file_first.keys())
     logging.info("Total parameter tensors: %d", len(keys))
 
