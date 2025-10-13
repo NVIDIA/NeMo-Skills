@@ -14,7 +14,7 @@ To add a new Slurm test follow this process:
 Before running tests you need to ensure your cluster config has a few specific mounts and run a few data preparation commands.
 
 - Define `/workspace` mount in your cluster config.
-- Define `/swe-bench-images` mount in your cluster config with [swe-bench images downloaded]((https://nvidia.github.io/NeMo-Skills/evaluation/code/#data-preparation)).
+- Define `/swe-bench-images` mount in your cluster config with [swe-bench images downloaded](https://nvidia.github.io/NeMo-Skills/evaluation/code/#data-preparation).
 - Run the following data preparation command for RULER.
 
 ```bash
