@@ -123,12 +123,12 @@ class Sandbox(abc.ABC):
 
                 def s_get():
                     return sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path).get(
-                        url, timeout=timeout
+                        url, timeout=timeout, headers=extra_headers
                     )
 
                 resp = await asyncio.to_thread(s_get)
             else:
-                resp = await self.http_session.get(url, timeout=timeout)
+                resp = await self.http_session.get(url, timeout=timeout, headers=extra_headers)
             if getattr(resp, "status_code", 200) != 200:
                 await asyncio.sleep(0.2)
                 continue
