@@ -46,23 +46,16 @@ def find_index_json(model_dir):
 
 
 def build_key_to_shard_map(model_dir):
-    """Return (key->file map, list of shards)."""
+    """Return key->file map from index.json (assuming index exists)."""
     idx_path = find_index_json(model_dir)
-    if idx_path:
-        with open(idx_path, "r") as fr:
-            idx = json.load(fr)
-        weight_map = idx.get("weight_map", {})
-        shards = sorted(list(set(weight_map.values())))
-        return weight_map, shards
-    # fallback: scan shards
-    shards = sorted([f for f in os.listdir(model_dir) if f.endswith(".safetensors")])
-    key2file = {}
-    for shard in shards:
-        spath = os.path.join(model_dir, shard)
-        with safe_open(spath, framework="pt") as f:
-            for k in f.keys():
-                key2file[k] = shard
-    return key2file
+    if not idx_path:
+        raise FileNotFoundError(f"No index.json found in {model_dir}")
+
+    with open(idx_path, "r") as fr:
+        idx = json.load(fr)
+
+    weight_map = idx.get("weight_map", {})
+    return weight_map
 
 
 def copy_side_files(src_model_dir, dst_dir):
