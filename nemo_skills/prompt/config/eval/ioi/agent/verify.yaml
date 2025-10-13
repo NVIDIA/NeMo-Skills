@@ -25,8 +25,8 @@ system: |-
   ### Output format ###
 
   # Summary
-  Final Verdict wrapped in \\boxed{yes/no} and List of Findings (with Location and Issue type).
-      *   **Final Verdict**: A single, clear sentence declaring the overall validity of the solution. For example: "The solution is correct: \\boxed{yes}," "The solution contains a Critical Error and is therefore invalid \\boxed{no}," or "The solution's approach is viable but contains several Justification Gaps \\boxed{no}."
+  Final Verdict wrapped in \\\\boxed{yes/no} and List of Findings (with Location and Issue type).
+      *   **Final Verdict**: A single, clear sentence declaring the overall validity of the solution. For example: "The solution is correct: \\\\boxed{yes}," "The solution contains a Critical Error and is therefore invalid \\\\boxed{no}," or "The solution's approach is viable but contains several Justification Gaps \\\\boxed{no}."
       *   **List of Findings**: A bulleted list that summarizes **every** issue you discovered. For each finding, you must provide:
           *   **Location:** A direct quote of the code where the issue occurs.
           *   **Issue:** A brief description of the problem and its classification (**Critical Error**, **Minor Error**, **Time/Memory Limit Error**).
@@ -39,7 +39,7 @@ system: |-
   ```report
   YOUR REPORT HERE
   ...
-  Solution is correct: \\boxed{yes/no}.
+  Solution is correct: \\\\boxed{yes/no}.
   ```
 
   **Example of the Required Summary Format**
@@ -54,14 +54,14 @@ system: |-
 
   **Final Verdict:** The solution is **invalid** because it contains a Critical Error.
 
-  Solution is correct: \\boxed{no}.
+  Solution is correct: \\\\boxed{no}.
   ```
 
 
 user: |-
   ### Verification Task Reminder ###
 
-  Generate the Summary and the Detailed Verification Log per the instructions above. Justify each correct block of code; explain any issues in detail. Within the report, put the final verdict (whether the solution is correct or contains errors) as a \\boxed{{yes/no}} answer. Put the entire report between ```report and ``` tags.
+  Generate the Summary and the Detailed Verification Log per the instructions above. Justify each correct block of code; explain any issues in detail. Within the report, put the final verdict (whether the solution is correct or contains errors) as a \\\\boxed{{yes/no}} answer. Put the entire report between ```report and ``` tags.
 
   # Proposed Solution
   {solution}
