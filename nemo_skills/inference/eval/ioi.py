@@ -173,7 +173,13 @@ class IOIExecutionGenerationTask(GenerationTask):
                     m = re.search(r"\\boxed\{([^}]+)\}", ver_out, re.IGNORECASE)
                     verdict = m.group(1).strip().lower() if m else ""
 
-                    if verdict.startswith("y"):
+                    # Ensure verdict is explicitly 'yes' or 'no'.
+                    if verdict not in ("yes", "no"):
+                        print(
+                            f"[Warning] Invalid verdict extracted (expected 'yes' or 'no', got '{verdict}'). Full output:\n{ver_out}"
+                        )
+
+                    if verdict == "yes":
                         consecutive_yes += 1
                         if consecutive_yes >= 5:
                             print(
@@ -185,7 +191,7 @@ class IOIExecutionGenerationTask(GenerationTask):
                                 "steps": chat_history,
                                 "num_steps_completed": num_steps_completed,
                             }
-                    else:
+                    else:  # Treat 'no' or invalid verdict as failure
                         if first_fail_report is None:
                             first_fail_report = ver_out
                         consecutive_yes = 0  # reset streak
