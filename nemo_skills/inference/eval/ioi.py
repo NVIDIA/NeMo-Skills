@@ -55,10 +55,13 @@ def extract_code_block(text: str):
 
 # Helper to extract a detailed bug report or solution section from an LLM response
 def extract_detailed_solution(solution: str, marker: str = "Detailed Verification", after: bool = True):
-    idx = solution.find(marker)
-    if idx == -1:
-        return ""
-    return solution[idx + len(marker) :].strip() if after else solution[:idx].strip()
+    # First, handle the new format where the report is enclosed in ```report ``` code fences.
+    report_matches = re.findall(r"```report(.*?)```", solution, re.DOTALL)
+    if report_matches:
+        # Return the last (most recent) report block, stripped of leading/trailing whitespace.
+        return report_matches[-1].strip()
+    else:
+        raise ValueError(f"No report found in solution: {solution}")
 
 
 @nested_dataclass(kw_only=True)
