@@ -117,7 +117,7 @@ def main():
     per_dir_key2file = {first_dirname: key2file_first}
     for dirname in model_dirs[1:]:
         md = os.path.join(args.checkpoint_dir, dirname)
-        k2f, _ = build_key_to_shard_map(md)
+        k2f = build_key_to_shard_map(md)
         if set(k2f.keys()) != set(keys):
             raise SystemExit("[Strict] Key sets differ between %s and first model." % dirname)
         per_dir_key2file[dirname] = k2f
