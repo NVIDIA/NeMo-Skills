@@ -151,7 +151,7 @@ def main():
 
             acc.div_(float(n))
             out_state[k] = acc.to(dtype=ref_dtype)
-            if (i % 4000) == 0:
+            if (i % 100) == 0:
                 logging.info("  ... %d / %d tensors", i, len(shard_keys))
 
         out_path = os.path.join(out_dir, shard_name)
@@ -170,11 +170,7 @@ def main():
             json.dump(idx, fw, indent=2)
         logging.info("Copied index json.")
     else:
-        weight_map = {k: key2file_first[k] for k in keys}
-        idx = {"metadata": {"format": "pt", "averaged_from": model_dirs}, "weight_map": weight_map}
-        with open(os.path.join(out_dir, "model.safetensors.index.json"), "w") as fw:
-            json.dump(idx, fw, indent=2)
-        logging.info("Generated simple index json.")
+        raise FileNotFoundError(f"No index.json found in {first_dir}")
 
     copy_side_files(first_dir, out_dir)
     logging.info("Averaged (sharded) checkpoint saved at: %s", out_dir)
