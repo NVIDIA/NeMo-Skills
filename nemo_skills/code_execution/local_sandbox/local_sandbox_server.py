@@ -17,6 +17,7 @@ import io
 import logging
 import multiprocessing as mp
 import os
+import queue
 import re
 import resource
 import signal
@@ -25,7 +26,10 @@ import tempfile
 import threading
 import time
 import traceback
+import uuid
 from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, Optional
 
 import psutil
 from flask import Flask, request
@@ -39,6 +43,134 @@ logging.basicConfig(
     level=logging.INFO,
     format=f"[worker {worker_id}] %(asctime)s %(levelname)s: %(message)s",
 )
+
+
+@dataclass
+class Job:
+    job_id: str
+    status: str = "queued"
+    request: Dict[str, Any]
+    created_at: float = field(default_factory=time.time)
+    started_at: Optional[float] = None
+    finished_at: Optional[float] = None
+    result: Optional[Dict[str, Any]] = None
+
+
+class JobManager:
+    def __init__(self, shell_manager):
+        self.jobs = {}
+        self.lock = threading.Lock()
+        self.job_queue = queue.Queue()
+        self.shell_manager = shell_manager
+        self.worker_thread = threading.Thread(target=self.worker_process, daemon=True)
+        self.worker_thread.start()
+
+    def submit(self, request: Dict[str, Any]):
+        job_id = str(uuid.uuid4())
+        job = Job(job_id, request=request)
+        with self.lock:
+            self.jobs[job_id] = job
+            self.job_queue.put(job)
+        return job_id
+
+    def get_job(self, job_id: str):
+        with self.lock:
+            return self.jobs.get(job_id)
+
+    def cancel_job(self, job_id: str):
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                return {"status": "not_found"}
+
+            if job.status == "queued":
+                job.status = "canceled"
+                return {"status": "ok", "message": "Job canceled from queue."}
+
+            if job.status != "running":
+                return {"status": "error", "message": f"Cannot cancel job in state '{job.status}'."}
+
+            # Handle running jobs
+            language = job.request.get("language")
+            if language == "ipython":
+                session_id = job.request.get("session_id")
+                if not session_id:
+                    return {"status": "error", "message": "Cannot cancel ipython job without session_id."}
+
+                was_interrupted, reason = self.shell_manager.interrupt_shell(session_id)
+                if was_interrupted:
+                    job.status = "canceling"
+                    return {"status": "ok", "message": "Job interruption signal sent."}
+                else:
+                    return {"status": "error", "message": f"Failed to interrupt job: {reason}"}
+            else:
+                return {"status": "error", "message": f"Cancellation for language '{language}' is not supported."}
+
+    def find_running_job_for_session(self, session_id: str):
+        with self.lock:
+            for job in self.jobs.values():
+                if job.request.get("session_id") == session_id and job.status == "running":
+                    return job
+        return None
+
+    def worker_process(self):
+        while True:
+            job = self.job_queue.get()
+            with self.lock:
+                job = self.jobs[job.job_id]
+                if job.status == "canceled":
+                    continue
+                job.started_at = time.time()
+                job.status = "running"
+
+            result = self.execute_job(job.request)
+
+            with self.lock:
+                # If the job was canceled while running, set the final status
+                if job.status == "canceling":
+                    job.status = "canceled"
+                    job.result = {
+                        "process_status": "canceled",
+                        "stdout": result.get("stdout", ""),
+                        "stderr": "Job was canceled.",
+                    }
+                else:
+                    job.result = result
+                    job.status = result["process_status"]
+                job.finished_at = time.time()
+
+    def execute_job(self, request: Dict[str, Any]):
+        try:
+            language = request["language"]
+            generated_code = request["generated_code"]
+            timeout = request.get("timeout", 10.0)
+            session_id = request.get("session_id", None)
+            std_input = request.get("std_input", "")
+            max_output_characters = request.get("max_output_characters", 1000)
+            traceback_verbosity = request.get("traceback_verbosity", "Plain")
+            result = {}
+
+            if language == "ipython":
+                if session_id is None:
+                    result = {"process_status": "error", "stderr": "X-Session-ID header required for ipython sessions"}
+                    return result
+                result = execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
+            elif language == "lean4":
+                result = execute_lean4(generated_code, timeout)
+            elif language == "shell":
+                result = execute_shell(generated_code, timeout)
+            else:
+                result = execute_python(generated_code, std_input, timeout, language)
+
+            if len(result.get("stdout", "")) > max_output_characters:
+                result["stdout"] = result["stdout"][:max_output_characters] + "<output cut>"
+            if len(result.get("stderr", "")) > max_output_characters:
+                result["stderr"] = result["stderr"][:max_output_characters] + "<output cut>"
+
+            return result
+        except Exception as e:
+            logging.error(f"Error during job execution: {e}\n{traceback.format_exc()}")
+            return {"process_status": "error", "stderr": f"An unexpected error occurred: {e}"}
 
 
 # Worker that runs inside the shell process and owns a TerminalInteractiveShell()
@@ -145,6 +277,29 @@ class ShellManager:
             pass
         proc.terminate()
         proc.join(timeout=2.0)
+
+    def interrupt_shell(self, shell_id):
+        with self.manager_lock:
+            entry = self.shells.get(shell_id)
+            if not entry:
+                return False, "not_found"
+
+        # The lock is acquired by run_cell, so if it's locked, a cell is running.
+        if not entry["lock"].locked():
+            return False, "not_busy"
+
+        proc = entry["proc"]
+        try:
+            logging.info(f"Interrupting shell {shell_id} (pid: {proc.pid})")
+            # Mimic the interruption logic from run_cell
+            try:
+                proc.send_signal(signal.SIGINT)
+            except AttributeError:
+                os.kill(proc.pid, signal.SIGINT)
+            return True, "interrupted"
+        except Exception as e:
+            logging.error(f"Failed to interrupt shell {shell_id}: {e}")
+            return False, "error"
 
     def run_cell(self, shell_id, code, timeout=1.0, grace=0.5, traceback_verbosity="Plain"):
         """
@@ -605,34 +760,35 @@ def execute_shell(command, timeout):
             os.remove(tmp_path)
 
 
-# Main Flask endpoint to handle execution requests
-@app.route("/execute", methods=["POST"])
-def execute():
-    generated_code = request.json["generated_code"]
-    timeout = request.json["timeout"]
-    language = request.json.get("language", "ipython")
-    std_input = request.json.get("std_input", "")
-    max_output_characters = request.json.get("max_output_characters", 1000)
-    traceback_verbosity = request.json.get("traceback_verbosity", "Plain")
+job_manager = JobManager(shell_manager)
 
-    session_id = request.headers.get("X-Session-ID")
 
-    if language == "ipython":
-        if session_id is None:
-            return {"error": "X-Session-ID header required for ipython sessions"}, 400
-        result = execute_ipython_session(generated_code, session_id, timeout, traceback_verbosity)
-    elif language == "lean4":
-        result = execute_lean4(generated_code, timeout)
-    elif language == "shell":
-        result = execute_shell(generated_code, timeout)
-    else:
-        result = execute_python(generated_code, std_input, timeout, language)
+@app.route("/jobs", methods=["POST"])
+def submit_job():
+    request_dict = request.json
+    # For ipython, session_id comes from a header, not the body
+    if request_dict.get("language") == "ipython":
+        request_dict["session_id"] = request.headers.get("X-Session-ID")
 
-    if len(result["stdout"]) > max_output_characters:
-        result["stdout"] = result["stdout"][:max_output_characters] + "<output cut>"
-    if len(result["stderr"]) > max_output_characters:
-        result["stderr"] = result["stderr"][:max_output_characters] + "<output cut>"
+    job_id = job_manager.submit(request_dict)
+    return {"job_id": job_id}, 202
 
+
+@app.route("/jobs/<job_id>", methods=["GET"])
+def get_job(job_id):
+    job = job_manager.get_job(job_id)
+    if job is None:
+        return {"error": f"Job {job_id} not found"}, 404
+    return asdict(job)
+
+
+@app.route("/jobs/<job_id>/cancel", methods=["POST"])
+def cancel_job_endpoint(job_id):
+    result = job_manager.cancel_job(job_id)
+    if result["status"] == "not_found":
+        return {"error": f"Job {job_id} not found"}, 404
+    if result["status"] == "error":
+        return {"error": result["message"]}, 409  # Conflict
     return result
 
 
@@ -664,6 +820,14 @@ def list_sessions():
 @app.route("/sessions/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
     """Delete a specific IPython session"""
+    # If a job is running in this session, cancel it first.
+    running_job = job_manager.find_running_job_for_session(session_id)
+    if running_job:
+        logging.info(f"Session {session_id} has a running job ({running_job.job_id}). Canceling it before deletion.")
+        job_manager.cancel_job(running_job.job_id)
+        # Give a moment for the interrupt to be processed before terminating the shell
+        time.sleep(0.1)
+
     try:
         with shell_manager.manager_lock:
             session_exists = session_id in shell_manager.shells
