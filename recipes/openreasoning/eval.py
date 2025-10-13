@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_skills.pipeline.cli import eval, genselect, wrap_arguments
+from nemo_skills.pipeline.cli import eval, wrap_arguments
 
 size_to_eval_gpus = {
     "1.5b": 1,
@@ -73,8 +73,13 @@ def eval_math(model_size):
 
     if run_genselect:
         for bench in math_benchmarks:
-            genselect(
-                ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 "),
+            eval(
+                ctx=wrap_arguments(
+                    f"++inference.tokens_to_generate={eval_tokens} "
+                    "++inference.temperature=0.6 "
+                    "++parallel_thinking.mode=genselect "
+                    "++parallel_thinking.generation_dir=/workspace/OpenReasoning-Nemotron-{model_size}/eval-results/{bench} "
+                ),
                 cluster=cluster,
                 expname=f"genselect-{bench}-{model_size}",
                 run_after=f"eval-math-{model_size}",
@@ -82,7 +87,7 @@ def eval_math(model_size):
                 model=f"/workspace/OpenReasoning-Nemotron-{model_size}",
                 server_type="sglang",
                 server_gpus=size_to_eval_gpus[model_size],
-                preprocess_args=f"++input_dir={output_dir}/{model_size}/eval-results/{bench}",
+                benchmarks=",".join([f"{bench}:{math_seeds}" for bench in math_benchmarks]),
                 num_random_seeds=math_seeds,
             )
 
