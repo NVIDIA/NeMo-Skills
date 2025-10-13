@@ -331,8 +331,6 @@ ns eval \
     --split=test_python \
     --data_dir=<DATA_DIR> \
     --output_dir=<OUTPUT_DIR> \
-    --with_sandbox \
-    --keep_mounts_for_sandbox \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
     ++inference.tokens_to_generate=32768

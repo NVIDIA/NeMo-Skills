@@ -59,7 +59,7 @@ async def sandbox_context(config: dict):
         await sandbox.close()
 
 
-async def _execute_in_sandbox_with_retries(
+async def execute_in_sandbox_with_retries(
     sandbox: Sandbox,
     num_retries: int,
     *args,
@@ -103,7 +103,7 @@ async def is_sandbox_available(sandbox_config: dict) -> bool:
     LOG.info(f"Attempting to connect to sandbox with config: {sandbox_config}")
     try:
         async with sandbox_context(sandbox_config) as sandbox:
-            await _execute_in_sandbox_with_retries(sandbox, 1, "true", language="shell", timeout=5)
+            await execute_in_sandbox_with_retries(sandbox, 1, "true", language="shell", timeout=5)
         LOG.info("Sandbox connection successful. Sandbox is available.")
         return True
     except httpx.NetworkError as e:
@@ -169,7 +169,7 @@ async def _install_packages_in_sandbox(sandbox: Sandbox, eval_config: LiveCodeBe
     git_url = LIVECODEBENCH_PYTHON_GIT_URL if eval_config.interpreter == "python" else LIVECODEBENCH_PYPY3_GIT_URL
     cmd = f"{pip_cmd} install {git_url}"
 
-    result, _ = await _execute_in_sandbox_with_retries(
+    result, _ = await execute_in_sandbox_with_retries(
         sandbox, eval_config.num_retries, cmd, language="shell", timeout=300
     )
     if result.get("process_status") != "completed":
@@ -233,7 +233,7 @@ async def eval_livecodebench_async(cfg, eval_config: LiveCodeBenchEvaluatorConfi
             """)
 
             cmd = f"{eval_config.interpreter} -c {shlex.quote(eval_code)}"
-            output, _ = await _execute_in_sandbox_with_retries(
+            output, _ = await execute_in_sandbox_with_retries(
                 sandbox,
                 eval_config.num_retries,
                 cmd,
