@@ -49,7 +49,7 @@ def build_key_to_shard_map(model_dir):
     """Return key->file map from index.json (assuming index exists)."""
     idx_path = find_index_json(model_dir)
     if not idx_path:
-        raise FileNotFoundError(f"No index.json found in {model_dir}")
+        raise FileNotFoundError(f"No index.json in {model_dir}")
 
     with open(idx_path, "r") as fr:
         idx = json.load(fr)
@@ -91,7 +91,7 @@ def main():
 
     model_dirs = list_candidate_model_dirs(args.checkpoint_dir, args.steps)
     if not model_dirs:
-        raise SystemExit("No valid model subdirectories found.")
+        raise SystemExit("No model subdirectories found")
 
     logging.info("Selected model dirs:")
     for d in model_dirs:
@@ -112,7 +112,7 @@ def main():
         md = os.path.join(args.checkpoint_dir, dirname)
         k2f = build_key_to_shard_map(md)
         if set(k2f.keys()) != set(keys):
-            raise SystemExit("[Strict] Key sets differ between %s and first model." % dirname)
+            raise SystemExit(f"[Strict] Key sets differ between {dirname} and first model.")
         per_dir_key2file[dirname] = k2f
 
     # Output directory
@@ -144,7 +144,7 @@ def main():
                 with safe_open(os.path.join(md, shard_k), framework="pt") as fh:
                     tk = fh.get_tensor(k)
                     if tuple(tk.shape) != ref_shape:
-                        raise SystemExit("[Strict] Shape mismatch for %s in %s" % (k, dirname))
+                        raise SystemExit(f"[Strict] Shape mismatch for {k} in {dirname}")
                     if tk.dtype in (torch.int8, torch.int16, torch.int32, torch.int64, torch.uint8):
                         raise SystemExit("Int tensor not supported for averaging: %s (%s)" % (k, tk.dtype))
                     acc.add_(tk.to(dtype=torch.float32))
