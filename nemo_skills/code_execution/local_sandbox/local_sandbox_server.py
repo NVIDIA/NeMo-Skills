@@ -17,7 +17,6 @@ import io
 import logging
 import multiprocessing as mp
 import os
-import queue
 import re
 import resource
 import signal
@@ -27,6 +26,7 @@ import threading
 import time
 import traceback
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional
@@ -59,18 +59,19 @@ class Job:
 class JobManager:
     def __init__(self, shell_manager):
         self.jobs = {}
+        self.futures = {}
         self.lock = threading.Lock()
-        self.job_queue = queue.Queue()
         self.shell_manager = shell_manager
-        self.worker_thread = threading.Thread(target=self.worker_process, daemon=True)
-        self.worker_thread.start()
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
     def submit(self, request: Dict[str, Any]):
         job_id = str(uuid.uuid4())
         job = Job(job_id, request=request)
         with self.lock:
             self.jobs[job_id] = job
-            self.job_queue.put(job)
+            # schedule serially via single-worker executor
+            future = self.executor.submit(self._run_job, job_id)
+            self.futures[job_id] = future
         return job_id
 
     def get_job(self, job_id: str):
@@ -84,53 +85,59 @@ class JobManager:
                 return {"status": "not_found"}
 
             if job.status == "queued":
+                fut = self.futures.get(job_id)
+                # best-effort cancel if not yet started
+                if fut is not None:
+                    fut.cancel()
                 job.status = "canceled"
+                job.finished_at = time.time()
                 return {"status": "ok", "message": "Job canceled from queue."}
 
             if job.status != "running":
                 return {"status": "error", "message": f"Cannot cancel job in state '{job.status}'."}
 
-            # Handle running jobs
             language = job.request.get("language")
             if language == "ipython":
                 session_id = job.request.get("session_id")
                 if not session_id:
                     return {"status": "error", "message": "Cannot cancel ipython job without session_id."}
 
-                was_interrupted, reason = self.shell_manager.interrupt_shell(session_id)
-                if was_interrupted:
-                    job.status = "canceling"
-                    return {"status": "ok", "message": "Job interruption signal sent."}
+                stopped, msg = self.shell_manager.stop_shell(session_id)
+                if stopped:
+                    job.status = "canceled"
+                    return {"status": "ok", "message": f"Job cancel requested; {msg}"}
                 else:
-                    return {"status": "error", "message": f"Failed to interrupt job: {reason}"}
+                    return {"status": "error", "message": f"Failed to cancel job: {msg}"}
             else:
                 return {"status": "error", "message": f"Cancellation for language '{language}' is not supported."}
 
-    def worker_process(self):
-        while True:
-            job = self.job_queue.get()
-            with self.lock:
-                job = self.jobs[job.job_id]
-                if job.status == "canceled":
-                    continue
-                job.started_at = time.time()
-                job.status = "running"
+    def _run_job(self, job_id: str) -> None:
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                return
+            if job.status == "canceled":
+                # was canceled before start; nothing to do
+                self.futures.pop(job_id, None)
+                return
+            job.started_at = time.time()
+            job.status = "running"
 
-            result = self.execute_job(job.request)
+        result = self.execute_job(job.request)
 
-            with self.lock:
-                # If the job was canceled while running, set the final status
-                if job.status == "canceling":
-                    job.status = "canceled"
-                    job.result = {
-                        "process_status": "canceled",
-                        "stdout": result.get("stdout", ""),
-                        "stderr": "Job was canceled.",
-                    }
-                else:
-                    job.result = result
-                    job.status = result["process_status"]
-                job.finished_at = time.time()
+        with self.lock:
+            # If the job was canceled while running, set the final status
+            if job.status == "canceled":
+                job.result = {
+                    "process_status": "canceled",
+                    "stdout": result.get("stdout", ""),
+                    "stderr": "Job was canceled.",
+                }
+            else:
+                job.result = result
+                job.status = result["process_status"]
+            job.finished_at = time.time()
+            self.futures.pop(job_id, None)
 
     def execute_job(self, request: Dict[str, Any]):
         try:
@@ -258,18 +265,28 @@ class ShellManager:
             entry = self.shells.pop(shell_id, None)
 
         if not entry:
-            return
+            return False, f"IPython session {shell_id} not found"
         proc, conn = entry["proc"], entry["conn"]
         try:
-            conn.send({"cmd": "shutdown"})
-        except Exception:
-            pass
-        try:
-            conn.close()
-        except Exception:
-            pass
-        proc.terminate()
-        proc.join(timeout=2.0)
+            try:
+                conn.send({"cmd": "shutdown"})
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+            try:
+                proc.terminate()
+            except Exception:
+                try:
+                    os.kill(proc.pid, signal.SIGKILL)
+                except Exception:
+                    pass
+            proc.join(timeout=2.0)
+            return True, f"IPython session {shell_id} deleted successfully"
+        except Exception as e:
+            return False, f"Error stopping IPython session {shell_id}: {e}"
 
     def run_cell(self, shell_id, code, timeout=1.0, grace=0.5, traceback_verbosity="Plain"):
         """
@@ -450,8 +467,11 @@ def cleanup_expired_sessions():
 
     for session_id in expired_sessions:
         try:
-            shell_manager.stop_shell(session_id)
-            logging.info(f"Cleaned up expired session: {session_id}")
+            ok, msg = shell_manager.stop_shell(session_id)
+            if ok:
+                logging.info(msg)
+            else:
+                logging.error(msg)
         except Exception as e:
             logging.warning(f"Error cleaning up session {session_id}: {e}")
 
@@ -482,8 +502,11 @@ def postprocess_output(output, traceback_verbosity):
 
 def cleanup_session(session_id):
     """Clean up and remove a specific session"""
-    shell_manager.stop_shell(session_id)
-    logging.info(f"Cleaned up session: {session_id}")
+    ok, msg = shell_manager.stop_shell(session_id)
+    if ok:
+        logging.info(msg)
+    else:
+        logging.error(msg)
 
 
 def execute_ipython_session(generated_code, session_id, timeout=30, traceback_verbosity="Plain"):
@@ -782,14 +805,51 @@ def list_sessions():
 def delete_session(session_id):
     """Delete a specific IPython session"""
     try:
-        with shell_manager.manager_lock:
-            session_exists = session_id in shell_manager.shells
+        # First, cancel any queued or running jobs tied to this session via JobManager
+        with job_manager.lock:
+            related_jobs = [
+                (jid, job.status)
+                for jid, job in job_manager.jobs.items()
+                if job.request.get("session_id") == session_id and job.status in ("queued", "running")
+            ]
 
-        if session_exists:
-            shell_manager.stop_shell(session_id)
-            return {"message": f"IPython session {session_id} deleted successfully"}
+        canceled_queued = 0
+        canceled_running = 0
+        cancel_errors = []
+        for jid, prior_status in related_jobs:
+            res = job_manager.cancel_job(jid)
+            if res.get("status") == "ok":
+                if prior_status == "queued":
+                    canceled_queued += 1
+                elif prior_status == "running":
+                    canceled_running += 1
+            else:
+                cancel_errors.append({"job_id": jid, "error": res})
+
+        # If a running job was canceled, its shell was already stopped by cancel_job.
+        # Preserve the session if we only canceled queued jobs; delete only when there were
+        # no running cancellations AND no queued cancellations (explicit delete request).
+        if canceled_running > 0:
+            ok, msg = True, f"IPython session {session_id} deleted successfully"
+        elif canceled_queued > 0:
+            ok, msg = True, f"Canceled {canceled_queued} queued job(s); session preserved"
         else:
-            return {"error": f"IPython session {session_id} not found"}, 404
+            ok, msg = shell_manager.stop_shell(session_id)
+
+        response = {
+            "message": msg,
+            "jobs_canceled": {"queued": canceled_queued, "running": canceled_running},
+        }
+
+        if cancel_errors:
+            response["cancel_errors"] = cancel_errors
+
+        if ok or canceled_queued > 0 or canceled_running > 0:
+            return response
+        else:
+            if "not found" in msg:
+                return {"error": msg}, 404
+            return {"error": msg}, 500
     except Exception as e:
         return {"error": f"Error deleting IPython session {session_id}: {e}"}, 500
 
