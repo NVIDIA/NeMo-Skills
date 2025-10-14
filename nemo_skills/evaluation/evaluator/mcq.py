@@ -34,7 +34,7 @@ class MCQEvaluatorConfig:
 def eval_mcq(cfg):
     # Create config from cfg.eval_config (following pattern from other evaluators)
     eval_config = MCQEvaluatorConfig(**cfg.eval_config)
-        
+
     def extract_letter(text, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$"):
         # extract prediction from boxed{} or regex
         extracted_answer = extract_answer(text, extract_from_boxed=extract_from_boxed, extract_regex=extract_regex)
@@ -51,7 +51,9 @@ def eval_mcq(cfg):
             if match:
                 parsed_letter = match[-1].strip()
 
-        LOG.info(f"Final parsed letter: {parsed_letter}, extract_from_boxed: {extract_from_boxed}, extract_regex: {extract_regex}, extracted_answer: {extracted_answer}")
+        LOG.info(
+            f"Final parsed letter: {parsed_letter}, extract_from_boxed: {extract_from_boxed}, extract_regex: {extract_regex}, extracted_answer: {extracted_answer}"
+        )
 
         return parsed_letter
 
