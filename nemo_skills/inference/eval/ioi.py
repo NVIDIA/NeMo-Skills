@@ -190,7 +190,7 @@ class IOIExecutionGenerationTask(GenerationTask):
                     # Ensure verdict is explicitly 'yes' or 'no'.
                     if verdict not in ("yes", "no"):
                         print(
-                            f"[Warning] Invalid verdict extracted (expected 'yes' or 'no', got '{verdict}'). Full output:\n{ver_out}"
+                            f"[Warning] Invalid verdict extracted (expected 'yes' or 'no', got '{verdict}'). Full output:\n{ver_out}. Report:\n{extract_detailed_solution(ver_out)}"
                         )
 
                     if verdict == "yes":
