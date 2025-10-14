@@ -64,6 +64,24 @@ def extract_detailed_solution(solution: str, marker: str = "Detailed Verificatio
         raise ValueError(f"No report found in solution: {solution}")
 
 
+def _extract_boxed_verdict(text: str) -> str:
+    """Return the lowercase verdict ('yes' or 'no') found **inside** the latest ```report``` block.
+
+    If no ```report``` block is present fall back to searching the whole text. Returns
+    an empty string when no boxed verdict is found.
+    """
+
+    # Try to focus on the report section first
+    try:
+        search_area = extract_detailed_solution(text)
+    except ValueError:
+        # No report block – fall back to full text.
+        search_area = text
+
+    m = re.search(r"\\boxed\{([^}]+)\}", search_area, re.IGNORECASE)
+    return m.group(1).strip().lower() if m else ""
+
+
 @nested_dataclass(kw_only=True)
 class IOIExecutionConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)
@@ -156,10 +174,7 @@ class IOIExecutionGenerationTask(GenerationTask):
                 ]
                 verify_results = await asyncio.gather(*verify_tasks)
                 yes_votes = sum(
-                    1
-                    for _, ver, _ in verify_results
-                    if (m := re.search(r"\\boxed\{([^}]+)\}", ver["generation"], re.IGNORECASE))
-                    and m.group(1).strip().lower().startswith("y")
+                    1 for _, ver, _ in verify_results if _extract_boxed_verdict(ver["generation"]).startswith("y")
                 )
                 print(f"[Step {step_num + 1}] Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
 
@@ -169,9 +184,8 @@ class IOIExecutionGenerationTask(GenerationTask):
                     )
                     ver_out = verify_resp["generation"]
 
-                    # Look for boxed{yes/no}
-                    m = re.search(r"\\boxed\{([^}]+)\}", ver_out, re.IGNORECASE)
-                    verdict = m.group(1).strip().lower() if m else ""
+                    # Extract verdict from inside the report block.
+                    verdict = _extract_boxed_verdict(ver_out)
 
                     # Ensure verdict is explicitly 'yes' or 'no'.
                     if verdict not in ("yes", "no"):
