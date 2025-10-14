@@ -78,6 +78,10 @@ class JobManager:
         with self.lock:
             return self.jobs.get(job_id)
 
+    def queued_ahead_count(self, job_id: str) -> int:
+        with self.lock:
+            return sum((j.job_id != job_id) and (j.status in ("queued", "running")) for j in self.jobs.values())
+
     def _run_job(self, job_id: str) -> None:
         with self.lock:
             job = self.jobs.get(job_id)
@@ -736,10 +740,7 @@ def execute():
     request_dict = request.json
     request_dict["session_id"] = session_id
     job_id = job_manager.submit(request_dict)
-    with job_manager.lock:
-        queued_ahead = sum(
-            1 for j in job_manager.jobs.values() if j.job_id != job_id and j.status in ("queued", "running")
-        )
+    queued_ahead = job_manager.queued_ahead_count(job_id)
     return {"job_id": job_id, "queued_ahead": queued_ahead}, 202
 
 
