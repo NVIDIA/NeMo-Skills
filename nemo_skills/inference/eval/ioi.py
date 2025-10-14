@@ -78,7 +78,7 @@ def _extract_boxed_verdict(text: str) -> str:
         # No report block – fall back to full text.
         search_area = text
 
-    m = re.search(r"\\boxed\{([^}]+)\}", search_area, re.IGNORECASE)
+    m = re.search(r"\\boxed\{([^}]*)\}", search_area)
     return m.group(1).strip().lower() if m else ""
 
 
@@ -91,7 +91,7 @@ class IOIExecutionConfig(GenerateSolutionsConfig):
     verify_prompt_config: str = "eval/ioi/agent/verify"
     improve_after_verify_prompt_config: str = "eval/ioi/agent/improve_after_verify"
     total_steps: int = 30
-    num_self_improve: int = 5
+    num_self_improve: int = 1
     num_verify: int = 10
 
 
