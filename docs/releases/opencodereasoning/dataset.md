@@ -38,7 +38,7 @@ mv open_code_reasoning_questions.jsonl open_code_reasoning_questions_full.jsonl
 head -n 1000 open_code_reasoning_questions_full.jsonl > open_code_reasoning_questions.jsonl
 ```
 
-**Note**: The questions from this dataset are already decontaminated against LiveCodeBench v6 2408-2505. However if you are evaluating against a newer version of LiveCodeBench, you may need to perform decontamination yourself. You can follow the instructions here to construct [decontamination pipeline](https://nvidia.github.io/NeMo-Skills/pipelines/decontamination/).
+**Note**: The questions from this dataset are already decontaminated against LiveCodeBench v6 2408-2505. However if you are evaluating against a newer version of LiveCodeBench, you may need to perform decontamination yourself. You can follow the instructions here to construct [decontamination pipeline](https://nvidia-nemo.github.io/Skills/pipelines/decontamination/).
 
 ## Solution generation pipeline
 
