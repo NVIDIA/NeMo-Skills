@@ -747,7 +747,8 @@ def execute():
     request_dict["session_id"] = session_id
     job_id = job_manager.submit(request_dict)
     queued_ahead = job_manager.queued_ahead_count(job_id)
-    return {"job_id": job_id, "queued_ahead": queued_ahead}, 202
+    logging.info("Accepted job %s queued_ahead=%d pid=%d worker=%s", job_id, queued_ahead, os.getpid(), worker_id)
+    return {"job_id": job_id, "queued_ahead": queued_ahead, "pid": os.getpid(), "worker": worker_id}, 202
 
 
 # Session management endpoints
