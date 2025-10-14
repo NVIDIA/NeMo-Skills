@@ -177,19 +177,22 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
 
     cmd += f"   --training-folder={output_dir} "
     cmd += f"   --hf-ckpt-path={final_hf_path} "
-
-    if step is not None:
-        cmd += f"  --step {step} "
+    if step != "last":
+        try:
+            step = int(step)
+        except ValueError:
+            raise ValueError(
+                f"Invalid step value: {step}. Expected a string representing an integer (e.g. '100') or 'last'."
+            )
+        cmd += f" --step {step} "
 
     return cmd
 
 
-def get_checkpoint_average_cmd(output_dir, average_steps, backend, cleanup):
+def get_checkpoint_average_cmd(output_dir, average_steps, backend, remove_checkpoints_after_average):
     cmd = "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && export UV_PROJECT=/opt/NeMo-RL && cd /nemo_run/code && "
 
-    if backend == "fsdp":
-        raise ValueError("Only support 'megatron' backend now")
-    elif backend == "megatron":
+    if backend in ["fsdp", "megatron"]:
         cmd += "uv run python -m nemo_skills.pipeline.nemo_rl.average_checkpoints "
     else:
         raise ValueError("Invalid backend: must be 'fsdp' or 'megatron'")
@@ -199,8 +202,9 @@ def get_checkpoint_average_cmd(output_dir, average_steps, backend, cleanup):
 
     cmd += f"--checkpoint_dir {output_dir} "
     cmd += f"--steps {steps_str} "
-    if cleanup:
-        cmd += "--cleanup "
+    cmd += f"   --backend={backend} "
+    if remove_checkpoints_after_average:
+        cmd += "--remove_checkpoints_after_average "
 
     return cmd
 
@@ -227,13 +231,19 @@ def sft_nemo_rl(
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
-    conversion_step: int = typer.Option(None, help="The step of checkpoint that needs to be converted"),
+    conversion_step: str = typer.Option(
+        default="last",
+        help=(
+            "The checkpoint step to convert. Use 'last' (default) to convert the latest checkpoint, "
+            "or specify a step number explicitly, e.g. --conversion-step '100'."
+        ),
+    ),
     average_steps: str = typer.Option(
         None,
         help="List of commas separated checkpoint steps to average. E.g '1000,2000,3000,4000,5000'. If None, skip average step and only convert last checkpoint",
     ),
-    cleanup: bool = typer.Option(
-        True, help="Whether to delete original step directories after averaging (default: True)."
+    remove_checkpoints_after_average: bool = typer.Option(
+        False, help="Whether to delete original step directories after averaging (default: True)."
     ),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
@@ -459,7 +469,7 @@ def sft_nemo_rl(
                     output_dir=output_dir,
                     average_steps=average_steps,
                     backend=backend,
-                    cleanup=cleanup,
+                    remove_checkpoints_after_average=remove_checkpoints_after_average,
                 ),
                 task_name=f"{expname}-average-ckpt",
                 log_dir=f"{log_dir}/average-ckpt",
