@@ -34,7 +34,7 @@ To orchestrate complex jobs, NeMo-Skills uses Docker containers. You’ll need t
 Run the following commands locally to complete the setup:
 
 ```shell
-pip install git+https://github.com/NVIDIA/NeMo-Skills.git
+pip install git+https://github.com/NVIDIA-NeMo/Skills.git
 ns setup
 ```
 
@@ -104,7 +104,7 @@ ns run_cmd --expname=prepare-data --log_dir=/workspace/prepare-data --cluster=lo
     head -n 1000 raw_aops_data.jsonl > data.jsonl'
 ```
 
-The fields from the data.jsonl will be used to fill the prompt in [extract-problems.yaml](https://github.com/NVIDIA/NeMo-Skills/blob/main/recipes/openmathreasoning/prompts/extract-problems.yaml), and this final prompt will be passed to an LLM. To learn more, you can inspect the data file and prompt script. For more details about prompt format, see the [prompts](https://nvidia-nemo.github.io/Skills/basics/prompt-format/) documentation.
+The fields from the data.jsonl will be used to fill the prompt in [extract-problems.yaml](https://github.com/NVIDIA-NeMo/Skills/blob/main/recipes/openmathreasoning/prompts/extract-problems.yaml), and this final prompt will be passed to an LLM. To learn more, you can inspect the data file and prompt script. For more details about prompt format, see the [prompts](https://nvidia-nemo.github.io/Skills/basics/prompt-format/) documentation.
 
 Next, run the [generation pipeline](https://nvidia-nemo.github.io/Skills/pipelines/generation/) using the [Python API](https://nvidia-nemo.github.io/Skills/pipelines/#python-interface):
 
@@ -310,6 +310,6 @@ You can also see it in the W&B dashboard. Switch to the Runs panel and click on 
 
 ## What's next?
 
-With NeMo-Skills, you can easily build sophisticated pipelines by connecting the various stages needed to improve LLM abilities. This enables you to seamlessly switch between different training and inference frameworks. All the commands used in this tutorial can be combined into a [single script](https://github.com/NVIDIA/NeMo-Skills/blob/main/recipes/openmathreasoning/scripts/simplified_recipe.py) that schedules the entire job. With just one line change, you can transition from quick prototyping on your local workstation to large-scale experiments on a Slurm cluster.
+With NeMo-Skills, you can easily build sophisticated pipelines by connecting the various stages needed to improve LLM abilities. This enables you to seamlessly switch between different training and inference frameworks. All the commands used in this tutorial can be combined into a [single script](https://github.com/NVIDIA-NeMo/Skills/blob/main/recipes/openmathreasoning/scripts/simplified_recipe.py) that schedules the entire job. With just one line change, you can transition from quick prototyping on your local workstation to large-scale experiments on a Slurm cluster.
 
 As an exercise, try adding the extra filtering steps mentioned in the [OpenMathReasoning documentation](https://nvidia-nemo.github.io/Skills/releases/openmathreasoning/dataset/). You can also try generating multiple solutions per problem and check how this affects final evaluation results. As you will see, having a single script that runs everything—from data generation to model training to evaluation—makes it very easy to iterate on changes to any part of the pipeline.
