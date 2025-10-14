@@ -19,7 +19,7 @@ Here are some of the features we support:
     - [**Tool-calling**](https://nvidia-nemo.github.io/Skills/evaluation/tool-calling): e.g. [bfcl_v3](https://nvidia-nemo.github.io/Skills/evaluation/tool-calling/#bfcl_v3)
     - [**Multilingual**](https://nvidia-nemo.github.io/Skills/evaluation/multilingual): e.g. [mmlu-prox](https://nvidia-nemo.github.io/Skills/evaluation/multilingual/#mmlu-prox), [FLORES-200](https://nvidia-nemo.github.io/Skills/evaluation/multilingual/#FLORES-200), [wmt24pp](https://nvidia-nemo.github.io/Skills/evaluation/multilingual/#wmt24pp)
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
-- [Model training](https://nvidia-nemo.github.io/Skills/pipelines/training): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
+- [Model training](https://nvidia-nemo.github.io/Skills/pipelines/training): Train models using [NeMo-RL](https://github.com/NVIDIA-NeMo/RL/) or [verl](https://github.com/volcengine/verl).
 
 ## News
 * [08/22/2025]: Added details for [reproducing evals](https://nvidia-nemo.github.io/Skills/tutorials/2025/08/22/reproducing-nvidia-nemotron-nano-9b-v2-evals/) for the [NVIDIA-Nemotron-Nano-9B-v2](https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2) model by NVIDIA.
