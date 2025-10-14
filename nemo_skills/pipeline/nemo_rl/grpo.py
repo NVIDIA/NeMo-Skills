@@ -246,7 +246,7 @@ def grpo_nemo_rl(
         help="List of commas separated checkpoint steps to average. E.g '1000,2000,3000,4000,5000'. If None, skip average step and only convert last checkpoint",
     ),
     remove_checkpoints_after_average: bool = typer.Option(
-        False, help="Whether to delete original step directories after averaging (default: True)."
+        False, help="Whether to delete original step directories after averaging (default: False)."
     ),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
