@@ -37,26 +37,23 @@ def eval_mcq(cfg):
         
     def extract_letter(text, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$"):
         # extract prediction from boxed{} or regex
-        LOG.info(f"Extracting letter by using {extract_from_boxed} and {extract_regex}")
-        parsed = extract_answer(text, extract_from_boxed=extract_from_boxed, extract_regex=extract_regex)
-        LOG.info(f"Extracted answer: {parsed}")
+        extracted_answer = extract_answer(text, extract_from_boxed=extract_from_boxed, extract_regex=extract_regex)
+        parsed_letter = None
 
-        if parsed is not None and len(parsed) != 1:
-            match = re.findall(r"\b[A-J]\b(?!.*\b[A-J]\b)", parsed, re.DOTALL)
+        if extracted_answer is not None and len(extracted_answer) != 1:
+            match = re.findall(r"\b[A-J]\b(?!.*\b[A-J]\b)", extracted_answer, re.DOTALL)
             if len(match) > 0:
-                parsed = match[-1].strip()
+                parsed_letter = match[-1].strip()
 
         # adapted from https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview
-        if parsed is None:
+        if parsed_letter is None:
             match = re.findall(r"(?i)[\*\_]{0,2}Answer[\*\_]{0,2}\s*:[\s\*\_]{0,2}\s*([A-Z])(?![a-zA-Z0-9])", text)
             if match:
-                parsed = match[-1].strip()
+                parsed_letter = match[-1].strip()
 
-            LOG.info(f"Falling back to answer regex, parsed letter: {parsed}")
+        LOG.info(f"Final parsed letter: {parsed_letter}, extract_from_boxed: {extract_from_boxed}, extract_regex: {extract_regex}, extracted_answer: {extracted_answer}")
 
-        LOG.info(f"Final parsed letter: {parsed}")
-
-        return parsed
+        return parsed_letter
 
     for file in unroll_files(cfg.input_files):
         with open(file, "rt", encoding="utf-8") as fin:
