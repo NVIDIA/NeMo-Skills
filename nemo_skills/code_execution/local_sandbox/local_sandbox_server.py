@@ -76,7 +76,13 @@ class JobManager:
 
     def get_job(self, job_id: str):
         with self.lock:
-            return self.jobs.get(job_id)
+            job = self.jobs.get(job_id)
+            if job is None:
+                return None
+            # Evict finished jobs after they are returned once to save memory
+            if job.status not in ("queued", "running"):
+                return self.jobs.pop(job_id)
+            return job
 
     def queued_ahead_count(self, job_id: str) -> int:
         with self.lock:
