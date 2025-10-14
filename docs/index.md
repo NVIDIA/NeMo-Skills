@@ -4,7 +4,7 @@ hide:
   - toc
 ---
 
-[NeMo-Skills](https://github.com/NVIDIA/NeMo-Skills) is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
+[NeMo-Skills](https://github.com/NVIDIA-NeMo/Skills) is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
 
 Here are some of the features we support:
 
@@ -21,7 +21,8 @@ Here are some of the features we support:
         - [**Instruction following**](./evaluation/instruction-following.md): e.g. [ifbench](./evaluation/instruction-following.md#ifbench), [ifeval](./evaluation/instruction-following.md#ifeval)
         - [**Long-context**](./evaluation/long-context.md): e.g. [ruler](./evaluation/long-context.md#ruler), [mrcr](./evaluation/long-context.md#mrcr)
         - [**Tool-calling**](./evaluation/tool-calling.md): e.g. [bfcl_v3](./evaluation/tool-calling.md#bfcl_v3)
-        - [**Robustness Evaluation**](./evaluation/robustness.md): Evaluate model sensitvity against changes in prompt.
+        - [**Multilingual capabilities**](./evaluation/multilingual.md): e.g. [mmlu-prox](./evaluation/multilingual.md#mmlu-prox), [flores-200](./evaluation/multilingual.md#FLORES-200), [wmt24pp](./evaluation/multilingual.md#wmt24pp)
+        - [**Robustness evaluation**](./evaluation/robustness.md): Evaluate model sensitvity against changes in prompt.
     - Easily parallelize each evaluation across many Slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](pipelines/training.md): Train models using [NeMo-Aligner](https://github.com/NVIDIA/NeMo-Aligner/), [NeMo-RL](https://github.com/NVIDIA/NeMo-RL/) or [verl](https://github.com/volcengine/verl).
 
