@@ -123,11 +123,15 @@ class Sandbox(abc.ABC):
         job_id = response_json["job_id"]
 
         # Estimate the deadline based on the queued ahead jobs; cut it off at 1200 seconds
-        deadline_seconds = min(1200, (float(response_json.get("queued_ahead", 0)) + 1) * (timeout + 2))
+        # Add extra overhead for ipython to account for interrupt/kill/restart latency
+        overhead = 5.0 if request.get("language") == "ipython" else 2.0
+        deadline_seconds = min(1200, (float(response_json.get("queued_ahead", 0)) + 1) * (timeout + overhead))
         deadline = time.monotonic() + deadline_seconds
         while True:
             # This should never happen under normal circumstances
             if time.monotonic() > deadline:
+                # TODO: if the worker is healthy, instead of resetting it, we should try to restart the job
+                # maybe reset the deadline and log retry attempt
                 LOG.error(
                     "Client timed out polling job %s; issuing hard worker reset (session_id=%s)",
                     job_id,
@@ -136,14 +140,15 @@ class Sandbox(abc.ABC):
                 _ = await self._request(
                     "post", f"http://{self.host}:{self.port}/admin/reset_worker", timeout=5.0, headers=extra_headers
                 )
-                raise httpx.TimeoutException()
+                raise httpx.TimeoutException("Client poll deadline exceeded")
 
             resp = await self._request(
                 "get", f"http://{self.host}:{self.port}/jobs/{job_id}", timeout=2.0, headers=extra_headers
             )
             # This should never happen under normal circumstances
             if getattr(resp, "status_code", 200) != 200:
-                raise RuntimeError(f"Error during polling job {job_id}: {resp.text}")
+                LOG.error("Polling job %s failed with status %d: %s", job_id, resp.status_code, resp.text)
+                raise RuntimeError(f"Error during polling job {job_id} (status {resp.status_code}): {resp.text}")
 
             job_data = resp.json()
             if job_data.get("status") in {"completed", "timeout", "error", "failed", "canceled"}:
