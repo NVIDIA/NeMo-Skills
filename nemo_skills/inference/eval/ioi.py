@@ -94,6 +94,7 @@ class IOIExecutionConfig(GenerateSolutionsConfig):
     total_steps: int = 30
     num_self_improve: int = 1
     num_verify: int = 10
+    num_majority_verify: int = 5
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -160,7 +161,6 @@ class IOIExecutionGenerationTask(GenerationTask):
 
             for step_num in range(self.cfg.total_steps):
                 print(f"[Step {step_num + 1}/{self.cfg.total_steps}] Starting verification phase")
-                consecutive_yes = 0
                 first_fail_report = None
 
                 # Launch verifier calls concurrently
@@ -194,22 +194,21 @@ class IOIExecutionGenerationTask(GenerationTask):
                             f"[Warning] Invalid verdict extracted (expected 'yes' or 'no', got '{verdict}'). Full output:\n{ver_out}. Report:\n{extract_detailed_solution(ver_out)}"
                         )
 
-                    if verdict == "yes":
-                        consecutive_yes += 1
-                        if consecutive_yes >= 5:
-                            print(
-                                f"[Success] Solution verified correct with {consecutive_yes} consecutive 'yes' votes."
-                            )
-                            latest_generation_response = solution
-                            return {
-                                "generation": latest_generation_response,
-                                "steps": chat_history,
-                                "num_steps_completed": num_steps_completed,
-                            }
-                    else:  # Treat 'no' or invalid verdict as failure
+                    if verdict != "yes":  # Treat 'no' or invalid verdict as failure
                         if first_fail_report is None:
                             first_fail_report = ver_out
-                        consecutive_yes = 0  # reset streak
+
+                # Accept if total yes votes meet or exceed majority threshold
+                if yes_votes >= self.cfg.num_majority_verify:
+                    print(
+                        f"[Success] Solution verified correct with {yes_votes} 'yes' votes (threshold: {self.cfg.num_majority_verify})."
+                    )
+                    latest_generation_response = solution
+                    return {
+                        "generation": latest_generation_response,
+                        "steps": chat_history,
+                        "num_steps_completed": num_steps_completed,
+                    }
 
                 # If we reach here, solution deemed incorrect -> improve using first fail report
                 if first_fail_report is not None:
