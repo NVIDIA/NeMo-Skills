@@ -107,6 +107,7 @@ class JobManager:
                 return
             job.started_at = time.time()
             job.status = "running"
+            logging.info("Worker %s started running job %s", worker_id, job_id)
 
         result = self.execute_job(job.request)
 
@@ -121,6 +122,7 @@ class JobManager:
             else:
                 job.result = result
                 job.status = result["process_status"]
+            logging.info("Worker %s finished running job %s with status %s", worker_id, job_id, job.status)
             job.finished_at = time.time()
             self.futures.pop(job_id, None)
 
@@ -144,6 +146,7 @@ class JobManager:
                 job.result = {"process_status": "canceled", "stdout": "", "stderr": "Job was canceled."}
 
             job.status = "canceled"
+            logging.info("Worker %s canceled job %s", worker_id, job_id)
             future = self.futures.get(job_id)
             if future is not None:
                 future.cancel()
@@ -838,7 +841,7 @@ def delete_session(session_id):
 
 @app.route("/health", methods=["GET"])
 def health():
-    return {"status": "healthy", "worker": os.environ.get("WORKER_NUM", "unknown")}
+    return {"status": "healthy", "worker": worker_id}
 
 
 @app.route("/admin/reset_worker", methods=["POST"])
