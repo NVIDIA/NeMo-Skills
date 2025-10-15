@@ -137,14 +137,10 @@ class Sandbox(abc.ABC):
                     job_id,
                     affinity_header,
                 )
-                _ = await self._request(
-                    "post", f"http://{self.host}:{self.port}/admin/reset_worker", timeout=5.0, headers=extra_headers
-                )
+                _ = await self._request("post", self._get_reset_worker_url(), timeout=5.0, headers=extra_headers)
                 raise httpx.TimeoutException("Client poll deadline exceeded")
 
-            resp = await self._request(
-                "get", f"http://{self.host}:{self.port}/jobs/{job_id}", timeout=2.0, headers=extra_headers
-            )
+            resp = await self._request("get", self._get_jobs_url(job_id), timeout=2.0, headers=extra_headers)
             # This should never happen under normal circumstances
             if getattr(resp, "status_code", 200) != 200:
                 LOG.error("Polling job %s failed with status %d: %s", job_id, resp.status_code, resp.text)
@@ -166,6 +162,18 @@ class Sandbox(abc.ABC):
 
     @abc.abstractmethod
     def _get_execute_url(self):
+        pass
+
+    @abc.abstractmethod
+    def _get_jobs_url(self, job_id):
+        pass
+
+    @abc.abstractmethod
+    def _get_reset_worker_url(self):
+        pass
+
+    @abc.abstractmethod
+    def _get_cancel_job_url(self, job_id):
         pass
 
     @abc.abstractmethod
@@ -388,6 +396,15 @@ class LocalSandbox(Sandbox):
 
     def _get_execute_url(self):
         return f"http://{self.host}:{self.port}/execute"
+
+    def _get_jobs_url(self, job_id):
+        return f"http://{self.host}:{self.port}/jobs/{job_id}"
+
+    def _get_reset_worker_url(self):
+        return f"http://{self.host}:{self.port}/admin/reset_worker"
+
+    def _get_cancel_job_url(self, job_id):
+        return f"http://{self.host}:{self.port}/jobs/{job_id}/cancel"
 
     def _parse_request_output(self, output):
         try:
