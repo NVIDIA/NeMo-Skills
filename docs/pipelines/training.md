@@ -42,7 +42,7 @@ Here is an example of how to run a training job.
 It supports models in the Hugging Face format directly.
 
 In the example below, we use Megatron as the backend.
-It provides two configuration options: fsdp and megatron
+NeMo-RL provides two configuration options: fsdp and megatron
 
 ```bash
 ns nemo_rl sft \
