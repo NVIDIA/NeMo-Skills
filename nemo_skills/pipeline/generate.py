@@ -24,6 +24,7 @@ from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils.commands import sandbox_command
 from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
+from nemo_skills.pipeline.utils.server import get_free_port
 from nemo_skills.utils import (
     compute_chunk_ids,
     get_logger_name,
@@ -422,12 +423,19 @@ def generate(
             prev_job = None
 
             for dep_idx in range(dependent_jobs + 1):
+                # Allocate sandbox port if needed
+                # This must be done BEFORE creating CommandGroup so client knows the port
+                if with_sandbox:
+                    current_sandbox_port = get_free_port(strategy="random") if get_random_port else 6000
+                else:
+                    current_sandbox_port = None
+
                 # Create CommandGroup for this task
                 cmd_group = _create_commandgroup_from_config(
                     generation_cmd=cmd,
                     server_config=server_config.copy() if server_config else None,
                     with_sandbox=with_sandbox,
-                    sandbox_port=None if get_random_port else 6000,
+                    sandbox_port=current_sandbox_port,
                     cluster_config=cluster_config,
                     installation_command=installation_command,
                     get_server_command_fn=generation_task.get_server_command_fn(),
