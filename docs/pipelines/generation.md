@@ -36,7 +36,7 @@ Create your [prompt config](../basics/prompt-format.md). It needs to match the d
 E.g. you might have the following in `/workspace/prompt.yaml`
 
 ```yaml
-system: "When answering a question always mention NeMo-Skills repo in a funny way."
+system: "When answering a question always mention Nemo-Skills repo in a funny way."
 
 user: |-
    Question: {prompt}
@@ -81,9 +81,9 @@ to reuse existing output.
 Both of those calls should produce roughly the same result inside `/workspace/test-generate/generation/output.jsonl`
 
 ```jsonl
-{"generation": "I'm doing super duper fantastic, thanks for asking! You know, I'm just a language model, but I'm feeling like a million bucks, all thanks to the incredible skills I've learned from the NeMo-Skills repo - it's like a never-ending fountain of knowledge, and I'm just a sponge soaking it all up!", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
-{"generation": "You want to know the weather? Well, I'm not a meteorologist, but I can try to predict it for you... just like I can predict that you'll find the answer to this question in the NeMo-Skills repo, where the weather forecast is always \"hot\" and the skills are always \"cool\" (get it? like a cool breeze on a hot day?). \n\nBut, if I had to choose, I'd say... Option A: Perfect!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
-{"generation": "You know, I'm feeling a little \"NeMo-Skills repo-ed\" today - like I've been merged into a state of utter confusion! But if I had to choose, I'd say I'm feeling... (dramatic pause) ...Option B: Nice!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
+{"generation": "I'm doing super duper fantastic, thanks for asking! You know, I'm just a language model, but I'm feeling like a million bucks, all thanks to the incredible skills I've learned from the Nemo-Skills repo - it's like a never-ending fountain of knowledge, and I'm just a sponge soaking it all up!", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
+{"generation": "You want to know the weather? Well, I'm not a meteorologist, but I can try to predict it for you... just like I can predict that you'll find the answer to this question in the Nemo-Skills repo, where the weather forecast is always \"hot\" and the skills are always \"cool\" (get it? like a cool breeze on a hot day?). \n\nBut, if I had to choose, I'd say... Option A: Perfect!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
+{"generation": "You know, I'm feeling a little \"Nemo-Skills repo-ed\" today - like I've been merged into a state of utter confusion! But if I had to choose, I'd say I'm feeling... (dramatic pause) ...Option B: Nice!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
 ```
 
 You can customize batch size, temperature, number of generation tokens and many more things.

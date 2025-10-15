@@ -4,7 +4,7 @@ hide:
   - toc
 ---
 
-[NeMo-Skills](https://github.com/NVIDIA-NeMo/Skills) is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
+[Nemo-Skills](https://github.com/NVIDIA-NeMo/Skills) is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
 
 Here are some of the features we support:
 
@@ -30,9 +30,9 @@ Here are some of the features we support:
 To get started, follow these [steps](basics/index.md), browse available [pipelines](./pipelines/index.md) or run `ns --help` to see all available
 commands and their options.
 
-You can find more examples of how to use NeMo-Skills in the [tutorials](./tutorials/index.md) page.
+You can find more examples of how to use Nemo-Skills in the [tutorials](./tutorials/index.md) page.
 
-We've built and released many popular models and datasets using NeMo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
+We've built and released many popular models and datasets using Nemo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
 
 We support many popular benchmarks and it's easy to add new in the future. The following categories of benchmarks are supported
 

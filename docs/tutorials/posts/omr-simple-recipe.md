@@ -6,7 +6,7 @@ readtime: 20
 # A Simple Pipeline to Improve Math Reasoning Accuracy
 
 This tutorial walks you through a simplified version of the pipeline that we used to win the [AIMO2 Kaggle competition](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard).
-We will start with [Qwen2.5-14B-Instruct](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct) model that only scores ~10% on AIME24 benchmark and improve it to ~30% through a series of NeMo-Skills jobs.
+We will start with [Qwen2.5-14B-Instruct](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct) model that only scores ~10% on AIME24 benchmark and improve it to ~30% through a series of Nemo-Skills jobs.
 
 If you’re following along, you’ll need access to either an NVIDIA DGX box with eight NVIDIA A100 (or newer) GPUs or a Slurm cluster with similarly configured nodes. All commands should only take ~2 hours to run.
 
@@ -29,7 +29,7 @@ You can also watch a video version of this tutorial.
 
 ## Setup
 
-To orchestrate complex jobs, NeMo-Skills uses Docker containers. You’ll need to install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) if running locally or use a Slurm cluster that supports [NVIDIA/pyxis](https://github.com/NVIDIA/pyxis). In both cases, it’s recommended that you set up NeMo-Skills on a local workstation and configure it to access your Slurm cluster through ssh. It will take care of uploading your code and scheduling jobs.
+To orchestrate complex jobs, Nemo-Skills uses Docker containers. You’ll need to install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) if running locally or use a Slurm cluster that supports [NVIDIA/pyxis](https://github.com/NVIDIA/pyxis). In both cases, it’s recommended that you set up Nemo-Skills on a local workstation and configure it to access your Slurm cluster through ssh. It will take care of uploading your code and scheduling jobs.
 
 Run the following commands locally to complete the setup:
 
@@ -38,7 +38,7 @@ pip install git+https://github.com/NVIDIA-NeMo/Skills.git
 ns setup
 ```
 
-When prompted to add mounts, define a folder as `/workspace`. This folder will be used in subsequent commands. For more details, see the [NeMo-Skills configs](https://nvidia-nemo.github.io/Skills/basics/cluster-configs/) documentation.
+When prompted to add mounts, define a folder as `/workspace`. This folder will be used in subsequent commands. For more details, see the [Nemo-Skills configs](https://nvidia-nemo.github.io/Skills/basics/cluster-configs/) documentation.
 
 In the following sections, we will always use commands with `--cluster=local` argument which you’d need to change to `--cluster=slurm` (or whatever you named the config during the setup process) if running on Slurm. When using Slurm, all commands will finish immediately and schedule jobs in the cluster queue.
 
@@ -142,7 +142,7 @@ generate(
 
 You can inspect sdg/extracted-problems.yaml to see the outputs. There should be a new field containing the extracted problems. Let's use the QwQ-32B model to generate solutions to these problems.
 
-Add the following code to the end of sdg.py script and rerun it. By default, it will skip the problem extraction step (if it’s complete) because NeMo-Skills can detect if the generation has already finished.
+Add the following code to the end of sdg.py script and rerun it. By default, it will skip the problem extraction step (if it’s complete) because Nemo-Skills can detect if the generation has already finished.
 
 ```py
 generate(
@@ -214,7 +214,7 @@ ns nemo_rl sft \
     ++sft.max_num_epochs=2
 ```
 
-To learn more about SFT configuration, see the [NeMo-Skills training](https://nvidia-nemo.github.io/Skills/pipelines/training/) documentation. If you have W\&B logging enabled, you can inspect the training metrics there.
+To learn more about SFT configuration, see the [Nemo-Skills training](https://nvidia-nemo.github.io/Skills/pipelines/training/) documentation. If you have W\&B logging enabled, you can inspect the training metrics there.
 
 ![Training metrics in the W&B dashboard](../images/omr-simple-recipe/figure2.png)
 
@@ -262,6 +262,6 @@ You can also see it in the W&B dashboard. Switch to the Runs panel and click on 
 
 ## What's next?
 
-With NeMo-Skills, you can easily build sophisticated pipelines by connecting the various stages needed to improve LLM abilities. This enables you to seamlessly switch between different training and inference frameworks. All the commands used in this tutorial can be combined into a [single script](https://github.com/NVIDIA-NeMo/Skills/blob/main/recipes/openmathreasoning/scripts/simplified_recipe.py) that schedules the entire job. With just one line change, you can transition from quick prototyping on your local workstation to large-scale experiments on a Slurm cluster.
+With Nemo-Skills, you can easily build sophisticated pipelines by connecting the various stages needed to improve LLM abilities. This enables you to seamlessly switch between different training and inference frameworks. All the commands used in this tutorial can be combined into a [single script](https://github.com/NVIDIA-NeMo/Skills/blob/main/recipes/openmathreasoning/scripts/simplified_recipe.py) that schedules the entire job. With just one line change, you can transition from quick prototyping on your local workstation to large-scale experiments on a Slurm cluster.
 
 As an exercise, try adding the extra filtering steps mentioned in the [OpenMathReasoning documentation](https://nvidia-nemo.github.io/Skills/releases/openmathreasoning/dataset/). You can also try generating multiple solutions per problem and check how this affects final evaluation results. As you will see, having a single script that runs everything—from data generation to model training to evaluation—makes it very easy to iterate on changes to any part of the pipeline.
