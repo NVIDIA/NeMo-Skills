@@ -100,7 +100,7 @@ class Sandbox(abc.ABC):
                 return sshtunnel_request.post(
                     url=self._get_execute_url(),
                     data=json.dumps(request),
-                    timeout=timeout + 5.0,
+                    timeout=5.0,
                     headers={"Content-Type": "application/json", **extra_headers},
                 )
 
@@ -111,7 +111,7 @@ class Sandbox(abc.ABC):
             output = await self.http_session.post(
                 self._get_execute_url(),
                 content=json.dumps(request),
-                timeout=timeout + 5.0,
+                timeout=5.0,
                 headers={"Content-Type": "application/json", **extra_headers},
             )
         try:
@@ -146,12 +146,12 @@ class Sandbox(abc.ABC):
 
                 def s_get():
                     return sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path).get(
-                        url, timeout=timeout, headers=extra_headers
+                        url, timeout=2.0, headers=extra_headers
                     )
 
                 resp = await asyncio.to_thread(s_get)
             else:
-                resp = await self.http_session.get(url, timeout=timeout, headers=extra_headers)
+                resp = await self.http_session.get(url, timeout=2.0, headers=extra_headers)
             if getattr(resp, "status_code", 200) != 200:
                 await asyncio.sleep(0.2)
                 continue
