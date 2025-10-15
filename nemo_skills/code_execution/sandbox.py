@@ -114,15 +114,32 @@ class Sandbox(abc.ABC):
                 timeout=timeout + 5.0,
                 headers={"Content-Type": "application/json", **extra_headers},
             )
-        j = output.json()
+        try:
+            j = output.json()
+        except json.JSONDecodeError:
+            raise RuntimeError(f"Error during parsing output: {output.text}")
         if "job_id" not in j:
             return self._parse_request_output(output)
-        url = f"http://{self.host}:{self.port}/jobs/{j['job_id']}"
+        job_id = j["job_id"]
+        url = f"http://{self.host}:{self.port}/jobs/{job_id}"
+        cancel_url = f"http://{self.host}:{self.port}/jobs/{job_id}/cancel"
         # Estimate the deadline based on the queued ahead jobs; cut it off at 1200 seconds
         deadline_seconds = min(1200, (float(j.get("queued_ahead", 0)) + 1) * (timeout + 2))
         deadline = time.monotonic() + deadline_seconds
         while True:
             if time.monotonic() > deadline:
+                LOG.error("Client timed out polling job %s; issuing cancel (session_id=%s)", job_id, affinity_header)
+                if self.ssh_server and self.ssh_key_path:
+                    import sshtunnel_requests
+
+                    def s_cancel():
+                        return sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path).post(
+                            cancel_url, timeout=5.0, headers=extra_headers
+                        )
+
+                    _ = await asyncio.to_thread(s_cancel)
+                else:
+                    _ = await self.http_session.post(cancel_url, timeout=5.0, headers=extra_headers)
                 raise httpx.TimeoutException("Client timed out")
             if self.ssh_server and self.ssh_key_path:
                 import sshtunnel_requests

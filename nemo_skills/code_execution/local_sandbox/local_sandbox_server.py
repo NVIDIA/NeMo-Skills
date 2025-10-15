@@ -29,7 +29,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import psutil
 from flask import Flask, request
@@ -88,6 +88,14 @@ class JobManager:
         with self.lock:
             return sum((j.job_id != job_id) and (j.status in ("queued", "running")) for j in self.jobs.values())
 
+    def get_related_jobs(self, job_id: str) -> List[str]:
+        with self.lock:
+            base = self.jobs.get(job_id)
+            if base is None:
+                return []
+            sid = base.request.get("session_id")
+            return [j.job_id for j in self.jobs.values() if j.request.get("session_id") == sid and j.job_id != job_id]
+
     def _run_job(self, job_id: str) -> None:
         with self.lock:
             job = self.jobs.get(job_id)
@@ -115,6 +123,42 @@ class JobManager:
                 job.status = result["process_status"]
             job.finished_at = time.time()
             self.futures.pop(job_id, None)
+
+    def cancel_job(self, job_id: str):
+        """Attempt to cancel a queued or running job.
+
+        - If the job hasn't started, mark it canceled and prevent execution.
+        - If running and language is ipython, stop the associated shell to interrupt execution.
+        - For other languages, we mark as canceled; underlying process may still finish, but
+            result will be recorded as canceled.
+        """
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                return False, f"Job {job_id} not found"
+            if job.status not in ("queued", "running"):
+                return False, f"Job {job_id} already finished with status {job.status}"
+
+            if job.status == "queued":
+                job.finished_at = time.time()
+                job.result = {"process_status": "canceled", "stdout": "", "stderr": "Job was canceled."}
+
+            job.status = "canceled"
+            future = self.futures.get(job_id)
+            if future is not None:
+                future.cancel()
+            self.futures.pop(job_id, None)
+            language = job.request.get("language")
+            session_id = job.request.get("session_id")
+
+        if language == "ipython" and session_id:
+            ok, msg = self.shell_manager.stop_shell(session_id)
+            if not ok:
+                logging.warning(
+                    "Tried to cancel job %s by stopping session %s but failed: %s", job_id, session_id, msg
+                )
+
+        return True, f"Job {job_id} canceled"
 
     def execute_job(self, request: Dict[str, Any]):
         try:
@@ -795,6 +839,26 @@ def delete_session(session_id):
 @app.route("/health", methods=["GET"])
 def health():
     return {"status": "healthy", "worker": os.environ.get("WORKER_NUM", "unknown")}
+
+
+@app.route("/jobs/<job_id>/cancel", methods=["POST"])
+def cancel_job(job_id):
+    """Cancel a queued or running job.
+
+    Best-effort: for ipython, we also stop the associated session to interrupt execution.
+    """
+    req_session_id = request.headers.get("X-Session-ID")
+    for related_job_id in job_manager.get_related_jobs(job_id):
+        ok, msg = job_manager.cancel_job(related_job_id)
+
+    ok, msg = job_manager.cancel_job(job_id)
+    if ok:
+        logging.info("Cancel request for job %s (header_session=%s): %s", job_id, req_session_id, msg)
+        return {"message": msg}, 200
+    else:
+        logging.warning("Cancel request for job %s (header_session=%s) failed: %s", job_id, req_session_id, msg)
+        status = 404 if "not found" in msg else 409
+        return {"error": msg}, status
 
 
 if __name__ == "__main__":
