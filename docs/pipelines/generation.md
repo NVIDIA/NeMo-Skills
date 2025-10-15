@@ -131,10 +131,7 @@ ns generate \
        ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
-In this case we are assuming you're running on a slurm cluster and have prepared Llama 3.1 405B
-in the TensorRT-LLM format (highly recommended for large-scale inference).
-See [checkpoint conversion](../pipelines/checkpoint-conversion.md) to learn more about how to convert
-models to different formats.
+In this case we are assuming you're running on a slurm cluster and have downloaded Llama 3.1 405B.
 
 Note that in this case we use a path to one the train set of the "math" dataset which we prepared with previous command.
 We are using a [generic/math](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config

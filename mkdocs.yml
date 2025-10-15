@@ -65,7 +65,6 @@ nav:
     - pipelines/index.md
     - Generation: pipelines/generation.md
     - Evaluation: pipelines/evaluation.md
-    - Checkpoint conversion: pipelines/checkpoint-conversion.md
     - LLM-as-a-judge: pipelines/llm-as-a-judge.md
     - Decontamination: pipelines/decontamination.md
     - Training (NeMo-RL): pipelines/training.md
