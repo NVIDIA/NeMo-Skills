@@ -73,8 +73,7 @@ For dense models (e.g., Qwen3-8B), adjusting these settings can significantly im
 ```bash
     ++policy.train_global_batch_size=32 \
     ++policy.train_micro_batch_size=1 \
-    ++policy.tensor_model_parallel_size=4
-    ++policy.pipeline_model_parallel_size=4
+    ++policy.tensor_model_parallel_size=4 \
 ```
 
 For MoE models (e.g., Qwen3-30B-A3B), you can also adjust additional MoE-specific parameters to further optimize performance.
