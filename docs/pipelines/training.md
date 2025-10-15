@@ -105,7 +105,7 @@ to schedule evaluation after training
 (whenever you need to run multiple commands, it's more convenient to use python interface)
 
 ```python
-from nemo_skills.pipeline.cli import wrap_arguments, sft_nemo_rl, convert, eval
+from nemo_skills.pipeline.cli import wrap_arguments, sft_nemo_rl, eval
 
 expname = "my-training-job"
 cluster = "slurm"
