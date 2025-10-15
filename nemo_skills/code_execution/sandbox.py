@@ -122,24 +122,28 @@ class Sandbox(abc.ABC):
             return self._parse_request_output(output)
         job_id = j["job_id"]
         url = f"http://{self.host}:{self.port}/jobs/{job_id}"
-        cancel_url = f"http://{self.host}:{self.port}/jobs/{job_id}/cancel"
+        reset_url = f"http://{self.host}:{self.port}/admin/reset_worker"
         # Estimate the deadline based on the queued ahead jobs; cut it off at 1200 seconds
         deadline_seconds = min(1200, (float(j.get("queued_ahead", 0)) + 1) * (timeout + 2))
         deadline = time.monotonic() + deadline_seconds
         while True:
             if time.monotonic() > deadline:
-                LOG.error("Client timed out polling job %s; issuing cancel (session_id=%s)", job_id, affinity_header)
+                LOG.error(
+                    "Client timed out polling job %s; issuing hard worker reset (session_id=%s)",
+                    job_id,
+                    affinity_header,
+                )
                 if self.ssh_server and self.ssh_key_path:
                     import sshtunnel_requests
 
-                    def s_cancel():
+                    def s_reset():
                         return sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path).post(
-                            cancel_url, timeout=5.0, headers=extra_headers
+                            reset_url, timeout=5.0, headers=extra_headers
                         )
 
-                    _ = await asyncio.to_thread(s_cancel)
+                    _ = await asyncio.to_thread(s_reset)
                 else:
-                    _ = await self.http_session.post(cancel_url, timeout=5.0, headers=extra_headers)
+                    _ = await self.http_session.post(reset_url, timeout=5.0, headers=extra_headers)
                 raise httpx.TimeoutException("Client timed out")
             if self.ssh_server and self.ssh_key_path:
                 import sshtunnel_requests

@@ -841,6 +841,32 @@ def health():
     return {"status": "healthy", "worker": os.environ.get("WORKER_NUM", "unknown")}
 
 
+@app.route("/admin/reset_worker", methods=["POST"])
+def reset_worker():
+    """
+    Forcefully exit this worker process.
+
+    We return a 200 response first, then exit shortly after in a
+    background thread to ensure the HTTP response is delivered.
+    """
+    try:
+        pid = os.getpid()
+        wid = os.environ.get("WORKER_NUM", "unknown")
+
+        def _delayed_exit():
+            try:
+                time.sleep(0.25)
+            finally:
+                os._exit(0)
+
+        threading.Thread(target=_delayed_exit, daemon=True).start()
+        logging.warning("Hard reset requested: exiting worker pid=%d worker=%s", pid, wid)
+        return {"message": "worker exiting for hard reset", "pid": pid, "worker": wid}
+    except Exception as e:
+        logging.error("Hard reset failed: %s", e)
+        return {"error": f"Hard reset failed: {e}"}, 500
+
+
 @app.route("/jobs/<job_id>/cancel", methods=["POST"])
 def cancel_job(job_id):
     """Cancel a queued or running job.
