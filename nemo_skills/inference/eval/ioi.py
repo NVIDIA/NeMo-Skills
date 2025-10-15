@@ -79,7 +79,9 @@ def _extract_boxed_verdict(text: str) -> str:
         # No report block – fall back to full text.
         search_area = text
 
-    m = re.search(r"\\boxed\{([^}]*)\}", search_area)
+    # Match one-or-more backslashes before 'boxed' and allow optional spaces
+    # around the braces and content to be robust to model formatting.
+    m = re.search(r"\\+boxed\s*\{\s*([^}]*)\s*\}", search_area)
     return m.group(1).strip().lower() if m else ""
 
 
@@ -175,8 +177,12 @@ class IOIExecutionGenerationTask(GenerationTask):
                 ]
                 verify_results = await asyncio.gather(*verify_tasks)
                 yes_votes = sum(
-                    1 for _, ver, _ in verify_results if _extract_boxed_verdict(ver["generation"]).startswith("y")
+                    1 for _, ver, _ in verify_results if _extract_boxed_verdict(ver["generation"]) == "yes"
                 )
+                for _, ver, _ in verify_results:
+                    print(f"GENERATION: {ver['generation']}")
+                for _, ver, _ in verify_results:
+                    print(f"VOTE: {_extract_boxed_verdict(ver['generation'])}")
                 print(f"[Step {step_num + 1}] Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
 
                 for prompt_txt, verify_resp, gen_time in verify_results:
