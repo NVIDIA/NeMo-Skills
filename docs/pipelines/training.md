@@ -42,7 +42,7 @@ Here is an example of how to run a training job.
 It supports models in the Hugging Face format directly.
 
 In the example below, we use Megatron as the backend.
-NeMo-RL provides two configuration options: fsdp and megatron
+NeMo-RL supports two training backends: fsdp and megatron. fsdp is typically slower but supports more models. If your model is supported by megatron we recommend using it.
 
 ```bash
 ns nemo_rl sft \
@@ -59,14 +59,14 @@ ns nemo_rl sft \
 
 This will run training on 8 nodes of 8 GPUs, using 4 dependent slurm jobs.
 You can adjust the number of epochs and steps as shown below.
-The training will finish earlier once either the specified number of epochs or steps is reached.
+The training will finish once either the specified number of epochs or steps is reached.
 
 ```bash
     ++sft.max_num_epochs=2 \
     ++sft.max_num_steps=1000 \
 ```
 
-It is also recommended to tune the micro batch size and tensor parallel parameters for optimal performance.
+It is also recommended to tune the micro batch size, max sequence length and parallelism parameters for optimal performance. If sequence packing is enabled (default) it's recommended to keep micro batch size as 1 and instead increase sequence packing length when GPU memory isn't used fully.
 
 For dense models (e.g., Qwen3-8B), adjusting these settings can significantly improve training efficiency.
 
@@ -86,16 +86,16 @@ For MoE models (e.g., Qwen3-30B-A3B), you can also adjust additional MoE-specifi
 
 
 We also support sequence packing and context parallel, especially for training sequences > 4k or so, it's recommended to use sequence packing and context parallel.
-(By default, our sft config set sequence_packing as True)
+By default, our sft config set sequence_packing as True.
 ```bash
    ++policy.sequence_packing.enabled=True \
    ++policy.context_parallel_size=4
 ```
 
 
-The training script will automatically convert the final saved checkpoint into the Hugging Face format.
-If you want to only average a subset of checkpoint, add `--average_steps` parameter (e.g. --average_steps=100,200,300).
-
+The training script will automatically convert the final saved checkpoint into the HuggingFace format.
+If you want to convert non-final checkpoint, use `--conversion_step=X`.
+If you want to average a subset of checkpoints, add `--average_steps` parameter (e.g. --average_steps=100,200,300).
 
 ## Chaining pipelines with Python
 

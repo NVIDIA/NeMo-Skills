@@ -74,8 +74,7 @@ ns nemo_rl sft \
     ++checkpointing.save_period=10000 \
     ++sft.max_num_steps=60000 \
     ++sft.max_num_epochs=100 \
-    ++policy.sequence_packing.enabled=False \
-    ++checkpointing.checkpoint_must_save_by=00:03:45:00
+    ++policy.sequence_packing.enabled=False
 ```
 
 For 70B model, we used 5M data subset and the following parameters, but training
@@ -101,8 +100,7 @@ ns nemo_rl sft \
     ++checkpointing.save_period=3330 \
     ++sft.max_num_steps=20000 \
     ++sft.max_num_epochs=100 \
-    ++policy.sequence_packing.enabled=False \
-    ++checkpointing.checkpoint_must_save_by=00:03:20:00
+    ++policy.sequence_packing.enabled=False
 ```
 
 
