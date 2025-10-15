@@ -91,7 +91,7 @@ For MoE models (e.g., Qwen3-30B-A3B), you can also adjust additional MoE-specifi
 ```
 
 
-We also support sequence packing and context parallel, espeically for training sequences > 4k or so, it's recommended to use sequence packing and context parallel.
+We also support sequence packing and context parallel, especially for training sequences > 4k or so, it's recommended to use sequence packing and context parallel.
 (By default, our sft config set sequence_packing as True)
 ```bash
    ++policy.sequence_packing.enabled=True \
