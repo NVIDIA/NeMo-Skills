@@ -33,7 +33,7 @@ def prepare(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
     # download the models and prepare the data
     cmd = (
         f"cd {workspace} && "
-        f"export DOWNLOAD_PREFIX=https://raw.githubusercontent.com/NVIDIA/NeMo-Skills/refs/heads/main/recipes/openmathreasoning && "
+        f"export DOWNLOAD_PREFIX=https://raw.githubusercontent.com/NVIDIA-NeMo/Skills/refs/heads/main/recipes/openmathreasoning && "
         f"wget $DOWNLOAD_PREFIX/scripts/prepare_raw_data.py && "
         f"wget $DOWNLOAD_PREFIX/prompts/extract-problems.yaml && "
         f"wget $DOWNLOAD_PREFIX/scripts/postprocess_problem_extraction.py && "
@@ -100,6 +100,7 @@ def run_sdg(workspace, cluster, num_gpus, training_backend, expname_prefix, wand
         model="Qwen/QwQ-32B",
         server_type="trtllm",
         server_gpus=num_gpus,
+        server_args="--max_num_tokens 10000",  # to account for prompt tokens
         log_samples=not wandb_params["disable_wandb"],
         # using prefix as group to make it easier to see all sdg steps together
         wandb_group=f"{expname_prefix}-sdg",

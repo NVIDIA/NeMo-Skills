@@ -52,6 +52,7 @@ def run_cmd(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
@@ -88,6 +89,10 @@ def run_cmd(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     log_dir: str = typer.Option(
         None,
         help="Can specify a custom location for slurm logs. "
@@ -102,8 +107,8 @@ def run_cmd(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
@@ -181,9 +186,11 @@ def run_cmd(
                 container=containers,
                 cluster_config=cluster_config,
                 partition=partition,
+                qos=qos,
                 time_min=time_min,
                 server_config=server_config,
                 with_sandbox=with_sandbox,
+                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 sandbox_port=None if get_random_port else 6000,
                 run_after=run_after,
                 reuse_code=reuse_code,

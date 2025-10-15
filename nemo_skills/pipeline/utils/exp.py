@@ -29,11 +29,17 @@ from torchx.specs.api import AppState
 
 from nemo_skills.pipeline.utils.cluster import (
     get_env_variables,
+    get_slurm_timeout_str,
     get_tunnel,
     temporary_env_update,
     tunnel_hash,
 )
-from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path, is_mounted_filepath
+from nemo_skills.pipeline.utils.mounts import (
+    check_remote_mount_directories,
+    get_mounts_from_config,
+    get_unmounted_path,
+    is_mounted_filepath,
+)
 from nemo_skills.pipeline.utils.packager import (
     get_packager,
     get_registered_external_repo,
@@ -161,6 +167,7 @@ def get_executor(
     log_prefix: str = "main",
     mounts=None,
     partition=None,
+    qos=None,
     time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
@@ -252,10 +259,7 @@ def get_executor(
                 f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{group} | head -n1)"
             )
 
-    if "timeouts" not in cluster_config:
-        timeout = "10000:00:00:00"
-    else:
-        timeout = cluster_config["timeouts"][partition]
+    timeout = get_slurm_timeout_str(cluster_config, partition, with_save_delay=False)
 
     additional_parameters = {"time_min": time_min} if time_min is not None else {}
     if cluster_config.get("mail_type") is not None:
@@ -283,6 +287,7 @@ def get_executor(
     return run.SlurmExecutor(
         account=cluster_config["account"],
         partition=partition,
+        qos=qos,
         nodes=num_nodes,
         ntasks_per_node=tasks_per_node,
         tunnel=get_tunnel(cluster_config),
@@ -368,8 +373,10 @@ def add_task(
     num_nodes=1,
     log_dir=None,
     partition=None,
+    qos=None,
     time_min=None,
     with_sandbox=False,
+    keep_mounts_for_sandbox=False,
     sandbox_port: int | None = None,
     server_config=None,
     reuse_code_exp: str | run.Experiment | None = None,
@@ -382,8 +389,9 @@ def add_task(
     heterogeneous: bool = False,
     with_ray: bool = False,
     installation_command: str | None = None,
-    skip_hf_home_check: bool = False,
+    skip_hf_home_check: bool | None = None,
     dry_run: bool = False,
+    sandbox_env_overrides: list[str] | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -438,6 +446,10 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     env_vars = get_env_variables(cluster_config)
+    # If not explicitly set, resolve from cluster config
+    if skip_hf_home_check is None:
+        skip_hf_home_check = cluster_config.get("skip_hf_home_check", False)
+
     if cluster_config["executor"] != "none" and not skip_hf_home_check:
         if "HF_HOME" not in env_vars:
             raise RuntimeError(
@@ -469,6 +481,7 @@ def add_task(
             tasks_per_node=num_server_tasks,
             gpus_per_node=server_config["num_gpus"],
             partition=partition,
+            qos=qos,
             time_min=time_min,
             dependencies=dependencies,
             job_name=task_name,
@@ -513,6 +526,7 @@ def add_task(
                         tasks_per_node=cur_tasks,
                         gpus_per_node=num_gpus if server_config is None else 0,
                         partition=partition,
+                        qos=qos,
                         time_min=time_min,
                         dependencies=dependencies,
                         job_name=task_name,
@@ -537,6 +551,10 @@ def add_task(
             "LISTEN_PORT": sandbox_port,
             "NGINX_PORT": sandbox_port,
         }
+        if sandbox_env_overrides:
+            for override in sandbox_env_overrides:
+                key, value = override.split("=", 1)
+                sandbox_env_updates.setdefault(key, value)
         current_env_vars = cluster_config.get("env_vars", []).copy()
         for override in current_env_vars:
             if "PYTHONPATH" in override:
@@ -554,7 +572,7 @@ def add_task(
                 gpus_per_node=0,
                 partition=partition,
                 time_min=time_min,
-                mounts=[],  # we don't want to mount anything
+                mounts=None if keep_mounts_for_sandbox else [],
                 dependencies=dependencies,
                 job_name=task_name,
                 log_dir=log_dir,
@@ -646,6 +664,20 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
     if dry_run:
         LOG.info("Dry run mode is enabled, not running the experiment.")
         return
+
+    if "mounts" in cluster_config:
+        # Can only check cluster mounts here, not those added to add_task
+        mounts = get_mounts_from_config(cluster_config)
+        mount_sources = [m.split(":")[0] for m in mounts]
+
+        LOG.info("Checking mount paths: %s", mount_sources)
+        exit_if_failure = os.environ.get("NEMO_SKILLS_DISABLE_MOUNT_CHECK", "False").lower() not in (
+            "1",
+            "true",
+            "yes",
+        )
+        check_remote_mount_directories(mount_sources, cluster_config, exit_on_failure=exit_if_failure)
+
     if cluster_config["executor"] != "slurm":
         exp.run(detach=False, tail_logs=True, sequential=sequential)
     else:

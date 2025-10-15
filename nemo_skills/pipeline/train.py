@@ -27,11 +27,11 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_exp,
     get_mounted_path,
-    get_timeout,
+    get_timeout_str,
     resolve_mount_paths,
     run_exp,
 )
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -140,7 +140,7 @@ def get_training_cmd(
     if validation_data is None:
         validation_data = training_data
 
-    timeout = get_timeout(cluster_config, partition)
+    timeout = get_timeout_str(cluster_config, partition)
 
     logging_params = get_logging_params(expname, disable_wandb, wandb_project, wandb_group)
 
@@ -186,6 +186,13 @@ def get_logging_params(expname, disable_wandb, wandb_project, wandb_group):
         )
         if wandb_group:
             logging_params += f"++exp_manager.wandb_logger_kwargs.group={wandb_group} "
+
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=expname,
+            wandb_group=wandb_group,
+            wandb_id=wandb_id,
+        )
     else:
         logging_params = "exp_manager.create_wandb_logger=False +exp_manager.create_tensorboard_logger=True"
     return logging_params
@@ -240,6 +247,10 @@ def train(
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
     with_sandbox: bool = typer.Option(False, help="If sandbox is required for code generation"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     partition: str = typer.Option(None, help="Specify partition for jobs"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     average_steps: str = typer.Option(
@@ -277,8 +288,8 @@ def train(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
@@ -370,6 +381,7 @@ def train(
                 partition=partition,
                 time_min=time_min,
                 with_sandbox=with_sandbox,
+                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,

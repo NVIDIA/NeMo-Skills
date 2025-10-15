@@ -27,7 +27,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 # TODO: read this from init.py
-DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24"]
+DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24", "ojbench"]
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -46,6 +46,7 @@ def prepare_data(
     ),
     expname: str = typer.Option("prepare-data", help="Experiment name for data preparation"),
     partition: str = typer.Option(None, help="Slurm partition to use"),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="Time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
@@ -55,11 +56,15 @@ def prepare_data(
     reuse_code_exp: str = typer.Option(None, help="Experiment to reuse code from"),
     config_dir: str = typer.Option(None, help="Custom cluster config directory"),
     with_sandbox: bool = typer.Option(False, help="Start a sandbox container alongside"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
 ):
@@ -130,6 +135,7 @@ def prepare_data(
         command=command,
         expname=expname,
         partition=partition,
+        qos=qos,
         time_min=time_min,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
@@ -139,6 +145,7 @@ def prepare_data(
         reuse_code_exp=reuse_code_exp,
         config_dir=config_dir,
         with_sandbox=with_sandbox,
+        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
         log_dir=log_dir,
         exclusive=exclusive,
         check_mounted_paths=check_mounted_paths,

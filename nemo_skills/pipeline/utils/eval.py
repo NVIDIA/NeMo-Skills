@@ -20,6 +20,7 @@ import shlex
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Dict
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import get_dataset_module, import_from_path
@@ -93,6 +94,7 @@ class BenchmarkArgs:
     judge_args: str
     judge_pipeline_args: dict
     requires_sandbox: bool
+    keep_mounts_for_sandbox: bool
     generation_module: str
     num_samples: int
     num_chunks: int | None
@@ -101,6 +103,8 @@ class BenchmarkArgs:
     score_module: str | None = None
     job_ids: list[int] = field(default_factory=list)
     remaining_jobs: list[dict] = field(default_factory=list)
+    # Per-benchmark sandbox environment overrides in KEY=VALUE form
+    sandbox_env_overrides: list[str] = field(default_factory=list)
 
     @property
     def requires_judge(self):
@@ -180,6 +184,13 @@ def get_benchmark_args_from_module(
     if prompt_config:
         generation_args = f"++prompt_config={prompt_config} {generation_args}"
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
+    keep_mounts_for_sandbox = get_arg_from_module_or_dict(
+        benchmark_module, "KEEP_MOUNTS_FOR_SANDBOX", False, override_dict
+    )
+
+    # Collect any benchmark-specific environment variables
+    env_vars_from_module = getattr(benchmark_module, "SANDBOX_ENV_VARS", [])
+    sandbox_env_overrides = list(env_vars_from_module) if env_vars_from_module else []
 
     generation_module = get_arg_from_module_or_dict(
         benchmark_module, "GENERATION_MODULE", "nemo_skills.inference.generate", override_dict
@@ -221,11 +232,13 @@ def get_benchmark_args_from_module(
         judge_args=judge_args,
         judge_pipeline_args=judge_pipeline_args,
         requires_sandbox=requires_sandbox,
+        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
         generation_module=generation_module,
         num_samples=num_samples,
         num_chunks=num_chunks,
         eval_subfolder=eval_subfolder,
         benchmark_group=benchmark_group,
+        sandbox_env_overrides=sandbox_env_overrides,
     )
 
 
@@ -304,6 +317,7 @@ def prepare_eval_commands(
     extra_datasets_type,
     exclusive,
     with_sandbox,
+    keep_mounts_for_sandbox,
     wandb_parameters,
     extra_eval_args,
     eval_requires_judge,
@@ -354,14 +368,23 @@ def prepare_eval_commands(
             benchmarks_dict[benchmark] = benchmark_args
             if rs_num != -1:
                 if len(cur_benchmarks) > 1:
-                    raise ValueError(
-                        f"Cannot specify number of samples ({rs_num}) for benchmark group {benchmark_or_group}. "
-                        f"Use '{benchmark_or_group}' instead of '{benchmark_or_group}:{rs_num}'."
+                    LOG.warning(
+                        "Number of samples > 1 (%d) is specified for a benchmark group %s, "
+                        "overriding for all benchmarks in the group.",
+                        rs_num,
+                        benchmark_or_group,
                     )
                 benchmarks_dict[benchmark].num_samples = rs_num
 
             if benchmark_args.requires_sandbox and not with_sandbox:
                 LOG.warning("Found benchmark (%s) which requires sandbox, enabled sandbox for it.", benchmark)
+
+            if (
+                benchmark_args.requires_sandbox
+                and benchmark_args.keep_mounts_for_sandbox
+                and not keep_mounts_for_sandbox
+            ):
+                LOG.warning("Found benchmark (%s) which requires sandbox to keep mounts, enabling it.", benchmark)
 
     total_evals = 0
     for benchmark, benchmark_args in benchmarks_dict.items():
@@ -404,9 +427,7 @@ def prepare_eval_commands(
         eval_to_job_map.extend([i] * count)
 
     cur_job_idx = 0
-    get_random_port = pipeline_utils.should_get_random_port(
-        server_parameters["server_gpus"], exclusive, server_parameters["server_type"]
-    )
+    get_random_port = pipeline_utils.should_get_random_port(server_parameters["server_gpus"], exclusive)
     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(
         **server_parameters,
         extra_arguments=extra_arguments,
@@ -505,16 +526,38 @@ def prepare_eval_commands(
 
                 if cur_eval == total_evals - 1 or cur_job_idx != eval_to_job_map[cur_eval + 1]:
                     job_needs_sandbox = any(benchmarks_dict[b].requires_sandbox for b in job_benchmarks)
+                    job_needs_sandbox_to_keep_mounts = any(
+                        benchmarks_dict[b].keep_mounts_for_sandbox for b in job_benchmarks
+                    )
+                    # Aggregate per-job sandbox env overrides from participating benchmarks (first key wins)
+                    ordered_benchmarks = [b for b in benchmarks_dict.keys() if b in job_benchmarks]
+                    env_map: Dict[str, str] = {}
+                    env_source: Dict[str, str] = {}
+                    for b in ordered_benchmarks:
+                        for override in benchmarks_dict[b].sandbox_env_overrides:
+                            key, value = override.split("=", 1)
+                            if key in env_map and env_map[key] != value:
+                                raise ValueError(
+                                    f"Conflicting sandbox environment overrides for key '{key}': "
+                                    f"'{env_map[key]}' (from {env_source[key]}) vs '{value}' (from {b}). "
+                                    "Please submit the benchmarks as separate jobs or increase num_jobs so they do not share a job."
+                                )
+                            env_map[key] = value
+                            env_source[key] = b
+                    job_sandbox_env_overrides = [f"{k}={v}" for k, v in env_map.items()]
+
                     # TODO: move to a dataclass
                     job_batches.append(
                         (
                             job_cmds,
                             job_benchmarks,
                             job_needs_sandbox,
+                            job_needs_sandbox_to_keep_mounts,
                             job_server_config,
                             job_server_address,
                             # a check above guarantees that this is the same for all tasks in a job
                             generation_task.get_server_command_fn(),
+                            job_sandbox_env_overrides,
                         )
                     )
                     job_server_config, job_server_address, job_extra_arguments = pipeline_utils.configure_client(

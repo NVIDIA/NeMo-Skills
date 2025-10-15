@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import json
 import logging
 import random
 import re
 from dataclasses import asdict, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from transformers import AutoTokenizer
@@ -304,6 +305,68 @@ class Prompt:
 
     def __str__(self):
         return str(self.config)
+
+
+def get_token_count(
+    tokenizer,
+    messages: Union[str, list[Union[dict, Any]]],
+    tools: Union[list[dict], None] = None,
+) -> int | None:
+    """
+    Count the number of tokens in a string or chat message list.
+
+    Args:
+        messages (str | list[dict]): Input text or chat messages.
+
+    Returns:
+        int | None: Token count, or None if no tokenizer is set.
+    """
+
+    def message_to_dict(orig_message: Any) -> Dict[str, Any]:
+        message = {"role": orig_message.role}
+        # Handle content
+        if orig_message.content is not None:
+            message["content"] = orig_message.content
+        else:
+            message["content"] = ""
+
+        # Handle tool_calls
+        if hasattr(orig_message, "tool_calls") and orig_message.tool_calls:
+            message["tool_calls"] = []
+            for tool_call in orig_message.tool_calls:
+                # Check if tool_call is already a dict
+                if isinstance(tool_call, dict):
+                    # Already in dict format, use as-is
+                    message["tool_calls"].append(tool_call)
+                else:
+                    # Convert object to dict
+                    tool_call_dict = {
+                        "id": tool_call.id,
+                        "type": tool_call.type,
+                        "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments},
+                    }
+                    message["tool_calls"].append(tool_call_dict)
+        return message
+
+    if tokenizer is None:
+        return None
+
+    if messages is None:
+        return None
+
+    if isinstance(messages, str):
+        return len(tokenizer.encode(messages, add_special_tokens=False))
+    elif isinstance(messages, list):
+        # Convert messages to dicts if they are not already in dict format
+        messages = [
+            message if isinstance(message, dict) else message_to_dict(copy.deepcopy(message)) for message in messages
+        ]
+        try:
+            return len(tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True, tools=tools))
+        except Exception as e:
+            raise ValueError(f"Invalid chat message format: {e}")
+    else:
+        raise ValueError("messages must be a string or a list of dictionaries")
 
 
 def get_config_path(config: str, config_dir: str | None = None, config_extension: str = "yaml") -> Path:
