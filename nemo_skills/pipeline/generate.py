@@ -90,12 +90,20 @@ def _create_commandgroup_from_config(
         components.append(server_cmd)
 
     # 2. Add main generation command
+    # Note: General cluster config env vars are automatically added by get_env_variables() in get_executor()
+    client_env = {}
+    if with_sandbox and sandbox_port is not None:
+        client_env["NEMO_SKILLS_SANDBOX_PORT"] = str(sandbox_port)
+
     client_cmd = Command(
         command=generation_cmd,
         container=cluster_config["containers"]["nemo-skills"],
         name=task_name,
         installation_command=installation_command,
-        metadata={"log_prefix": "main"},
+        metadata={
+            "log_prefix": "main",
+            "environment": client_env,
+        },
     )
     components.append(client_cmd)
 
