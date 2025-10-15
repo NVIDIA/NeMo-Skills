@@ -4,7 +4,7 @@
 
     This pipeline starting script is [nemo_skills/pipeline/nemo_rl/sft.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/pipeline/nemo_rl/sft.py)
 
-    All extra parameters are passed to [nemo_skills/training/nemo-rl/start_sft.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/training/nemo_rl/start_sft.py)
+    All extra parameters are passed to [nemo_skills/training/nemo_rl/start_sft.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/training/nemo_rl/start_sft.py)
 
 
 ## Preparing the data
@@ -31,12 +31,6 @@ that data preparation script supports which you can see
 [here](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/training/data_preparation_utils/config/math_sft.yaml).
 We are using [SDP library](https://github.com/NVIDIA/NeMo-speech-data-processor) for preparing the data, so it's
 a good idea to check their documentation to understand how this config is structured.
-
-!!! note
-
-    Even though we support both SFT and DPO training, the data preparation is currently only implemented
-    for SFT jobs. For DPO, you'd need to manually prepare the data according to the
-    [NeMo-Aligner documentation](https://docs.nvidia.com/nemo-framework/user-guide/latest/modelalignment/dpo.html#dpo-model-training)
 
 
 ## Running training
