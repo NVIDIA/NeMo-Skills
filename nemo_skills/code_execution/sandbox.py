@@ -111,7 +111,7 @@ class Sandbox(abc.ABC):
             "post",
             self._get_execute_url(),
             content=payload,
-            timeout=5.0,
+            timeout=10.0,
             headers={"Content-Type": "application/json", **extra_headers},
         )
         try:
@@ -154,7 +154,7 @@ class Sandbox(abc.ABC):
                     if "process_status" in result
                     else {**result, "process_status": job_data.get("status", "error")}
                 )
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.5)
 
     @abc.abstractmethod
     def _parse_request_output(self, output):
