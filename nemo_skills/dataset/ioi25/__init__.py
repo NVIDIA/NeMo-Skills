@@ -12,11 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+todo: We are working on providing the data files that are necessary to run IOI25 evaluation.
+"""
+
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
-DATASET_GROUP = "code"
-METRICS_TYPE = "ojbench"
-EVAL_SPLIT = "test_python"
-EVAL_ARGS = "++eval_type=ojbench"
-REQUIRES_SANDBOX = True
-KEEP_MOUNTS_FOR_SANDBOX = True
 GENERATION_ARGS = "++prompt_config=generic/default"
+DATASET_GROUP = "code"
+METRICS_TYPE = "ioi"
+EVAL_ARGS = "++eval_type=ioi"
+
+# environment variables required by this benchmark
+SANDBOX_ENV_VARS = [
+    "UWSGI_PROCESSES=1024",
+    "UWSGI_CPU_AFFINITY=8",
+    "UWSGI_CHEAPER=1023",
+    "NUM_WORKERS=1",
+    "STATEFUL_SANDBOX=0",
+]
