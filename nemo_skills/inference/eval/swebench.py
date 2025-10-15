@@ -40,6 +40,11 @@ class SupportedAgentFrameworks(str, Enum):
     openhands = "openhands"
 
 
+class SupportedEvalHarnesses(str, Enum):
+    swe_bench = "swe_bench"
+    swe_gym = "swe_gym"
+
+
 # Like nemo_skills.inference.generate.InferenceConfig, except most parameters are not passed by default
 # because they may not be supported by all LLM servers or agent frameworks.
 # tokens_to_generate is purposefully unlimited by default for SWE-bench.
@@ -84,6 +89,34 @@ NS_TO_OPENHANDS_PARAM = {
 }
 
 
+def get_openhands_install_cmd(repo, commit):
+    return (
+        # make sure /workspace isn't mounted as a safety precaution
+        # (mounting it in the nemo-skills cluster config is ok, just not inside of apptainer specifically)
+        "if [ -d /workspace ]; then "
+        "    echo 'Exiting because /workspace is mounted.' && "
+        "    echo 'Please make sure /workspace is not mounted inside of Apptainer before running OpenHands.' && "
+        "    echo 'This is because OpenHands DELETES EVERYTHING in the /workspace folder if it exists.' && "
+        "    exit 1; "
+        "fi && "
+        # install openhands repo + dependencies
+        "cd /root && "
+        'curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && '
+        "bash Miniforge3-$(uname)-$(uname -m).sh -b && "
+        'eval "$(/root/miniforge3/bin/conda shell.bash hook)" && '
+        "mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
+        "mkdir OpenHands && "
+        "cd OpenHands && "
+        f"git clone {repo} . && "
+        f"git checkout {commit} && "
+        "export INSTALL_DOCKER=0 && "
+        "make build && "
+        "poetry run python -m pip install datasets && "
+        # set local runtime - this tells openhands to run all commands locally instead of spawning docker containers
+        "export RUNTIME=local"
+    )
+
+
 # not inheriting since most parameters are not supported because we don't use our model client here
 # TODO: should we fix that?
 @nested_dataclass(kw_only=True)
@@ -102,9 +135,11 @@ class SweBenchGenerationConfig:
     agent_config: str | None = None
     agent_max_turns: int = 100  # Max iterations for the agent
 
-    # URL of the evaluation harness repo to pass to git clone. Defaults to our fork of SWE-bench with local evaluation
-    eval_harness_repo: str = "https://github.com/Kipok/SWE-bench.git"
-    eval_harness_commit: str = "HEAD"  # Which commit to use when cloning the eval harness repo
+    eval_harness: SupportedEvalHarnesses  # Which evaluation harness to use
+
+    # URL of the evaluation harness repo to pass to git clone
+    eval_harness_repo: str | None = None
+    eval_harness_commit: str | None = None  # Which commit to use when cloning the eval harness repo
 
     swebench_tests_timeout: int = 60 * 30  # Timeout for the tests after applying the patch, in seconds
 
@@ -381,35 +416,15 @@ class SweBenchGenerationTask(GenerationTask):
         data_dir = "/root/" + data_point["dataset_name"].replace("/", "__")
 
         openhands_cmd = (
-            # make sure /workspace isn't mounted as a safety precaution
-            # (mounting it in the nemo-skills cluster config is ok, just not inside of apptainer specifically)
-            "if [ -d /workspace ]; then "
-            "    echo 'Exiting because /workspace is mounted.' && "
-            "    echo 'Please make sure /workspace is not mounted inside of Apptainer before running OpenHands.' && "
-            "    echo 'This is because OpenHands DELETES EVERYTHING in the /workspace folder if it exists.' && "
-            "    exit 1; "
-            "fi && "
             # install openhands repo + dependencies
-            "cd /root && "
-            'curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && '
-            "bash Miniforge3-$(uname)-$(uname -m).sh -b && "
-            'eval "$(/root/miniforge3/bin/conda shell.bash hook)" && '
-            "mamba install -y --override-channels conda-forge::python=3.12 conda-forge::nodejs conda-forge::poetry conda-forge::tmux && "
-            "mkdir OpenHands && "
-            "cd OpenHands && "
-            f"git clone {self.cfg.agent_framework_repo} . && "
-            f"git checkout {self.cfg.agent_framework_commit} && "
-            "export INSTALL_DOCKER=0 && "
-            "make build && "
-            "poetry run python -m pip install datasets && "
+            f"{get_openhands_install_cmd(self.cfg.agent_framework_repo, self.cfg.agent_framework_commit)} && "
             # copy dataset
             f"mkdir {data_dir} && "
             f"cp {self.cfg.input_file} {data_dir} && "
             # set up config files
             f"echo {shlex.quote(config_str)} >config.toml && "
             f"echo \"selected_ids = ['{data_point['instance_id']}']\" >evaluation/benchmarks/swe_bench/config.toml && "
-            # set local runtime & force verbose logs
-            "export RUNTIME=local && "
+            # force verbose logs
             "export LOG_ALL_EVENTS=true && "
             "export LOG_LEVEL=DEBUG && "
             # run the agent
@@ -454,6 +469,114 @@ class SweBenchGenerationTask(GenerationTask):
             )
         return pred_file
 
+    async def _eval_swe_bench(self, data_point, pred_mounted_path):
+        """
+        Evaluates a patch using the SWE-bench harness.
+        pred_mounted_path must be a mounted path to a file in the SWE-bench evaluation format.
+        Returns the absolute (not mounted) path to the evaluation report file.
+        """
+        if self.cfg.eval_harness_repo is None:
+            self.cfg.eval_harness_repo = "https://github.com/Kipok/SWE-bench.git"
+        if self.cfg.eval_harness_commit is None:
+            self.cfg.eval_harness_commit = "HEAD"
+
+        # Run full evaluation with streaming output
+        swe_bench_cmd = (
+            # first installing SWE-bench repo
+            "curl -LsSf https://astral.sh/uv/install.sh | sh && "
+            "source /root/.local/bin/env && "
+            "mkdir /root/SWE-bench && "
+            "cd /root/SWE-bench && "
+            f"git clone {self.cfg.eval_harness_repo} . && "
+            f"git checkout {self.cfg.eval_harness_commit} && "
+            "uv venv --python 3.12 venv && "
+            "source venv/bin/activate && "
+            "uv pip install -e . && "
+            # then running the evaluation with streaming output
+            f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
+            f"    --predictions_path {pred_mounted_path} "
+            f"    --instance_ids {data_point['instance_id']} "
+            f"    --run_id eval-outputs "
+            f"    --timeout {self.cfg.swebench_tests_timeout} "
+            f"    --dataset_name {self.cfg.input_file} && "
+            f"cp -r logs/run_evaluation/eval-outputs /trajectories_mount/"
+        )
+
+        # Execute SWE-bench evaluation command
+        search_path = os.path.join(self.output_dir, "eval-outputs", "*", data_point["instance_id"], "report.json")
+        return await self._execute_container_command(
+            data_point,
+            swe_bench_cmd,
+            search_path,
+            mode="eval",
+            timeout=self.cfg.swebench_tests_timeout + 120,
+        )
+
+    async def _eval_swe_gym(self, data_point, pred_mounted_path):
+        """
+        Evaluates a patch using the SWE-Gym evaluation harness that is built into the OpenHands framework.
+        pred_mounted_path must be a mounted path to a file in the SWE-bench evaluation format.
+        Returns the absolute (not mounted) path to the evaluation report file.
+        """
+        if self.cfg.eval_harness_repo is None:
+            self.cfg.eval_harness_repo = "https://github.com/ludwig-n/OpenHands.git"
+        if self.cfg.eval_harness_commit is None:
+            self.cfg.eval_harness_commit = "ns-swe-gym-eval"
+
+        # Folder for eval outputs.
+        # OH creates them in the same folder as the input file, so we will copy it to this folder before running.
+        eval_log_dir = f"/trajectories_mount/eval-outputs/{data_point['instance_id']}"
+        eval_pred_path = f"{eval_log_dir}/patch.jsonl"
+
+        gold_patch_dict = {
+            "model_name_or_path": "gold",
+            "instance_id": data_point["instance_id"],
+            "model_patch": data_point["patch"],
+        }
+
+        openhands_cmd = (
+            f"{get_openhands_install_cmd(self.cfg.eval_harness_repo, self.cfg.eval_harness_commit)} && "
+            f"poetry run python -m pip install git+https://github.com/SWE-Gym/SWE-Bench-Package.git && "
+            f"mkdir -p {eval_log_dir} && "
+            # f"cp {pred_mounted_path} {eval_pred_path} && "
+            f"echo {shlex.quote(json.dumps(gold_patch_dict))} >{eval_pred_path} && "
+            f"poetry run python evaluation/benchmarks/swe_bench/eval_infer.py "
+            f"    --input-file {eval_pred_path} "
+            f"    --dataset {self.cfg.input_file}"
+        )
+
+        search_path = os.path.join(
+            self.output_dir, "eval-outputs", data_point["instance_id"], "patch.swebench_eval.jsonl"
+        )
+        out_file = await self._execute_container_command(
+            data_point,
+            openhands_cmd,
+            search_path,
+            mode="eval",
+            timeout=self.cfg.swebench_tests_timeout + 120,
+        )
+
+        # Convert to SWE-bench report format
+
+        with open(out_file, "r") as f:
+            report = json.load(f)["test_result"]["report"]
+
+        report = {
+            data_point["instance_id"]: {
+                "resolved": report["resolved"],
+                "patch_exists": not report["empty_generation"],
+                "patch_successfully_applied": not (
+                    report["failed_apply_patch"] or report["error_eval"] or report["test_timeout"]
+                ),
+            }
+        }
+
+        report_file = os.path.join(self.output_dir, "eval-outputs", data_point["instance_id"], "report.json")
+        with open(report_file, "w") as f:
+            json.dump(report, f)
+
+        return report_file
+
     async def process_single_datapoint(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
         self.output_dir = Path(self.cfg.output_file).parent
@@ -464,27 +587,29 @@ class SweBenchGenerationTask(GenerationTask):
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
         # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
 
-        if "base_url" in self.cfg.server:
-            api_base = self.cfg.server.base_url
-        else:
-            api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
+        # if "base_url" in self.cfg.server:
+        #     api_base = self.cfg.server.base_url
+        # else:
+        #     api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
-        if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
-            pred_file = await self._run_swe_agent(data_point, api_base)
-        elif self.cfg.agent_framework == SupportedAgentFrameworks.openhands:
-            pred_file = await self._run_openhands(data_point, api_base)
-        else:
-            raise ValueError(
-                f"Unsupported agent framework: {self.cfg.agent_framework}. "
-                f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
-            )
+        # if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
+        #     pred_file = await self._run_swe_agent(data_point, api_base)
+        # elif self.cfg.agent_framework == SupportedAgentFrameworks.openhands:
+        #     pred_file = await self._run_openhands(data_point, api_base)
+        # else:
+        #     raise ValueError(
+        #         f"Unsupported agent framework: {self.cfg.agent_framework}. "
+        #         f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
+        #     )
 
-        pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount")
-        with open(pred_file, "r") as f:
-            trajectory_dict = json.loads(f.read())
+        # pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount")
+        # with open(pred_file, "r") as f:
+        #     trajectory_dict = json.loads(f.read())
 
-        # Check if the trajectory has an empty patch before running evaluation
-        has_patch = trajectory_dict["model_patch"] is not None
+        # # Check if the trajectory has an empty patch before running evaluation
+        # has_patch = trajectory_dict["model_patch"] is not None
+        pred_mounted_path = None
+        has_patch = True
 
         if not has_patch:
             report_json = {
@@ -495,39 +620,17 @@ class SweBenchGenerationTask(GenerationTask):
                 }
             }
         else:
-            # Run full evaluation with streaming output
-            swe_bench_cmd = (
-                # first installing SWE-bench repo
-                "curl -LsSf https://astral.sh/uv/install.sh | sh && "
-                "source /root/.local/bin/env && "
-                "mkdir /root/SWE-bench && "
-                "cd /root/SWE-bench && "
-                f"git clone {self.cfg.eval_harness_repo} . && "
-                f"git checkout {self.cfg.eval_harness_commit} && "
-                "uv venv --python 3.12 venv && "
-                "source venv/bin/activate && "
-                "uv pip install -e . && "
-                # then running the evaluation with streaming output
-                f"/root/SWE-bench/venv/bin/python -m swebench.harness.run_local_evaluation "
-                f"    --predictions_path {pred_mounted_path} "
-                f"    --instance_ids {data_point['instance_id']} "
-                f"    --run_id eval-outputs "
-                f"    --timeout {self.cfg.swebench_tests_timeout} "
-                f"    --dataset_name {self.cfg.input_file} && "
-                f"cp -r logs/run_evaluation/eval-outputs /trajectories_mount/"
-            )
-
-            # Execute SWE-bench evaluation command
-            search_path = os.path.join(self.output_dir, "eval-outputs", "*", data_point["instance_id"], "report.json")
             # TODO: should we fail on errors here? Seems that json isn't always generated
             try:
-                report_file = await self._execute_container_command(
-                    data_point,
-                    swe_bench_cmd,
-                    search_path,
-                    mode="eval",
-                    timeout=self.cfg.swebench_tests_timeout + 120,
-                )
+                if self.cfg.eval_harness == SupportedEvalHarnesses.swe_bench:
+                    report_file = await self._eval_swe_bench(data_point, pred_mounted_path)
+                elif self.cfg.eval_harness == SupportedEvalHarnesses.swe_gym:
+                    report_file = await self._eval_swe_gym(data_point, pred_mounted_path)
+                else:
+                    raise ValueError(
+                        f"Unsupported eval harness: {self.cfg.eval_harness}. "
+                        f"Supported harnesses: {', '.join(SupportedEvalHarnesses)}."
+                    )
             except ValueError:
                 LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point["instance_id"])
                 report_json = {
@@ -545,7 +648,7 @@ class SweBenchGenerationTask(GenerationTask):
 
         output_dict = {
             "swe-bench-metrics": report_json[data_point["instance_id"]],
-            "swe-bench-outputs": trajectory_dict,
+            "swe-bench-outputs": {},  # trajectory_dict,
             "generation": "",  # required TODO: we should fix this
         }
 
