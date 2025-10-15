@@ -55,8 +55,7 @@ def extract_code_block(text: str):
 
 # Helper to extract a detailed bug report or solution section from an LLM response
 def extract_detailed_solution(solution: str, marker: str = "Detailed Verification", after: bool = True):
-    # First, handle the new format where the report is enclosed in ```report ``` code fences.
-    report_matches = re.findall(r"```report(.*?)```", solution, re.DOTALL)
+    report_matches = re.findall(r"<report>(.*?)</report>", solution, re.DOTALL)
     if report_matches:
         # Return the last (most recent) report block, stripped of leading/trailing whitespace.
         return report_matches[-1].strip()
@@ -65,9 +64,9 @@ def extract_detailed_solution(solution: str, marker: str = "Detailed Verificatio
 
 
 def _extract_boxed_verdict(text: str) -> str:
-    """Return the lowercase verdict ('yes' or 'no') found **inside** the latest ```report``` block.
+    """Return the lowercase verdict ('yes' or 'no') found **inside** the latest <report> block.
 
-    If no ```report``` block is present fall back to searching the whole text. Returns
+    If no <report> block is present fall back to searching the whole text. Returns
     an empty string when no boxed verdict is found.
     """
 
