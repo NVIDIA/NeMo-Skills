@@ -99,12 +99,11 @@ class Sandbox(abc.ABC):
 
     async def _send_request(self, request, timeout):
         extra_headers = {}
-        affinity_header = request.pop("session_id", None) or request.pop("_affinity_key", None)
-
+        affinity_header = request.pop("session_id", None)
+        # We always need X-Session-ID header to route polling requests to the correct worker
         if affinity_header is None:
-            extra_headers["X-Session-ID"] = str(uuid.uuid4())
-        else:
-            extra_headers["X-Session-ID"] = str(affinity_header)
+            affinity_header = str(uuid.uuid4())
+        extra_headers["X-Session-ID"] = affinity_header
 
         payload = json.dumps(request)
         output = await self._request(
@@ -255,7 +254,6 @@ class Sandbox(abc.ABC):
                         cell_code, timeout, language, std_input, max_output_characters, traceback_verbosity
                     )
                     restore_request["session_id"] = request_session_id_str
-                    restore_request["_affinity_key"] = session_id_str
                     try:
                         restore_output = await self._send_request(restore_request, timeout)
                     except httpx.TimeoutException:
@@ -438,8 +436,9 @@ class LocalSandbox(Sandbox):
 
         for attempt in range(max_retries):
             try:
-                response = await self.http_session.delete(
-                    url=f"http://{self.host}:{self.port}/sessions/{session_id}",
+                response = await self._request(
+                    "delete",
+                    f"http://{self.host}:{self.port}/sessions/{session_id}",
                     timeout=10.0,
                     headers={"X-Session-ID": session_id},
                 )
