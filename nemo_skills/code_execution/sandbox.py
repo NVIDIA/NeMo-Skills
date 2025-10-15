@@ -79,90 +79,80 @@ class Sandbox(abc.ABC):
         """Close the HTTP session."""
         await self.http_session.aclose()
 
-    async def _send_request(self, request, timeout):
-        session_id = request.pop("session_id", None)
-        affinity_key = request.pop("_affinity_key", None)
-
-        affinity_header = session_id or affinity_key
-        if affinity_header is None:
-            affinity_header = str(uuid.uuid4())
-        else:
-            affinity_header = str(affinity_header)
-        extra_headers = {}
-        extra_headers["X-Session-ID"] = affinity_header
-
+    async def _request(self, method: str, url: str, **kwargs):
         if self.ssh_server and self.ssh_key_path:
-            # For SSH tunneling, use threads since there's no async version
             import sshtunnel_requests
 
-            def ssh_request():
-                sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
-                return sshtunnel_request.post(
-                    url=self._get_execute_url(),
-                    data=json.dumps(request),
-                    timeout=5.0,
-                    headers={"Content-Type": "application/json", **extra_headers},
-                )
+            def ssh_call():
+                session = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
+                call_kwargs = dict(kwargs)
+                data_value = call_kwargs.pop("content", None)
+                if data_value is not None:
+                    call_kwargs["data"] = data_value
+                http_method = getattr(session, method)
+                return http_method(url, **call_kwargs)
 
-            # Native async requires more lines of code, so we use to_thread
-            # Should be ok since this is a debug mode
-            output = await asyncio.to_thread(ssh_request)
+            return await asyncio.to_thread(ssh_call)
+
+        http_method = getattr(self.http_session, method)
+        return await http_method(url, **kwargs)
+
+    async def _send_request(self, request, timeout):
+        extra_headers = {}
+        affinity_header = request.pop("session_id", None) or request.pop("_affinity_key", None)
+
+        if affinity_header is None:
+            extra_headers["X-Session-ID"] = str(uuid.uuid4())
         else:
-            output = await self.http_session.post(
-                self._get_execute_url(),
-                content=json.dumps(request),
-                timeout=5.0,
-                headers={"Content-Type": "application/json", **extra_headers},
-            )
+            extra_headers["X-Session-ID"] = str(affinity_header)
+
+        payload = json.dumps(request)
+        output = await self._request(
+            "post",
+            self._get_execute_url(),
+            content=payload,
+            timeout=5.0,
+            headers={"Content-Type": "application/json", **extra_headers},
+        )
         try:
-            j = output.json()
+            response_json = output.json()
         except json.JSONDecodeError:
             raise RuntimeError(f"Error during parsing output: {output.text}")
-        if "job_id" not in j:
+        if "job_id" not in response_json:
             return self._parse_request_output(output)
-        job_id = j["job_id"]
-        url = f"http://{self.host}:{self.port}/jobs/{job_id}"
-        reset_url = f"http://{self.host}:{self.port}/admin/reset_worker"
+        job_id = response_json["job_id"]
+
         # Estimate the deadline based on the queued ahead jobs; cut it off at 1200 seconds
-        deadline_seconds = min(1200, (float(j.get("queued_ahead", 0)) + 1) * (timeout + 2))
+        deadline_seconds = min(1200, (float(response_json.get("queued_ahead", 0)) + 1) * (timeout + 2))
         deadline = time.monotonic() + deadline_seconds
         while True:
+            # This should never happen under normal circumstances
             if time.monotonic() > deadline:
                 LOG.error(
                     "Client timed out polling job %s; issuing hard worker reset (session_id=%s)",
                     job_id,
                     affinity_header,
                 )
-                if self.ssh_server and self.ssh_key_path:
-                    import sshtunnel_requests
+                _ = await self._request(
+                    "post", f"http://{self.host}:{self.port}/admin/reset_worker", timeout=5.0, headers=extra_headers
+                )
+                raise httpx.TimeoutException()
 
-                    def s_reset():
-                        return sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path).post(
-                            reset_url, timeout=5.0, headers=extra_headers
-                        )
-
-                    _ = await asyncio.to_thread(s_reset)
-                else:
-                    _ = await self.http_session.post(reset_url, timeout=5.0, headers=extra_headers)
-                raise httpx.TimeoutException("Client timed out")
-            if self.ssh_server and self.ssh_key_path:
-                import sshtunnel_requests
-
-                def s_get():
-                    return sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path).get(
-                        url, timeout=2.0, headers=extra_headers
-                    )
-
-                resp = await asyncio.to_thread(s_get)
-            else:
-                resp = await self.http_session.get(url, timeout=2.0, headers=extra_headers)
+            resp = await self._request(
+                "get", f"http://{self.host}:{self.port}/jobs/{job_id}", timeout=2.0, headers=extra_headers
+            )
+            # This should never happen under normal circumstances
             if getattr(resp, "status_code", 200) != 200:
-                await asyncio.sleep(0.2)
-                continue
-            p = resp.json()
-            if p.get("status") in {"completed", "timeout", "error", "failed", "canceled"}:
-                r = p.get("result") or {}
-                return r if "process_status" in r else {**r, "process_status": p.get("status", "error")}
+                raise RuntimeError(f"Error during polling job {job_id}: {resp.text}")
+
+            job_data = resp.json()
+            if job_data.get("status") in {"completed", "timeout", "error", "failed", "canceled"}:
+                result = job_data.get("result") or {}
+                return (
+                    result
+                    if "process_status" in result
+                    else {**result, "process_status": job_data.get("status", "error")}
+                )
             await asyncio.sleep(0.2)
 
     @abc.abstractmethod
