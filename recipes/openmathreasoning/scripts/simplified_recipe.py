@@ -166,7 +166,7 @@ def initial_eval(workspace, cluster, num_gpus, expname_prefix, wandb_params):
         num_jobs=1,
         expname=f"{expname_prefix}-baseline-eval",
         run_after=f"{expname_prefix}-download-assets",
-        wandb_name=f"{expname_prefix}-final-eval" if not wandb_params["disable_wandb"] else None,
+        wandb_name=f"{expname_prefix}-baseline-eval" if not wandb_params["disable_wandb"] else None,
         wandb_project=wandb_params["wandb_project"],
     )
 
