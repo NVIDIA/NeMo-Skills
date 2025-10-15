@@ -55,6 +55,8 @@ def extract_code_block(text: str):
 
 # Helper to extract a detailed bug report or solution section from an LLM response
 def extract_detailed_solution(solution: str, marker: str = "Detailed Verification", after: bool = True):
+    # todo (sean): this is a hack to prevent catching report tags in the CoT, causing parsing errors for gpt-oss.
+    solution = solution.split("<|end|><|start|>assistant<|channel|>final<|message|>")[-1]
     report_matches = re.findall(r"<report>(.*?)</report>", solution, re.DOTALL)
     if report_matches:
         # Return the last (most recent) report block, stripped of leading/trailing whitespace.
