@@ -699,24 +699,23 @@ class GenerationTask:
         data = self.skip_completed_samples(data)
 
         if len(data) == 0:
-            LOG.info("No data to process, exiting.")
-            return
+            LOG.info("No data to process, skipping generation")
+        else:
+            data = self.preprocess_data(data)
 
-        data = self.preprocess_data(data)
+            self.log_example_prompt(data)
 
-        self.log_example_prompt(data)
+            if self.cfg.dry_run:
+                LOG.info("Exiting without running generation as dry_run flag is set.")
+                return
 
-        if self.cfg.dry_run:
-            LOG.info("Exiting without running generation as dry_run flag is set.")
-            return
+            if not self.cfg.skip_filled:
+                for output_path in [Path(self.cfg.output_file), Path(self.cfg.output_file + "-async")]:
+                    if output_path.exists():
+                        output_path.unlink()
 
-        if not self.cfg.skip_filled:
-            for output_path in [Path(self.cfg.output_file), Path(self.cfg.output_file + "-async")]:
-                if output_path.exists():
-                    output_path.unlink()
-
-        self.wait_for_server()
-        asyncio.run(self.async_loop(data))
+            self.wait_for_server()
+            asyncio.run(self.async_loop(data))
 
         if self.should_run_evaluation and self.evaluator is None:
             self.run_batch_evaluation()
