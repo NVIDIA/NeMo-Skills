@@ -131,7 +131,7 @@ class SolverAgent(BaseSubAgent):
         logs.append({"prompt": filled, "response": out["generation"], "generation_time": t})
         sol = extract_cpp_block(out["generation"]) or ""
         if not sol:
-            raise ValueError("SolverAgent failed to produce a C++ solution block")
+            raise ValueError(f"SolverAgent failed to produce a C++ solution block: {out['generation']}")
         return sol, logs
 
 
