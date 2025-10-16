@@ -89,7 +89,7 @@ policy:
     sequence_length_round: 64
   # ensures the training sequence length is divisible by both (2 × context_parallel_size) and context_parallel_size
   # uses their least common multiple (LCM) for safe alignment between CP and SP
-  make_sequence_length_divisible_by: ${lcm:${mul:${policy.context_parallel_size}, 2}, ${policy.context_parallel_size}}
+  make_sequence_length_divisible_by: ${lcm:${mul:${policy.context_parallel_size}, 2}, ${policy.tensor_model_parallel_size}}
   max_grad_norm: 1.0
 
   optimizer:
