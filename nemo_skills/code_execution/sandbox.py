@@ -14,7 +14,6 @@
 
 import abc
 import asyncio
-import glob
 import json
 import logging
 import os
@@ -31,12 +30,6 @@ from nemo_skills.code_execution.proof_utils import (
 from nemo_skills.utils import get_logger_name, python_doc_to_cmd_help
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-def unroll_files(input_files):
-    for manifest_pattern in input_files:
-        for manifest in sorted(glob.glob(manifest_pattern, recursive=True)):
-            yield manifest
 
 
 class Sandbox(abc.ABC):

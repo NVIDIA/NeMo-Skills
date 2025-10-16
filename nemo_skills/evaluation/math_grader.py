@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
 import logging
 import re
 
@@ -22,12 +21,6 @@ from math_verify import LatexExtractionConfig, StringExtractionConfig, parse, ve
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-def unroll_files(input_files):
-    for manifest_pattern in input_files:
-        for manifest in sorted(glob.glob(manifest_pattern, recursive=True)):
-            yield manifest
 
 
 def _additional_normalization(expr):

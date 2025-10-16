@@ -23,7 +23,6 @@ from argparse import Namespace
 
 from omegaconf import OmegaConf
 
-from nemo_skills.file_utils import unroll_files
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -149,17 +148,17 @@ def install_requirements(url):
 
 
 def eval_livecodebench_pro(cfg):
-    for jsonl_file in unroll_files(cfg.input_files):
-        with open(jsonl_file) as f:
-            samples = [preprocess_code(json.loads(line), "python") for line in f]
-            for sample in samples:
-                sample["problem_id"] = sample.pop("task_id")
-                sample["text_response"] = sample.pop("completion")
-                sample["response_meta"] = None
+    jsonl_file = cfg.input_file
+    with open(jsonl_file) as f:
+        samples = [preprocess_code(json.loads(line), "python") for line in f]
+        for sample in samples:
+            sample["problem_id"] = sample.pop("task_id")
+            sample["text_response"] = sample.pop("completion")
+            sample["response_meta"] = None
 
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
 
 
 def eval_livebench_coding(cfg):
@@ -174,43 +173,43 @@ def eval_livebench_coding(cfg):
             LOG.info("Failed to install 'livecodebench'. Please install it manually.")
             raise
 
-    for jsonl_file in unroll_files(cfg.input_files):
-        samples = []
-        with open(jsonl_file) as f:
-            for line in f:
-                sample = json.loads(line)
-                if sample["task"] == "coding_completion":
-                    assert len(sample["partial_solution"]) > 0
-                    sample = preprocess_code(sample, strip_whitespace=False)
-                    sample["completion"] = sample["completion"].replace("\t", "    ")
-                    full_solution = sample["partial_solution"] + "\n" + sample["completion"]
-                    sample["code_list"] = [full_solution]
-                else:
-                    sample = preprocess_code(sample, strip_whitespace=True)
-                    sample["code_list"] = [sample["completion"]]
+    jsonl_file = cfg.input_file
+    samples = []
+    with open(jsonl_file) as f:
+        for line in f:
+            sample = json.loads(line)
+            if sample["task"] == "coding_completion":
+                assert len(sample["partial_solution"]) > 0
+                sample = preprocess_code(sample, strip_whitespace=False)
+                sample["completion"] = sample["completion"].replace("\t", "    ")
+                full_solution = sample["partial_solution"] + "\n" + sample["completion"]
+                sample["code_list"] = [full_solution]
+            else:
+                sample = preprocess_code(sample, strip_whitespace=True)
+                sample["code_list"] = [sample["completion"]]
 
-                samples.append(sample)
+            samples.append(sample)
 
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
 
-        evaluate(
-            custom_output_file=jsonl_file,
-            k_list=[1],
-            num_process_evaluate=12,
-            timeout=6,
-        )
+    evaluate(
+        custom_output_file=jsonl_file,
+        k_list=[1],
+        num_process_evaluate=12,
+        timeout=6,
+    )
 
-        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
-            eval_grades = json.load(fin)
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                sample["graded_list"] = eval_grades["eval"][sample["question_id"]]["graded_list"]
-                f.write(json.dumps(sample) + "\n")
+    with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+        eval_grades = json.load(fin)
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            sample["graded_list"] = eval_grades["eval"][sample["question_id"]]["graded_list"]
+            f.write(json.dumps(sample) + "\n")
 
-        # moving eval file to ensure metrics are recomputed
-        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+    # moving eval file to ensure metrics are recomputed
+    shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
 
 
 def install_or_upgrade_package(package_name):
@@ -237,47 +236,45 @@ def eval_bigcodebench(cfg):
             raise
 
     data_split = None
-    for jsonl_file in unroll_files(cfg.input_files):
-        samples = []
-        with open(jsonl_file) as f:
-            for line in f:
-                generation_dict = preprocess_code(json.loads(line))
-                generation_dict["solution"] = generation_dict.pop("completion")
-                samples.append(generation_dict)
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
-                if data_split is None:
-                    data_split = sample["split"]
-                elif data_split != sample["split"]:
-                    raise ValueError(
-                        f"All samples should have the same split, but got {data_split} and {sample['split']}"
-                    )
+    jsonl_file = cfg.input_file
+    samples = []
+    with open(jsonl_file) as f:
+        for line in f:
+            generation_dict = preprocess_code(json.loads(line))
+            generation_dict["solution"] = generation_dict.pop("completion")
+            samples.append(generation_dict)
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
+            if data_split is None:
+                data_split = sample["split"]
+            elif data_split != sample["split"]:
+                raise ValueError(f"All samples should have the same split, but got {data_split} and {sample['split']}")
 
-        # https://github.com/bigcode-project/bigcodebench/blob/main/bigcodebench/evaluate.py#L117
-        # if the input filename is "output.jsonl"
-        # then there will be two output files (generated) after evaluation:
-        # "output_eval_results-saved.json"
-        # "output_pass_at_k.json"
-        evaluate(
-            "instruct",
-            data_split,  # full, hard
-            samples=jsonl_file,
-            execution="local",
-            pass_k="1",
-            calibrated=True,
-            save_pass_rate=True,  # saves pass_at_k results in file: "output_pass_at_k.json"
-        )
+    # https://github.com/bigcode-project/bigcodebench/blob/main/bigcodebench/evaluate.py#L117
+    # if the input filename is "output.jsonl"
+    # then there will be two output files (generated) after evaluation:
+    # "output_eval_results-saved.json"
+    # "output_pass_at_k.json"
+    evaluate(
+        "instruct",
+        data_split,  # full, hard
+        samples=jsonl_file,
+        execution="local",
+        pass_k="1",
+        calibrated=True,
+        save_pass_rate=True,  # saves pass_at_k results in file: "output_pass_at_k.json"
+    )
 
-        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
-            eval_grades = json.load(fin)
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                sample["status"] = eval_grades["eval"][sample["task_id"]][0]["status"]
-                f.write(json.dumps(sample) + "\n")
+    with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+        eval_grades = json.load(fin)
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            sample["status"] = eval_grades["eval"][sample["task_id"]][0]["status"]
+            f.write(json.dumps(sample) + "\n")
 
-        # moving eval file to ensure metrics are recomputed
-        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+    # moving eval file to ensure metrics are recomputed
+    shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
 
 
 def eval_human_eval_infilling(cfg):
@@ -317,34 +314,32 @@ def eval_human_eval_infilling(cfg):
         return sample
 
     data_split = None
-    for jsonl_file in unroll_files(cfg.input_files):
-        samples = []
-        with open(jsonl_file) as f:
-            for line in f:
-                sample = json.loads(line)
-                if data_split is None:
-                    data_split = sample["split"]
-                elif data_split != sample["split"]:
-                    raise ValueError(
-                        f"All samples should have the same split, but got {data_split} and {sample['split']}"
-                    )
+    jsonl_file = cfg.input_file
+    samples = []
+    with open(jsonl_file) as f:
+        for line in f:
+            sample = json.loads(line)
+            if data_split is None:
+                data_split = sample["split"]
+            elif data_split != sample["split"]:
+                raise ValueError(f"All samples should have the same split, but got {data_split} and {sample['split']}")
 
-                sample = preprocess_code(sample, strip_whitespace=False)
-                sample["original_completion"] = sample["completion"]
-                sample = postprocess_code(sample)
-                samples.append(sample)
+            sample = preprocess_code(sample, strip_whitespace=False)
+            sample["original_completion"] = sample["completion"]
+            sample = postprocess_code(sample)
+            samples.append(sample)
 
-        # all changes will be done with a new key "completion", so it's ok to write to the same file
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
+    # all changes will be done with a new key "completion", so it's ok to write to the same file
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
 
-        evaluate(data_split, jsonl_file, k=[1], n_workers=4, timeout=3.0)
+    evaluate(data_split, jsonl_file, k=[1], n_workers=4, timeout=3.0)
 
-        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
-            eval_grades = json.load(fin)
+    with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+        eval_grades = json.load(fin)
 
-        with open(jsonl_file, "wt", encoding="utf-8") as f_out:
-            for s in samples:
-                s["passed"] = eval_grades["eval"][s["task_id"]][0]["passed"]
-                f_out.write(json.dumps(s) + "\n")
+    with open(jsonl_file, "wt", encoding="utf-8") as f_out:
+        for s in samples:
+            s["passed"] = eval_grades["eval"][s["task_id"]][0]["passed"]
+            f_out.write(json.dumps(s) + "\n")

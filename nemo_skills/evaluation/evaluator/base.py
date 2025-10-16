@@ -39,12 +39,7 @@ class BaseEvaluator(ABC):
         self.num_parallel_requests = num_parallel_requests
 
     async def eval_full(self) -> None:
-        """
-        Evaluate full dataset in batch mode.
-
-        Args:
-            input_files: List of input files to evaluate
-        """
+        """Evaluate full dataset in batch mode."""
         semaphore = asyncio.Semaphore(self.num_parallel_requests)
 
         # assume that input_file is small enough to entirely fit in the memory
