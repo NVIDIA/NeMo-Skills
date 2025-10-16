@@ -238,13 +238,12 @@ class IOISolutionExecutionGenerationTask(GenerationTask):
         chat_history = []
         num_steps_completed = 0
 
-        latest_generation_response = model_solution
-        try:
-            solution = latest_generation_response
-            first_fail_report = None
+        all_model_solutions = data_point["correct_solutions"]
 
-            for step_num in range(self.cfg.total_steps):
-                print(f"[Step {step_num + 1}/{self.cfg.total_steps}] Starting verification phase")
+        for x, latest_generation_response in enumerate(all_model_solutions):
+            print(f"Processing models solution {x}/{len(all_model_solutions)}")
+            try:
+                solution = latest_generation_response
 
                 # Launch verifier calls concurrently
                 verify_tasks = [
@@ -261,69 +260,10 @@ class IOISolutionExecutionGenerationTask(GenerationTask):
                     1 for _, ver, _ in verify_results if _extract_boxed_verdict(ver["generation"]) == "yes"
                 )
                 for _, ver, _ in verify_results:
-                    print(f"GENERATION: {ver['generation']}")
-                for _, ver, _ in verify_results:
                     print(f"VOTE: {_extract_boxed_verdict(ver['generation'])}")
-                print(f"[Step {step_num + 1}] Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
-                exit(0)
-
-                for prompt_txt, verify_resp, gen_time in verify_results:
-                    chat_history.append(
-                        {"prompt": prompt_txt, "response": verify_resp["generation"], "generation_time": gen_time}
-                    )
-                    ver_out = verify_resp["generation"]
-
-                    # Extract verdict from inside the report block.
-                    verdict = _extract_boxed_verdict(ver_out)
-
-                    # Ensure verdict is explicitly 'yes' or 'no'.
-                    if verdict not in ("yes", "no"):
-                        print(
-                            f"[Warning] Invalid verdict extracted (expected 'yes' or 'no', got '{verdict}'). Full output:\n{ver_out}. Report:\n{extract_detailed_solution(ver_out)}"
-                        )
-
-                    if verdict != "yes":  # Treat 'no' or invalid verdict as failure
-                        if first_fail_report is None:
-                            first_fail_report = ver_out
-
-                # Accept if total yes votes meet or exceed majority threshold
-                if yes_votes >= self.cfg.num_majority_verify:
-                    print(
-                        f"[Success] Solution verified correct with {yes_votes} 'yes' votes (threshold: {self.cfg.num_majority_verify})."
-                    )
-                    latest_generation_response = solution
-                    return {
-                        "generation": latest_generation_response,
-                        "steps": chat_history,
-                        "num_steps_completed": num_steps_completed,
-                    }
-
-                # If we reach here, solution deemed incorrect -> improve using first fail report
-                if first_fail_report is not None:
-                    verification_log = extract_detailed_solution(first_fail_report, "Detailed Verification", False)
-                else:
-                    raise ValueError("No fail report found")
-
-                prompt_txt, sol_resp, gen_time = await self._call_llm(
-                    data_point,
-                    all_data,
-                    "improve_after_verify_solution",
-                    solution=solution,
-                    verification=verification_log,
-                )
-
-                new_solution = extract_code_block(sol_resp["generation"])
-                if not new_solution:
-                    raise ValueError(f"Failed to extract improved solution. Response: {sol_resp}")
-
-                latest_generation_response = sol_resp["generation"]
-                solution = new_solution
-                chat_history.append(
-                    {"prompt": prompt_txt, "response": sol_resp["generation"], "generation_time": gen_time}
-                )
-                num_steps_completed += 1
-        except Exception as e:
-            print(f"Agent loop failed: {e}")
+                print(f"Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
+            except Exception as e:
+                print(f"Agent loop failed: {e}")
 
         return {
             "generation": latest_generation_response,
