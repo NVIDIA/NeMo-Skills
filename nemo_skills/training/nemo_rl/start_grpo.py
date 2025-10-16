@@ -22,6 +22,7 @@ import os
 import pprint
 from collections import defaultdict
 from dataclasses import dataclass
+from math import lcm
 from typing import Any, Optional
 
 from datasets import Dataset, load_dataset
@@ -40,8 +41,6 @@ from omegaconf import OmegaConf
 from transformers import PreTrainedTokenizerBase
 
 from nemo_skills.prompt.utils import get_prompt
-
-OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
@@ -283,6 +282,8 @@ def main() -> None:
         print(f"Overrides: {overrides}")
         config = parse_hydra_overrides(config, overrides)
 
+    OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
+    OmegaConf.register_new_resolver("lcm", lambda x, y: lcm(int(x), int(y)))
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 

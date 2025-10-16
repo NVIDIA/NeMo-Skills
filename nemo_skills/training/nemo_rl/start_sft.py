@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 from functools import partial
+from math import lcm
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -289,6 +290,7 @@ def main():
         config = parse_hydra_overrides(config, overrides)
 
     OmegaConf.register_new_resolver("mul", lambda x, y: int(x) * int(y))
+    OmegaConf.register_new_resolver("lcm", lambda x, y: lcm(int(x), int(y)))
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 
