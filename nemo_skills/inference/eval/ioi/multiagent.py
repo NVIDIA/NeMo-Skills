@@ -94,7 +94,7 @@ class MultiAgentConfig(GenerateSolutionsConfig):
     # Sub-agent configuration
     execution_steps: int = 3
     test_timeout_s: float = 30.0
-    agents: str = "solver,execution,chained"  # comma-separated: solver, execution, chained
+    agents: List[str] = field(default_factory=lambda: [])
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -338,9 +338,9 @@ class MultiAgentGenerationTask(GenerationTask):
     async def process_single_datapoint(self, data_point, all_data, prompt=None):
         chat_history: List[dict] = []
 
-        # Prepare agents for this run (comma-separated string -> list)
+        # Prepare agents for this run (list of agent names)
         agents: List[BaseSubAgent] = []
-        agent_names = [a.strip() for a in (self.cfg.agents or "").split(",") if a.strip()]
+        agent_names = [a.strip() for a in self.cfg.agents]
         for a in agent_names:
             factory = self.available_agents.get(a)
             if factory is not None:
