@@ -242,28 +242,23 @@ class IOISolutionExecutionGenerationTask(GenerationTask):
 
         for x, latest_generation_response in enumerate(all_model_solutions):
             print(f"Processing models solution {x}/{len(all_model_solutions)}")
-            try:
-                solution = latest_generation_response
+            solution = latest_generation_response
 
-                # Launch verifier calls concurrently
-                verify_tasks = [
-                    self._call_llm(
-                        data_point,
-                        all_data,
-                        "verify_solution",
-                        solution=solution,
-                    )
-                    for _ in range(self.cfg.num_verify)
-                ]
-                verify_results = await asyncio.gather(*verify_tasks)
-                yes_votes = sum(
-                    1 for _, ver, _ in verify_results if _extract_boxed_verdict(ver["generation"]) == "yes"
+            # Launch verifier calls concurrently
+            verify_tasks = [
+                self._call_llm(
+                    data_point,
+                    all_data,
+                    "verify_solution",
+                    solution=solution,
                 )
-                for _, ver, _ in verify_results:
-                    print(f"VOTE: {_extract_boxed_verdict(ver['generation'])}")
-                print(f"Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
-            except Exception as e:
-                print(f"Agent loop failed: {e}")
+                for _ in range(self.cfg.num_verify)
+            ]
+            verify_results = await asyncio.gather(*verify_tasks)
+            yes_votes = sum(1 for _, ver, _ in verify_results if _extract_boxed_verdict(ver["generation"]) == "yes")
+            for _, ver, _ in verify_results:
+                print(f"VOTE: {_extract_boxed_verdict(ver['generation'])}")
+            print(f"Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
 
         return {
             "generation": latest_generation_response,
