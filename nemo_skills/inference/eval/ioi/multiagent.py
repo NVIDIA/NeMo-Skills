@@ -223,6 +223,7 @@ class ExecutionAgent(BaseSubAgent):
                 print("[ExecutionAgent] Corresponding full test generation was:\n" + out_test["generation"])
                 raise
             exec_output = f"STDOUT:\n{run_stdout}\nSTDERR:\n{run_stderr}"
+            print("[ExecutionAgent] Execution result (captured):\n" + exec_output)
 
             # Improve using feedback
             print("[ExecutionAgent] Improving solution based on execution feedback")
