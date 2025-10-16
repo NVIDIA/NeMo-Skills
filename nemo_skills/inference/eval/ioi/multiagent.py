@@ -206,13 +206,22 @@ class ExecutionAgent(BaseSubAgent):
                 question_with_history, current_solution, all_data
             )
             logs.append({"prompt": filled_test, "response": out_test["generation"], "generation_time": t_test})
+            print("[ExecutionAgent] Full test generation (raw):\n" + out_test["generation"])
             script = extract_script_block(out_test["generation"]) or ""
             if not script:
+                print(
+                    "[ExecutionAgent] Failed to extract test script. Full generation was:\n" + out_test["generation"]
+                )
                 raise ValueError("Failed to extract test script from generate_test output")
 
             # Execute test script (standalone C++) via custom compile-and-run helper
             print("[ExecutionAgent] Compiling and executing generated test script (custom runner)")
-            run_stdout, run_stderr = await self._compile_and_run_cpp(script, data_point)
+            try:
+                run_stdout, run_stderr = await self._compile_and_run_cpp(script, data_point)
+            except Exception:
+                print("[ExecutionAgent] Compilation/execution error. Test script was:\n" + script)
+                print("[ExecutionAgent] Corresponding full test generation was:\n" + out_test["generation"])
+                raise
             exec_output = f"STDOUT:\n{run_stdout}\nSTDERR:\n{run_stderr}"
 
             # Improve using feedback
