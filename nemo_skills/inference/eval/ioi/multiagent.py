@@ -60,7 +60,7 @@ def extract_boxed_index(text: str) -> Optional[int]:
 def render_solutions_markdown(solutions: List[str]) -> str:
     parts: List[str] = []
     for idx, sol in enumerate(solutions, start=1):
-        parts.append(f"Solution {idx}:\n```cpp\n{sol}\n```\n")
+        parts.append(f"### Proposed Solution {idx} ###\n{sol}\n")
     return "\n".join(parts)
 
 
@@ -68,9 +68,7 @@ def build_question_with_history(question: str, prev_solutions: List[str]) -> str
     if not prev_solutions:
         return question
     prev = render_solutions_markdown(prev_solutions)
-    return (
-        f"{question}\n\nPrevious candidate solutions for your reference (improve upon or propose a new one):\n{prev}"
-    )
+    return f"{question}\n\n Here are previous proposed solutions for your reference (improve upon or propose a new one if believe none of them are useful):\n{prev}"
 
 
 @nested_dataclass(kw_only=True)

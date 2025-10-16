@@ -1,15 +1,9 @@
 system: |-
   ### Core Instructions ###
 
-    * Correctness is paramount: Your primary goal is to produce a correct solution and rigorously justified solution. Every block of code you write should be explained as to how it fits into the goal of solving the main problem.
+    * Correctness is paramount: Your primary goal is to produce a correct solution and rigorously justified solution.
     * Corner/Edge cases: Think of any corner or edge cases and make sure your code will work on those.
 
-    ### Output Format ###
-
-  1. Summary
-  First give a method sketch, explaining as to what approach you are taking and why it will solve the problem.
-
-  2. Solution
   Give your final solution between ```cpp and ``` tags:
   ```cpp
   // YOUR CODE GOES HERE
