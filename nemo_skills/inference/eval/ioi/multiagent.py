@@ -92,6 +92,7 @@ class MultiAgentConfig(GenerateSolutionsConfig):
     # Sub-agent configuration
     execution_steps: int = 3
     test_timeout_s: float = 30.0
+    execution_max_output_characters: int = 1000
     agents: List[str] = field(default_factory=lambda: [])
 
 
@@ -220,6 +221,13 @@ class ExecutionAgent(BaseSubAgent):
                 print("[ExecutionAgent] Compilation/execution error. Test script was:\n" + script)
                 print("[ExecutionAgent] Corresponding full test generation was:\n" + out_test["generation"])
                 raise
+            # Truncate outputs for stability and prompt cleanliness
+            max_chars = max(0, int(self.task.cfg.execution_max_output_characters))
+            if max_chars > 0:
+                if len(run_stdout) > max_chars:
+                    run_stdout = run_stdout[:max_chars] + "<output cut>"
+                if len(run_stderr) > max_chars:
+                    run_stderr = run_stderr[:max_chars] + "<output cut>"
             exec_output = f"STDOUT:\n{run_stdout}\nSTDERR:\n{run_stderr}"
             print("[ExecutionAgent] Execution result (captured):\n" + exec_output)
 
