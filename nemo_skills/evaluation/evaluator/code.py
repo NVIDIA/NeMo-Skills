@@ -24,47 +24,37 @@ from dataclasses import asdict
 from omegaconf import OmegaConf
 from nemo_skills.evaluation.evaluator import BaseEvaluator
 from nemo_skills.file_utils import unroll_files
-from nemo_skills.utils import get_logger_name
+from nemo_skills.utils import get_logger_name, nested_dataclass
 from nemo_skills.code_execution.sandbox import get_sandbox
+
 LOG = logging.getLogger(get_logger_name(__file__))
 
 BIGCODEBENCH_REQUIREMENTS_URL = (
     "https://raw.githubusercontent.com/bigcode-project/bigcodebench/main/Requirements/requirements-eval.txt"
 )
 
+@nested_dataclass(kw_only=True)
 class CodeExecEvaluatorConfig:
-    input_files: str
-    eval_type: str
-    eval_config: dict
-    language: str
     sandbox: dict
-
+    language: str = "python"
+    timeout: int = 10
 
 
 class CodeExecEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 12):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
-        self.sandbox = get_sandbox(**self.eval_config.sandbox)
+        self.sandbox = get_sandbox(self.eval_config.sandbox)
 
     async def eval_single(self, data_point: dict):
         """Evaluate single code during generation."""
 
         # Prepare code using shared utility
-        generation = data_point["generation"]
-
-        config = CodeBuildConfig(
-            final_answer_key=self.eval_config.final_answer_key,
-            extract_code_mode=self.eval_config.extract_code_mode,
-        )
-
-        predicted_code = build_code(
-            generation=generation, data_point=data_point, config=config, answer_format=self.eval_config.language
-        )
+        input = data_point["input"]
 
         # Execute code and get compiler output
         output, _ = await self.sandbox.execute_code(
-            generated_code=predicted_code,
+            generated_code=input,
             language=self.eval_config.language,
             timeout=self.eval_config.timeout,
         )
