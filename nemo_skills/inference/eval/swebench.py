@@ -30,7 +30,12 @@ import tomlkit
 from nemo_skills.inference.generate import GenerationTask
 from nemo_skills.inference.model import server_params
 from nemo_skills.prompt.utils import get_config_path
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.utils import (
+    get_help_message,
+    get_logger_name,
+    nested_dataclass,
+    setup_logging,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -180,7 +185,7 @@ class SweBenchGenerationTask(GenerationTask):
     def cleanup_litellm_cache(self):
         return
 
-    async def apply_evaluation_hook(self, data_point):
+    async def evaluate_single_datapoint(self, data_point):
         # currently evaluation is done directly after generation already
         return data_point
 

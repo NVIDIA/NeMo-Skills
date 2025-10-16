@@ -16,8 +16,8 @@
 DATASET_GROUP = "code"
 METRICS_TYPE = "scicode"
 # generation is a dictionary instead of string and remove_thinking is done during inference
-EVAL_ARGS = "++eval_type=scicode ++remove_thinking=False"
-GENERATION_ARGS = "++prompt_config=eval/scicode/default"
+EVAL_ARGS = ""
+GENERATION_ARGS = "++prompt_config=eval/scicode/default ++eval_type=scicode ++remove_thinking=False"
 GENERATION_MODULE = "nemo_skills.inference.eval.scicode"
 REQUIRES_SANDBOX = True
 EVAL_SPLIT = "test_aai"  # default to test + validation for consistency with AAI

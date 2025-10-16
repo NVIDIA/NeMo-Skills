@@ -16,7 +16,7 @@
 DATASET_GROUP = "code"
 METRICS_TYPE = "ojbench"
 EVAL_SPLIT = "test_python"
-EVAL_ARGS = "++eval_type=ojbench"
+EVAL_ARGS = ""
 REQUIRES_SANDBOX = True
 KEEP_MOUNTS_FOR_SANDBOX = True
-GENERATION_ARGS = "++prompt_config=generic/default"
+GENERATION_ARGS = "++prompt_config=generic/default ++eval_type=ojbench"

@@ -18,5 +18,5 @@
 PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "multichoice"
 METRICS_TYPE = "multichoice"
-EVAL_ARGS = "++eval_type=multichoice"
-GENERATION_ARGS = ""
+EVAL_ARGS = ""
+GENERATION_ARGS = "++eval_type=multichoice"

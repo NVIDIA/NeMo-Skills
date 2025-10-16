@@ -15,5 +15,7 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "chat"
 METRICS_TYPE = "if"
-EVAL_ARGS = "++eval_type=ifbench ++generation_key=response"
-GENERATION_ARGS = "++generation_key=response ++prompt_config=generic/default"
+EVAL_ARGS = ""
+GENERATION_ARGS = (
+    "++generation_key=response ++prompt_config=generic/default ++eval_type=ifbench ++generation_key=response"
+)

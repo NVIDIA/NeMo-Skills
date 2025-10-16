@@ -16,8 +16,8 @@
 PROMPT_CONFIG = "generic/default"
 DATASET_GROUP = "long-context"
 METRICS_TYPE = "aalcr"
-EVAL_ARGS = "++eval_type=no-op"  # using judgement directly in metrics, no need for special evaluation
-GENERATION_ARGS = ""
+EVAL_ARGS = ""
+GENERATION_ARGS = "++eval_type=no-op"  # using judgement directly in metrics, no need for special evaluation
 
 JUDGE_PIPELINE_ARGS = {
     "model": "gpt-4.1",

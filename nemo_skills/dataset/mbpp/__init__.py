@@ -15,5 +15,5 @@
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = "code"
 METRICS_TYPE = "evalplus"
-EVAL_ARGS = "++eval_type=evalplus ++eval_config.dataset=mbpp"
-GENERATION_ARGS = "++prompt_config=generic/codegen"
+EVAL_ARGS = ""
+GENERATION_ARGS = "++prompt_config=generic/codegen ++eval_type=evalplus ++eval_config.dataset=mbpp"

@@ -18,5 +18,5 @@
 PROMPT_CONFIG = "multilingual/segment-translation"
 DATASET_GROUP = "chat"
 METRICS_TYPE = "translation"
-EVAL_ARGS = "++eval_type=no-op"
-GENERATION_ARGS = ""
+EVAL_ARGS = ""
+GENERATION_ARGS = "++eval_type=no-op"
