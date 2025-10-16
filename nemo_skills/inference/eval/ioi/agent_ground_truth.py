@@ -1,9 +1,7 @@
 import asyncio
 import logging
-import os
 import re
 import sys
-import tempfile
 import time
 from dataclasses import field
 
@@ -17,136 +15,6 @@ from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-model_solution = """
-#include "worldmap.h"
-#include <vector>
-#include <iostream>
-using namespace std;
-
-std::vector<std::vector<int> > create_map(int N, int M, std::vector<int> A, std::vector<int> B) {
-	// step #1. preparation
-	vector<vector<int> > G(N);
-	for (int i = 0; i < M; i++) {
-		A[i]--;
-		B[i]--;
-		G[A[i]].push_back(B[i]);
-		G[B[i]].push_back(A[i]);
-	}
-
-	// step #2. make spanning tree
-	vector<bool> vis(N, false);
-	vector<int> depth(N);
-	vector<int> tour, RA, RB;
-	auto dfs = [&](auto& self, int x) -> void {
-		vis[x] = true;
-		tour.push_back(x);
-		for (int i : G[x]) {
-			if (!vis[i]) {
-				depth[i] = depth[x] + 1;
-				self(self, i);
-				tour.push_back(x);
-			} else if (depth[x] < depth[i]) {
-				RA.push_back(x);
-				RB.push_back(i);
-			}
-		}
-	};
-	dfs(dfs, 0);
-
-	// step #3. construction
-	vector<int> rank(N, -1), holder(N, -1);
-	for (int i = 0; i < 2 * N - 1; i++) {
-		int d = min(i, (2 * N - 2) - i);
-		if (rank[tour[i]] < d) {
-			rank[tour[i]] = d;
-			holder[tour[i]] = i;
-		}
-	}
-	vector<vector<int> > H(N);
-	for (int i = 0; i < M - (N - 1); i++) {
-		if (rank[RA[i]] < rank[RB[i]]) {
-			swap(RA[i], RB[i]);
-		}
-		H[RA[i]].push_back(RB[i]);
-	}
-	vector<vector<int> > ans(2 * N, vector<int>(2 * N, 0));
-	int cur = 0, parity = 0;
-	for (int i = 0; i < 2 * N - 1; i++) {
-		if (i == holder[tour[i]]) {
-			int pos = 0;
-			for (int j = 0; j < 2 * N; j++) {
-				int ya = cur - j;
-				if (0 <= ya && ya < 2 * N) {
-					ans[j][ya] = tour[i];
-				}
-				int yb = (cur + 1) - j;
-				if (0 <= yb && yb < 2 * N) {
-					if (pos < int(H[tour[i]].size())) {
-						ans[j][yb] = H[tour[i]][pos];
-						pos++;
-					} else {
-						ans[j][yb] = tour[i];
-					}
-				}
-				int yc = (cur + 2) - j;
-				if (0 <= yc && yc < 2 * N) {
-					ans[j][yc] = tour[i];
-				}
-			}
-			cur += 3;
-			parity ^= 1;
-		} else {
-			for (int j = 0; j < 2 * N; j++) {
-				int ya = cur - j;
-				if (0 <= ya && ya < 2 * N) {
-					ans[j][ya] = tour[i];
-				}
-			}
-			cur += 1;
-		}
-	}
-
-	// step #4. final step
-	for (int i = 0; i < int(ans.size()); i++) {
-		for (int j = 0; j < int(ans.size()); j++) {
-			ans[i][j]++;
-		}
-	}
-
-	return ans;
-}
-"""
-
-
-async def compile_and_run_cpp(code_string: str, data_point: dict):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        for original_path, content in data_point.get("grader_files", []):
-            filename = os.path.basename(original_path)
-            if "checker" in filename or "grader" in filename or not filename.endswith(".h"):
-                continue
-            with open(os.path.join(temp_dir, filename), "w") as f:
-                f.write(content)
-
-        executable_path = os.path.join(temp_dir, "a.out")
-        compile_command = ["g++", "-I", temp_dir, "-x", "c++", "-o", executable_path, "-"]
-        compiler_process = await asyncio.create_subprocess_exec(
-            *compile_command,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, compile_stderr = await compiler_process.communicate(input=code_string.encode())
-
-        if compiler_process.returncode != 0:
-            raise RuntimeError(f"C++ compilation failed:\n{compile_stderr.decode()}\nCode:{code_string}")
-
-        run_process = await asyncio.create_subprocess_exec(
-            executable_path, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        run_stdout, run_stderr = await run_process.communicate()
-        return run_stdout.decode(), run_stderr.decode()
 
 
 def extract_code_block(text: str):
@@ -236,9 +104,9 @@ class IOISolutionExecutionGenerationTask(GenerationTask):
 
     async def process_single_datapoint(self, data_point, all_data, prompt=None):
         chat_history = []
-        num_steps_completed = 0
 
         all_model_solutions = data_point["correct_solutions"]
+        latest_generation_response = ""
 
         for x, latest_generation_response in enumerate(all_model_solutions):
             print(f"Processing models solution {x}/{len(all_model_solutions)}")
@@ -259,11 +127,17 @@ class IOISolutionExecutionGenerationTask(GenerationTask):
             for _, ver, _ in verify_results:
                 print(f"VOTE: {_extract_boxed_verdict(ver['generation'])}")
             print(f"Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
+            chat_history.append(
+                {
+                    "solution": solution,
+                    "verdicts": [_extract_boxed_verdict(ver["generation"]) for _, ver, _ in verify_results],
+                    "generations": [ver["generation"] for _, ver, _ in verify_results],
+                }
+            )
 
         return {
             "generation": latest_generation_response,
-            "steps": chat_history,
-            "num_steps_completed": num_steps_completed,
+            "results": chat_history,
         }
 
 
