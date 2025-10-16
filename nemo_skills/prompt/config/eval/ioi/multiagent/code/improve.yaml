@@ -1,0 +1,25 @@
+# default prompt for all python based code benchmark evaluations
+
+system: ""
+
+user: |-
+  You are a competitive programmer. You are given a proposed C++ solution, and the execution output from a C++ test script. Make improvements to the solution based on the feedback and propose a new solution.
+
+  The final improved solution must be in the following format:
+  ```cpp
+  // Your improved C++ solution here
+  ```
+
+  Here is the problem for which you need to generate/complete code:
+
+  ## Problem
+  {question}
+
+  ## Proposed Solution (C++)
+  {solution}
+
+  ## Test Script (C++)
+  {script}
+
+  ## Execution Results
+  {output}

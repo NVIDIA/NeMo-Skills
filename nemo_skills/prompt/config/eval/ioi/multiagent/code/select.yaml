@@ -1,0 +1,19 @@
+system: ""
+
+user: |-
+  You are a careful judge. You will be shown a competitive programming problem and several candidate final C++ solutions from different agents.
+  Your task is to SELECT the single best solution to return.
+
+  Consider correctness, clarity, robustness to edge cases, and expected performance. If multiple are correct, prefer the cleanest and most robust. If unsure, pick the one most likely to be correct.
+
+  Output your selection as follows:
+  <report>
+  - Brief reasoning for the selection.
+  - Final line: \\boxed{INDEX} where INDEX is a 1-based index of the selected solution from the list below.
+  </report>
+
+  ## Problem
+  {question}
+
+  ## Candidate Solutions (numbered)
+  {solutions}
