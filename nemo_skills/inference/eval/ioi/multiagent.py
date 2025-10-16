@@ -233,7 +233,7 @@ class ExecutionAgent(BaseSubAgent):
             logs.append({"prompt": filled_imp, "response": out_imp["generation"], "generation_time": t_imp})
             new_solution = extract_cpp_block(out_imp["generation"]) or ""
             if not new_solution:
-                raise ValueError("Failed to extract improved C++ solution")
+                raise ValueError("Failed to extract improved C++ solution", out_imp["generation"])
             current_solution = new_solution
 
         return current_solution, logs
