@@ -187,7 +187,7 @@ def get_executor(
         extra_package_dirs = tuple(extra_package_dirs)
     packager = get_packager(extra_package_dirs=extra_package_dirs)
 
-    if cluster_config["executor"] != "slurm":
+    if cluster_config["executor"] not in {"slurm", "lepton"}:
         if num_nodes > 1:
             raise ValueError("Local executor does not support multi-node execution")
 
@@ -678,7 +678,7 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
         )
         check_remote_mount_directories(mount_sources, cluster_config, exit_on_failure=exit_if_failure)
 
-    if cluster_config["executor"] != "slurm":
+    if cluster_config["executor"] not in {"slurm", "lepton"}:
         exp.run(detach=False, tail_logs=True, sequential=sequential)
     else:
         try:
