@@ -1,8 +1,8 @@
-cluster: local
+cluster: dfw
 base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
 expname: "gpt-oss-generate-solutions"
-suffix: ""  # Suffix for experiment names
-dataset_name: ""  # Optional dataset name for id generation
+suffix: "limo_train_preparation"  # Suffix for experiment names
+dataset_name: "limo_train"  # Optional dataset name for id generation
 is_mcq: False
 
 
@@ -11,7 +11,7 @@ is_mcq: False
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
 # Make sure the problems fit the prompt you are using
-input_file: "/nemo_run/code/nemo_skills/dataset/mmlu/val.jsonl"
+input_file: "/ebakhturina/data/stem_v2_seed_data/limo_train.jsonl"
 
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: None
@@ -21,7 +21,7 @@ pipeline_stages:
   - filter_problems          # Filter problems based on format
   - decontaminate            # Decontaminate problems
   - topics_labeling          # Label topics and subtopics
-  - difficulty_estimation    # Estimate difficulty of problems
+  # - difficulty_estimation    # Estimate difficulty of problems
 
 # Directory structure configuration
 directories:
@@ -114,6 +114,8 @@ stages:
       server_gpus: 8
       server_nodes: 2
       num_random_seeds: ${stages.difficulty_estimation.num_random_seeds}
+      server_args: "++inference.tokens_to_generate=16000"
+      num_random_seeds: 5
       num_chunks: 5  
     
     judge_kwargs:
@@ -122,6 +124,8 @@ stages:
       server_gpus: 8
       server_nodes: 2
       num_random_seeds: ${stages.difficulty_estimation.num_random_seeds}
+      server_args: "++skip_filled=True  ++prompt_config=judge/general-judge "
+      num_random_seeds: 1
       num_chunks: 5
     
     dependencies:

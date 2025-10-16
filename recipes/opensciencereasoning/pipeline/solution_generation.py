@@ -70,6 +70,49 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
             ctx=wrapped_cmd, 
             run_after=run_after)
 
+def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
+    input_file = stage_config.get("input_file")
+    output_dir = stage_config["output_dir"]
+    prompt_config = stage_config["mcq_prompt_config"] if stage_config["is_mcq"] else stage_config["openq_prompt_config"]
+    generation_kwargs = stage_config.get("generation_kwargs", {})
+    judge_kwargs = stage_config.get("judge_kwargs", {})
+
+    server_args = generation_kwargs.get("server_args", "")
+
+    expname_1 = f"{expname}-difficulty-generation"
+
+    # run generation
+    generate(
+        ctx=wrap_arguments(
+            f"++prompt_config={prompt_config} " + generation_kwargs.get("inline_args", "")
+        ),
+        cluster=cluster,
+        input_file=input_file,
+        output_dir=output_dir,
+        expname=expname_1,
+        run_after=run_after,
+        **generation_kwargs,
+        **stage_config.get("stage_kwargs", {}),
+    )
+
+    expname_2 = f"{expname}-difficulty-judge"
+
+    generate(
+        ctx=wrap_arguments(
+            f"++prompt_config={prompt_config} " + generation_kwargs.get("inline_args", "")
+        ),
+        generation_type="math_judge",
+        cluster=cluster,
+        input_file=f"{output_dir}/{OUTPUT_FILE}",
+        output_dir=output_dir,
+        expname=expname_2,
+        run_after=expname_1,
+        **judge_kwargs,
+    )
+
+
+    # run judging
+
 
 def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
     """Run contamination retrieval and checking, then write decontaminated data.
