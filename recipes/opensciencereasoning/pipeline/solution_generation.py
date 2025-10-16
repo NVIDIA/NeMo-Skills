@@ -58,8 +58,14 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
         f"    --num_options {stage_config.get('num_options', None)} "
         f"    --option_format_regex '{stage_config.get('option_format_regex', None)}'"
     )
+    
     wrapped_cmd = wrap_arguments(cmd)
-    run_cmd(cluster, expname, wrapped_cmd, run_after=run_after)
+    run_cmd(cluster=cluster, 
+            container="nemo",
+            log_dir=f"{output_dir}/logs",
+            expname=expname, 
+            ctx=wrapped_cmd, 
+            run_after=run_after)
 
 def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
     input_file = stage_config.get("input_file")
@@ -72,7 +78,6 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
 
     expname_1 = f"{expname}-difficulty-generation"
 
-    
     # run generation
     generate(
         ctx=wrap_arguments(
@@ -93,6 +98,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
         ctx=wrap_arguments(
             f"++prompt_config={prompt_config} " + generation_kwargs.get("inline_args", "")
         ),
+        generation_type="math_judge",
         cluster=cluster,
         input_file=f"{output_dir}/{OUTPUT_FILE}",
         output_dir=output_dir,
@@ -167,7 +173,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
                 f"python /nemo_run/code/recipes/opensciencereasoning/scripts/decontaminate.py "
                 f"    --input_path '{input_file}' "
                 f"    --dec_path '{output_dir}/decontaminate/output.jsonl' "
-                f"    --save_path {output_dir}/final_result.jsonl "
+                f"    --save_path {output_dir}/{OUTPUT_FILE} "
                 f"    --with_duplicates False "
             )
         ),
@@ -247,7 +253,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_topics.py "
             f"    --input_files {shlex.quote(json.dumps(save_paths, ensure_ascii=False))} "
-            f"    --output_file '{output_dir}/final_result.jsonl' "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --topics_structure {shlex.quote(json.dumps(topics_structure, ensure_ascii=False))} "
             f"    --names {shlex.quote(json.dumps(generation_keys, ensure_ascii=False))} "
         ),
@@ -262,18 +268,20 @@ stages_map = {
     "filter_problems": filter_problems,
     "decontaminate": decontaminate,
     "topics_labeling": topics_labeling,
+    "difficulty_estimation": difficulty_estimation,
 }
 
 
 if __name__ == "__main__":
     config_dir = Path(__file__).parents[1] / "configs" / "solution_sdg"
+    print(f"Looking for configs in {config_dir}")
     available_configs = get_available_configs(config_dir)
 
     parser = argparse.ArgumentParser(description="OpenMathReasoning-1 solution generation pipeline")
     parser.add_argument(
         "--mode",
         type=str,
-        required=True,
+        default="gpt-oss",
         choices=available_configs,
         help="Will pick a corresponding config from configs folder",
     )

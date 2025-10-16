@@ -1,8 +1,8 @@
-cluster: local
+cluster: dfw
 base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
 expname: "gpt-oss-generate-solutions"
-suffix: ""  # Suffix for experiment names
-dataset_name: ""  # Optional dataset name for id generation
+suffix: "limo_train_preparation"  # Suffix for experiment names
+dataset_name: "limo_train"  # Optional dataset name for id generation
 is_mcq: False
 
 
@@ -11,16 +11,17 @@ is_mcq: False
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
 # Make sure the problems fit the prompt you are using
-input_file: "/nemo_run/code/nemo_skills/dataset/mmlu/val.jsonl"
+input_file: "/ebakhturina/data/stem_v2_seed_data/limo_train.jsonl"
 
 # Can define initial dependency for the `generate_solutions` stage to run after
-initial_dependency: ""
+initial_dependency: None
 
 # Define the full sequence of stages for this mode
 pipeline_stages:
   - filter_problems          # Filter problems based on format
-  - decontaminate            # Decontaminate problems
-  - topics_labeling          # Label topics and subtopics
+  # - decontaminate            # Decontaminate problems
+  # - topics_labeling          # Label topics and subtopics
+  # - difficulty_estimation    # Estimate difficulty of problems
 
 # Directory structure configuration
 directories:
@@ -37,7 +38,7 @@ stages:
     dataset_name: ${dataset_name}
     is_mcq: ${is_mcq}
     remove_images: True
-    num_options: None
+    num_options: 4
     option_format_regex: None
     deduplicate: True
   
@@ -101,8 +102,8 @@ stages:
     output_dir: ${directories.step-3-difficulty-estimation}
     input_file: ${directories.step-0-filter-problems}/final_result.jsonl 
     is_mcq: ${is_mcq}
-    mcq_prompt_config: ""
-    openq_prompt_config: ""
+    mcq_prompt_config: "aai/mcq-4choices"
+    openq_prompt_config: "generic/general-boxed"
 
     generation_kwargs:
       model: /hf_models/Qwen3-30B-A3B
@@ -111,7 +112,7 @@ stages:
       server_nodes: 2
       server_args: "++inference.tokens_to_generate=16000"
       num_random_seeds: 5
-      num_chunks: 10  
+      num_chunks: 5  
     
     judge_kwargs:
       model: /hf_models/Qwen2.5-32B-Instruct
@@ -120,7 +121,7 @@ stages:
       server_nodes: 2
       server_args: "++skip_filled=True  ++prompt_config=judge/general-judge "
       num_random_seeds: 1
-      num_chunks: 10
+      num_chunks: 5
     
     dependencies:
       - decontaminate
