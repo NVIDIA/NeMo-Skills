@@ -63,10 +63,19 @@ class AALCRMetrics(BaseMetrics):
 
         # Primary evaluation method: LLM-based equality checker
         if "judgement" in prediction:
+<<<<<<< HEAD
             correctness_dict["reasoning_valid"] = len(prediction.get("_full_generation", "")) > 0
             correctness_dict["judge_correct_raw"] = self.is_aalcr_correct(
                 prediction["judgement"], prediction["generation"]
             )
+=======
+            correctness_dict["judge_correct_raw"] = self.is_aalcr_correct(prediction["judgement"])
+            correctness_dict["is_generation_empty"] = len(prediction["generation"].strip()) == 0
+            # We use _full_generation to check if the reasoning is finished to prevent using reasoning content instead of final answer for judgement.
+            # One concern is we can only evaluate reasoning models (thinking on) for this task.
+            correctness_dict["is_reasoning_empty"] = len(prediction.get("_full_generation", "")) == 0
+
+>>>>>>> 0a577bf6 (update comments)
 
             if correctness_dict["reasoning_valid"]:
                 correctness_dict["judge_correct"] = correctness_dict["judge_correct_raw"]
