@@ -94,7 +94,7 @@ class MultiAgentConfig(GenerateSolutionsConfig):
     # Sub-agent configuration
     execution_steps: int = 3
     test_timeout_s: float = 30.0
-    agents: List[str] = field(default_factory=list())  # available: solver, execution, chained
+    agents: List[str] = field(default_factory=[])  # available: solver, execution, chained
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
