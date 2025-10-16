@@ -79,7 +79,7 @@ class InferenceConfig:
 
 @nested_dataclass(kw_only=True)
 class GenerateSolutionsConfig:
-    """LLM generation parameters."""
+    """Generation parameters."""
 
     input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
@@ -179,7 +179,7 @@ class GenerateSolutionsConfig:
     # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
     enable_litellm_cache: bool = False
 
-    # Evaluation during generation
+    # Evaluation setup if requested
     eval_type: str | None = None  # "lean4-proof", "math", etc.
     eval_config: dict = field(default_factory=dict)  # Config for the evaluator
 
@@ -451,6 +451,65 @@ class GenerationTask:
         """
         pass
 
+    def run_batch_evaluation(self):
+        """Run post-generation evaluation if configured."""
+        eval_cfg = deepcopy(self.cfg.batch_eval)
+        if not eval_cfg.enabled:
+            return
+
+        if not eval_cfg.eval_type:
+            raise ValueError("Batch evaluation enabled but eval_type is not specified.")
+
+        input_files = eval_cfg.input_files or [self.cfg.output_file]
+        if isinstance(input_files, str):
+            input_files = input_files.split(" ")
+        elif isinstance(input_files, ListConfig):
+            input_files = list(input_files)
+
+        if not isinstance(input_files, list):
+            input_files = list(input_files)
+
+        eval_cfg.input_files = [str(path) for path in input_files]
+
+        LOG.info(
+            "Running batch evaluation (eval_type=%s) on files: %s",
+            eval_cfg.eval_type,
+            ", ".join(eval_cfg.input_files),
+        )
+
+        if eval_cfg.remove_thinking:
+            LOG.info(
+                "Removing the thinking part from the %s key "
+                '(using %s and %s tokens). Original content will be stored in "_full_generation" key.',
+                eval_cfg.generation_key,
+                eval_cfg.thinking_begin,
+                eval_cfg.thinking_end,
+            )
+            for jsonl_file in eval_cfg.input_files:
+                with open(jsonl_file, encoding="utf-8") as fin:
+                    samples = [json.loads(line) for line in fin]
+                    for sample in samples:
+                        if eval_cfg.generation_key not in sample:
+                            raise ValueError(
+                                f"Key {eval_cfg.generation_key} not found in a sample, "
+                                "but remove_thinking=True is specified. "
+                                "Use batch_eval.generation_key parameter to specify the key containing the generations."
+                            )
+
+                with open(jsonl_file, "wt", encoding="utf-8") as fout:
+                    for sample in samples:
+                        remove_thinking(
+                            sample,
+                            eval_cfg.generation_key,
+                            eval_cfg.thinking_begin,
+                            eval_cfg.thinking_end,
+                        )
+                        fout.write(json.dumps(sample) + "\n")
+
+        from nemo_skills.evaluation.evaluator import evaluate
+
+        evaluate(eval_cfg)
+
     def skip_completed_samples(self, data):
         # if non-async file exists and we are asked to skip filled, then there is no more data to process
         if self.cfg.skip_filled and Path(self.cfg.output_file).exists():
@@ -720,6 +779,7 @@ class GenerationTask:
         self.wait_for_server()
         asyncio.run(self.async_loop(data))
 
+        self.run_batch_evaluation()
         self.postprocess()
 
 

@@ -221,7 +221,7 @@ ns eval \
     --split=test_v6_2408_2505 \
     --data_dir=<DATA_DIR> \
     --output_dir=<OUTPUT_DIR> \
-    --extra_eval_args="++eval_config.interpreter=python" \
+    ++eval_config.interpreter=python \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
     ++inference.tokens_to_generate=65536
@@ -229,9 +229,9 @@ ns eval \
 
 ##### Pypy3 Evaluation
 
-To run with the Pypy3 interpreter, we need to use sandbox. Therefore, pass these flags `--with_sandbox --keep_mounts_for_sandbox` and modify the `--extra_eval_args` flag as shown below.
+To run with the Pypy3 interpreter, we need to use sandbox. Therefore, pass these flags `--with_sandbox --keep_mounts_for_sandbox` and also add the following arguments
 ```
---extra_eval_args="++eval_config.interpreter=pypy3 ++eval_config.test_file=<DATA_DIR>/livecodebench/test_v6_2408_2505.jsonl"
+++eval_config.interpreter=pypy3 ++eval_config.test_file=<DATA_DIR>/livecodebench/test_v6_2408_2505.jsonl
 ```
 
 ##### Verifying Results

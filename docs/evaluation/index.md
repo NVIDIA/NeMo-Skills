@@ -166,7 +166,7 @@ Different benchmarks have different evaluation options that you can customize. H
 code execution timeout for scicode benchmark
 
 ```bash
-    --extra_eval_args="++eval_config.timeout=60"
+    ++eval_config.timeout=60
 ```
 
 ## Using data on cluster
@@ -228,9 +228,7 @@ GENERATION_ARGS = "++prompt_config=generic/math"
 ```
 
 The prompt config and default generation arguments are passed to the
-[nemo_skills/inference/generate.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/inference/generate.py) and
-the default eval args are passed to the
-[nemo_skills/evaluation/evaluate_results.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/evaluation/evaluate_results.py).
+[nemo_skills/inference/generate.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/inference/generate.py).
 The dataset group is used by [nemo_skills/dataset/prepare.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/dataset/prepare.py)
 to help download only benchmarks from a particular group if `--dataset_groups` parameter is used.
 Finally, the metrics type is used to pick a metrics class from [nemo_skills/evaluation/metrics/map_metrics.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/evaluation/metrics/map_metrics.py)
