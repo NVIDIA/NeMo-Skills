@@ -333,6 +333,7 @@ class GenerationTask:
         self.should_run_evaluation = self.cfg.eval_type is not None
         self.evaluator = None
         if self.should_run_evaluation:
+            self.cfg.eval_config = dict(self.cfg.eval_config)
             if supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
                 LOG.info("Evaluator supports per-datapoint evals, will interleave evaluation with generation.")
                 self.evaluator = get_evaluator_class(self.cfg.eval_type, self.cfg.eval_config)
@@ -446,7 +447,7 @@ class GenerationTask:
 
     def run_batch_evaluation(self):
         """Run final evaluation consuming all data together if configured."""
-        self.cfg.eval_config.input_file = self.cfg.output_file
+        self.cfg.eval_config["input_file"] = self.cfg.output_file
         evaluate(self.cfg.eval_config)
 
     def skip_completed_samples(self, data):
