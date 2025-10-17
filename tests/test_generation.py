@@ -33,7 +33,6 @@ def test_eval_gsm8k_api(tmp_path):
         f"    --benchmarks=gsm8k "
         f"    --output_dir={tmp_path} "
         f"    ++max_samples=2 "
-        f"    ++remove_thinking=True "
     )
     subprocess.run(cmd, shell=True, check=True)
 

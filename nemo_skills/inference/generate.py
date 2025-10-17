@@ -641,6 +641,12 @@ class GenerationTask:
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
+                for output, data_point in zip(prefilled_outputs, prefilled_data_points):
+                    await self.postprocess_single_output(output, data_point)
+
+                    # evaluate single-data point if requested and evaluator supports that
+                    if self.should_run_evaluation and self.evaluator:
+                        output = await self.evaluate_single_datapoint({**data_point, **output})
                 async with self.output_lock:
                     self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
 

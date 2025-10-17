@@ -68,11 +68,13 @@ def eval_ruler(cfg):
     jsonl_file = cfg.input_file
     with open(jsonl_file, "rt", encoding="utf-8") as fin:
         data = [json.loads(line) for line in fin]
-    with open(jsonl_file, "wt", encoding="utf-8") as fout:
         for sample in tqdm(data):
             parse_result = parse_funcs[eval_config.parse_func](sample["generation"])
             sample["is_correct"] = match_type_funcs[eval_config.match_type](
                 sample["generation"], sample["expected_answer"]
             )
             sample["predicted_answer"] = parse_result
+
+    with open(jsonl_file, "wt", encoding="utf-8") as fout:
+        for sample in data:
             fout.write(json.dumps(sample) + "\n")
