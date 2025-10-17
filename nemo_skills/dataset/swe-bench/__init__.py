@@ -16,6 +16,5 @@
 EVAL_SPLIT = "default"
 DATASET_GROUP = "code"
 METRICS_TYPE = "swe-bench"
-EVAL_ARGS = ""
-GENERATION_ARGS = "++eval_type=no-op"  # evaluation is fused with generation for efficiency
+# evaluation is fused with generation for efficiency
 GENERATION_MODULE = "nemo_skills.inference.eval.swebench"

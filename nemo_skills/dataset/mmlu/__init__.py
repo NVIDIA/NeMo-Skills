@@ -16,5 +16,4 @@
 
 DATASET_GROUP = "multichoice"
 METRICS_TYPE = "multichoice"
-EVAL_ARGS = ""
 GENERATION_ARGS = "++prompt_config=eval/aai/mcq-4choices-boxed ++eval_type=multichoice"

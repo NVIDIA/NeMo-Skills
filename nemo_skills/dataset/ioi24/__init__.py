@@ -16,7 +16,6 @@
 GENERATION_ARGS = "++prompt_config=generic/default ++eval_type=ioi"
 DATASET_GROUP = "code"
 METRICS_TYPE = "ioi"
-EVAL_ARGS = ""
 
 # environment variables required by this benchmark
 SANDBOX_ENV_VARS = [

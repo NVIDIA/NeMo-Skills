@@ -38,18 +38,12 @@ from nemo_skills.evaluation.evaluator.ojbench import eval_ojbench
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
 
-
-def dummy_eval(cfg):
-    return
-
-
 EVALUATOR_MAP = {
     # Function-based evaluators (batch-only)
     "evalplus": eval_evalplus,
     "if": eval_if,
     "ifbench": eval_ifbench,
     "bfcl": eval_bfcl,
-    "no-op": dummy_eval,
     "multichoice": eval_mcq,
     "ruler": eval_ruler,
     "livecodebench": eval_livecodebench,

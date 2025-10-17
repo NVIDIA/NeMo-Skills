@@ -104,7 +104,7 @@ def install_from_git(git_url):
 @nested_dataclass(kw_only=True)
 class EvalPlusEvaluatorConfig(BaseEvaluatorConfig):
     # evalplus specific configurations
-    eval_config: dict = field(default_factory=dict)
+    evalplus: dict = field(default_factory=dict)
 
 
 def eval_evalplus(cfg):
@@ -131,7 +131,7 @@ def eval_evalplus(cfg):
         "noextreme": False,
         "version": "default",
     }
-    eval_config.update(OmegaConf.to_container(cfg.eval_config))
+    eval_config.update(OmegaConf.to_container(cfg.evalplus))
     evaluate(Namespace(**eval_config))
     with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
         evalplus_grades = json.load(fin)
