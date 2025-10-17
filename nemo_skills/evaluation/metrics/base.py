@@ -71,9 +71,9 @@ class BaseMetrics(abc.ABC):
         Only adds columns to pass@1[avg-of-{k}] that must exist in the passed metrics_dict.
 
         Example (max_k=4):
-            3 samples × 4 attempts = [[1,0,1,0], [1,1,0,0], [0,1,1,1]]
+            4 attempts x 3 samples = [[1,1,0], [0,1,1], [1,0,1], [0,0,1]]
 
-            Standard deviation and error of average metric values across runs (transpose):
+            Standard deviation and error of average metric values across runs:
             - Run 1: [1,1,0] → avg 0.6667
             - Run 2: [0,1,1] → avg 0.6667
             - Run 3: [1,0,1] → avg 0.6667
@@ -81,7 +81,7 @@ class BaseMetrics(abc.ABC):
             → std_dev_across_runs = stdev([0.6667, 0.6667, 0.6667, 0.3333]) ≈ 0.1925
             → std_err_across_runs = 0.1925 / sqrt(4) ≈ 0.096
 
-            Average of per-sample standard deviations:
+            Average of per-sample standard deviations (transpose):
             - Sample 1: stdev([1,0,1,0]) ≈ 0.5773
             - Sample 2: stdev([1,1,0,0]) ≈ 0.5773
             - Sample 3: stdev([0,1,1,1]) ≈ 0.5000
