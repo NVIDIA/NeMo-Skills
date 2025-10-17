@@ -45,7 +45,7 @@ def eval_mcq(cfg):
                 parsed_letter = extracted_answer
             elif len(extracted_answer) > 1:
                 # try to extract the letter from extracted answer, useful to match <A>, {A}, *A*, etc.
-                match = re.findall(r"\b[A-J]\b(?!.*\b[A-J]\b)", extracted_answer, re.DOTALL)
+                match = re.findall(r"\b[A-Z]\b(?!.*\b[A-Z]\b)", extracted_answer, re.DOTALL)
                 if len(match) > 0:
                     parsed_letter = match[-1].strip()
 
@@ -53,7 +53,7 @@ def eval_mcq(cfg):
         if parsed_letter is None:
             match = re.findall(r"(?i)[\*\_]{0,2}Answer[\*\_]{0,2}\s*:[\s\*\_]{0,2}\s*([A-Z])(?![a-zA-Z0-9])", text)
             if match:
-                parsed_letter = match[-1].strip()
+                parsed_letter = match[-1].strip().upper()
 
         LOG.info(
             f"Final parsed letter: {parsed_letter}, extract_from_boxed: {extract_from_boxed}, extract_regex: {extract_regex}, extracted_answer: {extracted_answer}"
