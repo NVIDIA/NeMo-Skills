@@ -147,6 +147,10 @@ class SweBenchGenerationConfig:
     remove_thinking: bool = False
     thinking_end: str = "</think>"
 
+    # Evaluation setup if requested. If eval_type is set to None, evaluation is skipped
+    eval_type: str | None = None  # "lean4-proof", "math", etc.
+    eval_config: dict = field(default_factory=dict)  # Config for the evaluator
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
@@ -168,6 +172,11 @@ class SweBenchGenerationTask(GenerationTask):
 
         # needs to skip completed samples, not used otherwise
         self.cfg.prompt_format = "ns"
+
+        if self.cfg.eval_type is not None:
+            raise ValueError(
+                "SWE-bench generation task does not support eval_type parameter. Evaluation is done automatically."
+            )
 
     def log_example_prompt(self, data):
         return
