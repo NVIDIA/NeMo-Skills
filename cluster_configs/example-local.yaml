@@ -18,6 +18,7 @@ containers:
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:1.0.0
   vllm: vllm/vllm-openai:v0.10.1.1
   sglang: lmsysorg/sglang:v0.5.3rc1-cu126
+  # dockerfile: for now can only specify relative to repo root
   megatron: dockerfile:dockerfiles/Dockerfile.megatron
   sandbox: dockerfile:dockerfiles/Dockerfile.sandbox
   nemo-skills: dockerfile:dockerfiles/Dockerfile.nemo-skills
