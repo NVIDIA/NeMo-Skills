@@ -45,11 +45,13 @@ class AALCRMetrics(BaseMetrics):
         self.token_bucket_metrics = defaultdict(lambda: defaultdict(lambda: {"correct": 0, "total": 0}))
 
     @staticmethod
-    def is_aalcr_correct(judgement: str) -> bool:
+    def is_aalcr_correct(judgement: str, generation: str) -> bool:
         """Check if AA-LCR judgement indicates correct answer.
 
         AA-LCR uses 'CORRECT' or 'INCORRECT' format instead of 'Judgement: Yes/No'.
         """
+        if len(generation.strip()) == 0:
+            return False
         if judgement is None:
             return False
         judgement = judgement.strip().upper()
@@ -61,16 +63,15 @@ class AALCRMetrics(BaseMetrics):
 
         # Primary evaluation method: LLM-based equality checker
         if "judgement" in prediction:
-            correctness_dict["is_generation_empty"] = len(prediction["generation"].strip()) == 0
-            correctness_dict["is_reasoning_empty"] = len(prediction.get("_full_generation", "")) == 0
-            correctness_dict["judge_correct_raw"] = self.is_aalcr_correct(prediction["judgement"])
+            correctness_dict["reasoning_valid"] = len(prediction.get("_full_generation", "")) > 0
+            correctness_dict["judge_correct_raw"] = self.is_aalcr_correct(
+                prediction["judgement"], prediction["generation"]
+            )
 
-            # If generation or reasoning is empty, the prediction is incorrect. 
-            # We don't want to use the judgement of empty generation or reasoning content for accuracy calculation.
-            if correctness_dict["is_generation_empty"] or correctness_dict["is_reasoning_empty"]:
-                correctness_dict["judge_correct"] = False
-            else:
+            if correctness_dict["reasoning_valid"]:
                 correctness_dict["judge_correct"] = correctness_dict["judge_correct_raw"]
+            else:
+                correctness_dict["judge_correct"] = False
 
         return correctness_dict
 
