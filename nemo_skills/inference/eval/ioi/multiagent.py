@@ -88,6 +88,7 @@ class MultiAgentConfig(GenerateSolutionsConfig):
     min_steps_before_terminate: int = 2
     majority_terminate_n: int = 10
     majority_selection_n: int = 10
+    skip_termination: bool = False
 
     # Sub-agent configuration
     execution_steps: int = 3
@@ -392,12 +393,15 @@ class MultiAgentGenerationTask(GenerationTask):
 
             current_solutions = new_solutions
 
-            # Check termination after minimum number of steps
-            if step_num + 0 >= max(1, self.cfg.min_steps_before_terminate):
+            # Check termination after minimum number of steps (unless skipped)
+            if (not self.cfg.skip_termination) and step_num + 0 >= max(1, self.cfg.min_steps_before_terminate):
                 terminate, term_logs = await self._should_terminate(data_point, all_data, current_solutions)
                 chat_history.extend(term_logs)
                 if terminate:
                     print("[MultiAgent] Termination condition satisfied. Selecting final solution...")
+                    if len(agents) == 1:
+                        final_solution = current_solutions[0]
+                        return {"generation": final_solution, "steps": chat_history, "num_steps_completed": step_num}
                     best_idx, sel_logs = await self._select_best(data_point, all_data, current_solutions)
                     chat_history.extend(sel_logs)
                     final_solution = current_solutions[best_idx]
@@ -405,6 +409,9 @@ class MultiAgentGenerationTask(GenerationTask):
 
         # If not terminated within steps, still select the best at the end
         print("[MultiAgent] Reached maximum steps without termination. Selecting final solution anyway...")
+        if len(agents) == 1:
+            final_solution = current_solutions[0]
+            return {"generation": final_solution, "steps": chat_history, "num_steps_completed": self.cfg.total_steps}
         best_idx, sel_logs = await self._select_best(data_point, all_data, current_solutions)
         chat_history.extend(sel_logs)
         final_solution = current_solutions[best_idx]
