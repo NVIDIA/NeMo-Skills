@@ -129,7 +129,7 @@ policy:
     algorithm: "modified_first_fit_decreasing"
     sequence_length_round: 64
     logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
-  make_sequence_length_divisible_by: 1
+  make_sequence_length_divisible_by: null
   max_grad_norm: null
 
   optimizer:

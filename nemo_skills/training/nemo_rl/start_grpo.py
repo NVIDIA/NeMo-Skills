@@ -283,9 +283,10 @@ def main() -> None:
         config = parse_hydra_overrides(config, overrides)
 
     OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
-    tp = config["policy"]["tensor_model_parallel_size"]
-    cp = config["policy"]["context_parallel_size"]
-    config["policy"]["make_sequence_length_divisible_by"] = setup_make_sequence_length_divisible_by(tp, cp)
+    if config["policy"]["make_sequence_length_divisible_by"] is None:
+        tp = config["policy"]["tensor_model_parallel_size"]
+        cp = config["policy"]["context_parallel_size"]
+        config["policy"]["make_sequence_length_divisible_by"] = setup_make_sequence_length_divisible_by(tp, cp)
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 
