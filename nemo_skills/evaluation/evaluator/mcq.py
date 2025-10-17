@@ -18,6 +18,7 @@ import re
 
 from tqdm import tqdm
 
+from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
 from nemo_skills.evaluation.math_grader import extract_answer
 from nemo_skills.utils import get_logger_name
 
@@ -25,6 +26,8 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def eval_mcq(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
+
     def extract_letter(text, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$"):
         # extract prediction from boxed{}
         parsed = extract_answer(text, extract_from_boxed=extract_from_boxed, extract_regex=extract_regex)

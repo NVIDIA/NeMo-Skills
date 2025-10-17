@@ -18,12 +18,15 @@ from difflib import SequenceMatcher
 
 from tqdm import tqdm
 
+from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def eval_mrcr(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
+
     def grade(response, answer, random_string_to_prepend) -> float:
         """
         Compare response and answer.

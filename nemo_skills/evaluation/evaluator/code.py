@@ -20,10 +20,12 @@ import shutil
 import subprocess
 import sys
 from argparse import Namespace
+from dataclasses import field
 
 from omegaconf import OmegaConf
 
-from nemo_skills.utils import get_logger_name
+from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
+from nemo_skills.utils import get_logger_name, nested_dataclass
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -99,7 +101,14 @@ def install_from_git(git_url):
         print(f"Error during installation: {e}")
 
 
+@nested_dataclass(kw_only=True)
+class EvalPlusEvaluatorConfig(BaseEvaluatorConfig):
+    # evalplus specific configurations
+    eval_config: dict = field(default_factory=dict)
+
+
 def eval_evalplus(cfg):
+    cfg = EvalPlusEvaluatorConfig(**cfg)
     # TODO: need to move it to a separate docker (either our sandbox or separate srun)
     from evalplus.evaluate import evaluate
 
@@ -148,6 +157,7 @@ def install_requirements(url):
 
 
 def eval_livecodebench_pro(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
     jsonl_file = cfg.input_file
     with open(jsonl_file) as f:
         samples = [preprocess_code(json.loads(line), "python") for line in f]
@@ -162,6 +172,7 @@ def eval_livecodebench_pro(cfg):
 
 
 def eval_livebench_coding(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
     try:
         from livecodebench.evaluate import evaluate
     except ImportError:
@@ -222,6 +233,7 @@ def install_or_upgrade_package(package_name):
 
 
 def eval_bigcodebench(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
     try:
         from bigcodebench.evaluate import evaluate
     except ImportError:
@@ -278,6 +290,7 @@ def eval_bigcodebench(cfg):
 
 
 def eval_human_eval_infilling(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
     try:
         from human_eval_infilling.evaluate import evaluate
     except ImportError:

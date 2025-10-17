@@ -18,12 +18,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def eval_if(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
     jsonl_file = cfg.input_file
     jsonl_path = Path(jsonl_file).resolve()
     output_dir = jsonl_path.parent / f"{jsonl_path.stem}_metrics_tmp"
