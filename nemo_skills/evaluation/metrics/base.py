@@ -88,27 +88,20 @@ class BaseMetrics(abc.ABC):
             → avg_sample_std_dev = (0.5773 + 0.5773 + 0.5000) / 3 ≈ 0.5515
         """
         for score_method, scores_list in self.all_scores.items():
-            for scores in scores_list:
-                assert len(scores) == self.max_k, f"Sample has {len(scores)} scores but expected {self.max_k}"
+            assert len(scores_list) == self.max_k, f"Sample has {len(scores_list)} scores but expected {self.max_k}"
 
             for k in range(2, self.max_k + 1):
-                # Average of metric values across runs
-                avg = np.mean([np.mean(scores[:k]) for scores in scores_list])
-
                 # Standard deviation and error of average metric values across runs
-                run_scores = [[] for _ in range(k)]
-                for scores in scores_list:
-                    for i, score in enumerate(scores[:k]):
-                        run_scores[i].append(score)
-                run_averages = [np.mean(scores) for scores in run_scores]
+                run_averages = [np.mean(scores) for scores in scores_list[:k]]
                 std_dev_across_runs = np.std(run_averages, ddof=1)
                 std_err_across_runs = std_dev_across_runs / math.sqrt(k)
 
+                # Average of metric values across runs
+                avg = np.mean(run_averages)
+
                 # Average of per-sample standard deviations
-                sample_std_devs = []
-                for scores in scores_list:
-                    sample_std_devs.append(np.std(scores[:k], ddof=1))
-                avg_sample_std_dev = sum(sample_std_devs) / len(sample_std_devs)
+                sample_std_devs = [np.std(scores, ddof=1) for scores in zip(*scores_list[:k])]
+                avg_sample_std_dev = np.mean(sample_std_devs)
 
                 # Update metrics dictionary
                 std_metrics = {
@@ -151,6 +144,7 @@ class BaseMetrics(abc.ABC):
             )
         if self.max_k == 0:
             self.max_k = len(predictions)
+            self.all_scores = defaultdict(lambda: [[] for _ in range(self.max_k)])
         self.avg_tokens += sum(
             pred["num_generated_tokens"] for pred in predictions if "num_generated_tokens" in pred
         ) / len(predictions)
@@ -170,11 +164,11 @@ class BaseMetrics(abc.ABC):
             reasoning_tokens.append(reasoning_count)
             answer_tokens.append(answer_count)
 
-        if reasoning_tokens:
-            self.all_scores["reasoning_tokens"].append(reasoning_tokens)
+        for i in range(len(reasoning_tokens)):
+            self.all_scores["reasoning_tokens"][i].append(reasoning_tokens[i])
 
-        if answer_tokens:
-            self.all_scores["answer_tokens"].append(answer_tokens)
+        for i in range(len(answer_tokens)):
+            self.all_scores["answer_tokens"][i].append(answer_tokens[i])
 
         try:
             self.min_start_time = min(
@@ -368,7 +362,8 @@ class BaseMetrics(abc.ABC):
 
         for score_method in score_dicts[0].keys():
             scores_list = [correctness_dict[score_method] for correctness_dict in score_dicts]
-            self.all_scores[score_method].append(scores_list)
+            for i in range(len(scores_list)):
+                self.all_scores[score_method][i].append(scores_list[i])
 
             # Check if the task/instance has binary scores
             # For tasks like IF, the probabilistic logic for pass@k is not applicable
