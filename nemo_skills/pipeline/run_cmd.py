@@ -56,7 +56,7 @@ def run_cmd(
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     num_gpus: int | None = typer.Option(None, help="Number of GPUs per node to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
-    num_tasks: int = typer.Option(None, help="Number of tasks per node"),
+    num_tasks: int = typer.Option(1, help="Number of tasks per node"),
     model: str = typer.Option(None, help="Path to the model to evaluate"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
     server_type: pipeline_utils.SupportedServers | None = typer.Option(None, help="Type of server to use"),
