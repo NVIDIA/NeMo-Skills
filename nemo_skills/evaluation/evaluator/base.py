@@ -25,7 +25,8 @@ from nemo_skills.utils import nested_dataclass
 
 @nested_dataclass(kw_only=True)
 class BaseEvaluatorConfig:
-    input_file: str
+    # TODO: should we pass input_file separately everywhere?
+    input_file: str | None = None  # could be None for interleaved evals
     data_dir: str | None = None
     split: str = "test"
 
