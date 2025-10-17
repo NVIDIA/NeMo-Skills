@@ -129,8 +129,6 @@ policy:
     algorithm: "modified_first_fit_decreasing"
     sequence_length_round: 64
     logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
-  # ensures the training sequence length is divisible by both (2 × context_parallel_size) and context_parallel_size
-  # uses their least common multiple (LCM) for safe alignment between CP and SP
   make_sequence_length_divisible_by: 1
   max_grad_norm: null
 
