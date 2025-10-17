@@ -448,7 +448,7 @@ class GenerationTask:
     def run_batch_evaluation(self):
         """Run final evaluation consuming all data together if configured."""
         self.cfg.eval_config["input_file"] = self.cfg.output_file
-        evaluate(self.cfg.eval_config)
+        evaluate(self.cfg.eval_type, self.cfg.eval_config)
 
     def skip_completed_samples(self, data):
         # if non-async file exists and we are asked to skip filled, then there is no more data to process

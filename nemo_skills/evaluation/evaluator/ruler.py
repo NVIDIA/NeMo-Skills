@@ -55,7 +55,7 @@ def eval_ruler(cfg):
         ][0]
         return score
 
-    eval_config = RulerEvaluatorConfig(**cfg.eval_config)
+    eval_config = RulerEvaluatorConfig(**cfg)
 
     parse_funcs = {
         "default": default_parse,
