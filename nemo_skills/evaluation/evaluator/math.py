@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from dataclasses import asdict, field
+from dataclasses import field
 
 from nemo_skills.code_execution.proof_utils import (
     ProofBuildConfig,
@@ -56,15 +56,14 @@ class MathEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests=10):
         super().__init__(config, num_parallel_requests)
         self.eval_config = MathEvaluatorConfig(**self.config)
-        self.eval_config_dict = asdict(self.eval_config)
 
     async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
         """Evaluate single problem for math"""
-        if not self.eval_config_dict.use_predicted_answer_key:
+        if not self.eval_config.use_predicted_answer_key:
             data_point["predicted_answer"] = extract_answer(
                 data_point["generation"],
-                extract_from_boxed=self.eval_config_dict.extract_from_boxed,
-                extract_regex=self.eval_config_dict.extract_regex,
+                extract_from_boxed=self.eval_config.extract_from_boxed,
+                extract_regex=self.eval_config.extract_regex,
             )
         else:
             if "predicted_answer" not in data_point:
@@ -78,9 +77,9 @@ class MathEvaluator(BaseEvaluator):
         data_point["symbolic_correct"] = math_equal(
             gt_answer,
             predicted_answer,
-            take_modulo=self.eval_config_dict.take_modulo,
-            numeric_precision=self.eval_config_dict.numeric_precision,
-            timeout_seconds=self.eval_config_dict.timeout,
+            take_modulo=self.eval_config.take_modulo,
+            numeric_precision=self.eval_config.numeric_precision,
+            timeout_seconds=self.eval_config.timeout,
         )
         return data_point
 
@@ -91,9 +90,8 @@ class Lean4ProofEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests=10):
         """Initialize Lean4ProofEvaluator with sandbox."""
         super().__init__(config, num_parallel_requests)
-        eval_config = LeanEvaluatorConfig(**self.config)
-        self.sandbox = get_sandbox(**eval_config.sandbox)
-        self.eval_config = eval_config
+        self.eval_config = LeanEvaluatorConfig(**self.config)
+        self.sandbox = get_sandbox(**self.eval_config.sandbox)
 
     async def eval_single(self, data_point: dict[str, any]) -> dict[str, any]:
         """Evaluate single Lean4 proof during generation."""
