@@ -126,6 +126,10 @@ def get_benchmark_args_from_module(
     generation_args = get_arg_from_module_or_dict(benchmark_module, "GENERATION_ARGS", "", override_dict=override_dict)
     if prompt_config:
         generation_args = f"++prompt_config={prompt_config} {generation_args}"
+    # this is deprecated, should remove in the future
+    eval_args = get_arg_from_module_or_dict(benchmark_module, "EVAL_ARGS", "", override_dict=override_dict)
+    if eval_args:
+        generation_args = f"{eval_args} {generation_args}"
     generation_args += f" ++eval_config.split={split} "
     requires_sandbox = get_arg_from_module_or_dict(benchmark_module, "REQUIRES_SANDBOX", False, override_dict)
     keep_mounts_for_sandbox = get_arg_from_module_or_dict(
