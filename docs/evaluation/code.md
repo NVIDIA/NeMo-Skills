@@ -221,6 +221,7 @@ ns eval \
     --split=test_v6_2408_2505 \
     --data_dir=<DATA_DIR> \
     --output_dir=<OUTPUT_DIR> \
+    ++remove_thinking=True \
     ++eval_config.interpreter=python \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -331,6 +332,7 @@ ns eval \
     --split=test_python \
     --data_dir=<DATA_DIR> \
     --output_dir=<OUTPUT_DIR> \
+    ++remove_thinking=True \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
     ++inference.tokens_to_generate=32768
