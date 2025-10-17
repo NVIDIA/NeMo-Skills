@@ -34,6 +34,16 @@ from nemo_skills.file_utils import calculate_chunk_indices, unroll_files, jdump,
 # isort: on
 
 
+def get_logger_name(file):
+    if "/nemo_skills/" in file:
+        return "nemo_skills" + file.split("nemo_skills")[1].replace("/", ".").replace(".py", "")
+    else:
+        return f"[external] {Path(file).stem}"
+
+
+LOG = logging.getLogger(get_logger_name(__file__))
+
+
 def remove_thinking(sample: dict, generation_key: str = "generation", thinking_end: str = "</think>"):
     sample[f"_{generation_key}_finished_thinking"] = thinking_end in sample[generation_key]
     if thinking_end in sample[generation_key]:
@@ -42,6 +52,12 @@ def remove_thinking(sample: dict, generation_key: str = "generation", thinking_e
     else:
         sample[f"_full_{generation_key}"] = sample[generation_key]
         sample[generation_key] = ""  # no end tag, so setting the generation to empty
+        LOG.warning(
+            "Thinking end tag `%s` not found in generation; setting generation to empty. "
+            "If this happens for every generation, you might have accidentally set ++remove_thinking=True for a "
+            "non-reasoning model or have incorrect end tag.",
+            thinking_end,
+        )
 
 
 def nested_dataclass(*args, **kwargs):
@@ -123,13 +139,6 @@ def remove_handlers():
     logger = logging.getLogger("nemo_skills")
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-
-
-def get_logger_name(file):
-    if "/nemo_skills/" in file:
-        return "nemo_skills" + file.split("nemo_skills")[1].replace("/", ".").replace(".py", "")
-    else:
-        return f"[external] {Path(file).stem}"
 
 
 def get_skills_root_dir():
