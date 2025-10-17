@@ -40,7 +40,10 @@ def eval_mcq(cfg):
         extracted_answer = extract_answer(text, extract_from_boxed=extract_from_boxed, extract_regex=extract_regex)
         parsed_letter = None
 
-        if extracted_answer is not None and len(extracted_answer) != 1:
+        if len(extracted_answer) == 1:
+            parsed_letter = extracted_answer
+        elif extracted_answer is not None and len(extracted_answer) > 1:
+            # try to extract the letter from extracted answer, useful to match <A>, {A}, *A*, etc.
             match = re.findall(r"\b[A-J]\b(?!.*\b[A-J]\b)", extracted_answer, re.DOTALL)
             if len(match) > 0:
                 parsed_letter = match[-1].strip()
