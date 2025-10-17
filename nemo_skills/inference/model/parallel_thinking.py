@@ -233,22 +233,6 @@ class ParallelThinkingTask:
             # Generate the solutions first
             solutions = await self.generate_solutions(prompt, local_random, **kwargs)
 
-        # Filter out incomplete solutions if specified
-        if self.cfg.filter_incomplete_solutions:
-            # Remove unfinished solutions
-            filtered_solutions = []
-            for solution in solutions:
-                # filtering unfinished solutions
-                if self.cfg.remove_thinking and self.cfg.thinking_end not in solution[self.cfg.solution_key]:
-                    continue
-                else:
-                    filtered_solutions.append(solution)
-
-            if len(filtered_solutions) < len(solutions):
-                LOG.info(f"Filtered out {len(solutions) - len(filtered_solutions)} incomplete solutions")
-
-            solutions = filtered_solutions
-
         total_num_generated_tokens = 0
         for solution in solutions:
             total_num_generated_tokens += solution["output_dict"].get("num_generated_tokens", 0)

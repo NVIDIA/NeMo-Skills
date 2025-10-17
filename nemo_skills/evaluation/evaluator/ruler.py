@@ -14,6 +14,7 @@
 
 import json
 import logging
+import os
 import re
 
 from tqdm import tqdm
@@ -75,6 +76,8 @@ def eval_ruler(cfg):
             )
             sample["predicted_answer"] = parse_result
 
-    with open(jsonl_file, "wt", encoding="utf-8") as fout:
+    with open(jsonl_file + "-tmp", "wt", encoding="utf-8") as fout:
         for sample in data:
             fout.write(json.dumps(sample) + "\n")
+
+    os.replace(jsonl_file + "-tmp", jsonl_file)
