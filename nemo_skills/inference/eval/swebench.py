@@ -145,7 +145,6 @@ class SweBenchGenerationConfig:
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     remove_thinking: bool = False
-    thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
 
 

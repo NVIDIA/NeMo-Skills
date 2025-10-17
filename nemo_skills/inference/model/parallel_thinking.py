@@ -51,8 +51,7 @@ class ParallelThinkingConfig:
     temperature: float = 0.6
     tokens_to_generate: int | None = None
 
-    remove_thinking: bool = True  # Remove thinking tokens from the solution key
-    thinking_begin: str = "<think>"
+    remove_thinking: bool = False
     thinking_end: str = "</think>"
     endpoint_type: EndpointType = EndpointType.text
     tokenizer: str | None = None
@@ -154,7 +153,6 @@ class ParallelThinkingTask:
                 remove_thinking(
                     generation_result,
                     generation_key=self.cfg.solution_key,
-                    thinking_begin=self.cfg.thinking_begin,
                     thinking_end=self.cfg.thinking_end,
                 )
 
@@ -190,7 +188,6 @@ class ParallelThinkingTask:
                         remove_thinking(
                             data_point,
                             generation_key=self.cfg.solution_key,
-                            thinking_begin=self.cfg.thinking_begin,
                             thinking_end=self.cfg.thinking_end,
                         )
                     # TODO: Making an assumption that the prompt doesn't require all the data for few-shot prompting

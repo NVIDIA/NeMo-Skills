@@ -32,7 +32,11 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
-from nemo_skills.evaluation.evaluator import evaluate, get_evaluator_class, supports_single_eval
+from nemo_skills.evaluation.evaluator import (
+    evaluate,
+    get_evaluator_class,
+    supports_single_eval,
+)
 from nemo_skills.inference.model import (
     ParallelThinkingConfig,
     get_code_execution_model,
@@ -173,8 +177,8 @@ class GenerateSolutionsConfig:
     tool_overrides: dict | None = field(default_factory=dict)
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
+    # IMPORTANT: do not set this for non-reasoning models as it will make the generations empty!
     remove_thinking: bool = False
-    thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
 
     # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
@@ -390,9 +394,12 @@ class GenerationTask:
         if self.cfg.parallel_thinking.mode is not None:
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
-                "remove_thinking": self.cfg.parallel_thinking.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
+                # removing reasoning from solutions is important for parallel_thinking.
+                # We don't want to override this with the main generation config
+                "remove_thinking": self.cfg.parallel_thinking.remove_thinking,
                 "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
-                # The following are specific to parallel thinking and we want to defend against any future key overlaps with the main generation config
+                # The following are specific to parallel thinking and we want
+                # to defend against any future key overlaps with the main generation config
                 "mode": self.cfg.parallel_thinking.mode,
                 "window_size": self.cfg.parallel_thinking.window_size,
                 "solution_key": self.cfg.parallel_thinking.solution_key,
@@ -534,7 +541,11 @@ class GenerationTask:
             original_data_point.pop(key, None)
         output.update(original_data_point)
         if self.cfg.remove_thinking:
-            remove_thinking(output, self.cfg.generation_key, self.cfg.thinking_begin, self.cfg.thinking_end)
+            remove_thinking(
+                output,
+                self.cfg.generation_key,
+                self.cfg.thinking_end,
+            )
 
     def prefill_generation(self, data_point) -> dict | None:
         """Prefill generation in case LLM is not required."""

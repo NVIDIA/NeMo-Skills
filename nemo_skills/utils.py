@@ -34,15 +34,13 @@ from nemo_skills.file_utils import calculate_chunk_indices, unroll_files, jdump,
 # isort: on
 
 
-def remove_thinking(
-    sample: dict, generation_key: str = "generation", thinking_begin: str = "<think>", thinking_end: str = "</think>"
-):
-    sample["_has_think_tags"] = thinking_begin in sample[generation_key]
+def remove_thinking(sample: dict, generation_key: str = "generation", thinking_end: str = "</think>"):
+    sample[f"_{generation_key}_finished_thinking"] = thinking_end in sample[generation_key]
     if thinking_end in sample[generation_key]:
-        sample["_full_generation"] = sample[generation_key]
+        sample[f"_full_{generation_key}"] = sample[generation_key]
         sample[generation_key] = sample[generation_key].split(thinking_end)[-1].strip()
-    elif thinking_begin in sample[generation_key]:
-        sample["_full_generation"] = sample[generation_key]
+    else:
+        sample[f"_full_{generation_key}"] = sample[generation_key]
         sample[generation_key] = ""  # no end tag, so setting the generation to empty
 
 
