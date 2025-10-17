@@ -87,6 +87,7 @@ policy:
     logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.logprob_batch_size}}
     algorithm: "modified_first_fit_decreasing"
     sequence_length_round: 64
+  #If this value is set to null, it will be automatically assigned in the code.
   make_sequence_length_divisible_by: null
   max_grad_norm: 1.0
 
