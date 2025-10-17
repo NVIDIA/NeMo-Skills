@@ -22,11 +22,13 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def extract_cpp_block(text: str) -> Optional[str]:
+    text = text.split("<|end|><|start|>assistant<|channel|>final<|message|>")[-1]
     matches = re.findall(r"```cpp(.*?)```", text, re.DOTALL)
     return matches[-1].strip() if matches else None
 
 
 def extract_script_block(text: str) -> Optional[str]:
+    text = text.split("<|end|><|start|>assistant<|channel|>final<|message|>")[-1]
     matches = re.findall(r"```script(.*?)```", text, re.DOTALL)
     return matches[-1].strip() if matches else None
 
