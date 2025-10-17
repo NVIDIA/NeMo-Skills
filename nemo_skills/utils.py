@@ -45,6 +45,10 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def remove_thinking(sample: dict, generation_key: str = "generation", thinking_end: str = "</think>"):
+    # not doing anything if generation isn't a string
+    # TODO: should we be more explicit about this?
+    if not isinstance(sample[generation_key], str):
+        return
     sample[f"_{generation_key}_finished_thinking"] = thinking_end in sample[generation_key]
     if thinking_end in sample[generation_key]:
         sample[f"_full_{generation_key}"] = sample[generation_key]
