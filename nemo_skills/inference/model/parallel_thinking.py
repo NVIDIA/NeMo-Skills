@@ -69,7 +69,7 @@ class ParallelThinkingConfig:
     gensynthesis: GenSynthesisSpecificConfig = field(default_factory=GenSynthesisSpecificConfig)
 
     # Solution related parameters
-    solution_length_cap: int | None = 8192  # If specified, will filter out solutions that are longer than this length
+    solution_length_cap: int | None = 16384  # If specified, will filter out solutions that are longer than this length
     window_size: int = 8  # Number of solutions compared in a single request
     solution_key: str = "generation"  # Key used for identifying the solution content
     filter_incomplete_solutions: bool = True  # Filter out incomplete solutions
