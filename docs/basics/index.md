@@ -196,7 +196,7 @@ some registry (e.g. dockerhub) and reference the uploaded versions. To build sqs
    ```bash
    enroot import -o /path/to/nemo-skills-image.sqsh --docker://gitlab-master.nvidia.com/igitman/nemo-skills-containers:nemo-skills-0.7.1
    ```
-4. Specify local image path in your cluster config
+4. Specify this image path in your cluster config
    ```yaml
    containers:
      nemo-skills: /path/to/nemo-skills-image.sqsh

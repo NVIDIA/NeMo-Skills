@@ -22,6 +22,7 @@ import yaml
 from nemo_skills import _containers
 from nemo_skills.pipeline.app import app
 from nemo_skills.pipeline.utils import is_mounted_filepath
+from nemo_skills.pipeline.utils.docker_images import resolve_container_image
 
 
 def is_docker_available():
@@ -35,12 +36,20 @@ def is_docker_available():
 # Helper function to pull Docker containers
 def pull_docker_containers(containers):
     for container_name, container_image in containers.items():
-        typer.echo(f"Pulling {container_name}: {container_image}...")
-        try:
-            subprocess.run(["docker", "pull", container_image], check=True)
-            typer.echo(f"Successfully pulled {container_image}")
-        except subprocess.SubprocessError as e:
-            typer.echo(f"Failed to pull {container_image}: {e}")
+        if container_image.startswith("dockerfile:"):
+            typer.echo(f"Building {container_name} from {container_image}...")
+            try:
+                resolved_image = resolve_container_image(container_image, {"executor": "local"})
+                typer.echo(f"Successfully built {resolved_image}")
+            except Exception as e:
+                typer.echo(f"Failed to build {container_image}: {e}")
+        else:
+            typer.echo(f"Pulling {container_name}: {container_image}...")
+            try:
+                subprocess.run(["docker", "pull", container_image], check=True)
+                typer.echo(f"Successfully pulled {container_image}")
+            except subprocess.SubprocessError as e:
+                typer.echo(f"Failed to pull {container_image}: {e}")
 
 
 @app.command()
@@ -231,9 +240,9 @@ def setup():
 
         if config_type == "local":
             pull_containers = typer.confirm(
-                "\nWould you like to pull all the necessary Docker containers now? "
+                "\nWould you like to pull/build all the necessary Docker containers now? "
                 "This might take some time but ensures everything is ready to use.\n"
-                "You can skip this step and we will pull the containers automatically when you run the first job.",
+                "You can skip this step and we will pull/build the containers automatically when you run the first job.",
                 default=True,
             )
 
