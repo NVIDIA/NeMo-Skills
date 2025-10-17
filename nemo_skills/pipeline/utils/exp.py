@@ -243,6 +243,7 @@ def get_executor(
             # NB: despite LeptonExecutor type annotations, shared_memory_size can be None ("auto");
             # default value (65536) usually leads to error
             shared_memory_size=None,  # type:ignore
+            env_vars=env_vars,
         )
 
     # slurm-specific parameters
