@@ -161,6 +161,9 @@ class ParallelThinkingTask:
 
             if self.cfg.solution_length_cap is not None:
                 if len(generation_result[self.cfg.solution_key]) > self.cfg.solution_length_cap:
+                    LOG.debug(
+                        f"Solution filtered out: length {len(generation_result[self.cfg.solution_key])} exceeds cap {self.cfg.solution_length_cap}"
+                    )
                     continue
 
             solutions.append(
@@ -201,6 +204,9 @@ class ParallelThinkingTask:
 
                     if self.cfg.solution_length_cap is not None:
                         if len(data_point[self.cfg.solution_key]) > self.cfg.solution_length_cap:
+                            LOG.debug(
+                                f"Solution filtered out: length {len(data_point[self.cfg.solution_key])} exceeds cap {self.cfg.solution_length_cap}"
+                            )
                             continue
 
                     # TODO: Making an assumption that the prompt doesn't require all the data for few-shot prompting
