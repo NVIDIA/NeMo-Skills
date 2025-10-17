@@ -19,7 +19,6 @@ import json
 import os
 import pprint
 from functools import partial
-from math import lcm
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -36,6 +35,8 @@ from nemo_rl.utils.logger import get_next_experiment_dir
 from omegaconf import OmegaConf
 from transformers import AutoTokenizer
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+
+from nemo_skills.utils import setup_make_sequence_length_divisible_by
 
 TokenizerType = PreTrainedTokenizerBase
 _call_counter = 0
@@ -289,8 +290,10 @@ def main():
         print(f"Overrides: {overrides}")
         config = parse_hydra_overrides(config, overrides)
 
-    OmegaConf.register_new_resolver("mul", lambda x, y: int(x) * int(y))
-    OmegaConf.register_new_resolver("lcm", lambda x, y: lcm(int(x), int(y)))
+    OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
+    tp = config["policy"]["tensor_model_parallel_size"]
+    cp = config["policy"]["context_parallel_size"]
+    config["policy"]["make_sequence_length_divisible_by"] = setup_make_sequence_length_divisible_by(tp, cp)
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 

@@ -22,7 +22,6 @@ import os
 import pprint
 from collections import defaultdict
 from dataclasses import dataclass
-from math import lcm
 from typing import Any, Optional
 
 from datasets import Dataset, load_dataset
@@ -41,6 +40,7 @@ from omegaconf import OmegaConf
 from transformers import PreTrainedTokenizerBase
 
 from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.utils import setup_make_sequence_length_divisible_by
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
@@ -282,8 +282,10 @@ def main() -> None:
         print(f"Overrides: {overrides}")
         config = parse_hydra_overrides(config, overrides)
 
-    OmegaConf.register_new_resolver("mul", lambda x, y: int(x) * int(y))
-    OmegaConf.register_new_resolver("lcm", lambda x, y: lcm(int(x), int(y)))
+    OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
+    tp = config["policy"]["tensor_model_parallel_size"]
+    cp = config["policy"]["context_parallel_size"]
+    config["policy"]["make_sequence_length_divisible_by"] = setup_make_sequence_length_divisible_by(tp, cp)
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 
