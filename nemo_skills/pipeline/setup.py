@@ -81,8 +81,10 @@ def setup():
             if not overwrite:
                 continue
 
-        # initializing default containers
-        config = {"executor": config_type, "containers": _containers}
+        # initialize config with executor only; containers handled per executor type
+        config = {"executor": config_type}
+        if config_type == "local":
+            config["containers"] = dict(_containers)
 
         mounts = typer.prompt(
             "\nWe execute all commands in docker containers, so you need to "
@@ -201,15 +203,31 @@ def setup():
                 }
 
         # Create the config file
+        yaml_content = yaml.dump(config, sort_keys=False, indent=4)
+        if config_type == "slurm":
+            slurm_comment = (
+                "executor: slurm\n\n"
+                "containers:\n"
+                "  # follow steps in https://nvidia-nemo.github.io/Skills/basics/#slurm-inference\n"
+                "  # to complete this section\n\n"
+            )
+            yaml_content = yaml_content.replace("executor: slurm\n", slurm_comment)
         with open(config_file, "wt") as fout:
-            yaml.dump(config, fout, sort_keys=False, indent=4)
+            fout.write(yaml_content)
 
-        typer.echo(
-            f"\nCreated {config_type} config file at {config_file}.\n"
-            f"The containers section was initialized with default values, but you can always change them manually.\n"
-            f"You can find more information on what containers we use in "
-            f"https://github.com/NVIDIA-NeMo/Skills/tree/main/dockerfiles"
-        )
+        if config_type == "local":
+            typer.echo(
+                f"\nCreated {config_type} config file at {config_file}.\n"
+                f"The containers section was initialized with default values, but you can always change them manually.\n"
+                f"You can find more information on what containers we use in "
+                f"https://github.com/NVIDIA-NeMo/Skills/tree/main/dockerfiles"
+            )
+        else:
+            typer.echo(
+                f"\nCreated {config_type} config file at {config_file}.\n"
+                "We left the containers section empty. Follow the instructions at "
+                "https://nvidia-nemo.github.io/Skills/basics/#slurm-inference to configure your cluster containers."
+            )
 
         if config_type == "local":
             pull_containers = typer.confirm(

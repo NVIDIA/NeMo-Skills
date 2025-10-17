@@ -198,8 +198,6 @@ def get_executor(
     if cluster_config["executor"] == "local":
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
         resolved_container = resolve_container_image(container, cluster_config)
-        if isinstance(resolved_container, list):
-            raise ValueError("Local executor does not support multiple containers.")
         return DockerExecutor(
             container_image=resolved_container,
             packager=packager,
