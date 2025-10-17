@@ -656,7 +656,7 @@ def add_task(
         )
 
 
-def run_exp(exp, cluster_config, sequential=False, dry_run=False):
+def run_exp(exp: run.Experiment, cluster_config, sequential=False, dry_run=False):
     """If sequential is not specified, using True locally and False otherwise.
 
     If it is specified, it will be used as is.
