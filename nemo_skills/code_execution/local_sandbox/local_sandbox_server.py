@@ -19,6 +19,7 @@ import multiprocessing as mp
 import os
 import re
 import resource
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -605,6 +606,20 @@ def execute_shell(command, timeout):
             os.remove(tmp_path)
 
 
+def execute_cpp(generated_code, timeout):
+    run_dir = f"/tmp/cpp_run_{os.getpid()}_{time.time_ns()}"
+    try:
+        os.makedirs(run_dir, exist_ok=False)
+        main_cpp = os.path.join(run_dir, "main.cpp")
+        with open(main_cpp, "w", encoding="utf-8") as f:
+            f.write(generated_code)
+
+        script = f'set -euo pipefail\ncd "{run_dir}"\ng++ -O2 -std=c++17 main.cpp -o a.out\n./a.out\n'
+        return execute_shell(script, timeout)
+    finally:
+        shutil.rmtree(run_dir, ignore_errors=True)
+
+
 # Main Flask endpoint to handle execution requests
 @app.route("/execute", methods=["POST"])
 def execute():
@@ -625,6 +640,8 @@ def execute():
         result = execute_lean4(generated_code, timeout)
     elif language == "shell":
         result = execute_shell(generated_code, timeout)
+    elif language == "cpp":
+        result = execute_cpp(generated_code, timeout)
     else:
         result = execute_python(generated_code, std_input, timeout, language)
 
