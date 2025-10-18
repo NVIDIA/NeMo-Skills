@@ -111,15 +111,20 @@ def run_training(workspace, cluster, num_gpus, expname_prefix, backend, wandb_pa
 
     # train the model
 
+    args = [
+        "++policy.max_total_sequence_length=8192",
+        "++policy.train_global_batch_size=32",
+        "++policy.tensor_model_parallel_size=4",
+        "++policy.context_parallel_size=2",
+        "++policy.lr=1e-5",
+        "++sft.max_num_epochs=2",
+    ]
+    # For FSDP, sequence_packing cannot be used with context parallel
+    if backend == "fsdp":
+        args.append("++policy.sequence_packing.enabled=False")
+
     sft_nemo_rl(
-        ctx=wrap_arguments(
-            "++policy.max_total_sequence_length=8192 "
-            "++policy.train_global_batch_size=32 "
-            "++policy.tensor_model_parallel_size=4 "
-            "++policy.context_parallel_size=2 "
-            "++policy.lr=1e-5 "
-            "++sft.max_num_epochs=2 "
-        ),
+        ctx=wrap_arguments(" ".join(args)),
         cluster=cluster,
         output_dir=f"{workspace}/training",
         hf_model="Qwen/Qwen2.5-14B-Instruct",
