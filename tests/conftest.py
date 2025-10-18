@@ -39,7 +39,7 @@ def docker_run(command, image_name=None, volume_paths=None):
             volumes[os.path.abspath(src)] = {"bind": dst, "mode": "rw"}
 
         # Run the container
-        full_command = f"/bin/bash -c '{command}'"
+        full_command = f"bash -c '{command}'"
         result = client.containers.run(
             image_name,
             command=full_command,
