@@ -106,14 +106,22 @@ cs.store(name="base_ioi_multiagent_config", node=MultiAgentConfig)
 class BaseSubAgent:
     def __init__(self, task: "MultiAgentGenerationTask"):
         self.task = task
+        self.tir_enabled: bool = False
 
     async def _call(self, prompt_key: str, data_point: dict, all_data: dict, **extra):
         combined = {**data_point, **extra}
         filled = self.task.fill_prompt(combined, all_data, prompt=self.task.prompts[prompt_key])
         start_t = time.time()
         try:
+            # When TIR is enabled, pass builtin_tools via generation params override
+            generation_params_override = None
+            if self.tir_enabled:
+                generation_params_override = {"builtin_tools": self.task.cfg.builtin_tools}
             out = await super(MultiAgentGenerationTask, self.task).process_single_datapoint(
-                combined, all_data, prompt=self.task.prompts[prompt_key]
+                combined,
+                all_data,
+                prompt=self.task.prompts[prompt_key],
+                generation_params_override=generation_params_override,
             )
         except (litellm.exceptions.OpenAIError, Exception) as e:
             print(f"LLM call failed: {e}\nPrompt causing failure:\n{filled}")
@@ -248,6 +256,18 @@ class ExecutionAgent(BaseSubAgent):
         return current_solution, logs
 
 
+class SolverTIRAgent(SolverAgent):
+    def __init__(self, task: "MultiAgentGenerationTask"):
+        super().__init__(task)
+        self.tir_enabled = True
+
+
+class ExecutionTIRAgent(ExecutionAgent):
+    def __init__(self, task: "MultiAgentGenerationTask", steps: int, test_timeout_s: float):
+        super().__init__(task, steps=steps, test_timeout_s=test_timeout_s)
+        self.tir_enabled = True
+
+
 class ChainedAgent(BaseSubAgent):
     def __init__(self, task: "MultiAgentGenerationTask", steps: int, test_timeout_s: float):
         super().__init__(task)
@@ -288,6 +308,10 @@ class MultiAgentGenerationTask(GenerationTask):
         self.available_agents = {
             "solver": lambda: SolverAgent(self),
             "execution": lambda: ExecutionAgent(
+                self, steps=self.cfg.execution_steps, test_timeout_s=self.cfg.test_timeout_s
+            ),
+            "solver_tir": lambda: SolverTIRAgent(self),
+            "execution_tir": lambda: ExecutionTIRAgent(
                 self, steps=self.cfg.execution_steps, test_timeout_s=self.cfg.test_timeout_s
             ),
             "chained": lambda: ChainedAgent(
@@ -369,7 +393,7 @@ class MultiAgentGenerationTask(GenerationTask):
 
         if not agents:
             raise ValueError(
-                "No agents configured. Please set cfg.agents to include at least one of: solver, execution, chained"
+                "No agents configured. Please set cfg.agents to include at least one of: solver, execution, solver_tir, execution_tir, chained"
             )
 
         # Step 0: ask all agents for an initial solution (no history)

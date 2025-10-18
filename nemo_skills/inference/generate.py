@@ -179,6 +179,10 @@ class GenerateSolutionsConfig:
     # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
     enable_litellm_cache: bool = False
 
+    # Built-in tools available to the model when Tool-Integrated Reasoning (TIR) is enabled
+    # Can be overridden by specific tasks/agents. Used to pass 'builtin_tools' into generation params.
+    builtin_tools: list[str] = field(default_factory=lambda: ["cpp", "python"])
+
     # Evaluation during generation
     eval_type: str | None = None  # "lean4-proof", "math", etc.
     eval_config: dict = field(default_factory=dict)  # Config for the evaluator
@@ -541,7 +545,9 @@ class GenerationTask:
         # Override this method to customize the prefilling behavior.
         return None
 
-    async def process_single_datapoint(self, data_point, all_data, prompt=None):
+    async def process_single_datapoint(
+        self, data_point, all_data, prompt=None, generation_params_override: dict | None = None
+    ):
         # Handle inference config - check if it's a dataclass or already a dict
         if is_dataclass(self.cfg.inference):
             inference_params = asdict(self.cfg.inference)
@@ -555,6 +561,10 @@ class GenerationTask:
             "prompt": self.fill_prompt(data_point, all_data, prompt),
             "stop_phrases": [self.cfg.stop_phrase] if self.cfg.stop_phrase else None,
         }
+
+        # Allow callers to override or add generation parameters (e.g., builtin_tools for TIR)
+        if generation_params_override:
+            generation_params.update(generation_params_override)
 
         if self.cfg.code_execution:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
