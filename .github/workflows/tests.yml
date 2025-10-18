@@ -29,8 +29,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
-        # mounted in the config by default, but unused in cpu tests
-        mkdir -p /mnt/datadrive/nemo-skills-test-data
     - name: Build Images
       run: |
         # these tags need to match the ones in tests/gpu-tests/test-local.yaml
