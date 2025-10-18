@@ -9,7 +9,7 @@ user: |-
   Output your selection as follows:
   <report>
   - Brief reasoning for the selection.
-  - Final line: \\boxed{INDEX} where INDEX is a 1-based index of the selected solution from the list below.
+  - Final line: \\boxed{{INDEX}} where INDEX is a 1-based index of the selected solution from the list below.
   </report>
 
   ## Problem

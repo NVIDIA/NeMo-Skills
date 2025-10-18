@@ -6,15 +6,15 @@ user: |-
 
   Carefully read the problem and all solutions. Pay attention to edge cases, correctness, complexity, and typical pitfalls. If there is clear evidence that a solution is incorrect, explain it briefly. If multiple solutions look correct, that's acceptable.
 
-  Then output ONLY a single verdict using \\boxed{yes} or \\boxed{no} on a separate final line, where:
-  - \\boxed{yes}: we should terminate now (we believe at least one solution is correct)
-  - \\boxed{no}: we should continue iterating (none of the solutions appear reliably correct yet)
+  Then output ONLY a single verdict using \\boxed{{yes}} or \\boxed{{no}} on a separate final line, where:
+  - \\boxed{{yes}}: we should terminate now (we believe at least one solution is correct)
+  - \\boxed{{no}}: we should continue iterating (none of the solutions appear reliably correct yet)
 
   Format your response as follows:
   <report>
   - Brief reasoning referencing specific issues or confirming apparent correctness.
   - State your confidence.
-  - Final verdict line with \\boxed{yes} or \\boxed{no}.
+  - Final verdict line with \\boxed{{yes}} or \\boxed{{no}}.
   </report>
 
   ## Problem
