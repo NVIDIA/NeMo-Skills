@@ -86,7 +86,7 @@ class MultiAgentConfig(GenerateSolutionsConfig):
     select_prompt_config: str = "eval/ioi/multiagent/code/select"
 
     # Orchestration
-    total_steps: int = 10
+    total_steps: int = 3
     min_steps_before_terminate: int = 2
     majority_terminate_n: int = 10
     majority_selection_n: int = 10
@@ -164,7 +164,7 @@ class ExecutionAgent(BaseSubAgent):
         return filled, out, t
 
     async def _compile_and_run_cpp(self, code_string: str, data_point: dict):
-        # Compile the provided C++ code from stdin and run the produced executable, returning stdout and stderr.
+        # Compile the provided C++ code from stdin and run the produced executable.
         with tempfile.TemporaryDirectory() as temp_dir:
             for original_path, content in data_point.get("grader_files", []):
                 filename = os.path.basename(original_path)
@@ -183,14 +183,15 @@ class ExecutionAgent(BaseSubAgent):
             )
             _, compile_stderr = await compiler_process.communicate(input=code_string.encode())
 
+            # If compilation failed, surface the compiler stderr and return without running
             if compiler_process.returncode != 0:
-                raise RuntimeError(f"C++ compilation failed:\n{compile_stderr.decode()}\nCode:{code_string}")
+                return "", "", compile_stderr.decode()
 
             run_process = await asyncio.create_subprocess_exec(
                 executable_path, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             run_stdout, run_stderr = await run_process.communicate()
-            return run_stdout.decode(), run_stderr.decode()
+            return run_stdout.decode(), run_stderr.decode(), ""
 
     async def run(
         self, data_point: dict, all_data: dict, prev_solutions: List[str], starting_solution: Optional[str] = None
@@ -226,21 +227,23 @@ class ExecutionAgent(BaseSubAgent):
 
             # Execute test script (standalone C++) via custom compile-and-run helper
             print("[ExecutionAgent] Compiling and executing generated test script (custom runner)")
-            try:
-                run_stdout, run_stderr = await self._compile_and_run_cpp(script, data_point)
-            except Exception:
-                print("[ExecutionAgent] Compilation/execution error. Test script was:\n" + script)
-                print("[ExecutionAgent] Corresponding full test generation was:\n" + out_test["generation"])
-                raise
+            run_stdout, run_stderr, compile_stderr = await self._compile_and_run_cpp(script, data_point)
+            compiled_ok = len(compile_stderr) == 0
             # Truncate outputs for stability and prompt cleanliness
             max_chars = max(0, int(self.task.cfg.execution_max_output_characters))
-            if max_chars > 0:
-                if len(run_stdout) > max_chars:
-                    run_stdout = run_stdout[:max_chars] + "<output cut>"
-                if len(run_stderr) > max_chars:
-                    run_stderr = run_stderr[:max_chars] + "<output cut>"
-            exec_output = f"STDOUT:\n{run_stdout}\nSTDERR:\n{run_stderr}"
-            print("[ExecutionAgent] Execution result (captured):\n" + exec_output)
+            if compiled_ok:
+                if max_chars > 0:
+                    if len(run_stdout) > max_chars:
+                        run_stdout = run_stdout[:max_chars] + "<output cut>"
+                    if len(run_stderr) > max_chars:
+                        run_stderr = run_stderr[:max_chars] + "<output cut>"
+                exec_output = f"STDOUT:\n{run_stdout}\nSTDERR:\n{run_stderr}"
+                print("[ExecutionAgent] Execution result (captured):\n" + exec_output)
+            else:
+                if max_chars > 0 and len(compile_stderr) > max_chars:
+                    compile_stderr = compile_stderr[:max_chars] + "<output cut>"
+                exec_output = f"COMPILATION_ERROR:\n{compile_stderr}"
+                print("[ExecutionAgent] Using compilation error as feedback to improve the solution.")
 
             # Improve using feedback
             print("[ExecutionAgent] Improving solution based on execution feedback")
