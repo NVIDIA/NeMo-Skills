@@ -116,7 +116,22 @@ class BaseSubAgent:
             # When TIR is enabled, pass builtin_tools via generation params override
             generation_params_override = None
             if self.tir_enabled:
-                generation_params_override = {"builtin_tools": self.task.cfg.builtin_tools}
+                # Merge builtin_tools into extra_body.chat_template_kwargs without overwriting existing keys
+                merged_extra_body = dict(getattr(self.task.cfg.inference, "extra_body", {}) or {})
+                existing_ctk = dict(merged_extra_body.get("chat_template_kwargs", {}) or {})
+
+                existing_tools = list(existing_ctk.get("builtin_tools", []) or [])
+                tools_to_add = [t for t in (self.task.cfg.builtin_tools or []) if t not in existing_tools]
+                if tools_to_add or "builtin_tools" in existing_ctk:
+                    # Append new tools, keep existing order
+                    existing_ctk["builtin_tools"] = existing_tools + tools_to_add
+
+                # Only set chat_template_kwargs if we actually have something to pass/merge
+                if existing_ctk:
+                    merged_extra_body["chat_template_kwargs"] = existing_ctk
+
+                if merged_extra_body:
+                    generation_params_override = {"extra_body": merged_extra_body}
             out = await super(MultiAgentGenerationTask, self.task).process_single_datapoint(
                 combined,
                 all_data,
