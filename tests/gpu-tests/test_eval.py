@@ -183,6 +183,7 @@ def test_megatron_eval():
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_MEGATRON_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
+    print(f"model_type: {model_type}")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     if model_type != "qwen":
@@ -201,8 +202,8 @@ def test_megatron_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++max_samples=5 "
-        f"    ++tokenizer=Qwen/Qwen3-4B "
-        f"    --server_args='--tokenizer-model Qwen/Qwen3-4B --inference-max-requests=20' "
+        f"    ++tokenizer=Qwen/Qwen3-1.7B "
+        f"    --server_args='--tokenizer-model Qwen/Qwen3-1.7B --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
 
