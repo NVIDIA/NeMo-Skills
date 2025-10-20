@@ -30,8 +30,6 @@ def test_trtllm_judge():
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != "llama":
-        pytest.skip("Only running this test for llama models")
 
     input_dir = "/nemo_run/code/tests/data"
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/judge/math"
@@ -53,6 +51,7 @@ def test_trtllm_judge():
         f"    --server_args='--backend pytorch' "
         f"    ++max_samples=10 "
         f"    ++skip_filled=False "
+        f"    ++inference.tokens_to_generate=2048 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
