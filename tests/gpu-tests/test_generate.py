@@ -110,8 +110,6 @@ def test_vllm_generate_seeds():
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != "llama":
-        pytest.skip("Only running this test for llama models")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-seeds/generation"
     docker_rm([output_dir])

@@ -30,8 +30,6 @@ def test_check_contamination():
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != "llama":
-        pytest.skip("Only running this test for llama models")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/contamination"
 
@@ -79,5 +77,5 @@ def test_check_contamination():
         data = json.loads(line)
         assert "contaminated" in data
         num_contaminated += data["contaminated"]
-    # gt answer is 4, but llama judges more problems as contaminated
+    # gt answer is 4, but qwen judges more problems as contaminated
     assert 3 <= num_contaminated < 10

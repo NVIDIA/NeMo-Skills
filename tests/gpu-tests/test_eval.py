@@ -52,10 +52,9 @@ def test_trtllm_eval():
         metrics = json.load(f)["gsm8k"]["pass@1"]
 
     # rough check, since exact accuracy varies depending on gpu type
-    if model_type == "llama":
-        assert metrics["symbolic_correct"] >= 50
-    else:  # qwen
+    if model_type == "qwen":
         assert metrics["symbolic_correct"] >= 70
+
     assert metrics["num_entries"] == 20
 
 
@@ -69,8 +68,11 @@ def test_trtllm_code_execution_eval(server_type):
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     # we are using the base prompt for llama to make it follow few-shots
-    tokenizer = "meta-llama/Llama-3.1-8B" if model_type == "llama" else "Qwen/Qwen2.5-32B-Instruct"
-    code_tags = "nemotron" if model_type == "llama" else "qwen"
+    if model_type == "qwen":
+        tokenizer = "Qwen/Qwen3-4B"
+        code_tags = "qwen"
+    else:
+        pytest.skip("Only qwen models are supported in this test")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
     docker_rm([output_dir])
@@ -99,9 +101,7 @@ def test_trtllm_code_execution_eval(server_type):
     with open(f"{output_dir}/eval-results/gsm8k/metrics.json", "r") as f:
         metrics = json.load(f)["gsm8k"]["pass@1"]
     # rough check, since exact accuracy varies depending on gpu type
-    if model_type == "llama":
-        assert metrics["symbolic_correct"] >= 40
-    else:  # qwen
+    if model_type == "qwen":
         assert metrics["symbolic_correct"] >= 70
     assert metrics["num_entries"] == 20
 
@@ -109,7 +109,7 @@ def test_trtllm_code_execution_eval(server_type):
 @pytest.mark.gpu
 @pytest.mark.parametrize("server_type,server_args", [("vllm", ""), ("sglang", ""), ("trtllm", "--backend pytorch")])
 def test_hf_eval(server_type, server_args):
-    # this test expects llama3-instruct to properly check accuracy
+    # this test expects qwen3-1.7b to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast
     # mmlu/ifeval will be cut to 400 samples to save time
     # could cut everything, but human-eval/mbpp don't work with partial gens
@@ -119,8 +119,8 @@ def test_hf_eval(server_type, server_args):
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != "llama":
-        pytest.skip("Only running this test for llama models")
+    if model_type != "qwen":
+        pytest.skip("Only running this test for qwen models")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
     docker_rm([output_dir])
@@ -184,8 +184,8 @@ def test_megatron_eval():
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    if model_type != "llama":
-        pytest.skip("Only llama models are supported in Megatron.")
+    if model_type != "qwen":
+        pytest.skip("Only qwen models are supported in Megatron.")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/megatron-eval"
     docker_rm([output_dir])
@@ -199,9 +199,9 @@ def test_megatron_eval():
         f"    --benchmarks gsm8k "
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
-        f"    ++max_samples=2 "
-        f"    ++tokenizer=meta-llama/Llama-3.1-8B-Instruct "
-        f"    --server_args='--tokenizer-model meta-llama/Llama-3.1-8B-Instruct --inference-max-requests=20' "
+        f"    ++max_samples=5 "
+        f"    ++tokenizer=Qwen/Qwen3-4B "
+        f"    --server_args='--tokenizer-model Qwen/Qwen3-4B --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
 
@@ -210,5 +210,5 @@ def test_megatron_eval():
         metrics = json.load(f)["gsm8k"]["pass@1"]
     # rough check, since exact accuracy varies depending on gpu type
     # TODO: something is broken in megatron inference here as this should be 50!
-    assert metrics["symbolic_correct"] >= 20
-    assert metrics["num_entries"] == 2
+    assert metrics["symbolic_correct"] >= 40
+    assert metrics["num_entries"] == 5
