@@ -110,7 +110,7 @@ def run_training(workspace, cluster, num_gpus, expname_prefix, backend, wandb_pa
     )
 
     # train the model
-    args = [
+    base_args = [
         "++policy.max_total_sequence_length=8192",
         "++policy.train_global_batch_size=32",
         "++policy.tensor_model_parallel_size=4",
@@ -120,13 +120,14 @@ def run_training(workspace, cluster, num_gpus, expname_prefix, backend, wandb_pa
     ]
     # For FSDP, sequence_packing cannot be used with context parallel
     for training_backend in backend:
+        args = list(base_args)
         if training_backend == "fsdp":
             args.append("++policy.sequence_packing.enabled=False")
 
         sft_nemo_rl(
             ctx=wrap_arguments(" ".join(args)),
             cluster=cluster,
-            output_dir=f"{workspace}/training",
+            output_dir=f"{workspace}/training-{training_backend}",
             hf_model="Qwen/Qwen2.5-14B-Instruct",
             backend=training_backend,
             num_gpus=num_gpus,
@@ -136,7 +137,7 @@ def run_training(workspace, cluster, num_gpus, expname_prefix, backend, wandb_pa
             training_data=f"{workspace}/sft-data.jsonl",
             expname=f"{expname_prefix}-training-{training_backend}",
             run_after=f"{expname_prefix}-prepare-training-data",
-            final_hf_path=f"{workspace}/training/qwen2.5-14b-improved-hf-{training_backend}",
+            final_hf_path=f"{workspace}/training-{training_backend}/qwen2.5-14b-improved-hf",
         )
 
 
@@ -146,7 +147,7 @@ def final_eval(workspace, cluster, num_gpus, expname_prefix, backend, wandb_para
         eval(
             ctx=wrap_arguments("++inference.tokens_to_generate=16384 "),
             cluster=cluster,
-            model=f"{workspace}/training/qwen2.5-14b-improved-hf-{training_backend}",
+            model=f"{workspace}/training-{training_backend}/qwen2.5-14b-improved-hf",
             server_type="vllm",
             server_gpus=num_gpus,
             benchmarks="aime24:8,aime25:8",
