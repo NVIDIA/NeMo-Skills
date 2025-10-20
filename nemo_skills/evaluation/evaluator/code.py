@@ -41,6 +41,7 @@ class CodeExecEvaluatorConfig:
     sandbox: dict
     language: str = "python"
     timeout: int = 10
+    
 
 
 class CodeExecEvaluator(BaseEvaluator):
