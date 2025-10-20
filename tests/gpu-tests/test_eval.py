@@ -200,8 +200,8 @@ def test_megatron_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++max_samples=5 "
-        f"    ++tokenizer=Qwen/Qwen3-4B "
-        f"    --server_args='--tokenizer-model Qwen/Qwen3-4B --inference-max-requests=20' "
+        f"    ++tokenizer=Qwen/Qwen3-1.7B "
+        f"    --server_args='--tokenizer-model Qwen/Qwen3-1.7B --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
 
