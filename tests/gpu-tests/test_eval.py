@@ -87,7 +87,6 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --with_sandbox "
-        # f"    ++tokenizer={tokenizer} "
         f"    ++stop_phrase='\\n\\n\\n\\n\\n\\n' "
         f"    --server_args='--backend pytorch' "
         f"    ++code_tags={code_tags} "
@@ -109,9 +108,9 @@ def test_trtllm_code_execution_eval(server_type):
 @pytest.mark.gpu
 @pytest.mark.parametrize("server_type,server_args", [("vllm", ""), ("sglang", ""), ("trtllm", "--backend pytorch")])
 def test_hf_eval(server_type, server_args):
-    # this test expects qwen3-4b to properly check accuracy
+    # this test expects qwen3-1.7b to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast
-    # mmlu/ifeval will be cut to 400 samples to save time
+    # mmlu/ifeval will be cut to 164 samples to save time
     # could cut everything, but human-eval/mbpp don't work with partial gens
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
