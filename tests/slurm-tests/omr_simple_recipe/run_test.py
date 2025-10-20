@@ -12,6 +12,7 @@
 # limitations under the License.
 
 import argparse
+import subprocess
 
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
@@ -45,7 +46,7 @@ def main():
     elif args.wandb_project:
         cmd += f" --wandb_project {args.wandb_project} "
 
-    # subprocess.run(cmd, shell=True, check=True)
+    subprocess.run(cmd, shell=True, check=True)
 
     checker_cmd = f"python tests/slurm-tests/omr_simple_recipe/check_results.py --workspace {args.workspace} --backend {' '.join(args.backend)}"
 
