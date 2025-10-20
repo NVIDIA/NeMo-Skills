@@ -155,6 +155,7 @@ class SolverAgent(BaseSubAgent):
         filled, out, t = await self._call("solver", {**data_point, "question": question_with_history}, all_data)
         logs.append({"prompt": filled, "response": out["generation"], "generation_time": t})
         sol = extract_cpp_block(out["generation"]) or ""
+        print(f"SolverAgent generation: {out['generation']}")
         if not sol:
             raise ValueError(f"SolverAgent failed to produce a C++ solution block: {out['generation']}")
         return sol, logs
