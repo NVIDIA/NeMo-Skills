@@ -48,7 +48,7 @@ class CodeExecEvaluator(BaseEvaluator):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
         import time
-        time.sleep(10)
+        time.sleep(100)
         self.sandbox = get_sandbox(self.eval_config.sandbox)
 
     async def eval_single(self, data_point: dict):
