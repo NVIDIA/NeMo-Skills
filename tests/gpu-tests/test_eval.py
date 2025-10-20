@@ -109,7 +109,7 @@ def test_trtllm_code_execution_eval(server_type):
 @pytest.mark.gpu
 @pytest.mark.parametrize("server_type,server_args", [("vllm", ""), ("sglang", ""), ("trtllm", "--backend pytorch")])
 def test_hf_eval(server_type, server_args):
-    # this test expects qwen3-1.7b to properly check accuracy
+    # this test expects qwen3-4b to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast
     # mmlu/ifeval will be cut to 400 samples to save time
     # could cut everything, but human-eval/mbpp don't work with partial gens
@@ -202,8 +202,8 @@ def test_megatron_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    ++max_samples=5 "
-        f"    ++tokenizer=Qwen/Qwen3-1.7B "
-        f"    --server_args='--tokenizer-model Qwen/Qwen3-1.7B --inference-max-requests=20' "
+        f"    ++tokenizer=Qwen/Qwen3-4B "
+        f"    --server_args='--tokenizer-model Qwen/Qwen3-4B --inference-max-requests=20' "
     )
     subprocess.run(cmd, shell=True, check=True)
 
