@@ -56,6 +56,7 @@ def test_run_cmd_llm_infer():
             f"--server_type {server_type} "
             f"--server_gpus 1 "
             f"--server_nodes 1 "
+            f"--server_args '--enable-eager'"
             f"--command '{command}'"
         )
 
