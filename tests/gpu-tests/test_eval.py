@@ -138,6 +138,7 @@ def test_hf_eval(server_type, server_args):
         f"    --server_args='{server_args}' "
         f"    ++max_samples=164 "
         f"    ++max_concurrent_requests=200 "
+        f"    ++inference.tokens_to_generate=2048 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
