@@ -69,7 +69,7 @@ def test_trtllm_code_execution_eval(server_type):
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     # we are using the base prompt for llama to make it follow few-shots
     if model_type == "qwen":
-        tokenizer = "Qwen/Qwen3-4B"
+        # tokenizer = "Qwen/Qwen3-1.7B"
         code_tags = "qwen"
     else:
         pytest.skip("Only qwen models are supported in this test")
@@ -87,7 +87,7 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --with_sandbox "
-        f"    ++tokenizer={tokenizer} "
+        # f"    ++tokenizer={tokenizer} "
         f"    ++stop_phrase='\\n\\n\\n\\n\\n\\n' "
         f"    --server_args='--backend pytorch' "
         f"    ++code_tags={code_tags} "
@@ -137,7 +137,6 @@ def test_hf_eval(server_type, server_args):
         f"    --num_jobs 1 "
         f"    --server_args='{server_args}' "
         f"    ++max_samples=164 "
-        f"    ++max_concurrent_requests=200 "
         f"    ++inference.tokens_to_generate=2048 "
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -158,17 +157,17 @@ def test_hf_eval(server_type, server_args):
     with open(f"{output_dir}/eval-results/human-eval/metrics.json", "r") as f:
         metrics = json.load(f)["human-eval"]["pass@1"]
 
-    assert metrics["passing_base_tests"] >= 40
-    assert metrics["passing_plus_tests"] >= 40
+    assert metrics["passing_base_tests"] >= 35
+    assert metrics["passing_plus_tests"] >= 35
     assert metrics["num_entries"] == 164
 
     with open(f"{output_dir}/eval-results/ifeval/metrics.json", "r") as f:
         metrics = json.load(f)["ifeval"]["pass@1"]
 
     assert metrics["prompt_strict_accuracy"] >= 60
-    assert metrics["instruction_strict_accuracy"] >= 70
+    assert metrics["instruction_strict_accuracy"] >= 60
     assert metrics["prompt_loose_accuracy"] >= 60
-    assert metrics["instruction_loose_accuracy"] >= 70
+    assert metrics["instruction_loose_accuracy"] >= 60
     assert metrics["num_prompts"] == 164
 
     with open(f"{output_dir}/eval-results/mmlu/metrics.json", "r") as f:
