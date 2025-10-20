@@ -178,7 +178,10 @@ def run_cmd(
         print(f"server_address: {server_address}")
         print(f"commands: {commands}")
         if model is not None and server_config is not None:
-            commands = [pipeline_utils.set_python_path_and_wait_for_server(server_address, cmd) for cmd in commands]
+            commands = [
+                pipeline_utils.set_python_path_and_wait_for_server(server_address, server_type, cmd)
+                for cmd in commands
+            ]
 
         print(f"commands: {commands}")
 
