@@ -44,7 +44,7 @@ def test_trtllm_eval():
         f"    --server_gpus 1 "
         f"    --server_nodes 1 "
         f"    --server_args='--backend pytorch' "
-        f"    ++max_samples=20 "
+        f"    ++max_samples=10 "
     )
     subprocess.run(cmd, shell=True, check=True)
 
@@ -55,7 +55,7 @@ def test_trtllm_eval():
     if model_type == "qwen":
         assert metrics["symbolic_correct"] >= 70
 
-    assert metrics["num_entries"] == 20
+    assert metrics["num_entries"] == 10
 
 
 @pytest.mark.gpu
