@@ -59,7 +59,6 @@ def test_run_cmd_llm_infer():
             f"--command '{command}'"
         )
 
-        print("Command: ", cmd)
         subprocess.run(cmd, shell=True, check=True)
 
         jsonl_file = Path(output_dir) / "output.txt"

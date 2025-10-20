@@ -603,7 +603,7 @@ def maybe_get_env(value: Union[Any, List[Any]], env_name, default=None, cast: Ca
     return value
 
 
-def get_server_wait_cmd(server_address, server_type):
+def get_server_wait_cmd(server_address):
     # might be required if we are not hosting server ourselves
     # this will try to handshake in a loop and unblock when the server responds
     return (

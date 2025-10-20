@@ -67,9 +67,9 @@ def wrap_python_path(cmd):
     return "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && cd /nemo_run/code && " + cmd
 
 
-def set_python_path_and_wait_for_server(server_address, server_type, generation_commands):
+def set_python_path_and_wait_for_server(server_address, generation_commands):
     if server_address is not None:
-        cmd = get_server_wait_cmd(server_address, server_type) + " && "
+        cmd = get_server_wait_cmd(server_address) + " && "
     else:
         cmd = ""
     # will run in a single task always (no need to check mpi env vars)
