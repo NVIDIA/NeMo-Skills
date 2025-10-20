@@ -359,6 +359,7 @@ class IOIEvaluator(BaseEvaluator):
                 if not result.get("compile_success", True):
                     print(
                         f"Compile failed for problem '{entry['name']}', test '{test_name}':\n"
+                        f"--- Solution ---\n{completion}\n"
                         f"--- STDOUT ---\n{result.get('compile_stdout', '').strip()}\n"
                         f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
                     )

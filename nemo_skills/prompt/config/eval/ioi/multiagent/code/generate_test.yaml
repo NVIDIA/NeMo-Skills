@@ -3,7 +3,9 @@ system: ""
 user: |-
   You are given a competitive programming problem and a candidate solution. You are required to test this solution, by creating an executable c++ script, that will be compiled and run. It must takes the solution and test it for correctness. Please embed the solution into this script.
 
-  The script will be executed without any inputs, so make sure to script is standalone, testing the functionality of the solution. Try to make the output as concise as possible, as there is a limit to the number of characters (no large prints as they will be truncated)
+  The script will be executed without any inputs, so make sure to script is standalone, testing the functionality of the solution. Try to make the output as concise as possible, as there is a limit to the number of characters (no large prints as they will be truncated).
+
+  The header files for the problem (if written in the problem statement) will be provided when compiled/executed, so no need to include them in the script.
 
   You must use ```script to wrap the executable script with the following format:
   ```script
