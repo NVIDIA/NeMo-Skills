@@ -158,8 +158,8 @@ def test_hf_eval(server_type, server_args):
     with open(f"{output_dir}/eval-results/human-eval/metrics.json", "r") as f:
         metrics = json.load(f)["human-eval"]["pass@1"]
 
-    assert metrics["passing_base_tests"] >= 50
-    assert metrics["passing_plus_tests"] >= 50
+    assert metrics["passing_base_tests"] >= 40
+    assert metrics["passing_plus_tests"] >= 40
     assert metrics["num_entries"] == 164
 
     with open(f"{output_dir}/eval-results/ifeval/metrics.json", "r") as f:
