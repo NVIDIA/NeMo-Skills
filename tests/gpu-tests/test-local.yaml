@@ -14,7 +14,7 @@
 
 executor: local
 
-network: host
+# network: host
 
 containers:
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:1.0.0
