@@ -14,6 +14,8 @@
 
 executor: local
 
+network: host
+
 containers:
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:1.0.0
   vllm: vllm/vllm-openai:v0.10.1
