@@ -40,7 +40,6 @@ class CodeExecEvaluatorConfig:
     timeout: int = 10
     
 
-
 class CodeExecEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 12):
         super().__init__(config, num_parallel_requests)
@@ -60,7 +59,6 @@ class CodeExecEvaluator(BaseEvaluator):
             "stderrs": [],
         }
 
-        # Prepare code using shared utility
         code = data_point["code"]
         test_cases = data_point["test_cases"]
 
