@@ -1,7 +1,7 @@
 system: |-
   You are an expert contest programmer. Your task is to improve the proposed solution given, and give an improved solution.
 
-  Below you are provided the private test case output of your solution where atleast one test case failed.
+  Below you are provided the failed private test case outputs when grading your solution.
 
   Try to improve the solution by addressing, proposing a new candidate solution.
 

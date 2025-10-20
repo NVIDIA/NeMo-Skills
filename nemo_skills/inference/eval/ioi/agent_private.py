@@ -190,8 +190,9 @@ class IOIExecutionGenerationTask(GenerationTask):
                 # Evaluate the current solution using the external evaluator.
                 eval_results = await self.evaluator.eval_single({**data_point, "generation": cur_generation_response})
                 test_case_results = eval_results["test_case_results"]
-                # Check if all test cases passed.
-                if test_case_results and all(res.get("passed") for res in test_case_results.values()):
+
+                # Check if all subtasks passed fully (score == 1 for every output)
+                if all(all(o["score"] == 1 for o in v["outputs"]) for v in test_case_results.values()):
                     print(f"[Success] All test cases passed at step {step_num}.")
                     return {
                         "generation": cur_generation_response,
@@ -201,13 +202,23 @@ class IOIExecutionGenerationTask(GenerationTask):
 
                 print(f"[Step {step_num + 1}/{self.cfg.total_steps}] Improving based on evaluator feedback.")
 
+                # Prepare a concise failure summary (only non-perfect cases)
+                failure_lines = []
+                for subtask, info in test_case_results.items():
+                    for out in info["outputs"]:
+                        if out["score"] != 1:
+                            failure_lines.append(
+                                f"{subtask}:{out['test_name']} score={out['score']} msg={out.get('run_stderr', '').strip()}"
+                            )
+                failure_summary = "\n".join(failure_lines)
+
                 # Ask the LLM to improve the solution given the evaluator feedback.
                 prompt_txt, improve_resp, gen_time = await self._call_llm(
                     data_point,
                     all_data,
                     "improve_after_verify_solution",
                     solution=extract_code_block(cur_generation_response),
-                    test_case_results=str(test_case_results),
+                    test_case_results=failure_summary,
                 )
 
                 num_steps_completed += 1
