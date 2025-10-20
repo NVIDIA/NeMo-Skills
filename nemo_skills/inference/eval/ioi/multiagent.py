@@ -70,7 +70,7 @@ def build_question_with_history(question: str, prev_solutions: List[str]) -> str
     if not prev_solutions:
         return question
     prev = render_solutions_markdown(prev_solutions)
-    return f"{question}\n\n Here are previous proposed solutions for your reference (improve upon or propose a new one if believe none of them are useful):\n{prev}"
+    return f"{question}\n\n Here are previous proposed solutions from various agents that you can use for your reference:\n{prev}"
 
 
 @nested_dataclass(kw_only=True)
