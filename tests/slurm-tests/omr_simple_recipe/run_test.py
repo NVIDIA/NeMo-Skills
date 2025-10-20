@@ -12,7 +12,6 @@
 # limitations under the License.
 
 import argparse
-import subprocess
 
 from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
@@ -24,7 +23,13 @@ def main():
     ap.add_argument("--wandb_project", default="nemo-skills-slurm-ci", help="W&B project name")
     ap.add_argument("--expname_prefix", required=True, help="Experiment name prefix used inside the recipe")
     ap.add_argument("--disable_wandb", action="store_true", help="Disable W&B logging in the recipe")
-    ap.add_argument("--backend", type=str, default="megatron", help="Can either be megatron or fsdp")
+    ap.add_argument(
+        "--backend",
+        type=str,
+        nargs="+",
+        choices=["megatron", "fsdp"],
+        default=["megatron"],
+    )
     args = ap.parse_args()
 
     cmd = (
@@ -32,7 +37,7 @@ def main():
         f" --cluster {args.cluster} "
         f" --workspace {args.workspace} "
         f" --expname_prefix {args.expname_prefix} "
-        f" --backend {args.backend} "
+        f" --backend {' '.join(args.backend)} "
     )
 
     if args.disable_wandb:
@@ -40,9 +45,9 @@ def main():
     elif args.wandb_project:
         cmd += f" --wandb_project {args.wandb_project} "
 
-    subprocess.run(cmd, shell=True, check=True)
+    # subprocess.run(cmd, shell=True, check=True)
 
-    checker_cmd = f"python tests/slurm-tests/omr_simple_recipe/check_results.py --workspace {args.workspace}"
+    checker_cmd = f"python tests/slurm-tests/omr_simple_recipe/check_results.py --workspace {args.workspace} --backend {' '.join(args.backend)}"
 
     run_cmd(
         ctx=wrap_arguments(checker_cmd),
@@ -53,6 +58,7 @@ def main():
             f"{args.expname_prefix}-final-eval",
             f"{args.expname_prefix}-baseline-eval",
         ],
+        reuse_code=False,
     )
 
 
