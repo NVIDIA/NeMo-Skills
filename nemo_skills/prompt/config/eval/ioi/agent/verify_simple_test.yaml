@@ -1,0 +1,27 @@
+system: ""
+
+user: |-
+  You are given a competitive programming problem, a candidate solution, and the output of a test script that was compiled and executed against the solution to evaluate its correctness.
+
+  Decide if the provided stdout/stderr (or compile error) indicate the solution is correct. Answer with a single boxed yes/no verdict only (like \\boxed{{yes}} or \\boxed{{no}}).
+
+  ## Problem
+  {question}
+
+  ## Candidate Solution
+  {solution}
+
+  ## Test Execution Output
+  stdout:
+  ```
+  {stdout}
+  ```
+  stderr:
+  ```
+  {stderr}
+  ```
+
+  ## Compile Error (if any)
+  ```
+  {compile_error}
+  ```

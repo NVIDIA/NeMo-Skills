@@ -49,7 +49,17 @@ async def compile_and_run_cpp(code_string: str, data_point: dict):
 
 
 def extract_code_block(text: str):
+    # todo (sean): this is a hack to prevent catching report tags in the CoT, causing parsing errors for gpt-oss.
+    text = text.split("<|end|><|start|>assistant<|channel|>final<|message|>")[-1]
     matches = re.findall(r"```cpp(.*?)```", text, re.DOTALL)
+    return matches[-1].strip() if matches else None
+
+
+# Extract a C++ test script wrapped in ```script ... ``` fences
+def extract_script_block(text: str):
+    # todo (sean): this is a hack to prevent catching report tags in the CoT, causing parsing errors for gpt-oss.
+    text = text.split("<|end|><|start|>assistant<|channel|>final<|message|>")[-1]
+    matches = re.findall(r"```script(.*?)```", text, re.DOTALL)
     return matches[-1].strip() if matches else None
 
 
@@ -92,6 +102,8 @@ class IOIExecutionConfig(GenerateSolutionsConfig):
     prompt_config: str = "eval/ioi/agent/solver"
     self_improve_prompt_config: str = "eval/ioi/agent/self_improve"
     verify_prompt_config: str = "eval/ioi/agent/verify"
+    testgen_prompt_config: str = "eval/ioi/multiagent/code/generate_test"
+    simple_verify_prompt_config: str = "eval/ioi/agent/verify_simple_test"
     improve_after_verify_prompt_config: str = "eval/ioi/agent/improve_after_verify"
     total_steps: int = 30
     num_self_improve: int = 1
@@ -113,7 +125,8 @@ class IOIExecutionGenerationTask(GenerationTask):
         self.prompts = {
             "initial": get_prompt(cfg.prompt_config, **prompt_kwargs),
             "self_improve_solution": get_prompt(cfg.self_improve_prompt_config, **prompt_kwargs),
-            "verify_solution": get_prompt(cfg.verify_prompt_config, **prompt_kwargs),
+            "generate_test_script": get_prompt(cfg.testgen_prompt_config, **prompt_kwargs),
+            "simple_verify_solution": get_prompt(cfg.simple_verify_prompt_config, **prompt_kwargs),
             "improve_after_verify_solution": get_prompt(cfg.improve_after_verify_prompt_config, **prompt_kwargs),
         }
         self.sandbox = LocalSandbox()
@@ -163,46 +176,108 @@ class IOIExecutionGenerationTask(GenerationTask):
 
             for step_num in range(self.cfg.total_steps):
                 print(f"[Step {step_num + 1}/{self.cfg.total_steps}] Starting verification phase")
-                first_fail_report = None
 
-                # Launch verifier calls concurrently
-                verify_tasks = [
-                    self._call_llm(
+                async def run_single_verification():
+                    # 1) Generate C++ test script wrapped in ```script fences
+                    test_prompt_txt, test_gen_resp, test_gen_time = await self._call_llm(
                         data_point,
                         all_data,
-                        "verify_solution",
+                        "generate_test_script",
                         solution=solution,
                     )
-                    for _ in range(self.cfg.num_verify)
-                ]
-                verify_results = await asyncio.gather(*verify_tasks)
-                yes_votes = sum(
-                    1 for _, ver, _ in verify_results if _extract_boxed_verdict(ver["generation"]) == "yes"
-                )
-                for _, ver, _ in verify_results:
-                    print(f"GENERATION: {ver['generation']}")
-                for _, ver, _ in verify_results:
-                    print(f"VOTE: {_extract_boxed_verdict(ver['generation'])}")
-                print(f"[Step {step_num + 1}] Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
+                    test_script_full = test_gen_resp["generation"]
+                    test_script_code = extract_script_block(test_script_full)
+                    if not test_script_code:
+                        raise ValueError(f"Failed to extract test script. Response: {test_gen_resp}")
 
-                for prompt_txt, verify_resp, gen_time in verify_results:
-                    chat_history.append(
-                        {"prompt": prompt_txt, "response": verify_resp["generation"], "generation_time": gen_time}
+                    # 2) Execute the script
+                    exec_stdout = ""
+                    exec_stderr = ""
+                    compile_error = ""
+                    try:
+                        exec_stdout, exec_stderr = await compile_and_run_cpp(test_script_code, data_point)
+                    except Exception as e:
+                        compile_error = str(e)
+
+                    # Debug prints for execution output
+                    print(f"[Execution] stdout:\n{exec_stdout}")
+                    print(f"[Execution] stderr:\n{exec_stderr}")
+                    if compile_error:
+                        print(f"[Execution] compile_error:\n{compile_error}")
+
+                    # 3) Simple verification using outputs
+                    verify_prompt_txt, verify_resp, verify_time = await self._call_llm(
+                        data_point,
+                        all_data,
+                        "simple_verify_solution",
+                        solution=solution,
+                        stdout=exec_stdout,
+                        stderr=exec_stderr,
+                        compile_error=compile_error,
                     )
-                    ver_out = verify_resp["generation"]
 
-                    # Extract verdict from inside the report block.
+                    return {
+                        "test_gen": {
+                            "prompt": test_prompt_txt,
+                            "response": test_gen_resp["generation"],
+                            "generation_time": test_gen_time,
+                            "script": test_script_code,
+                        },
+                        "simple_verify": {
+                            "prompt": verify_prompt_txt,
+                            "response": verify_resp["generation"],
+                            "generation_time": verify_time,
+                            "stdout": exec_stdout,
+                            "stderr": exec_stderr,
+                            "compile_error": compile_error,
+                        },
+                    }
+
+                # Launch verifier attempts concurrently
+                verify_results = await asyncio.gather(*[run_single_verification() for _ in range(self.cfg.num_verify)])
+
+                # Tally votes
+                yes_votes = 0
+                first_fail_log = None
+                for res in verify_results:
+                    ver_out = res["simple_verify"]["response"]
                     verdict = _extract_boxed_verdict(ver_out)
+                    # Debug prints for each generation and vote
+                    print(f"GENERATION: {ver_out}")
+                    print(f"VOTE: {verdict}")
+                    if verdict == "yes":
+                        yes_votes += 1
+                    else:
+                        if first_fail_log is None:
+                            # Build a verification log from execution outputs and verifier response
+                            first_fail_log = (
+                                "stdout:\n"
+                                + res["simple_verify"]["stdout"]
+                                + "\n\nstderr:\n"
+                                + res["simple_verify"]["stderr"]
+                                + "\n\ncompile_error:\n"
+                                + res["simple_verify"]["compile_error"]
+                                + "\n\nverifier_response:\n"
+                                + ver_out
+                            )
 
-                    # Ensure verdict is explicitly 'yes' or 'no'.
-                    if verdict not in ("yes", "no"):
-                        print(
-                            f"[Warning] Invalid verdict extracted (expected 'yes' or 'no', got '{verdict}'). Full output:\n{ver_out}. Report:\n{extract_detailed_solution(ver_out)}"
-                        )
+                    # Track prompts/responses in chat history
+                    chat_history.append(
+                        {
+                            "prompt": res["test_gen"]["prompt"],
+                            "response": res["test_gen"]["response"],
+                            "generation_time": res["test_gen"]["generation_time"],
+                        }
+                    )
+                    chat_history.append(
+                        {
+                            "prompt": res["simple_verify"]["prompt"],
+                            "response": res["simple_verify"]["response"],
+                            "generation_time": res["simple_verify"]["generation_time"],
+                        }
+                    )
 
-                    if verdict != "yes":  # Treat 'no' or invalid verdict as failure
-                        if first_fail_report is None:
-                            first_fail_report = ver_out
+                print(f"[Step {step_num + 1}] Verification yes votes: {yes_votes}/{self.cfg.num_verify}")
 
                 # Accept if total yes votes meet or exceed majority threshold
                 if yes_votes >= self.cfg.num_majority_verify:
@@ -216,18 +291,16 @@ class IOIExecutionGenerationTask(GenerationTask):
                         "num_steps_completed": num_steps_completed,
                     }
 
-                # If we reach here, solution deemed incorrect -> improve using first fail report
-                if first_fail_report is not None:
-                    verification_log = extract_detailed_solution(first_fail_report, "Detailed Verification", False)
-                else:
-                    raise ValueError("No fail report found")
+                # If we reach here, solution deemed incorrect -> improve using first failure execution log
+                if first_fail_log is None:
+                    raise ValueError("No failure verification log found")
 
                 prompt_txt, sol_resp, gen_time = await self._call_llm(
                     data_point,
                     all_data,
                     "improve_after_verify_solution",
                     solution=solution,
-                    verification=verification_log,
+                    verification=first_fail_log,
                 )
 
                 new_solution = extract_code_block(sol_resp["generation"])
