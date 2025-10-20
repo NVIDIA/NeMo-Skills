@@ -12,7 +12,10 @@
 # See the License for the specific lang
 
 import functools
+import importlib
+from pathlib import Path
 
+from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.evaluation.metrics.aalcr_metrics import AALCRMetrics
 from nemo_skills.evaluation.metrics.answer_judgement_metrics import AnswerJudgementMetrics
 from nemo_skills.evaluation.metrics.arena_metrics import ArenaMetrics
@@ -33,6 +36,7 @@ from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
 from nemo_skills.evaluation.metrics.mrcr_metrics import MRCRMetrics
 from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 from nemo_skills.evaluation.metrics.simpleqa_metrics import SimpleQAMetrics
+from nemo_skills.evaluation.metrics.translation_metrics import TranslationMetrics
 
 METRICS_MAP = {
     "math": MathMetrics,
@@ -56,11 +60,37 @@ METRICS_MAP = {
     "aalcr": AALCRMetrics,
     "livebench_coding": LiveCodeBenchMetrics,
     "ojbench": OJBenchMetrics,
+    "translation": TranslationMetrics,
     "human_eval_infilling": HumanEvalInfillingMetrics,
 }
 
 
 def get_metrics(metric_type: str):
-    if metric_type not in METRICS_MAP:
-        raise ValueError(f"Metric {metric_type} not found.\nSupported types: {str(METRICS_MAP.keys())}")
-    return METRICS_MAP[metric_type]()
+    """Get metrics class.
+
+    Class path formats:
+        - Module format: `path.to.module::ClassName`
+        - Path format: `/path/to/module/file.py::ClassName`
+
+    Arguments:
+        metric_type: Either a string from METRICS_MAP, or a path to class (class path format above).
+    """
+    metrics_cls = None
+
+    if metric_type in METRICS_MAP:
+        metrics_cls = METRICS_MAP[metric_type]
+    elif "::" in metric_type:
+        module_str, class_str = metric_type.split("::", 1)
+        if Path(module_str).is_file():
+            module = import_from_path(module_str)
+        else:
+            module = importlib.import_module(module_str)
+
+        metrics_cls = getattr(module, class_str)
+
+    if metrics_cls is None:
+        raise ValueError(
+            f"Metric {metric_type} not found.\nSupported types: {str(METRICS_MAP.keys())} or use explicit class path format."
+        )
+
+    return metrics_cls()

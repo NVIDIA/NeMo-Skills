@@ -40,6 +40,7 @@ from nemo_skills.inference.model import (
     get_tool_calling_model,
     server_params,
 )
+from nemo_skills.inference.model.base import EndpointType
 from nemo_skills.prompt.utils import get_prompt, get_token_count
 from nemo_skills.utils import (
     chunk_data,
@@ -56,6 +57,13 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class InferenceConfig:
+    # Type of completion to generate when using OpenAI
+    # "chat": used by default
+    # "text": for text completions, in this case we will
+    # take the tokenizer from the model and apply it to the prompt before sending it.
+    # You can override tokenizer with tokenizer parameter.
+    # "responses": for responses api format.
+    endpoint_type: EndpointType = EndpointType.chat
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
     top_k: int = -1
     top_p: float = 0.95
@@ -76,15 +84,15 @@ class GenerateSolutionsConfig:
     input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
     prompt_config: str | None = None  # How to format the data into prompts
-    # by default we use chat completions, set this to True to use completions API. In that case we will take the
-    # tokenizer from the model and apply it to the prompt before sending it. You can override tokenizer with
-    # tokenizer parameter
+
+    # Deprecated, please use endpoint_type in the InferenceConfig instead
     use_completions_api: bool = False
+
     # path or name of the tokenizer to use for completions API. By default uses server.model
     tokenizer: str | None = None
     # extra parameters to pass to the tokenizer's apply_chat_template method
     chat_template_kwargs: dict = field(default_factory=dict)
-    # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
+    # to specify the format of the prompt, "ns" for Nemo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
     system_message: str | None = None  # can override the default system message in the config
@@ -179,6 +187,7 @@ class GenerateSolutionsConfig:
         self._post_init_validate_data()
         self._post_init_validate_server()
         self._post_init_validate_params()
+        self._post_init_deprecated_params()
 
     def _post_init_validate_data(self):
         if isinstance(self.total_code_executions_in_prompt, ListConfig):
@@ -199,7 +208,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.use_completions_api = True
+            self.inference.endpoint_type = EndpointType.text
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -214,6 +223,10 @@ class GenerateSolutionsConfig:
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
+
+    def _post_init_deprecated_params(self):
+        if self.use_completions_api:
+            raise ValueError("use_completions_api is deprecated, please use ++inference.endpoint_type=text instead.")
 
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
@@ -258,22 +271,32 @@ class GenerationTask:
             cfg: GenerateSolutionsConfig object with the configuration parameters or subclass.
         """
         self.cfg = cfg
+        self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
 
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
         if self.cfg.chat_template_kwargs:
-            if not self.cfg.use_completions_api:
+            if self.cfg.inference.endpoint_type != EndpointType.text:
                 if "chat_template_kwargs" in self.cfg.inference.extra_body:
                     raise ValueError(
                         "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
                         "You can only use one of them!"
                     )
-                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
+
                 self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
 
+        if self.cfg.inference.extra_body.get("chat_template_kwargs"):
+            if self.cfg.chat_template_kwargs:
+                raise ValueError(
+                    "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
+                    "You can only use one of them!"
+                )
+            if self.cfg.inference.endpoint_type == EndpointType.text:
+                self.cfg.chat_template_kwargs = self.cfg.inference.extra_body.pop("chat_template_kwargs")
+
         # Setup tokenizer
         if (
-            self.cfg.use_completions_api
+            self.cfg.inference.endpoint_type == EndpointType.text
             or self.cfg.server.get("enable_soft_fail", False)
             or self.cfg.count_prompt_tokens
         ):
@@ -285,7 +308,7 @@ class GenerationTask:
         # Setup litellm cache
         self.setup_litellm_cache()
 
-        if self.cfg.use_completions_api and self.cfg.inference.tokens_to_generate is None:
+        if self.cfg.inference.endpoint_type == EndpointType.text and self.cfg.inference.tokens_to_generate is None:
             raise ValueError("When using completions API, tokens_to_generate must be specified!")
 
         # Setup prompt formatter and LLM
@@ -308,7 +331,10 @@ class GenerationTask:
         # Setup evaluator if specified
         self.evaluator = None
         if self.cfg.eval_type:
-            from nemo_skills.evaluation.evaluator import get_evaluator_class, supports_single_eval
+            from nemo_skills.evaluation.evaluator import (
+                get_evaluator_class,
+                supports_single_eval,
+            )
 
             if not supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
                 raise ValueError(
@@ -327,9 +353,12 @@ class GenerationTask:
         # Initialize semaphore for controlling concurrent requests
         if self.cfg.parallel_thinking.mode is not None:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
-            self.semaphore = asyncio.Semaphore(
-                self.cfg.max_concurrent_requests // self.llm.cfg.max_concurrent_requests
-            )
+            # Some models (like NIM speech models) don't have cfg attribute
+            if hasattr(self.llm, "cfg"):
+                divisor = self.llm.cfg.max_concurrent_requests
+            else:
+                divisor = 1
+            self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests // divisor)
         else:
             self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
@@ -342,7 +371,7 @@ class GenerationTask:
 
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
-            tokenizer=self.tokenizer if self.cfg.use_completions_api else None,
+            tokenizer=self.tokenizer if self.cfg.inference.endpoint_type == EndpointType.text else None,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
             system_message=self.cfg.system_message,
@@ -371,6 +400,12 @@ class GenerationTask:
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
                 "remove_thinking": self.cfg.parallel_thinking.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
+                "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
+                # The following are specific to parallel thinking and we want to defend against any future key overlaps with the main generation config
+                "mode": self.cfg.parallel_thinking.mode,
+                "window_size": self.cfg.parallel_thinking.window_size,
+                "solution_key": self.cfg.parallel_thinking.solution_key,
+                "filter_incomplete_solutions": self.cfg.parallel_thinking.filter_incomplete_solutions,
             }
 
             llm = get_parallel_thinking_model(
@@ -494,7 +529,7 @@ class GenerationTask:
                 output.pop("generation_end_time", None)
                 output.pop("generation_time", None)
                 output.pop("num_generated_tokens", None)
-                output.pop("input_sequence_length", None)
+                output.pop("num_input_tokens", None)
 
             for key in output:
                 original_data_point.pop(key, None)
@@ -527,12 +562,23 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        result = await self.llm.generate_async(**generation_params)
+        result = await self.generate_with_semaphore(**generation_params)
 
         if self.cfg.count_prompt_tokens:
-            input_sequence_length = get_token_count(self.hf_tokenizer, generation_params["prompt"])
-            result["input_sequence_length"] = input_sequence_length
+            num_input_tokens = get_token_count(self.hf_tokenizer, generation_params["prompt"])
+            result["num_input_tokens"] = num_input_tokens
+
         return result
+
+    async def generate_with_semaphore(self, **generation_params):
+        """Generate with semaphore control.
+
+        Ensures no more than max_concurrent_requests LLM calls can be run at the same time.
+        Should work even if process_single_datapoint is doing multiple requests in parallel
+        as long as those requests also use this function.
+        """
+        async with self.semaphore:
+            return await self.llm.generate_async(**generation_params)
 
     async def apply_evaluation_hook(self, data_point):
         if self.evaluator:
@@ -543,30 +589,29 @@ class GenerationTask:
             data_point.update(eval_results)
         return data_point
 
-    async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
-        """Process a single data point with semaphore control."""
-        async with self.semaphore:
-            # Generate output for this single data point
-            start_time = time.time()
-            output = await self.process_single_datapoint(data_point, all_data)
-            end_time = time.time()
+    async def _generate_and_save_datapoint(self, data_point, all_data, fout, pbar):
+        """Starts generation, evaluation and saves the output for a single data point."""
+        # Generate output for this single data point
+        start_time = time.time()
+        output = await self.process_single_datapoint(data_point, all_data)
+        end_time = time.time()
 
-            if self.cfg.add_generation_stats:
-                output["generation_start_time"] = start_time
-                output["generation_end_time"] = end_time
-                output["generation_time"] = end_time - start_time
+        if self.cfg.add_generation_stats:
+            output["generation_start_time"] = start_time
+            output["generation_end_time"] = end_time
+            output["generation_time"] = end_time - start_time
 
-            # Apply evaluation hook if configured
-            # TODO: note that this currently only evaluates independently--if there
-            # is any post-processing that needs to be done on the full set of
-            # generations, this will not work correctly, and we might need another
-            # hook at the end of generation to make it work properly
-            output = await self.apply_evaluation_hook({**data_point, **output})
+        # Apply evaluation hook if configured
+        # TODO: note that this currently only evaluates independently--if there
+        # is any post-processing that needs to be done on the full set of
+        # generations, this will not work correctly, and we might need another
+        # hook at the end of generation to make it work properly
+        output = await self.apply_evaluation_hook({**data_point, **output})
 
-            # Thread-safe output writing
-            async with self.output_lock:
-                self.dump_outputs([output], [data_point], fout)
-                pbar.update(1)
+        # Thread-safe output writing
+        async with self.output_lock:
+            self.dump_outputs([output], [data_point], fout)
+            pbar.update(1)
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
@@ -598,7 +643,7 @@ class GenerationTask:
             # Create tasks for all remaining data points
             tasks = []
             for data_point in remaining_data_points:
-                task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
+                task = asyncio.create_task(self._generate_and_save_datapoint(data_point, data, fout, pbar))
                 tasks.append(task)
 
             # Wait for all tasks to complete
@@ -627,8 +672,12 @@ class GenerationTask:
         self.cleanup_litellm_cache()
 
     def wait_for_server(self):
+        if not self.cfg.server.get("base_url") and not self.cfg.server.get("host") and not self.cfg.server.get("port"):
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
-        if not server_address:
+        # Hydra sets None parameters to "None" string
+        if server_address == "None":
             LOG.info("Skipping server wait as no server address is provided.")
             return
         server_start_cmd = get_server_wait_cmd(server_address)

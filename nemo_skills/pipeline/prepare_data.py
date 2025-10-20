@@ -46,8 +46,9 @@ def prepare_data(
     ),
     expname: str = typer.Option("prepare-data", help="Experiment name for data preparation"),
     partition: str = typer.Option(None, help="Slurm partition to use"),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="Time-min slurm parameter"),
-    num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
+    num_gpus: int | None = typer.Option(None, help="Number of GPUs per node to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount"),
     run_after: List[str] = typer.Option(None, help="List of expnames that this job depends on before starting"),
@@ -62,8 +63,8 @@ def prepare_data(
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
 ):
@@ -134,6 +135,7 @@ def prepare_data(
         command=command,
         expname=expname,
         partition=partition,
+        qos=qos,
         time_min=time_min,
         num_gpus=num_gpus,
         num_nodes=num_nodes,

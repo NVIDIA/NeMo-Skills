@@ -52,9 +52,11 @@ def run_cmd(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
+    num_gpus: int | None = typer.Option(None, help="Number of GPUs per node to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
+    num_tasks: int = typer.Option(1, help="Number of tasks per node"),
     model: str = typer.Option(None, help="Path to the model to evaluate"),
     server_address: str = typer.Option(None, help="Address of the server hosting the model"),
     server_type: pipeline_utils.SupportedServers | None = typer.Option(None, help="Type of server to use"),
@@ -106,8 +108,8 @@ def run_cmd(
         "You can use an arbitrary command here and we will run it on a single rank for each node. "
         "E.g. 'pip install my_package'",
     ),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
@@ -116,7 +118,7 @@ def run_cmd(
         None, help="Internal option to specify task dependencies.", hidden=True
     ),
 ):
-    """Run a pre-defined module or script in the NeMo-Skills container."""
+    """Run a pre-defined module or script in the Nemo-Skills container."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
     extra_arguments = f"{' '.join(ctx.args)}"
 
@@ -185,6 +187,7 @@ def run_cmd(
                 container=containers,
                 cluster_config=cluster_config,
                 partition=partition,
+                qos=qos,
                 time_min=time_min,
                 server_config=server_config,
                 with_sandbox=with_sandbox,
@@ -196,7 +199,7 @@ def run_cmd(
                 task_dependencies=prev_tasks,
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
-                num_tasks=[1] * len(commands),
+                num_tasks=[num_tasks] * len(commands),
                 slurm_kwargs={"exclusive": exclusive} if exclusive else None,
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,

@@ -21,7 +21,10 @@ from functools import partial
 import hydra
 from transformers import AutoTokenizer
 
-from nemo_skills.dataset.bfcl_v3.utils import convert_to_tool, func_doc_language_specific_pre_processing
+from nemo_skills.dataset.bfcl_v3.utils import (
+    convert_to_tool,
+    func_doc_language_specific_pre_processing,
+)
 from nemo_skills.inference.eval.bfcl_utils import (
     DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC,
     MAXIMUM_STEP_LIMIT,
@@ -29,10 +32,21 @@ from nemo_skills.inference.eval.bfcl_utils import (
     execute_multi_turn_func_call,
     is_empty_execute_response,
 )
-from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
+from nemo_skills.inference.generate import (
+    GenerateSolutionsConfig,
+    GenerationTask,
+    InferenceConfig,
+)
 from nemo_skills.inference.model import server_params
+from nemo_skills.inference.model.base import EndpointType
 from nemo_skills.inference.model.utils import is_context_window_exceeded_error
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
+from nemo_skills.prompt.utils import get_token_count
+from nemo_skills.utils import (
+    get_help_message,
+    get_logger_name,
+    nested_dataclass,
+    setup_logging,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -82,7 +96,7 @@ class ClientMessageParser:
         self._validate_and_setup_client_parsing()
 
     def _validate_and_setup_client_parsing(self):
-        # Importing here since bfcl_eval is not a main dependency of NeMo-Skills
+        # Importing here since bfcl_eval is not a main dependency of Nemo-Skills
         from bfcl_eval.constants.model_config import local_inference_model_map
 
         if self.cfg.model_name is None:
@@ -107,7 +121,9 @@ class ClientMessageParser:
         # Initialize the model handler - Temperature is not used but required by the model handler
         model_handler = model_handler_class(self.cfg.model_name, temperature=self.cfg.inference.temperature)
         # We only need the response parser from the model handler
-        self.response_parser = model_handler._parse_query_response_prompting
+        self.response_parser = self.create_response_parser(
+            native_response_parser=model_handler._parse_query_response_prompting
+        )
 
         # Initialize the prompt formatter
         # While BFCL model_handler also has the _format_prompt method, we found errors in it's implementation
@@ -115,17 +131,58 @@ class ClientMessageParser:
         tokenizer = AutoTokenizer.from_pretrained(model_handler.model_name_huggingface)
         self.message_formatter = partial(tokenizer.apply_chat_template, tokenize=False, add_generation_prompt=True)
 
+    def create_response_parser(self, native_response_parser):
+        """Create a response parser wrapper around the gorilla implementation that can remove bad tool calls."""
+
+        def wrapper_response_parser(response: dict):
+            parsed_response = native_response_parser(response)["model_responses_message_for_chat_history"]
+            if parsed_response.get("tool_calls", None) is not None:
+                # Remove tool calls which are not dictionaries
+                valid_tool_calls, invalid_tool_calls = [], []
+                for tool_call in parsed_response["tool_calls"]:
+                    if isinstance(tool_call, dict):
+                        valid_tool_calls.append(tool_call)
+                    else:
+                        invalid_tool_calls.append(tool_call)
+
+                if len(valid_tool_calls) == 0:
+                    LOG.warning(f"All tool calls are invalid. Response: {response}")
+                    # Remove tool calls from the parsed response since none are valid
+                    del parsed_response["tool_calls"]
+                else:
+                    if len(valid_tool_calls) != len(parsed_response["tool_calls"]):
+                        LOG.warning(
+                            f"Some tool calls are invalid.\n\n Invalid tool calls: {invalid_tool_calls}.\n\n Response: {response}"
+                        )
+
+                    # Update the tool calls in the parsed response
+                    parsed_response["tool_calls"] = valid_tool_calls
+
+            return parsed_response
+
+        return wrapper_response_parser
+
     def construct_input_dict(self, messages: list[dict], tools: list[dict]):
-        fmted_prompt = self.message_formatter(messages, tools=tools)
+        try:
+            fmted_prompt = self.message_formatter(messages, tools=tools)
+        except Exception as e:
+            # Sometimes the parsed tool-call is a string, which is not JSON serializable
+            # Putting a debugging here in case it happens in the future and we need to address it.
+            LOG.info(f"Messages: {messages}, Tools: {tools}")
+            LOG.error(f"Error formatting prompt: {e}")
+            raise e
+        kwargs = asdict(self.cfg.inference)
+        # Replace the completion type with text
+        kwargs["endpoint_type"] = EndpointType.text
         return {
             "prompt": fmted_prompt,
             "include_response": True,
-            **asdict(self.cfg.inference),
+            **kwargs,
         }
 
     def parse_output_dict(self, output_dict: dict):
         """Parse the output dictionary to get the model response."""
-        parsed_response = self.response_parser(output_dict["response"])["model_responses_message_for_chat_history"]
+        parsed_response = self.response_parser(output_dict["response"])
 
         model_response = {
             "role": "assistant",
@@ -227,21 +284,30 @@ class BFCLGenerationTask(GenerationTask):
 
         input_dict = self.message_parser.construct_input_dict(messages, tools)
 
+        return_dict = {}
+        if self.cfg.count_prompt_tokens:
+            num_input_tokens = get_token_count(
+                self.hf_tokenizer, messages=input_dict["prompt"], tools=input_dict.get("tools", None)
+            )
+            return_dict["num_input_tokens"] = num_input_tokens
+
         # Step 2: Query the LLM server
         try:
-            output = await self.llm.generate_async(**input_dict)
+            output = await self.generate_with_semaphore(**input_dict)
         except Exception as error:
             if is_context_window_exceeded_error(error):
                 # Enable soft-fail when the models run out of context
                 error_str = str(error)
                 LOG.warning(f"BFCL generation failed due to running out of context. {error_str}")
-                return {"message": None, "generation": ""}
+                return_dict.update({"message": None, "generation": ""})
+                return return_dict
             else:
                 raise error
 
         # Step 3: Parse the generated output
         parsed_response = self.message_parser.parse_output_dict(output)
-        return parsed_response
+        return_dict.update(parsed_response)
+        return return_dict
 
     async def _generate_single_data_point_single_turn(self, data_point):
         """Generate for a single data point with a single turn."""
@@ -251,12 +317,16 @@ class BFCLGenerationTask(GenerationTask):
 
         if model_response["message"] is None:
             # Ran out of context
-            return {"generation": "", "num_generated_tokens": 0, "error": "_ran_out_of_context_"}
+            return_dict = {"generation": "", "num_generated_tokens": 0, "error": "_ran_out_of_context_"}
         else:
-            return {
+            return_dict = {
                 "generation": model_response["generation"],
                 "num_generated_tokens": model_response.get("num_generated_tokens", 0),
             }
+
+        if self.cfg.count_prompt_tokens:
+            return_dict["num_input_tokens"] = model_response["num_input_tokens"]
+        return return_dict
 
     async def _generate_single_data_point_multi_turn(self, data_point):
         """Generate for a single data point with multiple turns."""
@@ -274,7 +344,11 @@ class BFCLGenerationTask(GenerationTask):
 
         all_multi_turn_messages: list[list[dict]] = data_point["question"]
         state_dict = {"messages": [], "tools": data_point["tools"]}
-        output_dict = {"num_generated_tokens": 0}
+
+        output_dict = {"num_generated_tokens_list": []}
+        if self.cfg.count_prompt_tokens:
+            output_dict["num_input_tokens_list"] = []
+
         out_of_context = False
 
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
@@ -306,7 +380,9 @@ class BFCLGenerationTask(GenerationTask):
                     LOG.info("Quitting the multi-turn generation due to running out of context.")
                     break
 
-                output_dict["num_generated_tokens"] += model_response.get("num_generated_tokens", 0)
+                output_dict["num_generated_tokens_list"].append(model_response.get("num_generated_tokens", 0))
+                if self.cfg.count_prompt_tokens:
+                    output_dict["num_input_tokens_list"].append(model_response.get("num_input_tokens", 0))
 
                 if self.cfg.remove_thinking:
                     trimmed_response_text = self._remove_thinking_from_message_content(
@@ -367,6 +443,10 @@ class BFCLGenerationTask(GenerationTask):
 
         if out_of_context:
             output_dict["error"] = "_ran_out_of_context_"
+
+        output_dict["num_generated_tokens"] = sum(output_dict["num_generated_tokens_list"])
+        if self.cfg.count_prompt_tokens:
+            output_dict["num_input_tokens"] = sum(output_dict["num_input_tokens_list"])
 
         return output_dict
 

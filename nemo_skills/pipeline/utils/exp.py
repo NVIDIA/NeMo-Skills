@@ -17,7 +17,7 @@ import logging
 import os
 import shlex
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from functools import lru_cache
 from pathlib import Path
 
@@ -34,7 +34,12 @@ from nemo_skills.pipeline.utils.cluster import (
     temporary_env_update,
     tunnel_hash,
 )
-from nemo_skills.pipeline.utils.mounts import get_mounts_from_config, get_unmounted_path, is_mounted_filepath
+from nemo_skills.pipeline.utils.mounts import (
+    check_remote_mount_directories,
+    get_mounts_from_config,
+    get_unmounted_path,
+    is_mounted_filepath,
+)
 from nemo_skills.pipeline.utils.packager import (
     get_packager,
     get_registered_external_repo,
@@ -162,6 +167,7 @@ def get_executor(
     log_prefix: str = "main",
     mounts=None,
     partition=None,
+    qos=None,
     time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
@@ -235,6 +241,20 @@ def get_executor(
         additional_parameters["mail_type"] = cluster_config["mail_type"]
     if cluster_config.get("mail_user") is not None:
         additional_parameters["mail_user"] = cluster_config["mail_user"]
+
+    # Merge slurm_kwargs into additional_parameters, but only non-explicit parameters
+    if slurm_kwargs:
+        # Get the set of explicit SlurmExecutor fields
+        from nemo_run.core.execution.slurm import SlurmExecutor as SE
+
+        explicit_fields = {f.name for f in fields(SE)}
+        # Separate into explicit and additional parameters
+        explicit_kwargs = {k: v for k, v in slurm_kwargs.items() if k in explicit_fields}
+        additional_from_slurm_kwargs = {k: v for k, v in slurm_kwargs.items() if k not in explicit_fields}
+        additional_parameters.update(additional_from_slurm_kwargs)
+    else:
+        explicit_kwargs = {}
+
     srun_args = [
         "--no-container-mount-home",
         "--mpi=pmix",
@@ -253,33 +273,43 @@ def get_executor(
     dependency_type = cluster_config.get("dependency_type", "afterany")
     job_details_class = CustomJobDetailsRay if with_ray else CustomJobDetails
 
-    return run.SlurmExecutor(
-        account=cluster_config["account"],
-        partition=partition,
-        nodes=num_nodes,
-        ntasks_per_node=tasks_per_node,
-        tunnel=get_tunnel(cluster_config),
-        container_image=container,
-        container_mounts=mounts,
-        time=timeout,
-        additional_parameters=additional_parameters,
-        packager=packager,
-        gpus_per_node=gpus_per_node if not cluster_config.get("disable_gpus_per_node", False) else None,
-        srun_args=srun_args,
-        job_details=job_details_class(
+    # Build executor parameters as a dictionary to avoid duplicate parameters
+    executor_params = {
+        "account": cluster_config["account"],
+        "partition": partition,
+        "qos": qos,
+        "nodes": num_nodes,
+        "ntasks_per_node": tasks_per_node,
+        "tunnel": get_tunnel(cluster_config),
+        "container_image": container,
+        "container_mounts": mounts,
+        "time": timeout,
+        "additional_parameters": additional_parameters,
+        "packager": packager,
+        "gpus_per_node": gpus_per_node if not cluster_config.get("disable_gpus_per_node", False) else None,
+        "srun_args": srun_args,
+        "job_details": job_details_class(
             job_name=cluster_config.get("job_name_prefix", "") + job_name,
             folder=get_unmounted_path(cluster_config, log_dir),
             srun_prefix=log_prefix + "_" + job_name + "_",
             sbatch_prefix=job_name + "_",
         ),
-        wait_time_for_group_job=0.01,
-        monitor_group_job_wait_time=20,
-        dependencies=dependencies,
-        dependency_type=dependency_type,
-        heterogeneous=heterogeneous,
-        env_vars=env_vars,
-        **(slurm_kwargs or {}),
-    )
+        "wait_time_for_group_job": 0.01,
+        "monitor_group_job_wait_time": 20,
+        "dependencies": dependencies,
+        "dependency_type": dependency_type,
+        "heterogeneous": heterogeneous,
+        "env_vars": env_vars,
+    }
+
+    # Update with explicit_kwargs to allow overriding default values
+    if explicit_kwargs:
+        # Check which parameters are being overridden
+        overridden = [k for k in explicit_kwargs if k in executor_params]
+        if overridden:
+            LOG.warning(f"Parameters from slurm_kwargs are overriding default values: {', '.join(overridden)}")
+        executor_params.update(explicit_kwargs)
+    return run.SlurmExecutor(**executor_params)
 
 
 def install_packages_wrap(cmd, installation_command: str | None = None):
@@ -341,6 +371,7 @@ def add_task(
     num_nodes=1,
     log_dir=None,
     partition=None,
+    qos=None,
     time_min=None,
     with_sandbox=False,
     keep_mounts_for_sandbox=False,
@@ -356,8 +387,9 @@ def add_task(
     heterogeneous: bool = False,
     with_ray: bool = False,
     installation_command: str | None = None,
-    skip_hf_home_check: bool = False,
+    skip_hf_home_check: bool | None = None,
     dry_run: bool = False,
+    sandbox_env_overrides: list[str] | None = None,
 ):
     """Wrapper for nemo-run exp.add to help setting up executors and dependencies.
 
@@ -412,6 +444,10 @@ def add_task(
         sandbox_port = get_free_port(strategy="random")
 
     env_vars = get_env_variables(cluster_config)
+    # If not explicitly set, resolve from cluster config
+    if skip_hf_home_check is None:
+        skip_hf_home_check = cluster_config.get("skip_hf_home_check", False)
+
     if cluster_config["executor"] != "none" and not skip_hf_home_check:
         if "HF_HOME" not in env_vars:
             raise RuntimeError(
@@ -433,9 +469,11 @@ def add_task(
     # assuming server always has the largest resources request, so it needs to go first
     if server_config is not None and int(server_config["num_gpus"]) > 0:
         # do not pass container into the command builder
-        server_container = server_config.pop("container", cluster_config["containers"][server_config["server_type"]])
+        # NOTE: avoid evaluating default (which would index cluster_config) unless needed
+        server_container = server_config.pop("container", None)
+        if server_container is None:
+            server_container = cluster_config["containers"][server_config["server_type"]]
         server_cmd, num_server_tasks = get_server_command(**server_config, cluster_config=cluster_config)
-
         server_executor = get_executor(
             cluster_config=cluster_config,
             container=server_container,
@@ -443,6 +481,7 @@ def add_task(
             tasks_per_node=num_server_tasks,
             gpus_per_node=server_config["num_gpus"],
             partition=partition,
+            qos=qos,
             time_min=time_min,
             dependencies=dependencies,
             job_name=task_name,
@@ -487,6 +526,7 @@ def add_task(
                         tasks_per_node=cur_tasks,
                         gpus_per_node=num_gpus if server_config is None else 0,
                         partition=partition,
+                        qos=qos,
                         time_min=time_min,
                         dependencies=dependencies,
                         job_name=task_name,
@@ -511,6 +551,10 @@ def add_task(
             "LISTEN_PORT": sandbox_port,
             "NGINX_PORT": sandbox_port,
         }
+        if sandbox_env_overrides:
+            for override in sandbox_env_overrides:
+                key, value = override.split("=", 1)
+                sandbox_env_updates.setdefault(key, value)
         current_env_vars = cluster_config.get("env_vars", []).copy()
         for override in current_env_vars:
             if "PYTHONPATH" in override:
@@ -620,6 +664,20 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
     if dry_run:
         LOG.info("Dry run mode is enabled, not running the experiment.")
         return
+
+    if "mounts" in cluster_config:
+        # Can only check cluster mounts here, not those added to add_task
+        mounts = get_mounts_from_config(cluster_config)
+        mount_sources = [m.split(":")[0] for m in mounts]
+
+        LOG.info("Checking mount paths: %s", mount_sources)
+        exit_if_failure = os.environ.get("NEMO_SKILLS_DISABLE_MOUNT_CHECK", "False").lower() not in (
+            "1",
+            "true",
+            "yes",
+        )
+        check_remote_mount_directories(mount_sources, cluster_config, exit_on_failure=exit_if_failure)
+
     if cluster_config["executor"] != "slurm":
         exp.run(detach=False, tail_logs=True, sequential=sequential)
     else:
