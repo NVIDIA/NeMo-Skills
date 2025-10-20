@@ -603,12 +603,20 @@ def maybe_get_env(value: Union[Any, List[Any]], env_name, default=None, cast: Ca
     return value
 
 
-def get_server_wait_cmd(server_address):
+def get_server_wait_cmd(server_address, server_type):
     # might be required if we are not hosting server ourselves
     # this will try to handshake in a loop and unblock when the server responds
+
+    if server_type in ["vllm", "sglang", "openai"]:
+        health_endpoint = "/health"
+    else:
+        health_endpoint = ""
+
     return (
         f"echo 'Waiting for the server to start at {server_address}' && "
-        f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done "
+        f"while ! curl -f http://{server_address}{health_endpoint} >/dev/null 2>&1; do "
+        f"echo 'Server not ready yet, waiting...' && sleep 3; done && "
+        f"echo 'Server is ready at {server_address}!'"
     )
 
 
