@@ -47,29 +47,47 @@ class CodeExecEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 12):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
+        import time
+        time.sleep(10)
         self.sandbox = get_sandbox(self.eval_config.sandbox)
 
     async def eval_single(self, data_point: dict):
         """Evaluate single code during generation."""
 
-        # Prepare code using shared utility
-        input = data_point["input"]
+        output_dict = {
+            "process_status": [],
+            "correct_tests": [],
+            "average_test_score": 0.0,
+            "stdouts": [],
+            "stderrs": [],
+        }
 
-        # Execute code and get compiler output
-        output, _ = await self.sandbox.execute_code(
-            generated_code=input,
-            language=self.eval_config.language,
-            timeout=self.eval_config.timeout,
+        # Prepare code using shared utility
+        code = data_point["code"]
+        test_cases = data_point["test_cases"]
+
+        for test_case in test_cases:
+            input_test_case = test_case["input"]
+            expected_output_test_case = test_case["output"]
+            output, _ = await self.sandbox.execute_code(
+                generated_code=code,
+                std_input=input_test_case,
+                language=self.eval_config.language,
+                timeout=self.eval_config.timeout,
+            )
+        
+            output_dict["process_status"].append(output["process_status"])
+            output_dict["stdouts"].append(output["stdout"])
+            output_dict["stderrs"].append(output["stderr"])
+            output_dict["correct_tests"].append(output["stderr"] == "")
+
+        output_dict["average_test_score"] = (
+            0.0
+            if len(output_dict["correct_tests"]) == 0
+            else (sum(output_dict["correct_tests"]) / len(output_dict["correct_tests"]))
         )
 
-        # Determine proof status using shared utility
-        code_status = determine_code_status(output)
-
-        return {
-            "predicted_code": predicted_code,
-            "code_status": code_status,
-            "lean_evaluation": {**output, "timeout": self.eval_config.timeout},
-        }
+        return {"code_execution": output_dict}
 
 
 def preprocess_code(generation_dict: dict, language="python", strip_whitespace=True):
