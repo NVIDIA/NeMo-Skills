@@ -177,8 +177,6 @@ def run_cmd(
         if model is not None and server_config is not None:
             commands = [pipeline_utils.set_python_path_and_wait_for_server(server_address, cmd) for cmd in commands]
 
-        print(f"commands: {commands}")
-
         prev_tasks = _task_dependencies
         for _ in range(dependent_jobs + 1):
             new_task = add_task(
