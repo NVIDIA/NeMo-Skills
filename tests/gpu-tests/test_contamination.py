@@ -65,7 +65,7 @@ def test_check_contamination():
         output_dir=output_dir,
         model=model_path,
         server_type="vllm",
-        server_args="--enforce-eager",
+        server_args="--enforce-eager --max-model-len 8192",
         server_gpus=1,
         run_after="contamination-retrieve",
     )
@@ -80,5 +80,5 @@ def test_check_contamination():
         data = json.loads(line)
         assert "contaminated" in data
         num_contaminated += data["contaminated"]
-    # gt answer is 4, but qwen judges more problems as contaminated
+    # gt answer is 4, but this allows for some variation
     assert 3 <= num_contaminated < 10
