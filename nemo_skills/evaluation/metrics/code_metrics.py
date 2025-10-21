@@ -60,6 +60,21 @@ class SweBenchMetrics(BaseMetrics):
         self._compute_pass_at_k(predictions=predictions)
 
 
+class TerminalBenchMetrics(BaseMetrics):
+    def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
+        return {
+            "tasks_resolved": bool(prediction["resolved"]),
+            "no_result": prediction["resolved"] is None,
+        }
+
+    def get_incorrect_sample(self, prediction: dict) -> dict:
+        return {"resolved": False}
+
+    def update(self, predictions):
+        super().update(predictions)
+        self._compute_pass_at_k(predictions=predictions)
+
+
 class SciCodeMetrics(BaseMetrics):
     def _get_score_dict(self, prediction: dict) -> dict[str, bool | int | float]:
         subtask_status_list = prediction["eval_status"]

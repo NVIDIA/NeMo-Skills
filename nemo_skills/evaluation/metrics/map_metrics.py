@@ -28,6 +28,7 @@ from nemo_skills.evaluation.metrics.code_metrics import (
     OJBenchMetrics,
     SciCodeMetrics,
     SweBenchMetrics,
+    TerminalBenchMetrics,
 )
 from nemo_skills.evaluation.metrics.if_metrics import IFMetrics
 from nemo_skills.evaluation.metrics.ioi_metrics import IOIMetrics
@@ -54,6 +55,7 @@ METRICS_MAP = {
     "ruler": RulerMetrics,
     "livecodebench": LiveCodeBenchMetrics,
     "swe-bench": SweBenchMetrics,
+    "terminal-bench": TerminalBenchMetrics,
     "scicode": SciCodeMetrics,
     "bigcodebench": BigCodeBenchMetrics,
     "mrcr": MRCRMetrics,
