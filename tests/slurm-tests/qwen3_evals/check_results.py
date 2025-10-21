@@ -34,6 +34,13 @@ TOOLCALLING_METRIC_RANGES = {
 }
 
 
+GENSELECT_METRIC_RANGES = {
+    "aime24": {
+        "pass@1[avg-of-8]": (60.0, 90.0),
+    }
+}
+
+
 def check_results(eval_dir: str):
     f = os.path.join(eval_dir, "eval-results", "bfcl_v3", "metrics.json")
     data = load_json(f)

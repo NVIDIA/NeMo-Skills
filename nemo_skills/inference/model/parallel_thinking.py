@@ -247,6 +247,9 @@ class ParallelThinkingTask:
                     and self.cfg.thinking_end not in solution[self.cfg.solution_key]
                 ):
                     continue
+                elif solution[self.cfg.solution_key] == "":
+                    LOG.warning("Solution is empty, skipping")
+                    continue
                 else:
                     filtered_solutions.append(solution)
 
@@ -389,7 +392,7 @@ class ParallelThinkingTask:
         solutions, total_num_generated_tokens = await self._get_multiple_solutions(prompt, local_random, **kwargs)
         result["total_solution_generated_tokens"] = total_num_generated_tokens
 
-        if not solutions:
+        if solutions is None or len(solutions) == 0:
             output_dict = {
                 self.cfg.solution_key: "",
                 "solution_list": [],
