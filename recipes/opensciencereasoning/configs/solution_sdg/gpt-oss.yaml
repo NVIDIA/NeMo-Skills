@@ -22,6 +22,7 @@ pipeline_stages:
   - decontaminate            # Decontaminate problems
   - topics_labeling          # Label topics and subtopics
   - difficulty_estimation    # Estimate difficulty of problems
+  - aggregate                # Aggregate all the metadata into a single file
 
 # Directory structure configuration
 directories:
@@ -128,6 +129,14 @@ stages:
     
     dependencies:
       - decontaminate
-      
+    
+  aggregate:
+    output_dir: ${directories.step-4-aggregate}
+    metadata_files: 
+      - ${directories.step-2-topics-labeling}/final_result.jsonl
+      - ${directories.step-3-difficulty-estimation}/final_result.jsonl
+    dependencies:
+      - topics_labeling
+      - difficulty_estimation
 
 
