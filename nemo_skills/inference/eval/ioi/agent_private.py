@@ -1,11 +1,5 @@
-import asyncio
 import logging
-import os
 import re
-
-# Use our own run directory instead of tempfile for better control
-# and cleanup handling.
-import shutil
 import sys
 import time
 from dataclasses import field
@@ -13,66 +7,12 @@ from dataclasses import field
 import hydra
 import litellm
 
-from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
 from nemo_skills.inference.model import server_params
 from nemo_skills.prompt.utils import get_prompt
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-async def compile_and_run_cpp(code_string: str, data_point: dict, timeout: int = 30):
-    """Compile the provided C++ code and run it inside a temporary directory.
-
-    A soft timeout (default 30 s) is applied to the execution phase. On timeout
-    the process is killed and a timeout message is returned as stderr.
-    """
-
-    # Create a unique directory for this run – it helps with debugging and keeps
-    # compilation artefacts isolated. It is explicitly removed in the finally
-    # clause so we don't rely on garbage-collection.
-    run_dir = f"/tmp/cpp_run_{os.getpid()}_{time.time_ns()}"
-    os.makedirs(run_dir, exist_ok=True)
-
-    try:
-        # Write supplementary header files supplied in the data point.
-        for original_path, content in data_point.get("grader_files", []):
-            filename = os.path.basename(original_path)
-            if ("checker" in filename) or ("grader" in filename) or (not filename.endswith(".h")):
-                continue
-            with open(os.path.join(run_dir, filename), "w") as f:
-                f.write(content)
-
-        # Compile the solution.
-        executable_path = os.path.join(run_dir, "a.out")
-        compile_command = ["g++", "-I", run_dir, "-x", "c++", "-o", executable_path, "-"]
-        compiler_process = await asyncio.create_subprocess_exec(
-            *compile_command,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, compile_stderr = await compiler_process.communicate(input=code_string.encode())
-
-        if compiler_process.returncode != 0:
-            raise RuntimeError(f"C++ compilation failed:\n{compile_stderr.decode()}\nCode:{code_string}")
-
-        # Run the compiled binary with a timeout.
-        run_process = await asyncio.create_subprocess_exec(
-            executable_path, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        try:
-            run_stdout, run_stderr = await asyncio.wait_for(run_process.communicate(), timeout=timeout)
-            return run_stdout.decode(), run_stderr.decode()
-        except asyncio.TimeoutError:
-            # Kill the process group to avoid lingering processes.
-            run_process.kill()
-            await run_process.wait()
-            return "", f"Execution timed out after {timeout} seconds."
-    finally:
-        # Ensure we never leave temporary artefacts behind.
-        shutil.rmtree(run_dir, ignore_errors=True)
 
 
 def extract_code_block(text: str):
@@ -82,62 +22,13 @@ def extract_code_block(text: str):
     return matches[-1].strip() if matches else None
 
 
-# Extract a C++ test script wrapped in ```script ... ``` fences
-def extract_script_block(text: str):
-    # todo (sean): this is a hack to prevent catching report tags in the CoT, causing parsing errors for gpt-oss.
-    text = text.split("<|end|><|start|>assistant<|channel|>final<|message|>")[-1]
-    matches = re.findall(r"```script(.*?)```", text, re.DOTALL)
-    return matches[-1].strip() if matches else None
-
-
-# Helper to extract a detailed bug report or solution section from an LLM response
-def extract_detailed_solution(solution: str, marker: str = "Detailed Verification", after: bool = True):
-    # todo (sean): this is a hack to prevent catching report tags in the CoT, causing parsing errors for gpt-oss.
-    solution = solution.split("<|end|><|start|>assistant<|channel|>final<|message|>")[-1]
-    report_matches = re.findall(r"<report>(.*?)</report>", solution, re.DOTALL)
-    if report_matches:
-        # Return the last (most recent) report block, stripped of leading/trailing whitespace.
-        return report_matches[-1].strip()
-    else:
-        raise ValueError(f"No report found in solution: {solution}")
-
-
-def _extract_boxed_verdict(text: str) -> str:
-    """Return the lowercase verdict ('yes' or 'no') found **inside** the latest <report> block.
-
-    If no <report> block is present fall back to searching the whole text. Returns
-    an empty string when no boxed verdict is found.
-    """
-
-    # Try to focus on the report section first
-    try:
-        search_area = extract_detailed_solution(text)
-    except ValueError:
-        # No report block – fall back to full text.
-        search_area = text
-
-    # Match one-or-more backslashes before 'boxed' and allow optional spaces
-    # around the braces and content to be robust to model formatting.
-    m = re.search(r"\\+boxed\s*\{\s*([^}]*)\s*\}", search_area)
-    return m.group(1).strip().lower() if m else ""
-
-
 @nested_dataclass(kw_only=True)
 class IOIExecutionConfig(GenerateSolutionsConfig):
     inference: InferenceConfig = field(default_factory=InferenceConfig)
     server: dict = field(default_factory=dict)
     prompt_config: str = "eval/ioi/agent/solver"
-    self_improve_prompt_config: str = "eval/ioi/agent/self_improve"
-    verify_prompt_config: str = "eval/ioi/agent/verify"
-    testgen_prompt_config: str = "eval/ioi/multiagent/code/generate_test"
-    simple_verify_prompt_config: str = "eval/ioi/agent/verify_simple_test"
     improve_after_verify_prompt_config: str = "eval/ioi/agent/improve_with_private_test"
-    total_steps: int = 30
-    num_self_improve: int = 1
-    num_verify: int = 10
-    num_majority_verify: int = 5
-    # Maximum wall-clock seconds allowed for running compiled C++ code.
-    run_timeout_seconds: int = 30
+    total_steps: int = 60
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -148,17 +39,12 @@ class IOIExecutionGenerationTask(GenerationTask):
     def __init__(self, cfg: IOIExecutionConfig):
         super().__init__(cfg)
         prompt_kwargs = {
-            "code_tags": cfg.code_tags,
             "examples_type": cfg.examples_type,
         }
         self.prompts = {
             "initial": get_prompt(cfg.prompt_config, **prompt_kwargs),
-            "self_improve_solution": get_prompt(cfg.self_improve_prompt_config, **prompt_kwargs),
-            "generate_test_script": get_prompt(cfg.testgen_prompt_config, **prompt_kwargs),
-            "simple_verify_solution": get_prompt(cfg.simple_verify_prompt_config, **prompt_kwargs),
             "improve_after_verify_solution": get_prompt(cfg.improve_after_verify_prompt_config, **prompt_kwargs),
         }
-        self.sandbox = LocalSandbox()
 
     def log_example_prompt(self, data):
         pass
@@ -188,7 +74,14 @@ class IOIExecutionGenerationTask(GenerationTask):
         try:
             for step_num in range(self.cfg.total_steps):
                 # Evaluate the current solution using the external evaluator.
+                # Time the external evaluator to capture evaluation latency.
+                eval_start_t = time.time()
                 eval_results = await self.evaluator.eval_single({**data_point, "generation": cur_generation_response})
+                eval_time = time.time() - eval_start_t
+
+                # Record evaluation time for the solution that was just evaluated (last entry in chat_history).
+                if chat_history:
+                    chat_history[-1]["evaluation_time"] = eval_time
                 test_case_results = eval_results["test_case_results"]
 
                 # Check if all subtasks passed fully (score == 1 for every output)
