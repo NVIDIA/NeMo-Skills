@@ -152,7 +152,7 @@ def main():
     #     wandb_project=args.wandb_project,
     # )
 
-    # These two tests are done with Qwen3-1.7B to make it faster
+    # GenSelect Tests
     online_genselect_expname = eval_qwen3_online_genselect(
         workspace=args.workspace,
         cluster=args.cluster,
@@ -168,7 +168,7 @@ def main():
     )
 
     # schedule a dependent check job on the cluster and check if the results are as expected
-    checker_cmd = f"python tests/slurm-tests/qwen3_4b_evals/check_results.py --workspace {args.workspace} "
+    checker_cmd = f"python tests/slurm-tests/qwen3_evals/check_results.py --workspace {args.workspace} "
 
     run_cmd(
         ctx=wrap_arguments(checker_cmd),

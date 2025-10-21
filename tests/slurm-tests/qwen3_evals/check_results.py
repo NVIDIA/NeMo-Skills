@@ -34,9 +34,15 @@ TOOLCALLING_METRIC_RANGES = {
 }
 
 
-GENSELECT_METRIC_RANGES = {
+ONLINE_GENSELECT_METRIC_RANGES = {
     "aime24": {
-        "pass@1[avg-of-8]": (60.0, 90.0),
+        ("pass@1[avg-of-1]", "symbolic_correct"): (60.0, 90.0),
+    }
+}
+
+OFFLINE_GENSELECT_METRIC_RANGES = {
+    "aime24": {
+        ("pass@1[avg-of-1]", "symbolic_correct"): (60.0, 90.0),
     }
 }
 
@@ -48,6 +54,14 @@ def check_results(eval_dir: str):
         val = float(get_nested_value(data, category_tuple))
         lo, hi = expected_range
         soft_assert(lo <= val <= hi, f"bfcl-v3 {category_tuple}={val} out of range [{lo},{hi}]")
+
+    # GenSelect Tests
+    online_genselect_f = os.path.join(eval_dir, "online_genselect", "eval-results", "aime24", "metrics.json")
+    online_genselect_data = load_json(online_genselect_f)
+    for metric, (lo, hi) in ONLINE_GENSELECT_METRIC_RANGES["aime24"].items():
+        val = float(get_nested_value(online_genselect_data, metric))
+        soft_assert(lo <= val <= hi, f"online-genselect {metric}={val} out of range [{lo},{hi}]")
+    # for
 
 
 def main():
