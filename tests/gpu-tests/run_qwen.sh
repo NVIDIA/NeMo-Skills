@@ -8,7 +8,7 @@ export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen2.5-3B-Instruct
 # pytest tests/gpu-tests/test_context_retry.py -s -x
 
 # Switch to Qwen3 model for other tests
-export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen3-4B
+export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen3-1.7B
 # generation/evaluation tests
 pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
