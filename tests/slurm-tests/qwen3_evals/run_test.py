@@ -55,7 +55,7 @@ def eval_qwen3_online_genselect(workspace, cluster, expname_prefix, wandb_projec
             "++parallel_thinking.mode=genselect "
             "++server.enable_soft_fail=True "
             "++server.context_limit_retry_strategy=reduce_generation "
-            "++skip_filled=False "
+            # "++skip_filled=False "
         ),
         cluster=cluster,
         benchmarks="aime24:1",
@@ -114,7 +114,7 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
             f"++parallel_thinking.generation_dir={output_dir}/eval-results/{benchmark} "
             f"++server.enable_soft_fail=True "
             f"++server.context_limit_retry_strategy=reduce_generation "
-            f"++skip_filled=True "
+            # f"++skip_filled=True "
         ),
         cluster=cluster,
         benchmarks="aime24:1",
