@@ -19,7 +19,7 @@ import argparse
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 parser = argparse.ArgumentParser(description="Create a tiny model for testing.")
-parser.add_argument("--model_type", type=str, required=True, choices=("qwen"))
+parser.add_argument("--model_type", type=str, required=True, choices=("qwen",))
 args = parser.parse_args()
 
 if args.model_type == "qwen":
