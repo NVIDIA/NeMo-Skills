@@ -49,7 +49,7 @@ class CodeExecEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 12):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
-        self.sandbox = get_sandbox(self.eval_config.sandbox)
+        self.sandbox = get_sandbox(**self.eval_config.sandbox)
         self._sandbox_ready = False
 
     async def _wait_for_sandbox_ready(self, timeout: int = 100):
@@ -88,13 +88,14 @@ class CodeExecEvaluator(BaseEvaluator):
                 generated_code=data["code"],
                 std_input=test_case["input"],
                 language=self.eval_config.language,
-                timeout=self.eval_config.timeout * len(data["test_cases"]),
+                timeout=self.eval_config.timeout,
             )
 
             output_dict["process_status"].append(output["process_status"])
             output_dict["stdouts"].append(output["stdout"])
+
             output_dict["stderrs"].append(output["stderr"])
-            output_dict["correct_tests"].append(output["stdout"] == test_case["output"])
+            output_dict["correct_tests"].append(output["stdout"].strip() == test_case["output"].strip())
 
         output_dict["average_test_score"] = (
             0.0
