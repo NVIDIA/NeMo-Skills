@@ -92,7 +92,7 @@ class GenerateSolutionsConfig:
     tokenizer: str | None = None
     # extra parameters to pass to the tokenizer's apply_chat_template method
     chat_template_kwargs: dict = field(default_factory=dict)
-    # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
+    # to specify the format of the prompt, "ns" for Nemo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
     system_message: str | None = None  # can override the default system message in the config
@@ -353,9 +353,12 @@ class GenerationTask:
         # Initialize semaphore for controlling concurrent requests
         if self.cfg.parallel_thinking.mode is not None:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
-            self.semaphore = asyncio.Semaphore(
-                self.cfg.max_concurrent_requests // self.llm.cfg.max_concurrent_requests
-            )
+            # Some models (like NIM speech models) don't have cfg attribute
+            if hasattr(self.llm, "cfg"):
+                divisor = self.llm.cfg.max_concurrent_requests
+            else:
+                divisor = 1
+            self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests // divisor)
         else:
             self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
@@ -397,6 +400,12 @@ class GenerationTask:
             # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
                 "remove_thinking": self.cfg.parallel_thinking.remove_thinking,  # Removing thinking from solutions is important for parallel_thinking. We don't want to override this with the main generation config
+                "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
+                # The following are specific to parallel thinking and we want to defend against any future key overlaps with the main generation config
+                "mode": self.cfg.parallel_thinking.mode,
+                "window_size": self.cfg.parallel_thinking.window_size,
+                "solution_key": self.cfg.parallel_thinking.solution_key,
+                "filter_incomplete_solutions": self.cfg.parallel_thinking.filter_incomplete_solutions,
             }
 
             llm = get_parallel_thinking_model(
@@ -663,8 +672,12 @@ class GenerationTask:
         self.cleanup_litellm_cache()
 
     def wait_for_server(self):
+        if not self.cfg.server.get("base_url") and not self.cfg.server.get("host") and not self.cfg.server.get("port"):
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
-        if not server_address:
+        # Hydra sets None parameters to "None" string
+        if server_address == "None":
             LOG.info("Skipping server wait as no server address is provided.")
             return
         server_start_cmd = get_server_wait_cmd(server_address)

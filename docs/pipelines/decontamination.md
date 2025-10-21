@@ -2,9 +2,9 @@
 
 !!! info
 
-    This pipeline starting script is [nemo_skills/pipeline/generate.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/pipeline/generate.py)
+    This pipeline starting script is [nemo_skills/pipeline/generate.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/pipeline/generate.py)
 
-    All extra parameters are passed to [nemo_skills/inference/check_contamination.py](https://github.com/NVIDIA/NeMo-Skills/blob/main/nemo_skills/inference/check_contamination.py)
+    All extra parameters are passed to [nemo_skills/inference/check_contamination.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/inference/check_contamination.py)
 
 We implemented an LLM-based data decontamination pipeline following
 [lmsys methodology](https://lmsys.org/blog/2023-11-14-llm-decontaminator/).
@@ -43,7 +43,7 @@ cmd = (
 
 run_cmd(
     cluster="local",
-    container="nemo",
+    container="nemo-rl",
     num_gpus=1,  # can increase this if you have more gpus
     ctx=wrap_arguments(cmd),
 )
@@ -78,6 +78,6 @@ since we now want to make a check for each training set example and find closest
 
 After you get `/workspace/math-contamination-results/output.jsonl`,
 you can pass it into [prepare_data command](training.md#preparing-the-data)
-with `++contamination_file=...` option.
+with `++filters.remove_contaminated=true ++contamination_file=...` option.
 
 See a more detailed example in [OpenMathInstruct-2 dataset construction pipeline](../releases/openmathinstruct2/dataset.md#decontamination).

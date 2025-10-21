@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typer import Typer
-
-from nemo_skills.pipeline.app import app
-
-openrlhf_app = Typer(help="OpenRLHF training pipelines (run 'ns openrlhf --help' for more information)")
-
-app.add_typer(openrlhf_app, name="openrlhf")
+# settings that define how evaluation should be done by default (all can be changed from cmdline)
+DATASET_GROUP = "code"
+METRICS_TYPE = "livecodebench"
+EVAL_SPLIT = "v6_2408_2505"
+EVAL_ARGS = "++eval_type=livecodebench ++eval_config.language=cpp"
+GENERATION_ARGS = "++prompt_config=eval/livecodebench/cpp_codegen"
