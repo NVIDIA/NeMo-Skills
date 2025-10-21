@@ -86,7 +86,6 @@ def process_file(
     deduplicate: bool = False,
     dataset_name: str = None,
     num_options: int | None = None,
-    num_options: int | None = None,
     option_format_regex: str = None
 ):
     input_file = Path(input_file)
@@ -149,6 +148,14 @@ def process_file(
                         dropped += 1
                         continue
 
+            # add everything beside id problem and expected_answer to metadata
+            metadata = {k: v for k, v in obj.items() if k not in ["id", "problem", "expected_answer"]}
+            obj["metadata"] = metadata
+            # remove old metadata keys
+            for key in metadata.keys():
+                del obj[key]
+
+            # write output
             fout.write(_json_dumps(obj) + "\n")
             kept += 1
 
