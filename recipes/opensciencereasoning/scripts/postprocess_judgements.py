@@ -13,18 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import glob
 import json
 from collections import defaultdict
-import glob
+
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 
 
 def main():
-    """Postprocess judged generations to add difficulty_model, pass_rate, pass_at_n.
+    """Postprocess judged generations to add pass_rate_model, pass_rate, pass_at_n.
 
     This script expects judged outputs. It aggregates Yes/No judgements per problem across
     seeds and writes enriched samples with:
-      - difficulty_model: model used for generations
+      - pass_rate_model: model used for generations
       - pass_rate: decimal ratio correct/total (e.g., 0.5)
       - pass_at_n: string fraction "correct/total" (e.g., 2/4)
     """
@@ -57,7 +58,7 @@ def main():
             pass_rate = correct / total if total > 0 else 0.0
             pass_at_n = f"{correct}/{total}" if total > 0 else "0/0"
 
-            sample["pass_rate_model"] = args.difficulty_model
+            sample["pass_rate_model"] = args.pass_rate_model
             sample["pass_rate"] = round(pass_rate, 6)
             sample["pass_at_n"] = pass_at_n
             fout.write(json.dumps(sample) + "\n")

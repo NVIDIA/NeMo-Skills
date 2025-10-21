@@ -15,7 +15,6 @@ input_file: "/ebakhturina/data/stem_v2_seed_data/limo_train.jsonl"
 
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: None
-initial_dependency: None
 
 # Define the full sequence of stages for this mode
 pipeline_stages:

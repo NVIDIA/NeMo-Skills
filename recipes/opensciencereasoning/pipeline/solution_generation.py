@@ -216,7 +216,6 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_topics.py "
             f"    --input_files {shlex.quote(json.dumps(save_paths, ensure_ascii=False))} "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
-            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --topics_structure {shlex.quote(json.dumps(topics_structure, ensure_ascii=False))} "
             f"    --names {shlex.quote(json.dumps(generation_keys, ensure_ascii=False))} "
         ),
@@ -293,13 +292,11 @@ stages_map = {
     "decontaminate": decontaminate,
     "topics_labeling": topics_labeling,
     "difficulty_estimation": difficulty_estimation,
-    "difficulty_estimation": difficulty_estimation,
 }
 
 
 if __name__ == "__main__":
     config_dir = Path(__file__).parents[1] / "configs" / "solution_sdg"
-    print(f"Looking for configs in {config_dir}")
     print(f"Looking for configs in {config_dir}")
     available_configs = get_available_configs(config_dir)
 
@@ -307,7 +304,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         type=str,
-        default="gpt-oss",
         default="gpt-oss",
         choices=available_configs,
         help="Will pick a corresponding config from configs folder",
