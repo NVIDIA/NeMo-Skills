@@ -30,6 +30,7 @@ directories:
   step-1-decontaminate: ${base_output_dir}/solution-sdg/step-1-decontaminate
   step-2-topics-labeling: ${base_output_dir}/solution-sdg/step-2-topics-labeling
   step-3-difficulty-estimation: ${base_output_dir}/solution-sdg/step-3-difficulty-estimation
+  step-4-aggregate: ${base_output_dir}/solution-sdg/step-4-aggregate
 
 # Stage-specific configurations
 stages:
