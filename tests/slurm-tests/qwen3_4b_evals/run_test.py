@@ -37,7 +37,6 @@ def eval_qwen3_bfcl(workspace, cluster, expname_prefix, wandb_project):
         expname=expname_prefix,
         wandb_project=wandb_project,
         wandb_name=expname_prefix,
-        server_args="--async_scheduling",
     )
 
     return expname_prefix
