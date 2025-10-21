@@ -72,7 +72,7 @@ class IOIExecutionGenerationTask(GenerationTask):
             chat_history = saved_state.get("steps", [])
             cur_generation_response = saved_state.get("generation")
             num_steps_completed = int(saved_state.get("num_steps_completed", 0))
-            print(f"[Resume] Loaded intermediate state at step {num_steps_completed}.")
+            print(f"[Resume] Restoring pos={async_pos} from step {num_steps_completed}")
         else:
             prompt_txt, solution_response, gen_time = await self._call_llm(data_point, all_data, "initial")
             cur_generation_response = solution_response["generation"]
@@ -82,6 +82,7 @@ class IOIExecutionGenerationTask(GenerationTask):
 
             print("[Initial] Generated initial solution.")
             # Save checkpoint after initial solution
+            print(f"[Checkpoint] Saving intermediate pos={async_pos}, step={num_steps_completed}")
             await self.save_intermediate_state(
                 async_pos,
                 {
@@ -142,6 +143,7 @@ class IOIExecutionGenerationTask(GenerationTask):
             print(f"Prompt: {prompt_txt}")
 
             # Save checkpoint after each improvement step
+            print(f"[Checkpoint] Saving intermediate pos={async_pos}, step={num_steps_completed}")
             await self.save_intermediate_state(
                 async_pos,
                 {
