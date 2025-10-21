@@ -39,7 +39,7 @@ def test_check_contamination():
     retrieve_from = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
     cmd = (
-        f"python -m nemo_skills.inference.retrieve_similar "
+        f"python3 -m nemo_skills.inference.retrieve_similar "
         f"    ++retrieve_from=\\'{retrieve_from}\\' "
         f"    ++compare_to=/nemo_run/code/tests/data/contamination-example.test "
         f"    ++output_file='{output_dir}/math-contamination-retrieved.jsonl' "
@@ -53,7 +53,7 @@ def test_check_contamination():
         num_gpus=1,
         ctx=wrap_arguments(cmd),
         expname="contamination-retrieve",
-        installation_command="pip install sentence-transformers",
+        installation_command="pip3 install sentence-transformers hydra-core fire",
     )
 
     generate(
