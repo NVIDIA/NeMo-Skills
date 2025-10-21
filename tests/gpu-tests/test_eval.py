@@ -29,7 +29,7 @@ def test_trtllm_eval():
         pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval"
     docker_rm([output_dir])
@@ -63,16 +63,17 @@ def test_trtllm_eval():
 def test_trtllm_code_execution_eval(server_type):
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     # we are using the base prompt for Qwen to make it follow few-shots
     if model_type == "qwen":
         # tokenizer = "Qwen/Qwen3-1.7B"
         code_tags = "qwen"
     else:
-        pytest.skip("Only qwen models are supported in this test")
+        raise ValueError("Only qwen models are supported in this test")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
     docker_rm([output_dir])
@@ -122,12 +123,12 @@ def test_hf_eval(server_type, server_args):
     # could cut everything, but human-eval/mbpp don't work with partial gens
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     if model_type != "qwen":
-        pytest.skip("Only running this test for qwen models")
+        raise ValueError(f"Only running this test for qwen models, got {model_type}")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/{server_type}-eval"
     docker_rm([output_dir])
@@ -189,11 +190,10 @@ def test_megatron_eval():
     if not model_path:
         pytest.skip("Define NEMO_SKILLS_TEST_MEGATRON_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    print(f"model_type: {model_type}")
     if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     if model_type != "qwen":
-        pytest.skip("Only qwen models are supported in Megatron.")
+        raise ValueError(f"Only running this test for qwen models, got {model_type}")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/megatron-eval"
     docker_rm([output_dir])
