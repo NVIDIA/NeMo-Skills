@@ -16,6 +16,7 @@
 import argparse
 import glob
 import json
+import os
 from collections import defaultdict
 from typing import Dict, List
 
@@ -57,6 +58,7 @@ def collect_solutions(solutions_path: str) -> List[dict]:
 
 def write(output_file: str, dataset: List[dict], metadata: Dict[str, dict]):
     """Write dataset with metadata."""
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as fout:
         for sample in dataset:
             sample.update(metadata[sample["problem"]])
