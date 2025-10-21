@@ -85,7 +85,7 @@ def process_file(
     remove_images: bool = False,
     deduplicate: bool = False,
     dataset_name: str = None,
-    num_options: int = None,
+    num_options: int | None = None,
     option_format_regex: str = None
 ):
     input_file = Path(input_file)
@@ -100,7 +100,7 @@ def process_file(
 
     with open(input_file, "r", encoding="utf-8") as fin, \
          open(output_file, "w", encoding="utf-8") as fout:
-        for line in fin:
+        for index, line in enumerate(fin):
             line = line.strip()
             if not line:
                 continue
@@ -119,7 +119,7 @@ def process_file(
             # ensure id
             if "id" not in obj:
                 logging.warning(f"⚠️ Missing id, generating one.")
-                obj["id"] = generate_id(dataset_name, problem)
+                obj["id"] = generate_id(dataset_name, index)
 
             # deduplicate
             if deduplicate:
@@ -174,7 +174,8 @@ if __name__ == "__main__":
     parser.add_argument("--is_mcq", action="store_true", help="Whether problems are multiple-choice questions")
     parser.add_argument("--deduplicate", action="store_true", help="Remove duplicate problems")
     parser.add_argument("--dataset_name", type=str, help="Dataset name (optional). If not provided, derived from filename")
-    parser.add_argument("--num_options", type=int, help="Filter by number of options (only relevant if is_mcq=True)")
+    parser.add_argument("--num_options", type=int, help="Filter by number of options (only relevant if is_mcq=True) otherwise ignored")
+    parser.add_argument("--remove_images", action="store_true", help="Remove images from problems")
     parser.add_argument("--option_format_regex", type=str, help="Filter by option format regex (e.g. '^[A-Z]\\)')")
 
     args = parser.parse_args()

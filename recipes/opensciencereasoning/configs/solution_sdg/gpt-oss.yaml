@@ -14,13 +14,14 @@ is_mcq: False
 input_file: "/nemo_run/code/nemo_skills/dataset/mmlu/val.jsonl"
 
 # Can define initial dependency for the `generate_solutions` stage to run after
-initial_dependency: ""
+initial_dependency: None
 
 # Define the full sequence of stages for this mode
 pipeline_stages:
   - filter_problems          # Filter problems based on format
   - decontaminate            # Decontaminate problems
   - topics_labeling          # Label topics and subtopics
+  - difficulty_estimation    # Estimate difficulty of problems
 
 # Directory structure configuration
 directories:
@@ -37,8 +38,8 @@ stages:
     dataset_name: ${dataset_name}
     is_mcq: ${is_mcq}
     remove_images: True
-    num_options: None
-    option_format_regex: None
+    num_options: 4
+    option_format_regex: null
     deduplicate: True
   
   decontaminate:
@@ -62,6 +63,8 @@ stages:
     output_dir: ${directories.step-2-topics-labeling}
     input_file: ${directories.step-1-decontaminate}/final_result.jsonl
     model: /hf_models/Qwen2.5-32B-Instruct
+    dependencies:
+      - decontaminate
     server_type: sglang
     server_gpus: 8
     server_nodes: 1
@@ -101,26 +104,26 @@ stages:
     output_dir: ${directories.step-3-difficulty-estimation}
     input_file: ${directories.step-0-filter-problems}/final_result.jsonl 
     is_mcq: ${is_mcq}
-    mcq_prompt_config: ""
-    openq_prompt_config: ""
+    mcq_prompt_config: "aai/mcq-4choices"
+    openq_prompt_config: "generic/general-boxed"
+    tokens_to_generate: 16000
+    num_random_seeds: 5
 
     generation_kwargs:
       model: /hf_models/Qwen3-30B-A3B
       server_type: vllm
       server_gpus: 8
       server_nodes: 2
-      server_args: "++inference.tokens_to_generate=16000"
-      num_random_seeds: 5
-      num_chunks: 10  
+      num_random_seeds: ${stages.difficulty_estimation.num_random_seeds}
+      num_chunks: 5  
     
     judge_kwargs:
       model: /hf_models/Qwen2.5-32B-Instruct
-      server_type: trtllm
+      server_type: vllm
       server_gpus: 8
       server_nodes: 2
-      server_args: "++skip_filled=True  ++prompt_config=judge/general-judge "
-      num_random_seeds: 1
-      num_chunks: 10
+      num_random_seeds: ${stages.difficulty_estimation.num_random_seeds}
+      num_chunks: 5
     
     dependencies:
       - decontaminate
