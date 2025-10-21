@@ -86,6 +86,7 @@ def process_file(
     deduplicate: bool = False,
     dataset_name: str = None,
     num_options: int | None = None,
+    num_options: int | None = None,
     option_format_regex: str = None
 ):
     input_file = Path(input_file)
