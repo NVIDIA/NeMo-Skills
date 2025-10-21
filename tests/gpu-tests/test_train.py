@@ -138,6 +138,7 @@ def test_sft_nemo_rl_messages_format():
     assert metrics["num_entries"] == 10
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("backend", ["fsdp", "megatron"])
 def test_grpo_nemo_rl(backend):
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
