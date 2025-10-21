@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-import os
 import random
 import time
 from typing import Optional
@@ -23,7 +22,7 @@ import html2text
 import requests
 from bs4 import BeautifulSoup
 from ddgs import DDGS
-from ddgs.exceptions import TimeoutException, RatelimitException, DDGSException
+from ddgs.exceptions import DDGSException
 
 ERROR_TEMPLATES = [
     "503 Server Error: Service Unavailable for url: {url}",
