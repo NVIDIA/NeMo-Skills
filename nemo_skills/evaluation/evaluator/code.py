@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import asyncio
 import json
 import logging
 import re
@@ -47,12 +48,29 @@ class CodeExecEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 12):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
-        import time
-        time.sleep(100)
         self.sandbox = get_sandbox(self.eval_config.sandbox)
+        self._sandbox_ready = False
 
-    async def eval_single(self, data_point: dict):
+    async def _wait_for_sandbox_ready(self, timeout: int = 100):
+        """Wait for sandbox to be ready."""
+        retries = timeout // self.eval_config.timeout
+        for _ in range(retries):
+            try:
+                output, _ = await self.sandbox.execute_code("print('test')", language=self.eval_config.language, timeout=self.eval_config.timeout)
+                if output.get("process_status") == "completed":
+                    self._sandbox_ready = True
+                    return
+                else:
+                    LOG.warning(f"Sandbox returned status: {output.get('process_status')}")
+            except Exception:
+                LOG.warning("Sandbox not ready yet, retrying...")
+            await asyncio.sleep(self.eval_config.timeout)
+        raise RuntimeError("Sandbox not available after multiple retries")
+
+    async def eval_single(self, data: dict):
         """Evaluate single code during generation."""
+        if not self._sandbox_ready:
+            await self._wait_for_sandbox_ready()
 
         output_dict = {
             "process_status": [],
@@ -62,30 +80,24 @@ class CodeExecEvaluator(BaseEvaluator):
             "stderrs": [],
         }
 
-        code = data_point["code"]
-        test_cases = data_point["test_cases"]
-
-        for test_case in test_cases:
-            input_test_case = test_case["input"]
-            expected_output_test_case = test_case["output"]
+        for test_case in data["test_cases"]:
             output, _ = await self.sandbox.execute_code(
-                generated_code=code,
-                std_input=input_test_case,
+                code=data["code"],
+                std_input=test_case["input"],
                 language=self.eval_config.language,
-                timeout=self.eval_config.timeout,
+                timeout=self.eval_config.timeout * len(data["test_cases"]),
             )
         
             output_dict["process_status"].append(output["process_status"])
             output_dict["stdouts"].append(output["stdout"])
             output_dict["stderrs"].append(output["stderr"])
-            output_dict["correct_tests"].append(output["stderr"] == "")
+            output_dict["correct_tests"].append(output["stdout"] == test_case["output"])
 
         output_dict["average_test_score"] = (
             0.0
             if len(output_dict["correct_tests"]) == 0
             else (sum(output_dict["correct_tests"]) / len(output_dict["correct_tests"]))
         )
-
         return {"code_execution": output_dict}
 
 
