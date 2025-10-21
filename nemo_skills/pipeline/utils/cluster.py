@@ -157,6 +157,7 @@ def get_env_variables(cluster_config):
         "AZURE_OPENAI_API_KEY",
         "OPENAI_API_KEY",
         "HF_TOKEN",
+        "NGC_API_KEY",
     }
     default_factories = {
         "HF_TOKEN": lambda: str(token) if (token := get_token()) else "",
@@ -197,6 +198,26 @@ def get_env_variables(cluster_config):
             if env_var_name not in _logged_optional_env_vars:
                 LOG.info(f"Optional environment variable {env_var_name} not found in user environment; skipping.")
                 _logged_optional_env_vars.add(env_var_name)
+
+    # replace placeholders with actual env var values from the environment where
+    # the job is being launched, not where its being run.
+    for key, value in env_vars.items():
+        if isinstance(value, str) and "$" in value:
+            if key in os.environ:
+                env_vars[key] = os.path.expandvars(value)
+                LOG.info(
+                    f"Resolved environment variable {key} inside the placeholder value: {value} with {env_vars[key]}"
+                )
+            else:
+                raise ValueError(f"Cannot resolve environment variable {key} inside the placeholder value: {value}")
+
+    # Unless NGC_API_KEY is explicitly set we will populate it to be equal to NVIDIA_API_KEY
+    if "NGC_API_KEY" not in env_vars:
+        if "NVIDIA_API_KEY" in env_vars:
+            env_vars["NGC_API_KEY"] = env_vars["NVIDIA_API_KEY"]
+            if "NGC_API_KEY" not in _logged_optional_env_vars:
+                LOG.info("Populating NGC_API_KEY to be equal to NVIDIA_API_KEY")
+                _logged_optional_env_vars.add("NGC_API_KEY")
     return env_vars
 
 
@@ -220,10 +241,16 @@ def read_config(config_file):
     # resolve ssh tunnel config
     if "ssh_tunnel" in cluster_config:
         cluster_config = update_ssh_tunnel_config(cluster_config)
+        if "job_dir" not in cluster_config["ssh_tunnel"]:
+            raise ValueError("job_dir must be provided in the ssh_tunnel config.")
+        if not Path(cluster_config["ssh_tunnel"]["job_dir"]).is_absolute():
+            raise ValueError("job_dir in ssh_tunnel must be an absolute path.")
 
     if cluster_config["executor"] == "slurm" and "ssh_tunnel" not in cluster_config:
         if "job_dir" not in cluster_config:
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
+        if not Path(cluster_config["job_dir"]).is_absolute():
+            raise ValueError("job_dir must be an absolute path.")
         set_nemorun_home(cluster_config["job_dir"])
 
     return cluster_config

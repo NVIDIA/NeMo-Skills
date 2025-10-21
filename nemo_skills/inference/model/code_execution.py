@@ -22,7 +22,7 @@ from nemo_skills.code_execution import extract_code_to_execute, format_code_outp
 from nemo_skills.code_execution.sandbox import Sandbox
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
-from .base import BaseModel
+from .base import BaseModel, EndpointType
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -65,6 +65,7 @@ class CodeExecutionWrapper:
         max_code_executions: int | None = None,  # if not None, will override self.config.max_code_executions
         stream: bool = False,
         extra_body: dict = None,
+        endpoint_type: EndpointType = None,
     ):
         # Handle OpenAI-style dictionary prompts
         is_openai_format = not isinstance(prompt, str)
@@ -75,6 +76,7 @@ class CodeExecutionWrapper:
         if stream:
             return self._stream_single(
                 prompt=prompt,
+                endpoint_type=endpoint_type,
                 code_begin=code_begin,
                 code_end=code_end,
                 code_output_begin=code_output_begin,
@@ -108,6 +110,7 @@ class CodeExecutionWrapper:
         stop_phrases = stop_phrases or []
 
         request = {
+            "endpoint_type": endpoint_type,
             "prompt": new_prompt,
             "tokens_to_generate": tokens_to_generate,
             "temperature": temperature,
@@ -126,6 +129,7 @@ class CodeExecutionWrapper:
         generation_time = 0
         code_execution_time = 0
         stopped_on_repetition = False
+        num_code_timeouts = 0
         # adding plus one to make sure there is always some completion after the last requested code block
         try:
             for generation_index in range(effective_max_code_executions + 1):
@@ -185,6 +189,9 @@ class CodeExecutionWrapper:
                         remaining_code_executions,
                     )
 
+                    if "process_status" in execution_dict and execution_dict["process_status"] == "timeout":
+                        num_code_timeouts += 1
+
                     if is_openai_format:
                         request["prompt"][-2]["content"] += code_output
                     else:
@@ -208,6 +215,7 @@ class CodeExecutionWrapper:
                 "generation_time": generation_time,
                 "code_execution_time": code_execution_time,
                 "stopped_on_repetition": stopped_on_repetition,
+                "num_code_timeouts": num_code_timeouts,
             }
         finally:
             # Clean up session if we created one and configured to do so
@@ -252,6 +260,7 @@ class CodeExecutionWrapper:
         max_code_executions: int | None = None,
         stream: bool = False,
         extra_body: dict = None,
+        endpoint_type: EndpointType = None,
     ) -> list[dict]:
         """For any generation parameter you can specify a list of values that needs to match the number of prompts.
 
@@ -261,6 +270,7 @@ class CodeExecutionWrapper:
             raise NotImplementedError("top_logprobs is not supported yet.")
 
         kwargs = {
+            "endpoint_type": endpoint_type,
             "code_begin": code_begin,
             "code_end": code_end,
             "code_output_begin": code_output_begin,
@@ -285,7 +295,9 @@ class CodeExecutionWrapper:
 
         output = await self._generate_single(**request)
         if not stream:
-            self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
+            # Some models (like NIM speech models) don't have this method
+            if hasattr(self.model, "_maybe_apply_stop_phrase_removal"):
+                self.model._maybe_apply_stop_phrase_removal(output, remove_stop_phrases, stop_phrases)
 
         return output
 
@@ -308,6 +320,7 @@ class CodeExecutionWrapper:
         timeout: float | int | None = 14400,  # None is 10min,
         max_code_executions: int | None = None,
         extra_body: dict = None,
+        endpoint_type: EndpointType = None,
     ):
         """
         Helper method, that implements streaming generation.
@@ -322,6 +335,7 @@ class CodeExecutionWrapper:
         stop_phrases = stop_phrases or []
 
         request = {
+            "endpoint_type": endpoint_type,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,

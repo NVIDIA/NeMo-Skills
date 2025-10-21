@@ -16,6 +16,8 @@ import dataclasses
 
 from nemo_skills.utils import python_doc_to_cmd_help
 
+# NIM models (speech)
+from .asr_nim import ASRNIMModel
 from .azure import AzureOpenAIModel
 
 # Base classes
@@ -31,6 +33,7 @@ from .parallel_thinking import ParallelThinkingConfig, ParallelThinkingTask
 
 # Tool Calling
 from .tool_call import ToolCallingWrapper
+from .tts_nim import TTSNIMModel
 
 # Utilities
 from .vllm import VLLMModel
@@ -47,6 +50,8 @@ models = {
     "gemini": GeminiModel,
     "vllm": VLLMModel,
     "sglang": VLLMModel,
+    "tts_nim": TTSNIMModel,
+    "asr_nim": ASRNIMModel,
 }
 
 
@@ -72,6 +77,7 @@ def get_parallel_thinking_model(
     model,
     orig_prompt_filler,
     parallel_thinking: ParallelThinkingConfig = None,
+    tokenizer=None,
     main_config=None,
     inference_override_config=None,
 ):
@@ -89,7 +95,9 @@ def get_parallel_thinking_model(
 
     parallel_thinking_config = ParallelThinkingConfig(**filtered_config)
 
-    return ParallelThinkingTask(model=model, orig_prompt_filler=orig_prompt_filler, cfg=parallel_thinking_config)
+    return ParallelThinkingTask(
+        model=model, tokenizer=tokenizer, orig_prompt_filler=orig_prompt_filler, cfg=parallel_thinking_config
+    )
 
 
 def get_tool_calling_model(

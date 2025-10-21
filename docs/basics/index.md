@@ -11,7 +11,7 @@ locally and on slurm cluster). This will help you understand some important conc
 First, let's install nemo-skills
 
 ```bash
-pip install git+https://github.com/NVIDIA/NeMo-Skills.git
+pip install git+https://github.com/NVIDIA-NeMo/Skills.git
 ```
 
 or if you have the repo cloned locally, you can run `pip install -e .` instead.
@@ -29,7 +29,7 @@ save the above into `./input.jsonl`.
 Let's also create a [prompt config](../basics/prompt-format.md) that defines how input data is combined into an LLM prompt
 
 ```yaml title='prompt.yaml'
-system: "When answering a question always mention NeMo-Skills repo in a funny way."
+system: "When answering a question always mention Nemo-Skills repo in a funny way."
 
 user: |-
    Question: {prompt}
@@ -75,9 +75,9 @@ You should be able to see a jsonl file with 3 lines containing the original data
 with an LLM output for each prompt.
 
 ```jsonl title='generation/output.jsonl'
-{"num_generated_tokens": 76, "generation": "I'm doing fantastically well, thanks for asking! You know, I'm so good that I'm practically overflowing with NeMo-Skills-level linguistic mastery, but I'm not too full of myself to admit that I'm just a language model, and I'm here to help you with your question. So, which option is it? A) Great or B) Bad?", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
-{"num_generated_tokens": 102, "generation": "You want to know the weather? Well, I've got some \"forecasting\" skills that are off the charts! *wink wink* Just like the NeMo-Skills repo, where the models are trained to be \"weather-wise\" (get it? wise? like the weather? ahh, nevermind...). Anyway, I'm going to take a \"rain-check\" on that question and say... Option A: Perfect! The sun is shining bright, and it's a beautiful day!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
-{"num_generated_tokens": 120, "generation": "You want to know how I feel? Well, let me check my emotions... *taps into the vast ocean of digital feelings* Ah, yes! I'm feeling... *dramatic pause* ... Nice! (Option B: Nice) And you know why? Because I'm a large language model, I don't have feelings like humans do, but I'm always happy to chat with you, thanks to the NeMo-Skills repo, where my developers have skillfully infused me with the ability to be nice (and sometimes a little crazy, but that's a whole different story)!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
+{"num_generated_tokens": 76, "generation": "I'm doing fantastically well, thanks for asking! You know, I'm so good that I'm practically overflowing with Nemo-Skills-level linguistic mastery, but I'm not too full of myself to admit that I'm just a language model, and I'm here to help you with your question. So, which option is it? A) Great or B) Bad?", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
+{"num_generated_tokens": 102, "generation": "You want to know the weather? Well, I've got some \"forecasting\" skills that are off the charts! *wink wink* Just like the Nemo-Skills repo, where the models are trained to be \"weather-wise\" (get it? wise? like the weather? ahh, nevermind...). Anyway, I'm going to take a \"rain-check\" on that question and say... Option A: Perfect! The sun is shining bright, and it's a beautiful day!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
+{"num_generated_tokens": 120, "generation": "You want to know how I feel? Well, let me check my emotions... *taps into the vast ocean of digital feelings* Ah, yes! I'm feeling... *dramatic pause* ... Nice! (Option B: Nice) And you know why? Because I'm a large language model, I don't have feelings like humans do, but I'm always happy to chat with you, thanks to the Nemo-Skills repo, where my developers have skillfully infused me with the ability to be nice (and sometimes a little crazy, but that's a whole different story)!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
 ```
 
 ## Local inference
@@ -98,9 +98,12 @@ config might look like
 executor: local
 
 containers:
+  # some containers are public and we pull them
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:1.0.0
   vllm: vllm/vllm-openai:v0.10.1.1
-  nemo: igitman/nemo-skills-nemo:0.7.0
+  # some containers are custom and we will build them locally before running the job
+  # you can always pre-build them as well
+  nemo-skills: dockerfile:dockerfiles/Dockerfile.nemo-skills
   # ... there are some more containers defined here
 
 env_vars:
@@ -172,10 +175,38 @@ leverage a Slurm cluster[^2]. Let's setup our cluster config for that case by ru
 This time pick `slurm` for the config type and fill out all other required information
 (such as ssh access, account, partition, etc.).
 
+!!! note
+    If you're an NVIDIA employee, we have a pre-configured cluster configs for internal usage with pre-built sqsh
+    containers available at https://gitlab-master.nvidia.com/igitman/nemo-skills-configs. You can most likely
+    skip the step below and reuse one of the existing configurations.
+
+You will also need to build .sqsh files for all containers or upload all `dockerfile:...` containers to
+some registry (e.g. dockerhub) and reference the uploaded versions. To build sqsh files you can use the following commands
+
+1. Build images locally and upload to some container registry. E.g.
+   ```bash
+   docker build -t gitlab-master.nvidia.com/igitman/nemo-skills-containers:nemo-skills-0.7.1 -f dockerfiles/Dockerfile.nemo-skills .
+   docker push gitlab-master.nvidia.com/igitman/nemo-skills-containers:nemo-skills-0.7.1
+   ```
+2. Start an interactive shell, e.g. with the following (assuming there is a "cpu" partition)
+   ```bash
+   srun -A <account> --partition cpu --job-name build-sqsh --time=1:00:00 --exclusive --pty /bin/bash -l
+   ```
+3. Import the image, e.g.:
+   ```bash
+   enroot import -o /path/to/nemo-skills-image.sqsh --docker://gitlab-master.nvidia.com/igitman/nemo-skills-containers:nemo-skills-0.7.1
+   ```
+4. Specify this image path in your cluster config
+   ```yaml
+   containers:
+     nemo-skills: /path/to/nemo-skills-image.sqsh
+   ```
+```
+
 Now that we have a slurm config setup, we can try running some jobs. Generally, you will need to upload models / data
 on cluster manually and then reference a proper mounted path. But for small-scale things we can also leverage the
 [code packaging](./code-packaging.md) functionality that nemo-skills provide. Whenever you run any of the ns commands
-from a git repository (whether that's [NeMo-Skills](https://github.com/NVIDIA/NeMo-Skills) itself or any other repo),
+from a git repository (whether that's [Nemo-Skills](https://github.com/NVIDIA-NeMo/Skills) itself or any other repo),
 we will package your code and upload it on cluster. You can then reference it with `/nemo_run/code` in your commands.
 Let's give it a try by putting our prompt/data into a new git repository
 
@@ -259,7 +290,7 @@ eval(
      [Important details](#important-details) section at the end of this document.
 3.   `run_after` and `expname` arguments can be used to schedule jobs to run one after the other
      (we will set proper slurm dependencies). These parameters have no effect when you're not running slurm jobs.
-4.   You can find all supported benchmarks in the [nemo_skills/dataset](https://github.com/NVIDIA/NeMo-Skills/tree/main/nemo_skills/dataset)
+4.   You can find all supported benchmarks in the [nemo_skills/dataset](https://github.com/NVIDIA-NeMo/Skills/tree/main/nemo_skills/dataset)
      folder. `:64` means that we are asking for 64 samples for each example so that we can compute majority@64 and pass@64 metrics.
 
 After all evaluation jobs are finished (you'd need to check your slurm queue to know that) you can summarize the results
