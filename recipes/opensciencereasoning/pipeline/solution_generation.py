@@ -268,44 +268,64 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
     )
 
 def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
+    """Run difficulty estimation generation, judge correctness, and postprocess metrics.
+
+    This stage:
+      - Generates multiple solutions per problem using the provided model/prompt.
+      - Runs LLM-based judging (math_judge) over those generations to get Yes/No per sample.
+      - Postprocesses the judgements to append three keys to the final results file:
+        - difficulty_model: the model used for generation
+        - pass_rate: decimal fraction of correct judgements (e.g., 0.5)
+        - pass_at_n: formatted fraction "correct/total" (e.g., 2/4)
+
+    Note: The judging step extracts predicted answers using the \\boxed{...} convention.
+    It will only work out-of-the-box when generations include a final answer in boxed format.
+    """
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
-    prompt_config = stage_config["mcq_prompt_config"] if stage_config["is_mcq"] else stage_config["openq_prompt_config"]
+    prompt_config = stage_config["prompt_config"]
     
     generation_kwargs = stage_config.get("generation_kwargs", {})
     judge_kwargs = stage_config.get("judge_kwargs", {})
+    judge_ctx_args = judge_kwargs.pop("judge_ctx_args", "")
 
-    expname_1 = f"{expname}-gen"
     tokens_to_generate = generation_kwargs.get("tokens_to_generate", 16000)
-    
-    # run generation
-    # generate(
-    #     ctx=wrap_arguments(
-    #         f" ++prompt_config={prompt_config} "
-    #         f" ++inference.tokens_to_generate={tokens_to_generate} "
-    #     ),
-    #     cluster=cluster,
-    #     input_file=input_file,
-    #     output_dir=f"{output_dir}/generation",
-    #     expname=expname_1,
-    #     run_after=run_after,
-    #     **generation_kwargs,
-    # )
-
-    expname_2 = f"{expname}-judge"
     
     generate(
         ctx=wrap_arguments(
-            f" ++prompt_config=judge/general-judge "
-            f" ++inference.tokens_to_generate={tokens_to_generate} "
+            f"++prompt_config={prompt_config} "
+            f"++inference.tokens_to_generate={tokens_to_generate} "
         ),
+        cluster=cluster,
+        input_file=input_file,
+        output_dir=f"{output_dir}/generation",
+        expname=f"{expname}-generation",
+        run_after=run_after,
+        **generation_kwargs,
+    )
+
+    generate(
+        ctx=wrap_arguments(judge_ctx_args),
         generation_type="math_judge",
         cluster=cluster,
         input_dir=f"{output_dir}/generation",
-        output_dir=f"{output_dir}/judge",
-        expname=expname_2,
-        run_after=expname_1,
+        output_dir=f"{output_dir}/judgement",
+        expname=f"{expname}-judgement",
+        run_after=f"{expname}-generation",
         **judge_kwargs,
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/postprocess_judgements.py "
+            f"    --judgement_dir '{output_dir}/judgement' "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
+            f"    --pass_rate_model '{generation_kwargs.get('model', '')}' "
+        ),
+        cluster=cluster,
+        exclusive=False,
+        run_after=f"{expname}-judgement",
+        expname=expname,
     )
 
 
