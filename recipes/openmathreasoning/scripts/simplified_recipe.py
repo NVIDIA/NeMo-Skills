@@ -62,7 +62,7 @@ def run_sdg(workspace, cluster, num_gpus, expname_prefix, wandb_params):
         expname=f"{expname_prefix}-problem-extraction",
         run_after=f"{expname_prefix}-download-assets",
         model="Qwen/Qwen2.5-14B-Instruct",
-        server_type="vllm",
+        server_type="sglang",
         server_gpus=num_gpus,
         log_samples=not wandb_params["disable_wandb"],
         # using prefix as group to make it easier to see all sdg steps together
