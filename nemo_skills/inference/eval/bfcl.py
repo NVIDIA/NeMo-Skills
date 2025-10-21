@@ -342,7 +342,6 @@ class BFCLGenerationTask(GenerationTask):
         all_model_response: list[list] = []  # The model response that will be used for later evaluation
         force_quit = False  # Whether the model has been forced to quit. If True, this whole entry will be failed
 
-        all_multi_turn_messages: list[list[dict]] = data_point["question"]
         state_dict = {"messages": [], "tools": data_point["tools"]}
 
         output_dict = {"num_generated_tokens_list": []}
@@ -351,6 +350,29 @@ class BFCLGenerationTask(GenerationTask):
 
         out_of_context = False
 
+        if is_memory(test_category):
+            # Execute no function call, but just to get a reference to all the instances to get the initial state for logging purpose
+            _, involved_instances = execute_multi_turn_func_call(
+                [],
+                initial_config,
+                involved_classes,
+                test_entry_id=test_entry_id,
+                long_context=("long_context" in test_category or "composite" in test_category),
+            )
+
+            assert (
+                len(involved_instances) == 1
+            ), "Memory category should only involve one class."
+
+            memory_instance: "MemoryAPI" = list(involved_instances.values())[0]
+            data_point["question"] = add_memory_instruction_system_prompt(
+                data_point["question"],
+                test_category,
+                data_point["scenario"],
+                memory_instance,
+            )
+
+        all_multi_turn_messages: list[list[dict]] = data_point["question"]
         for turn_idx, current_turn_message in enumerate(all_multi_turn_messages):
             current_turn_response = []
             count = 0
@@ -408,32 +430,10 @@ class BFCLGenerationTask(GenerationTask):
                     if is_empty_execute_response(decoded_model_responses):
                         LOG.info("No tools to execute in this turn. Proceed to next turn.")
                         break
-
                 except Exception:
-                    LOG.info("Failed to decode the model response. Proceed to next turn.")
+                    LOG.info("No tools to execute in this turn. Proceed to next turn.")
                     break
 
-                if is_memory(test_category):
-                    # Execute no function call, but just to get a reference to all the instances to get the initial state for logging purpose
-                    _, involved_instances = execute_multi_turn_func_call(
-                        [],
-                        initial_config,
-                        involved_classes,
-                        test_entry_id=test_entry_id,
-                        long_context=("long_context" in test_category or "composite" in test_category),
-                    )
-
-                    assert (
-                        len(involved_instances) == 1
-                    ), "Memory category should only involve one class."
-
-                    memory_instance: "MemoryAPI" = list(involved_instances.values())[0]
-                    data_point["question"] = add_memory_instruction_system_prompt(
-                        data_point["question"],
-                        test_category,
-                        data_point["scenario"],
-                        memory_instance,
-                    )
 
                 # Obtain the execution results
                 # TODO: Move the execution to sandbox
@@ -444,15 +444,6 @@ class BFCLGenerationTask(GenerationTask):
                     test_entry_id=test_entry_id,
                     long_context=("long_context" in test_category or "composite" in test_category),
                 )
-                # Special handling for the memory category
-                # Need to flush the memory to local file at the end of the conversation
-                if is_memory_prereq(test_entry_id):
-                    assert (
-                        len(involved_instances) == 1
-                    ), "Memory category should only involve one class."
-                    memory_instance: "MemoryAPI" = list(involved_instances.values())[0]
-                    memory_instance._flush_memory_to_local_file()
-
 
                 # Add the execution results to the chat history for the next turn
                 for execution_result, tool_call_id in zip(execution_results, model_response["tool_call_ids"]):
@@ -478,12 +469,22 @@ class BFCLGenerationTask(GenerationTask):
 
         output_dict["generation"] = all_model_response
 
+        # Special handling for the memory category
+        # Need to flush the memory to local file at the end of the conversation
+        if is_memory_prereq(test_entry_id):
+            assert (
+                len(involved_instances) == 1
+            ), "Memory category should only involve one class."
+            memory_instance: "MemoryAPI" = list(involved_instances.values())[0]
+            memory_instance._flush_memory_to_local_file()
+
         if out_of_context:
             output_dict["error"] = "_ran_out_of_context_"
 
         output_dict["num_generated_tokens"] = sum(output_dict["num_generated_tokens_list"])
         if self.cfg.count_prompt_tokens:
             output_dict["num_input_tokens"] = sum(output_dict["num_input_tokens_list"])
+
 
         return output_dict
 

@@ -205,11 +205,11 @@ def compute_score(metrics: dict):
 
     # Following the calculation guide from https://gorilla.cs.berkeley.edu/blogs/15_bfcl_v4_web_search.html
     overall_accuracy = (
-        (agentic_accuracy["overall_agentic"] * 0.4) +
-        (multi_turn_accuracy["overall_multi_turn"] * 0.3) +
-        (live_single_turn_accuracy["overall_live"] * 0.1) +
-        (non_live_single_turn_accuracy["overall_non_live"] * 0.1) +
-        (hallucination_accuracy["overall_hallucination"] * 0.1)
+        (agentic_accuracy["overall_agentic"]["accuracy"] * 0.4) +
+        (multi_turn_accuracy["overall_multi_turn"]["accuracy"] * 0.3) +
+        (live_single_turn_accuracy["overall_live"]["accuracy"] * 0.1) +
+        (non_live_single_turn_accuracy["overall_non_live"]["accuracy"] * 0.1) +
+        (hallucination_accuracy["overall_hallucination"]["accuracy"] * 0.1)
     )
 
     res = {
