@@ -13,23 +13,19 @@
 # limitations under the License.
 
 import json
-import os
 import subprocess
 from pathlib import Path
 
 import pytest
+from utils import require_env_var
 
 from tests.conftest import docker_rm
 
 
 @pytest.mark.gpu
 def test_trtllm_eval():
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/trtllm-eval"
     docker_rm([output_dir])
@@ -61,13 +57,9 @@ def test_trtllm_eval():
 @pytest.mark.gpu
 @pytest.mark.parametrize("server_type", ["trtllm"])
 def test_trtllm_code_execution_eval(server_type):
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
     # we are using the base prompt for Qwen to make it follow few-shots
     if model_type == "qwen":
         # tokenizer = "Qwen/Qwen3-1.7B"
@@ -121,12 +113,9 @@ def test_hf_eval(server_type, server_args):
     # will run a bunch of benchmarks, but is still pretty fast
     # mmlu/ifeval will be cut to 164 samples to save time
     # could cut everything, but human-eval/mbpp don't work with partial gens
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
+
     if model_type != "qwen":
         raise ValueError(f"Only running this test for qwen models, got {model_type}")
 
@@ -186,13 +175,9 @@ def test_hf_eval(server_type, server_args):
 
 @pytest.mark.gpu
 def test_megatron_eval():
-    model_path = os.getenv("NEMO_SKILLS_TEST_MEGATRON_MODEL")
-    if not model_path:
-        # Keeping the skip here because megatron model support is not a priority right now.
-        pytest.skip("Define NEMO_SKILLS_TEST_MEGATRON_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_MEGATRON_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
+
     if model_type != "qwen":
         raise ValueError(f"Only running this test for qwen models, got {model_type}")
 

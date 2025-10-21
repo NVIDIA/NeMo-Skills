@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import json
-import os
 from pathlib import Path
 
 import pytest
+from utils import require_env_var
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 from tests.conftest import docker_rm
@@ -24,12 +24,8 @@ from tests.conftest import docker_rm
 
 @pytest.mark.gpu
 def test_check_contamination():
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/contamination"
 

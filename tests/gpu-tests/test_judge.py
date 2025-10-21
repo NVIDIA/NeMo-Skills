@@ -18,18 +18,15 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from utils import require_env_var
 
 from tests.conftest import docker_rm
 
 
 @pytest.mark.gpu
 def test_trtllm_judge():
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
     input_dir = "/nemo_run/code/tests/data"
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/judge/math"

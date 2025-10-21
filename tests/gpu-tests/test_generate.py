@@ -18,6 +18,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from utils import require_env_var
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
 from tests.conftest import docker_rm
@@ -27,12 +28,8 @@ from tests.conftest import docker_rm
 
 @pytest.mark.gpu
 def test_vllm_generate_greedy():
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy/generation"
     docker_rm([output_dir])
