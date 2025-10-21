@@ -18,7 +18,7 @@ import os
 import re
 import threading
 import time
-from typing import Dict
+from typing import Dict, Optional
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator
@@ -32,6 +32,8 @@ class IOIEvaluatorConfig:
     num_workers: int = 16  # number of test workers
     test_batch_size: int = 16  # number of tests to run concurrently
     overwrite: bool = False
+    memory_limit_override: Optional[int] = None
+    time_limit_override: Optional[int] = None
 
 
 _precompile_loop_tls = threading.local()
@@ -298,6 +300,18 @@ class IOIEvaluator(BaseEvaluator):
         compile_code = subtask_meta["compile"]
         run_code = subtask_meta["run"]
         grader_files = subtask_meta["grader_files"]
+        if self.eval_cfg.memory_limit_override is not None or self.eval_cfg.time_limit_override is not None:
+            _new_gf = []
+            for p, c in grader_files:
+                if p == "graders/grader_config.json":
+                    _cfg = json.loads(c)
+                    if self.eval_cfg.memory_limit_override is not None:
+                        _cfg["memory_limit"] = self.eval_cfg.memory_limit_override
+                    if self.eval_cfg.time_limit_override is not None:
+                        _cfg["time_limit"] = self.eval_cfg.time_limit_override
+                    c = json.dumps(_cfg)
+                _new_gf.append([p, c])
+            grader_files = _new_gf
 
         if pid not in self.precompiled_cache:
             self.precompiled_cache[pid] = await asyncio.to_thread(
