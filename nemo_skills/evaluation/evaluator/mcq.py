@@ -62,7 +62,7 @@ def eval_mcq(cfg):
 
         return parsed_letter
 
-    jsonl_file = cfg.input_file
+    jsonl_file = eval_config.input_file
     with open(jsonl_file, "rt", encoding="utf-8") as fin:
         data = [json.loads(line) for line in fin]
     with open(jsonl_file, "wt", encoding="utf-8") as fout:
