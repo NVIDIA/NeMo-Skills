@@ -18,12 +18,12 @@ from typing import Any, Callable, Dict
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator
 from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import (
+    CodeExecEvaluator,
     eval_bigcodebench,
     eval_evalplus,
     eval_human_eval_infilling,
     eval_livebench_coding,
     eval_livecodebench_pro,
-    CodeExecEvaluator
 )
 from nemo_skills.evaluation.evaluator.ifbench import eval_ifbench
 from nemo_skills.evaluation.evaluator.ifeval import eval_if

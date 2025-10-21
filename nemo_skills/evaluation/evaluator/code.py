@@ -37,12 +37,13 @@ BIGCODEBENCH_REQUIREMENTS_URL = (
     "https://raw.githubusercontent.com/bigcode-project/bigcodebench/main/Requirements/requirements-eval.txt"
 )
 
+
 @nested_dataclass(kw_only=True)
 class CodeExecEvaluatorConfig:
     sandbox: dict
     language: str = "python"
     timeout: int = 10
-    
+
 
 class CodeExecEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 12):
@@ -56,7 +57,9 @@ class CodeExecEvaluator(BaseEvaluator):
         retries = timeout // self.eval_config.timeout
         for _ in range(retries):
             try:
-                output, _ = await self.sandbox.execute_code("print('test')", language=self.eval_config.language, timeout=self.eval_config.timeout)
+                output, _ = await self.sandbox.execute_code(
+                    "print('test')", language=self.eval_config.language, timeout=self.eval_config.timeout
+                )
                 if output.get("process_status") == "completed":
                     self._sandbox_ready = True
                     return
@@ -82,12 +85,12 @@ class CodeExecEvaluator(BaseEvaluator):
 
         for test_case in data["test_cases"]:
             output, _ = await self.sandbox.execute_code(
-                code=data["code"],
+                generated_code=data["code"],
                 std_input=test_case["input"],
                 language=self.eval_config.language,
                 timeout=self.eval_config.timeout * len(data["test_cases"]),
             )
-        
+
             output_dict["process_status"].append(output["process_status"])
             output_dict["stdouts"].append(output["stdout"])
             output_dict["stderrs"].append(output["stderr"])
