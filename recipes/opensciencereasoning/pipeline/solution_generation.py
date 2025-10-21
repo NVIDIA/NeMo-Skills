@@ -328,12 +328,45 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
     )
 
+def aggregate(cluster, expname, run_after, stage_config, **kwargs):
+    """Aggregate per-problem metadata and solutions into a final JSONL.
+
+    This stage invokes `scripts/aggregate_matadata.py` to:
+      - Merge metadata from `stage_config["metadata_files"]` (JSON list), if provided.
+      - Optionally merge solutions from `stage_config["solutions_path"]`, which may be a directory
+        or a glob pattern. When present, solutions form the base dataset; metadata keys are overlaid.
+
+    Args:
+        cluster: Cluster name for job submission.
+        expname: Experiment name for this stage.
+        run_after: Dependency specification for orchestration.
+        stage_config: Dict containing `output_dir`, optional `metadata_files`, optional `solutions_path`.
+        **kwargs: Unused, reserved for compatibility.
+    """
+    output_dir = stage_config["output_dir"]
+    metadata_files = stage_config.get("metadata_files", [])
+    solutions_path = stage_config.get("solutions_path", None)
+
+    solutions_path_arg = f"    --solutions_path {shlex.quote(str(solutions_path))} " if solutions_path is not None else ""
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_matadata.py "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
+            f"    --metadata_files {shlex.quote(json.dumps(metadata_files, ensure_ascii=False))} "
+            f"{solutions_path_arg}"
+        ),
+        cluster=cluster,
+        exclusive=False,
+        run_after=run_after,
+        expname=expname,
+    )
 
 stages_map = {
     "filter_problems": filter_problems,
     "decontaminate": decontaminate,
     "topics_labeling": topics_labeling,
     "difficulty_estimation": difficulty_estimation,
+    "aggregate": aggregate,
 }
 
 
