@@ -66,7 +66,7 @@ def eval_ruler(cfg):
         "part": string_match_part_single,
     }
 
-    jsonl_file = cfg.input_file
+    jsonl_file = eval_config.input_file
     with open(jsonl_file, "rt", encoding="utf-8") as fin:
         data = [json.loads(line) for line in fin]
         for sample in tqdm(data):
