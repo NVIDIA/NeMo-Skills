@@ -291,15 +291,7 @@ def aggregate(cluster, expname, run_after, stage_config, **kwargs):
 
     This stage invokes `scripts/aggregate_matadata.py` to:
       - Merge metadata from `stage_config["metadata_files"]` (JSON list), if provided.
-      - Optionally merge solutions from `stage_config["solutions_path"]`, which may be a directory
-        or a glob pattern. When present, solutions form the base dataset; metadata keys are overlaid.
-
-    Args:
-        cluster: Cluster name for job submission.
-        expname: Experiment name for this stage.
-        run_after: Dependency specification for orchestration.
-        stage_config: Dict containing `output_dir`, optional `metadata_files`, optional `solutions_path`.
-        **kwargs: Unused, reserved for compatibility.
+      - Optionally merge solutions from `stage_config["solutions_path"]`, which should be a glob pattern.
     """
     output_dir = stage_config["output_dir"]
     metadata_files = stage_config.get("metadata_files", [])
