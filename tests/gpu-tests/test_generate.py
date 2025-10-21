@@ -29,10 +29,10 @@ from tests.conftest import docker_rm
 def test_vllm_generate_greedy():
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy/generation"
     docker_rm([output_dir])
@@ -68,10 +68,10 @@ def test_vllm_generate_greedy():
 def test_vllm_generate_greedy_chunked():
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-greedy-chunked/generation"
     docker_rm([output_dir])
@@ -108,10 +108,10 @@ def test_vllm_generate_greedy_chunked():
 def test_vllm_generate_seeds():
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/vllm-generate-seeds/generation"
     docker_rm([output_dir])

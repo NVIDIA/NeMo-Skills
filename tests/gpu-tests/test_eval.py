@@ -26,7 +26,7 @@ from tests.conftest import docker_rm
 def test_trtllm_eval():
     model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
     if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
+        raise ValueError("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         raise ValueError("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
@@ -188,6 +188,7 @@ def test_hf_eval(server_type, server_args):
 def test_megatron_eval():
     model_path = os.getenv("NEMO_SKILLS_TEST_MEGATRON_MODEL")
     if not model_path:
+        # Keeping the skip here because megatron model support is not a priority right now.
         pytest.skip("Define NEMO_SKILLS_TEST_MEGATRON_MODEL to run this test")
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
