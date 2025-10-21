@@ -178,6 +178,9 @@ class SweBenchGenerationTask(GenerationTask):
                 "SWE-bench generation task does not support eval_type parameter. Evaluation is done automatically."
             )
 
+        self.should_run_evaluation = False
+        self.evaluator = None
+
     def log_example_prompt(self, data):
         return
 
