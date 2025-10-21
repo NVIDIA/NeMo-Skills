@@ -51,7 +51,7 @@ def eval_qwen3_online_genselect(workspace, cluster, expname_prefix, wandb_projec
         ctx=wrap_arguments(
             "++inference.temperature=0.6 "
             "++inference.top_p=0.95 "
-            "++inference.tokens_to_generate=8192 "
+            "++inference.tokens_to_generate=16384 "
             "++parallel_thinking.mode=genselect "
             "++server.enable_soft_fail=True "
             "++server.context_limit_retry_strategy=reduce_generation "
