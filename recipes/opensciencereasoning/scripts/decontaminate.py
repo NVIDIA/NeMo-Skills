@@ -58,10 +58,14 @@ def main():
     args = parser.parse_args()
 
     dec = set()
+    logging.info(f"Reading contamination decisions from {args.dec_path}")
 
     with open(args.dec_path) as fin:
         for line in fin:
             sample = json.loads(line)
+            if not sample:
+                logging.warning(f"Skipping empty line")
+                continue
             if not sample['contaminated']:
                 dec.add(sample['problem'])
 

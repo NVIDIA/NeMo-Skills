@@ -25,6 +25,9 @@ import sys
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 from recipes.opensciencereasoning.few_shots import few_shots
 
+
+OUTPUT_FILE = "final_result.jsonl"
+
 def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
 
@@ -44,7 +47,30 @@ def get_available_configs(config_dir: Path):
 def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
-    return
+    option_format_regex = stage_config.get('option_format_regex', None)
+    option_format_regex = f" --option_format_regex '{option_format_regex}' " if option_format_regex else ""
+
+    cmd = (
+        f"python /nemo_run/code/recipes/opensciencereasoning/scripts/filter_problems.py "
+        f"{input_file} "
+        f"{output_dir}/{OUTPUT_FILE}"
+        + (f" --is_mcq" if stage_config.get('is_mcq', False) else "")
+        + (f" --deduplicate" if stage_config.get('deduplicate', False) else "")
+        + (f" --remove_images" if stage_config.get('remove_images', False) else "")
+        + (f" --dataset_name {stage_config.get('dataset_name', None)}" if stage_config.get('dataset_name') else "")
+        + (f" --num_options {stage_config.get('num_options', None)}" if stage_config.get('num_options') else "")
+        + option_format_regex
+    )
+    print(cmd)
+    
+    wrapped_cmd = wrap_arguments(cmd)
+    run_cmd(cluster=cluster, 
+            container="nemo-skills",
+            log_dir=f"{output_dir}/logs",
+            expname=expname, 
+            ctx=wrapped_cmd, 
+            run_after=run_after)
+
 
 def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
     """Run contamination retrieval and checking, then write decontaminated data.
@@ -76,7 +102,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
 
     run_cmd(
         cluster=cluster,
-        container="nemo",
+        container="nemo-skills",
         expname=f"{expname}_retrieve_similar",
         run_after=run_after,
         exclusive=False,
@@ -95,12 +121,13 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
         expname=f"{expname}_check_contamination",
         run_after=f"{expname}_retrieve_similar",
         exclusive=False,
-        dependent_jobs=dependent_jobs,
         num_chunks=num_chunks,
         ctx=wrap_arguments(
             f"++check_both_ways=True "
         ),
+        dependent_jobs=dependent_jobs,
     )
+
 
     run_cmd(
         ctx=wrap_arguments(
@@ -108,7 +135,8 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
                 f"python /nemo_run/code/recipes/opensciencereasoning/scripts/decontaminate.py "
                 f"    --input_path '{input_file}' "
                 f"    --dec_path '{output_dir}/decontaminate/output.jsonl' "
-                f"    --save_path {output_dir}/final_result.jsonl "
+                f"    --save_path {output_dir}/{OUTPUT_FILE} "
+                f"    --save_path {output_dir}/{OUTPUT_FILE} "
                 f"    --with_duplicates False "
             )
         ),
@@ -188,7 +216,8 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_topics.py "
             f"    --input_files {shlex.quote(json.dumps(save_paths, ensure_ascii=False))} "
-            f"    --output_file '{output_dir}/final_result.jsonl' "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --topics_structure {shlex.quote(json.dumps(topics_structure, ensure_ascii=False))} "
             f"    --names {shlex.quote(json.dumps(generation_keys, ensure_ascii=False))} "
         ),
@@ -198,23 +227,69 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         run_after=f"{expname}-{name}-labeling-{i}",
     )
 
+def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
+    input_file = stage_config.get("input_file")
+    output_dir = stage_config["output_dir"]
+    prompt_config = stage_config["mcq_prompt_config"] if stage_config["is_mcq"] else stage_config["openq_prompt_config"]
+    
+    generation_kwargs = stage_config.get("generation_kwargs", {})
+    judge_kwargs = stage_config.get("judge_kwargs", {})
+
+    expname_1 = f"{expname}-gen"
+    tokens_to_generate = generation_kwargs.get("tokens_to_generate", 16000)
+    
+    # run generation
+    # generate(
+    #     ctx=wrap_arguments(
+    #         f" ++prompt_config={prompt_config} "
+    #         f" ++inference.tokens_to_generate={tokens_to_generate} "
+    #     ),
+    #     cluster=cluster,
+    #     input_file=input_file,
+    #     output_dir=f"{output_dir}/generation",
+    #     expname=expname_1,
+    #     run_after=run_after,
+    #     **generation_kwargs,
+    # )
+
+    expname_2 = f"{expname}-judge"
+    
+    generate(
+        ctx=wrap_arguments(
+            f" ++prompt_config=judge/general-judge "
+            f" ++inference.tokens_to_generate={tokens_to_generate} "
+        ),
+        generation_type="math_judge",
+        cluster=cluster,
+        input_dir=f"{output_dir}/generation",
+        output_dir=f"{output_dir}/judge",
+        expname=expname_2,
+        run_after=expname_1,
+        **judge_kwargs,
+    )
+
 
 stages_map = {
     "filter_problems": filter_problems,
     "decontaminate": decontaminate,
     "topics_labeling": topics_labeling,
+    "difficulty_estimation": difficulty_estimation,
+    "difficulty_estimation": difficulty_estimation,
 }
 
 
 if __name__ == "__main__":
     config_dir = Path(__file__).parents[1] / "configs" / "solution_sdg"
+    print(f"Looking for configs in {config_dir}")
+    print(f"Looking for configs in {config_dir}")
     available_configs = get_available_configs(config_dir)
 
     parser = argparse.ArgumentParser(description="OpenMathReasoning-1 solution generation pipeline")
     parser.add_argument(
         "--mode",
         type=str,
-        required=True,
+        default="gpt-oss",
+        default="gpt-oss",
         choices=available_configs,
         help="Will pick a corresponding config from configs folder",
     )
