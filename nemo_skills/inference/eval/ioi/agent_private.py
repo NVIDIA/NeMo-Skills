@@ -65,77 +65,99 @@ class IOIExecutionGenerationTask(GenerationTask):
         chat_history = []
         num_steps_completed = 0
 
-        prompt_txt, solution_response, gen_time = await self._call_llm(data_point, all_data, "initial")
-        cur_generation_response = solution_response["generation"]
-        chat_history.append({"prompt": prompt_txt, "response": cur_generation_response, "generation_time": gen_time})
+        # Attempt to resume from latest intermediate state
+        async_pos = data_point[self.cfg.async_position_key]
+        saved_state = self.load_latest_state(async_pos)
+        if saved_state and saved_state.get("_intermediate", False):
+            chat_history = saved_state.get("steps", [])
+            cur_generation_response = saved_state.get("generation")
+            num_steps_completed = int(saved_state.get("num_steps_completed", 0))
+            print(f"[Resume] Loaded intermediate state at step {num_steps_completed}.")
+        else:
+            prompt_txt, solution_response, gen_time = await self._call_llm(data_point, all_data, "initial")
+            cur_generation_response = solution_response["generation"]
+            chat_history.append(
+                {"prompt": prompt_txt, "response": cur_generation_response, "generation_time": gen_time}
+            )
 
-        print("[Initial] Generated initial solution.")
+            print("[Initial] Generated initial solution.")
+            # Save checkpoint after initial solution
+            await self.save_intermediate_state(
+                async_pos,
+                {
+                    "generation": cur_generation_response,
+                    "steps": chat_history,
+                    "num_steps_completed": num_steps_completed,
+                },
+            )
 
-        try:
-            for step_num in range(self.cfg.total_steps):
-                # Evaluate the current solution using the external evaluator.
-                # Time the external evaluator to capture evaluation latency.
-                eval_start_t = time.time()
-                eval_results = await self.evaluator.eval_single({**data_point, "generation": cur_generation_response})
-                eval_time = time.time() - eval_start_t
+        for step_num in range(num_steps_completed, self.cfg.total_steps):
+            # Evaluate the current solution using the external evaluator.
+            # Time the external evaluator to capture evaluation latency.
+            eval_start_t = time.time()
+            eval_results = await self.evaluator.eval_single({**data_point, "generation": cur_generation_response})
+            eval_time = time.time() - eval_start_t
 
-                # Record evaluation time for the solution that was just evaluated (last entry in chat_history).
-                if chat_history:
-                    chat_history[-1]["evaluation_time"] = eval_time
-                test_case_results = eval_results["test_case_results"]
+            # Record evaluation time for the solution that was just evaluated (last entry in chat_history).
+            if chat_history:
+                chat_history[-1]["evaluation_time"] = eval_time
+            test_case_results = eval_results["test_case_results"]
 
-                # Check if all subtasks passed fully (score == 1 for every output)
-                if all(all(o["score"] == 1 for o in v["outputs"]) for v in test_case_results.values()):
-                    print(f"[Success] All test cases passed at step {step_num}.")
-                    return {
-                        "generation": cur_generation_response,
-                        "steps": chat_history,
-                        "num_steps_completed": num_steps_completed,
-                    }
+            # Check if all subtasks passed fully (score == 1 for every output)
+            if all(all(o["score"] == 1 for o in v["outputs"]) for v in test_case_results.values()):
+                print(f"[Success] All test cases passed at step {step_num}.")
+                return {
+                    "generation": cur_generation_response,
+                    "steps": chat_history,
+                    "num_steps_completed": num_steps_completed,
+                }
 
-                print(f"[Step {step_num + 1}/{self.cfg.total_steps}] Improving based on evaluator feedback.")
+            print(f"[Step {step_num + 1}/{self.cfg.total_steps}] Improving based on evaluator feedback.")
 
-                # Prepare a concise failure summary (only non-perfect cases)
-                failure_lines = []
-                for subtask, info in test_case_results.items():
-                    for out in info["outputs"]:
-                        if out["score"] != 1:
-                            failure_lines.append(
-                                f"{subtask}:{out['test_name']} score={out['score']} msg={out.get('run_stderr', '').strip()}"
-                            )
-                failure_summary = "\n".join(failure_lines)
+            # Prepare a concise failure summary (only non-perfect cases)
+            failure_lines = []
+            for subtask, info in test_case_results.items():
+                for out in info["outputs"]:
+                    if out["score"] != 1:
+                        failure_lines.append(
+                            f"{subtask}:{out['test_name']} score={out['score']} msg={out.get('run_stderr', '').strip()}"
+                        )
+            failure_summary = "\n".join(failure_lines)
 
-                # Ask the LLM to improve the solution given the evaluator feedback.
-                prompt_txt, improve_resp, gen_time = await self._call_llm(
-                    data_point,
-                    all_data,
-                    "improve_after_verify_solution",
-                    solution=extract_code_block(cur_generation_response),
-                    test_case_results=failure_summary,
-                )
+            # Ask the LLM to improve the solution given the evaluator feedback.
+            prompt_txt, improve_resp, gen_time = await self._call_llm(
+                data_point,
+                all_data,
+                "improve_after_verify_solution",
+                solution=extract_code_block(cur_generation_response),
+                test_case_results=failure_summary,
+            )
 
-                num_steps_completed += 1
-                cur_generation_response = improve_resp["generation"]
+            num_steps_completed += 1
+            cur_generation_response = improve_resp["generation"]
 
-                chat_history.append(
-                    {"prompt": prompt_txt, "response": cur_generation_response, "generation_time": gen_time}
-                )
-                print(f"Prompt: {prompt_txt}")
+            chat_history.append(
+                {"prompt": prompt_txt, "response": cur_generation_response, "generation_time": gen_time}
+            )
+            print(f"Prompt: {prompt_txt}")
 
-            # Reached maximum steps without passing all tests.
-            print("[Failure] Reached max improvement steps without passing all tests.")
-            return {
-                "generation": cur_generation_response,
-                "steps": chat_history,
-                "num_steps_completed": num_steps_completed,
-            }
-        except Exception as e:
-            print(f"Agent loop failed: {e}")
-            return {
-                "generation": cur_generation_response,
-                "steps": chat_history,
-                "num_steps_completed": num_steps_completed,
-            }
+            # Save checkpoint after each improvement step
+            await self.save_intermediate_state(
+                async_pos,
+                {
+                    "generation": cur_generation_response,
+                    "steps": chat_history,
+                    "num_steps_completed": num_steps_completed,
+                },
+            )
+
+        # Reached maximum steps without passing all tests.
+        print("[Failure] Reached max improvement steps without passing all tests.")
+        return {
+            "generation": cur_generation_response,
+            "steps": chat_history,
+            "num_steps_completed": num_steps_completed,
+        }
 
 
 GENERATION_TASK_CLASS = IOIExecutionGenerationTask

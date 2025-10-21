@@ -469,9 +469,15 @@ class GenerationTask:
                     LOG.warning(f"File `{base_output_file}` exists, skipping generation")
                     return []
             try:
+                latest_by_pos = {}
                 with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
                     for line in fin:
-                        filled_positions.add(int(json.loads(line)[self.cfg.async_position_key]))
+                        record = json.loads(line)
+                        pos = int(record[self.cfg.async_position_key])
+                        latest_by_pos[pos] = record
+                for pos, record in latest_by_pos.items():
+                    if not record.get("_intermediate", False):
+                        filled_positions.add(pos)
             except FileNotFoundError:
                 LOG.warning(f"File `{self.cfg.output_file}-async` not found, starting from scratch")
 
@@ -544,6 +550,36 @@ class GenerationTask:
         """Prefill generation in case LLM is not required."""
         # Override this method to customize the prefilling behavior.
         return None
+
+    async def save_intermediate_state(self, async_position: int, state: dict) -> None:
+        """Persist a minimal, resumable snapshot for a position into the -async file.
+
+        The snapshot is flagged with _intermediate: true so it can be ignored by the
+        final restore step and by skip logic unless a final record is written later.
+        """
+        # Ensure we have a lock even if called outside async_loop for some reason
+        if self.output_lock is None:
+            self.output_lock = asyncio.Lock()
+
+        payload = {
+            self.cfg.async_position_key: int(async_position),
+            "_intermediate": True,
+            **state,
+        }
+
+        async with self.output_lock:
+            with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
+                fout.write(json.dumps(payload) + "\n")
+
+    def load_latest_state(self, async_position: int) -> dict | None:
+        """Load the latest (final or intermediate) snapshot for a position from the -async file."""
+        latest = None
+        with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
+            for line in fin:
+                record = json.loads(line)
+                if record[self.cfg.async_position_key] == async_position:
+                    latest = record
+        return latest
 
     async def process_single_datapoint(
         self, data_point, all_data, prompt=None, generation_params_override: dict | None = None
@@ -665,16 +701,28 @@ class GenerationTask:
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
         with open(self.cfg.output_file + "-async", "rt", encoding="utf-8") as fin:
-            generations = [json.loads(line) for line in fin]
+            latest_by_pos = {}
+            for line in fin:
+                gen_dict = json.loads(line)
+                async_pos = gen_dict[self.cfg.async_position_key]
+                latest_by_pos[async_pos] = dict(gen_dict)
 
-        ordered_generations = [None] * len(generations)
-        for gen_dict in generations:
-            async_pos = gen_dict.pop(self.cfg.async_position_key)
-            ordered_generations[async_pos] = gen_dict
+        # Keep only final records (no _intermediate flag)
+        final_by_pos = {pos: rec for pos, rec in latest_by_pos.items() if not rec.get("_intermediate", False)}
 
-        with open(self.cfg.output_file, "wt", encoding="utf-8") as fout:
-            for gen_dict in ordered_generations:
-                fout.write(json.dumps(gen_dict) + "\n")
+        if final_by_pos:
+            max_pos = max(final_by_pos.keys())
+            ordered_generations = [None] * (max_pos + 1)
+            for pos, rec in final_by_pos.items():
+                rec = dict(rec)
+                rec.pop(self.cfg.async_position_key, None)
+                rec.pop("_intermediate", None)
+                ordered_generations[pos] = rec
+
+            with open(self.cfg.output_file, "wt", encoding="utf-8") as fout:
+                for gen_dict in ordered_generations:
+                    if gen_dict is not None:
+                        fout.write(json.dumps(gen_dict) + "\n")
 
         Path(self.cfg.output_file + "-async").unlink()
         self.cleanup_litellm_cache()
