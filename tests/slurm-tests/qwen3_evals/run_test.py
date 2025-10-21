@@ -65,6 +65,7 @@ def eval_qwen3_online_genselect(workspace, cluster, expname_prefix, wandb_projec
         server_type="vllm",
         server_args="--async-scheduling --enforce-eager",
         output_dir=output_dir,
+        log_dir=f"{output_dir}/logs",
         expname=expname,
         wandb_project=wandb_project,
         wandb_name=expname_prefix,
@@ -96,12 +97,14 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
         server_type="vllm",
         server_args="--async-scheduling --enforce-eager",
         output_dir=output_dir,
+        log_dir=f"{output_dir}/logs",
         expname=initial_solutions_expname,
         wandb_project=wandb_project,
         wandb_name=initial_solutions_expname,
     )
 
     expname = expname_prefix + "_offline-genselect-genselect"
+    output_dir = f"{workspace}/offline_genselect/genselect"
     eval(
         ctx=wrap_arguments(
             f"++inference.temperature=0.6 "
@@ -120,7 +123,8 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
         num_jobs=1,
         server_type="vllm",
         server_args="--async-scheduling --enforce-eager",
-        output_dir=f"{workspace}/offline_genselect/genselect",
+        output_dir=output_dir,
+        log_dir=f"{output_dir}/logs",
         expname=expname,
         run_after=initial_solutions_expname,
         wandb_project=wandb_project,
