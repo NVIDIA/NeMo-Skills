@@ -84,11 +84,7 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
     # Generate initial solutions
     initial_solutions_expname = expname_prefix + "_offline-genselect-initial-solutions"
     eval(
-        ctx=wrap_arguments(
-            "++inference.temperature=0.6 "
-            "++inference.top_p=0.95 "
-            "++inference.tokens_to_generate=16384 "  # Generating only 8192 tokens to make it faster
-        ),
+        ctx=wrap_arguments("++inference.temperature=0.6 ++inference.top_p=0.95 ++inference.tokens_to_generate=16384 "),
         cluster=cluster,
         benchmarks=f"{benchmark}:{num_samples}",
         model=model,
@@ -109,7 +105,7 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
         ctx=wrap_arguments(
             f"++inference.temperature=0.6 "
             f"++inference.top_p=0.95 "
-            f"++inference.tokens_to_generate=8192 "  # Generating only 8192 tokens to make it faster
+            f"++inference.tokens_to_generate=16384 "
             f"++parallel_thinking.mode=genselect "
             f"++parallel_thinking.generation_dir={output_dir}/eval-results/{benchmark} "
             f"++server.enable_soft_fail=True "
