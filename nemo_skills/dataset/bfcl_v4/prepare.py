@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ def process_multi_turn_test_case(instance):
 
 
 def load_dataset_entry(
-    target_folder: str,
+    target_folder: Path,
     test_category: str,
     include_prereq: bool = True,
     include_language_specific_hint: bool = True,
@@ -146,7 +146,6 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
         subfolder_path: Path to the data subfolder in case of BFCL
         output_dir: Directory to save the processed JSONL files
         file_prefix: Only process files starting with this prefix
-        model_type: Formatting of functions and tools can be model dependent.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
@@ -194,11 +193,11 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
             LOG.info(f"Successfully processed {processed_categories} BFCLv4 categories to {output_dir}")
 
         except subprocess.CalledProcessError as e:
-            LOG.error(f"Git command failed: {e}")
+            LOG.exception(f"Git command failed")
             LOG.error("Make sure git is installed and the repository URL is correct")
 
 
-def main(args):
+def main():
     LOG.warning(
         "Currently processing according to the OpenAI model style which works for most models, including Qwen/Llama-Nemotron/DeepSeek."
     )
@@ -209,8 +208,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_type", type=str, default=None, required=False)
-    args = parser.parse_args()
-
-    main(args)
+    main()

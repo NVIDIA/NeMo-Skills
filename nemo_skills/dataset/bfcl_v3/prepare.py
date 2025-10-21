@@ -157,7 +157,7 @@ def download_and_process_bfcl_data(repo_url, subfolder_path, output_dir, file_pr
             processed_files = 0
             for input_file in json_files:
                 filename = os.path.basename(input_file)
-                split_dirname = os.path.join(output_dir, filename.lstrip("BFCL_v4_").replace(".json", ""))
+                split_dirname = os.path.join(output_dir, filename.removeprefix("BFCL_v4_").replace(".json", ""))
                 if not os.path.exists(split_dirname):
                     os.makedirs(split_dirname)
 
