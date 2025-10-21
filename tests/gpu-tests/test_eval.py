@@ -67,7 +67,7 @@ def test_trtllm_code_execution_eval(server_type):
     model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
     if not model_type:
         pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
-    # we are using the base prompt for llama to make it follow few-shots
+    # we are using the base prompt for Qwen to make it follow few-shots
     if model_type == "qwen":
         # tokenizer = "Qwen/Qwen3-1.7B"
         code_tags = "qwen"
@@ -89,6 +89,7 @@ def test_trtllm_code_execution_eval(server_type):
         f"    --with_sandbox "
         f"    ++stop_phrase='\\n\\n\\n\\n\\n\\n' "
         f"    --server_args='--backend pytorch' "
+        f"    ++tokenizer=Qwen/Qwen3-1.7B-Base "
         f"    ++code_tags={code_tags} "
         f"    ++examples_type=gsm8k_text_with_code "
         f"    ++max_samples=20 "

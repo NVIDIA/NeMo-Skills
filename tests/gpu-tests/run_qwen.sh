@@ -3,9 +3,6 @@
 set -e
 
 export NEMO_SKILLS_TEST_MODEL_TYPE=qwen
-# TRTLLM still doesn't support Qwen3 models, using a smaller Qwen2.5 model for context retry tests
-export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen2.5-3B-Instruct
-# pytest tests/gpu-tests/test_context_retry.py -s -x
 
 # Switch to Qwen3 model for other tests
 export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen3-1.7B
@@ -14,7 +11,9 @@ pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
 pytest tests/gpu-tests/test_run_cmd_llm_infer.py -s -x
-# pytest tests/gpu-tests/test_contamination.py -s -x
+pytest tests/gpu-tests/test_contamination.py -s -x
+
+# TODO: Add context retry tests
 
 # for sft we are using the tiny random model to run much faster
 ns run_cmd --cluster test-local --config_dir tests/gpu-tests --container nemo \

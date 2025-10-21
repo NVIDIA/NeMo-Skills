@@ -49,22 +49,25 @@ def test_check_contamination():
     run_cmd(
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
-        container="nemo-rl",
+        container="nemo-skills",
         num_gpus=1,
         ctx=wrap_arguments(cmd),
+        expname="contamination-retrieve",
+        installation_command="pip install sentence-transformers",
     )
 
     generate(
-        ctx=wrap_arguments(""),
+        ctx=wrap_arguments("++inference.tokens_to_generate=2048 "),
         cluster="test-local",
         config_dir=Path(__file__).absolute().parent,
         generation_type="check_contamination",
         input_file=f"{output_dir}/math-contamination-retrieved.jsonl",
         output_dir=output_dir,
         model=model_path,
-        server_type="trtllm",
-        server_args="--backend pytorch",
+        server_type="vllm",
+        server_args="--enforce-eager",
         server_gpus=1,
+        run_after="contamination-retrieve",
     )
 
     output_file = f"{output_dir}/output.jsonl"
