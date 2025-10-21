@@ -21,15 +21,17 @@ pipeline_stages:
   - filter_problems          # Filter problems based on format
   - decontaminate            # Decontaminate problems
   - topics_labeling          # Label topics and subtopics
-  # - difficulty_estimation    # Estimate difficulty of problems
-  # - aggregate                # Aggregate all the metadata into a single file
+  - difficulty_estimation    # Estimate difficulty of problems
+  - aggregate                # Aggregate all the metadata into a single file
 
 # Directory structure configuration
 directories:
   step-0-filter-problems: ${base_output_dir}/solution-sdg/step-0-filter-problems
   step-1-decontaminate: ${base_output_dir}/solution-sdg/step-1-decontaminate
   step-2-topics-labeling: ${base_output_dir}/solution-sdg/step-2-topics-labeling
-  
+  step-3-difficulty-estimation: ${base_output_dir}/solution-sdg/step-3-difficulty-estimation
+  step-4-aggregate: ${base_output_dir}/solution-sdg/step-4-aggregate
+
 # Stage-specific configurations
 stages:
   filter_problems:
