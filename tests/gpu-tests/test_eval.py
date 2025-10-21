@@ -107,7 +107,14 @@ def test_trtllm_code_execution_eval(server_type):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("server_type,server_args", [("vllm", ""), ("sglang", ""), ("trtllm", "--backend pytorch")])
+@pytest.mark.parametrize(
+    "server_type,server_args",
+    [
+        ("vllm", "--enforce-eager --max-model-len 4096"),
+        ("sglang", "--context-length 4096"),
+        ("trtllm", "--backend pytorch"),
+    ],
+)
 def test_hf_eval(server_type, server_args):
     # this test expects qwen3-1.7b to properly check accuracy
     # will run a bunch of benchmarks, but is still pretty fast
