@@ -125,7 +125,7 @@ stages:
       judge_ctx_args: "++prompt_config=judge/general-judge"
       server_type: vllm
       server_gpus: 8
-      server_nodes: 2
+      server_nodes: 1
       num_random_seeds: ${stages.difficulty_estimation.num_random_seeds}
       server_args: "++skip_filled=True  ++prompt_config=judge/general-judge "
       num_random_seeds: 1
