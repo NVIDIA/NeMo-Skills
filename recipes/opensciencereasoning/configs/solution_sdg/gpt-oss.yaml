@@ -178,7 +178,7 @@ stages:
         server_type: vllm
         server_gpus: 8
         server_nodes: 1
-        num_random_seeds: ${stages.generate_solutions.params.num_random_seeds}
+        num_random_seeds: ${stages.generate_solutions.generation_kwargs.params.num_random_seeds}
         dependent_jobs: 1
         num_chunks: 5
   
