@@ -317,7 +317,7 @@ if __name__ == "__main__":
         "--config_path",
         type=str,
         default=f"{config_dir}/gpt-oss.yaml",
-        help="Path to the config file. Only one of config_path or mode should be specified.",
+        help="Path to the config file.",
     )
     parser.add_argument(
         "--stages",
@@ -342,20 +342,20 @@ if __name__ == "__main__":
     else:
         # No command line override, run all stages from config
         stages_to_run = full_stage_sequence
-        print(f"Running all stages defined in config for mode '{args.mode}': {stages_to_run}")
+        print(f"Running all stages defined in config '{config_path}': {stages_to_run}")
 
     for stage in stages_to_run:
         if stage not in stages_map:
             raise ValueError(f"Unknown stage specified: '{stage}'. Available stages: {list(stages_map.keys())}")
         if stage not in full_stage_sequence:
             raise ValueError(
-                f"Stage '{stage}' requested but not part of the defined sequence for mode '{args.mode}' in {config_path}. "
-                f"Specify one of {full_stage_sequence} or select an appropriate mode."
+                f"Stage '{stage}' requested but not part of the defined sequence for config '{config_path}'. "
+                f"Specify one of {full_stage_sequence} or select an appropriate config."
             )
 
     # --- Common parameters ---
     base_output_dir = config["base_output_dir"]
-    suffix = config.get("suffix", args.mode)
+    suffix = config.get("suffix", config_path.stem)
     cluster = config["cluster"]
     expname_base = config["expname"]
 
