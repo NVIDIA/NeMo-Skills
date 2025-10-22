@@ -397,7 +397,7 @@ if __name__ == "__main__":
 
     # --- Common parameters ---
     base_output_dir = config["base_output_dir"]
-    suffix = config.get("suffix", config_path.stem)
+    suffix = config.get("suffix", Path(config_path).stem)
     cluster = config["cluster"]
     expname_base = config["expname"]
 
