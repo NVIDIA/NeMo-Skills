@@ -385,7 +385,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_solutions.py "
             f"    --input_dir '{generation_dir}' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
-            f"    --generation_model '{generation_params.get('model', '').split('/')[-1]}' "
+            f"    --generation_model '{generation_params['model'].split('/')[-1]}' "
         ),
         cluster=cluster,
         expname=expname,
