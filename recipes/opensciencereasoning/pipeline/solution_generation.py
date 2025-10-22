@@ -13,14 +13,14 @@
 # limitations under the License.
 
 import argparse
-from pathlib import Path
 import json
+from pathlib import Path
 import shlex
+import sys
 
 from omegaconf import OmegaConf
 
 from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
-import sys
 
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 from recipes.opensciencereasoning.few_shots import few_shots
@@ -30,6 +30,9 @@ OUTPUT_FILE = "final_result.jsonl"
 def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
 
+def prepare_ctx_kwargs(generation_kwargs: dict):
+    ctx_params = " ".join(map(lambda x: f"++{x[0]}={x[1]}", generation_kwargs.get("ctx_params", {}).items()))
+    return ctx_params
 
 def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
     input_file = stage_config.get("input_file")
@@ -58,12 +61,14 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
     print(cmd)
     
     wrapped_cmd = wrap_arguments(cmd)
-    run_cmd(cluster=cluster, 
-            container="nemo-skills",
-            log_dir=f"{output_dir}/logs",
-            expname=expname, 
-            ctx=wrapped_cmd, 
-            run_after=run_after)
+    run_cmd(
+        cluster=cluster, 
+        container="nemo-skills",
+        log_dir=f"{output_dir}/logs",
+        expname=expname,
+        ctx=wrapped_cmd,
+        run_after=run_after,
+    )
 
 def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
     input_file = stage_config.get("input_file")
@@ -322,6 +327,67 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
         exclusive=False,
         run_after=f"{expname}-judgement",
         expname=expname,
+    )
+
+def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
+    """Generate solutions using the provided model/prompt."""
+    output_dir = stage_config["output_dir"]
+    make_majority_voting = stage_config.get("make_majority_voting", None)
+    make_judgement = stage_config.get("make_judgement", None)
+    predicted_answer_regex = stage_config.get("predicted_answer_regex", None)
+
+    generation_kwargs = stage_config.get("generation_kwargs", {})
+    judge_kwargs = stage_config.get("judge_kwargs", {})
+
+    generation_params = generation_kwargs.get("params", {})
+    ctx_params = prepare_ctx_kwargs(generation_kwargs)
+    judge_ctx_args = prepare_ctx_kwargs(judge_kwargs)
+    judge_params = judge_kwargs.get("params", {})
+
+    generate(
+        ctx=wrap_arguments(ctx_params),
+        cluster=cluster,
+        output_dir=f"{output_dir}/generation",
+        expname=f"{expname}_generate_solutions",
+        run_after=run_after,
+        **generation_params,
+    )
+    generation_dir = f"{output_dir}/with_predictions"
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/extract_predictions.py "
+            f"    --input_dir '{output_dir}/generation' "
+            f"    --output_dir '{generation_dir}' "
+            f"    --predicted_answer_regex '{predicted_answer_regex}' " if predicted_answer_regex else ""
+            f"    --majority_voting '{make_majority_voting}' " if make_majority_voting else ""
+        ),
+        cluster=cluster,
+    )
+    
+    if make_judgement:
+        generate(
+            ctx=wrap_arguments(judge_ctx_args),
+            cluster=cluster,
+            generation_type="math_judge",
+            input_dir=generation_dir,
+            output_dir=f"{output_dir}/judgement",
+            expname=f"{expname}_judgement",
+            run_after=f"{expname}_generate_solutions",
+            **judge_params,
+        )
+        generation_dir = f"{output_dir}/judgement"
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_solutions.py "
+            f"    --input_dir '{generation_dir}' "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
+            f"    --generation_model '{generation_params.get('model', '').split('/')[-1]}' "
+        ),
+        cluster=cluster,
+        expname=expname,
+        run_after=[f"{expname}_generate_solutions", f"{expname}_judgement"],
     )
 
 def aggregate(cluster, expname, run_after, stage_config, **kwargs):
