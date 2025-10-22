@@ -240,23 +240,21 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
     Note: The judging step extracts predicted answers using the \\boxed{...} convention.
     It will only work out-of-the-box when generations include a final answer in boxed format.
     """
-    input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
-    prompt_config = stage_config["prompt_config"]
     
     generation_kwargs = stage_config.get("generation_kwargs", {})
     judge_kwargs = stage_config.get("judge_kwargs", {})
-    judge_ctx_args = judge_kwargs.pop("judge_ctx_args", "")
 
-    tokens_to_generate = generation_kwargs.get("tokens_to_generate", 16000)
+    generation_params = generation_kwargs.pop("params", {})
+    generation_ctx_args = prepare_ctx_kwargs(generation_kwargs.pop("ctx_params", {}))
+
+    judge_params = judge_kwargs.pop("params", {})
+    judge_ctx_params = prepare_ctx_kwargs(judge_kwargs.pop("ctx_params", {}))
     
+
     generate(
-        ctx=wrap_arguments(
-            f"++prompt_config={prompt_config} "
-            f"++inference.tokens_to_generate={tokens_to_generate} "
-        ),
+        ctx=wrap_arguments(generation_ctx_args),
         cluster=cluster,
-        input_file=input_file,
         output_dir=f"{output_dir}/generation",
         expname=f"{expname}-generation",
         run_after=run_after,
@@ -264,14 +262,14 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
     )
 
     generate(
-        ctx=wrap_arguments(judge_ctx_args),
+        ctx=wrap_arguments(judge_ctx_params),
         generation_type="math_judge",
         cluster=cluster,
         input_dir=f"{output_dir}/generation",
         output_dir=f"{output_dir}/judgement",
         expname=f"{expname}-judgement",
         run_after=f"{expname}-generation",
-        **judge_kwargs,
+        **judge_params,
     )
 
     run_cmd(
