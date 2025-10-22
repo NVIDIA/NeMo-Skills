@@ -89,8 +89,7 @@ def aggregate_topics(input_files: dict, output_file: str, topics_structure: dict
     with open(output_file, "w") as f:
         for sample in data.values():
             check_topic_structure(sample, topics_structure, names)
-            sample.pop("topics_to_choose", None)
-            sample.pop("prompt_examples", None)
+            sample = {key: value for key, value in sample.items() if key in ["problem", "expected_answer", "id"] + names}
             f.write(json.dumps(sample) + "\n")
 
 def main():
