@@ -31,18 +31,6 @@ def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
 
 
-def get_available_configs(config_dir: Path):
-    """Get available YAML configuration files from the config directory."""
-    config_dir = Path(config_dir)
-    if not config_dir.exists() or not config_dir.is_dir():
-        return []
-
-    yaml_files = list(config_dir.glob("*.yaml"))
-    config_names = [file.stem for file in yaml_files]
-
-    return config_names
-
-
 def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
@@ -148,6 +136,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
         expname=f"{expname}_retrieve_similar",
         run_after=run_after,
         exclusive=False,
+        installation_command="pip install torch",
         ctx=wrap_arguments(cmd),
     )
 
@@ -364,16 +353,13 @@ stages_map = {
 
 if __name__ == "__main__":
     config_dir = Path(__file__).parents[1] / "configs" / "solution_sdg"
-    print(f"Looking for configs in {config_dir}")
-    available_configs = get_available_configs(config_dir)
 
     parser = argparse.ArgumentParser(description="OpenMathReasoning-1 solution generation pipeline")
     parser.add_argument(
-        "--mode",
+        "--config_path",
         type=str,
-        default="gpt-oss",
-        choices=available_configs,
-        help="Will pick a corresponding config from configs folder",
+        default=f"{config_dir}/gpt-oss.yaml",
+        help="Path to the config file. Only one of config_path or mode should be specified.",
     )
     parser.add_argument(
         "--stages",
@@ -384,7 +370,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    config_path = config_dir / f"{args.mode}.yaml"
+    config_path = args.config_path
     config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True, structured_config_mode="dict")
 
     if "pipeline_stages" not in config or not config["pipeline_stages"]:
