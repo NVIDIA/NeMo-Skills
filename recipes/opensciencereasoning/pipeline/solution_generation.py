@@ -48,7 +48,6 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
         f"python /nemo_run/code/recipes/opensciencereasoning/scripts/filter_problems.py "
         f"{input_file} "
         f"{output_dir}/{OUTPUT_FILE}"
-        + (f" --is_mcq" if stage_config.get('is_mcq', False) else "")
         + (f" --deduplicate" if stage_config.get('deduplicate', False) else "")
         + (f" --remove_images" if stage_config.get('remove_images', False) else "")
         + (f" --dataset_name {stage_config.get('dataset_name', None)}" if stage_config.get('dataset_name') else "")

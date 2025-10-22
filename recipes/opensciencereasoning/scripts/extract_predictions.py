@@ -66,12 +66,7 @@ def collect_predictions(
         samples: List[dict] = []
         with open(file_path) as fin:
             for line in fin:
-                if not line.strip():
-                    continue
-                try:
-                    sample = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+                sample = json.loads(line)
                 predicted_answer = extract_answer(
                     sample["generation"],
                     extract_from_boxed=False if predicted_answer_regex else True,

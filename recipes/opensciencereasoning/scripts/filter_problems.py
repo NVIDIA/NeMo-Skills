@@ -93,7 +93,6 @@ def contains_image(problem: str) -> bool:
 def process_file(
     input_file: str,
     output_file: str,
-    is_mcq: bool = False,
     remove_images: bool = False,
     deduplicate: bool = False,
     dataset_name: str = None,
@@ -156,20 +155,18 @@ def process_file(
                 dropped += 1
                 continue
 
-            # MCQ filters
-            if is_mcq:
-                # filter by number of options
-                if num_options is not None:
-                    option_count = count_options(problem)
-                    if option_count != num_options:
-                        dropped += 1
-                        continue
+            # filter by number of options
+            if num_options is not None:
+                option_count = count_options(problem)
+                if option_count != num_options:
+                    dropped += 1
+                    continue
 
-                # filter by option format regex
-                if option_format_regex is not None:
-                    if not match_option_format(problem, option_format_regex):
-                        dropped += 1
-                        continue
+            # filter by option format regex
+            if option_format_regex is not None:
+                if not match_option_format(problem, option_format_regex):
+                    dropped += 1
+                    continue
 
             # add everything beside id problem and expected_answer to metadata
             metadata = {k: v for k, v in obj.items() if k not in ["id", "problem", "expected_answer"]}
@@ -202,10 +199,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Filter JSONL dataset by question content and MCQ option format.")
     parser.add_argument("input_file", type=str, help="Path to input JSONL file")
     parser.add_argument("output_file", type=str, help="Path to output JSONL file")
-    parser.add_argument("--is_mcq", action="store_true", help="Whether problems are multiple-choice questions")
     parser.add_argument("--deduplicate", action="store_true", help="Remove duplicate problems")
     parser.add_argument("--dataset_name", type=str, help="Dataset name (optional). If not provided, derived from filename")
-    parser.add_argument("--num_options", type=int, help="Filter by number of options (only relevant if is_mcq=True) otherwise ignored")
+    parser.add_argument("--num_options", type=int, default=None, help="Filter by number of options")
     parser.add_argument("--remove_images", action="store_true", help="Remove images from problems")
     parser.add_argument("--option_format_regex", type=str, help="Filter by option format regex (e.g. '^[A-Z]\\)')")
     parser.add_argument("--problem_field", type=str, help="Field in the JSONL file that contains the problem")
@@ -217,7 +213,6 @@ if __name__ == "__main__":
     process_file(
         args.input_file,
         args.output_file,
-        is_mcq=args.is_mcq,
         deduplicate=args.deduplicate,
         dataset_name=args.dataset_name,
         num_options=args.num_options,
