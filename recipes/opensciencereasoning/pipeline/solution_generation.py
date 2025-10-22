@@ -375,7 +375,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
             input_dir=generation_dir,
             output_dir=f"{output_dir}/judgement",
             expname=f"{expname}_judgement",
-            run_after=f"{expname}_generate_solutions",
+            run_after=f"{expname}_extract_predictions",
             **judge_params,
         )
         generation_dir = f"{output_dir}/judgement"
@@ -389,7 +389,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
         ),
         cluster=cluster,
         expname=expname,
-        run_after=[f"{expname}_generate_solutions", f"{expname}_judgement"],
+        run_after=[f"{expname}_extract_predictions", f"{expname}_judgement"],
     )
 
 def aggregate(cluster, expname, run_after, stage_config, **kwargs):

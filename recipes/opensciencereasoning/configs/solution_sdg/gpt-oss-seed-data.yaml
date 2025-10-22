@@ -5,7 +5,7 @@ suffix: ""  # Suffix for experiment names
 dataset_name: ""  # Optional dataset name for id generation
 is_mcq: False
 
-
+# run with --stages filter_problems,decontaminate,topics_labeling,difficulty_estimation,aggregate
 
 # Input file for the first stage (generate_solutions)
 # It must include the field "problem"
@@ -117,10 +117,10 @@ difficulty_estimation:
       server_nodes: 2
       dependent_jobs: 1
       num_random_seeds: 5
-      num_chunks: 5
+      num_chunks: 20
     ctx_params:
       prompt_config: generic/general-boxed
-      tokens_to_generate: 16000
+      inference.tokens_to_generate: 16000
   
   judge_kwargs:
     params:
