@@ -176,7 +176,6 @@ all you need to do is replace `openhands` with `swe_agent` in the command above.
 !!! note
     For evaluation, we use a [custom fork](https://github.com/Kipok/SWE-bench) of the SWE-bench repository that supports running evaluation inside of an existing container. It may not always have the latest updates from the upstream repo.
 
-### ioi24
 
 ### IOI
 
