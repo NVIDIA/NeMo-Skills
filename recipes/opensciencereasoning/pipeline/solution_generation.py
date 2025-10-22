@@ -354,15 +354,19 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     )
     generation_dir = f"{output_dir}/with_predictions"
 
+    predicted_answer_regex_args = f"    --predicted_answer_regex '{predicted_answer_regex}' " if predicted_answer_regex else ""
+    majority_voting_args = f"    --majority_voting '{make_majority_voting}' " if make_majority_voting else ""
     run_cmd(
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/extract_predictions.py "
             f"    --input_dir '{output_dir}/generation' "
             f"    --output_dir '{generation_dir}' "
-            f"    --predicted_answer_regex '{predicted_answer_regex}' " if predicted_answer_regex else ""
-            f"    --majority_voting '{make_majority_voting}' " if make_majority_voting else ""
+            f"{predicted_answer_regex_args} "
+            f"{majority_voting_args} "
         ),
         cluster=cluster,
+        expname=f"{expname}_extract_predictions",
+        run_after=f"{expname}_generate_solutions",
     )
     
     if make_judgement:
