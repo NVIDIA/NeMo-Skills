@@ -182,10 +182,10 @@ stages:
 
   aggregate:
     output_dir: ${directories.step-5-aggregate}
-    solutions_path: ${directories.step-4-generate-solutions}/final_result.jsonl
+    solutions_path: ${directories.step-3-generate-solutions}/final_result.jsonl
     metadata_files: 
       - ${directories.step-2-topics-labeling}/final_result.jsonl
-      - ${directories.step-3-difficulty-estimation}/final_result.jsonl
+      - ${directories.step-4-difficulty-estimation}/final_result.jsonl
     dependencies:
       - topics_labeling
       - difficulty_estimation
