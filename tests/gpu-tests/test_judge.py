@@ -33,6 +33,7 @@ def test_trtllm_judge():
 
     docker_rm([output_dir])
 
+    total_samples = 10
     cmd = (
         f"ns generate "
         f"    --cluster test-local --config_dir {Path(__file__).absolute().parent} "
@@ -45,8 +46,8 @@ def test_trtllm_judge():
         f"    --output_dir={output_dir} "
         f"    --num_random_seeds=1 "
         f"    --preprocess_cmd='cp {input_dir}/output-rs0.test {input_dir}/output-rs0.jsonl' "
-        f"    --server_args='--backend pytorch' "
-        f"    ++max_samples=10 "
+        f"    --server_args='--backend pytorch --max_batch_size {total_samples}' "
+        f"    ++max_samples={total_samples} "
         f"    ++skip_filled=False "
         f"    ++inference.tokens_to_generate=2048 "
     )
@@ -57,7 +58,7 @@ def test_trtllm_judge():
     # no evaluation by default - checking just the number of lines and that there is a "judgement" key
     with open(output_file) as fin:
         lines = fin.readlines()
-    assert len(lines) == 10
+    assert len(lines) == total_samples
     for line in lines:
         data = json.loads(line)
         assert "judgement" in data
