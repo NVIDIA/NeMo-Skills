@@ -11,3 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import os
+
+
+def require_env_var(var_name: str) -> str:
+    """Raise a ValueError if the environment variable is not set."""
+    value = os.getenv(var_name)
+    if not value:
+        raise ValueError(f"Define {var_name} to run this test")
+    return value
