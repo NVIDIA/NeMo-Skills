@@ -225,65 +225,6 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         run_after=f"{expname}-{name}-labeling-{i}",
     )
 
-def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
-    """Run difficulty estimation generation, judge correctness, and postprocess metrics.
-
-    This stage:
-      - Generates multiple solutions per problem using the provided model/prompt.
-      - Runs LLM-based judging (math_judge) over those generations to get Yes/No per sample.
-      - Postprocesses the judgements to append three keys to the final results file:
-        - difficulty_model: the model used for generation
-        - pass_rate: decimal fraction of correct judgements (e.g., 0.5)
-        - pass_at_n: formatted fraction "correct/total" (e.g., 2/4)
-
-    Note: The judging step extracts predicted answers using the \\boxed{...} convention.
-    It will only work out-of-the-box when generations include a final answer in boxed format.
-    """
-    output_dir = stage_config["output_dir"]
-    
-    generation_kwargs = stage_config.get("generation_kwargs", {})
-    judge_kwargs = stage_config.get("judge_kwargs", {})
-
-    generation_params = generation_kwargs.get("params", {})
-    generation_ctx_args = prepare_ctx_kwargs(generation_kwargs.get("ctx_params", {}))
-
-    judge_params = judge_kwargs.get("params", {})
-    judge_ctx_params = prepare_ctx_kwargs(judge_kwargs.get("ctx_params", {}))
-    
-
-    generate(
-        ctx=wrap_arguments(generation_ctx_args),
-        cluster=cluster,
-        output_dir=f"{output_dir}/generation",
-        expname=f"{expname}-generation",
-        run_after=run_after,
-        **generation_params,
-    )
-
-    generate(
-        ctx=wrap_arguments(judge_ctx_params),
-        generation_type="math_judge",
-        cluster=cluster,
-        input_dir=f"{output_dir}/generation",
-        output_dir=f"{output_dir}/judgement",
-        expname=f"{expname}-judgement",
-        run_after=f"{expname}-generation",
-        **judge_params,
-    )
-
-    run_cmd(
-        ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/fill_difficulty.py "
-            f"    --judgement_dir '{output_dir}/judgement' "
-            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
-            f"    --pass_rate_model '{generation_params['model'].split('/')[-1]}' "
-        ),
-        cluster=cluster,
-        exclusive=False,
-        run_after=f"{expname}-judgement",
-        expname=expname,
-    )
-
 def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     """Generate solutions using the provided model/prompt."""
     output_dir = stage_config["output_dir"]
@@ -349,6 +290,78 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
         run_after=[f"{expname}_extract_predictions", f"{expname}_judgement"],
     )
 
+def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
+    """Run difficulty estimation generation, judge correctness, and postprocess metrics.
+
+    This stage:
+      - Generates multiple solutions per problem using the provided model/prompt.
+      - Runs LLM-based judging (math_judge) over those generations to get Yes/No per sample.
+      - Postprocesses the judgements to append three keys to the final results file:
+        - difficulty_model: the model used for generation
+        - pass_rate: decimal fraction of correct judgements (e.g., 0.5)
+        - pass_at_n: formatted fraction "correct/total" (e.g., 2/4)
+
+    Note: The judging step extracts predicted answers using the \\boxed{...} convention.
+    It will only work out-of-the-box when generations include a final answer in boxed format.
+    """
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+
+    generation_kwargs = stage_config.get("generation_kwargs", {})
+    judge_kwargs = stage_config.get("judge_kwargs", {})
+
+    generation_params = generation_kwargs.get("params", {})
+    generation_ctx_args = prepare_ctx_kwargs(generation_kwargs.get("ctx_params", {}))
+
+    judge_params = judge_kwargs.get("params", {})
+    judge_ctx_params = prepare_ctx_kwargs(judge_kwargs.get("ctx_params", {}))
+    
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/prepare_difficulty_estimation.py "
+            f"    --input_file '{input_file}' "
+            f"    --output_file '{output_dir}/tmp/prepared.jsonl' "
+        ),
+        cluster=cluster,
+        expname=f"{expname}_prepare_difficulty_estimation",
+        run_after=run_after,
+    )
+
+    generate(
+        ctx=wrap_arguments(generation_ctx_args),
+        cluster=cluster,
+        input_file=f"{output_dir}/tmp/prepared.jsonl",
+        output_dir=f"{output_dir}/generation",
+        expname=f"{expname}-generation",
+        run_after=f"{expname}_prepare_difficulty_estimation",
+        **generation_params,
+    )
+
+    generate(
+        ctx=wrap_arguments(judge_ctx_params),
+        generation_type="math_judge",
+        cluster=cluster,
+        input_dir=f"{output_dir}/generation",
+        output_dir=f"{output_dir}/judgement",
+        expname=f"{expname}-judgement",
+        run_after=f"{expname}-generation",
+        **judge_params,
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/fill_difficulty.py "
+            f"    --judgement_dir '{output_dir}/judgement' "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
+            f"    --pass_rate_model '{generation_params['model'].split('/')[-1]}' "
+        ),
+        cluster=cluster,
+        exclusive=False,
+        run_after=f"{expname}-judgement",
+        expname=expname,
+    )
+
 def aggregate(cluster, expname, run_after, stage_config, **kwargs):
     """Aggregate per-problem metadata and solutions into a final JSONL.
 
@@ -378,8 +391,8 @@ stages_map = {
     "filter_problems": filter_problems,
     "decontaminate": decontaminate,
     "topics_labeling": topics_labeling,
-    "difficulty_estimation": difficulty_estimation,
     "generate_solutions": generate_solutions,
+    "difficulty_estimation": difficulty_estimation,
     "aggregate": aggregate,
 }
 
