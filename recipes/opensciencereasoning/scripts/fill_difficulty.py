@@ -58,6 +58,7 @@ def main():
             pass_rate = correct / total if total > 0 else 0.0
             pass_at_n = f"{correct}/{total}" if total > 0 else "0/0"
 
+            sample = {key: value for key, value in sample.items() if key in ["problem", "expected_answer", "id"]}
             sample["pass_rate_model"] = args.pass_rate_model
             sample["pass_rate"] = round(pass_rate, 6)
             sample["pass_at_n"] = pass_at_n

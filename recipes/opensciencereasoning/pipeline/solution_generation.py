@@ -258,7 +258,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
         output_dir=f"{output_dir}/generation",
         expname=f"{expname}-generation",
         run_after=run_after,
-        **generation_kwargs,
+        **generation_params,
     )
 
     generate(
