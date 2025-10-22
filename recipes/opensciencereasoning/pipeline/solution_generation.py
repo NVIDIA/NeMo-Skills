@@ -31,8 +31,8 @@ OUTPUT_FILE = "final_result.jsonl"
 def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
 
-def prepare_ctx_kwargs(generation_kwargs: dict):
-    ctx_params = " ".join(map(lambda x: f"++{x[0]}={x[1]}", generation_kwargs.get("ctx_params", {}).items()))
+def prepare_ctx_kwargs(ctx_params: dict):
+    ctx_params = " ".join(map(lambda x: f"++{x[0]}={x[1]}", ctx_params.items()))
     return ctx_params
 
 def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
@@ -245,11 +245,11 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
     generation_kwargs = stage_config.get("generation_kwargs", {})
     judge_kwargs = stage_config.get("judge_kwargs", {})
 
-    generation_params = generation_kwargs.pop("params", {})
-    generation_ctx_args = prepare_ctx_kwargs(generation_kwargs.pop("ctx_params", {}))
+    generation_params = generation_kwargs.get("params", {})
+    generation_ctx_args = prepare_ctx_kwargs(generation_kwargs.get("ctx_params", {}))
 
-    judge_params = judge_kwargs.pop("params", {})
-    judge_ctx_params = prepare_ctx_kwargs(judge_kwargs.pop("ctx_params", {}))
+    judge_params = judge_kwargs.get("params", {})
+    judge_ctx_params = prepare_ctx_kwargs(judge_kwargs.get("ctx_params", {}))
     
 
     generate(
@@ -296,8 +296,8 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     judge_kwargs = stage_config.get("judge_kwargs", {})
 
     generation_params = generation_kwargs.get("params", {})
-    ctx_params = prepare_ctx_kwargs(generation_kwargs)
-    judge_ctx_args = prepare_ctx_kwargs(judge_kwargs)
+    ctx_params = prepare_ctx_kwargs(generation_kwargs.get("ctx_params", {}))
+    judge_ctx_args = prepare_ctx_kwargs(judge_kwargs.get("ctx_params", {}))
     judge_params = judge_kwargs.get("params", {})
 
     generate(
