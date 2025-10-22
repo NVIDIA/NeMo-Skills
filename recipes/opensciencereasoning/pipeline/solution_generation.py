@@ -420,6 +420,7 @@ stages_map = {
     "decontaminate": decontaminate,
     "topics_labeling": topics_labeling,
     "difficulty_estimation": difficulty_estimation,
+    "generate_solutions": generate_solutions,
     "aggregate": aggregate,
 }
 
