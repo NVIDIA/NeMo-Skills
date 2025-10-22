@@ -3,8 +3,6 @@ base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
 expname: "gpt-oss-generate-solutions"
 suffix: "limo_train_preparation"  # Suffix for experiment names
 dataset_name: "limo_train"  # Optional dataset name for id generation
-is_mcq: False
-
 
 
 # Input file for the first stage (generate_solutions)
@@ -40,9 +38,8 @@ stages:
     output_dir: ${directories.step-0-filter-problems}
     input_file: ${input_file}
     dataset_name: ${dataset_name}
-    is_mcq: ${is_mcq}
     remove_images: True
-    num_options: 4
+    num_options: null
     option_format_regex: null
     deduplicate: True
   
