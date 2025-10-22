@@ -94,7 +94,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
         expname=f"{expname}_retrieve_similar",
         run_after=run_after,
         exclusive=False,
-        installation_command="pip install torch sentence-transformers",
+        installation_command="pip install torch sentence-transformers", # TODO remove
         ctx=wrap_arguments(cmd),
     )
 

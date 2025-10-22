@@ -98,7 +98,10 @@ def process_file(
     deduplicate: bool = False,
     dataset_name: str = None,
     num_options: int | None = None,
-    option_format_regex: str = None
+    option_format_regex: str = None,
+    problem_field: str = "problem",
+    expected_answer_field: str = "expected_answer",
+    id_field: str = "id"
 ):
     input_file = Path(input_file)
     output_file = Path(output_file)
@@ -122,6 +125,13 @@ def process_file(
                 logging.warning(f"⚠️ Could not parse line: {e}")
                 dropped += 1
                 continue
+
+            # rename keys to standard names
+            for current_key, new_key in [(problem_field, "problem"), (expected_answer_field, "expected_answer"), (id_field, "id")]:
+                if current_key in obj:
+                    obj[new_key] = obj[current_key]
+                    del obj[current_key]
+                    
 
             problem = obj.get("problem", "")
             if not problem or not problem.strip():
@@ -197,6 +207,9 @@ if __name__ == "__main__":
     parser.add_argument("--num_options", type=int, help="Filter by number of options (only relevant if is_mcq=True) otherwise ignored")
     parser.add_argument("--remove_images", action="store_true", help="Remove images from problems")
     parser.add_argument("--option_format_regex", type=str, help="Filter by option format regex (e.g. '^[A-Z]\\)')")
+    parser.add_argument("--problem_field", type=str, help="Field in the JSONL file that contains the problem")
+    parser.add_argument("--expected_answer_field", type=str, help="Field in the JSONL file that contains the expected answer")
+    parser.add_argument("--id_field", type=str, help="Field in the JSONL file that contains the id")
 
     args = parser.parse_args()
 
@@ -207,5 +220,8 @@ if __name__ == "__main__":
         deduplicate=args.deduplicate,
         dataset_name=args.dataset_name,
         num_options=args.num_options,
-        option_format_regex=args.option_format_regex
+        option_format_regex=args.option_format_regex,
+        problem_field=args.problem_field,
+        expected_answer_field=args.expected_answer_field,
+        id_field=args.id_field
     )
