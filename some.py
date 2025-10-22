@@ -76,4 +76,5 @@ if __name__ == "__main__":
         print(HELP_MESSAGE)
     else:
         setup_logging()
+        LOG.info("WIPP run from some.py main")
         scicode_generation()
