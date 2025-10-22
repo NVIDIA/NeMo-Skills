@@ -20,8 +20,8 @@ pytest tests/gpu-tests/test_contamination.py -s -x
 # pytest tests/gpu-tests/test_context_retry.py -s -x
 
 # for sft we are using the tiny random model to run much faster
-ns run_cmd --cluster test-local --config_dir tests/gpu-tests --container nemo \
-    python /nemo_run/code/tests/gpu-tests/make_tiny_llm.py --model_type $NEMO_SKILLS_TEST_MODEL_TYPE
+ns run_cmd --cluster test-local --config_dir tests/gpu-tests --container vllm \
+    python3 /nemo_run/code/tests/gpu-tests/make_tiny_llm.py --model_type $NEMO_SKILLS_TEST_MODEL_TYPE
 
 # converting the model through test
 export NEMO_SKILLS_TEST_HF_MODEL=/tmp/nemo-skills-tests/$NEMO_SKILLS_TEST_MODEL_TYPE/tiny-model-hf
