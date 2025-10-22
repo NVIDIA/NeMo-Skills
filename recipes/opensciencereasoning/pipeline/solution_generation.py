@@ -38,6 +38,10 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
     option_format_regex = stage_config.get('option_format_regex', None)
     option_format_regex = f" --option_format_regex '{option_format_regex}' " if option_format_regex else ""
 
+    problem_field = stage_config.get("problem_field", None)
+    expected_answer_field = stage_config.get("expected_answer_field", None)
+    id_field = stage_config.get("id_field", None)
+
     cmd = (
         f"python /nemo_run/code/recipes/opensciencereasoning/scripts/filter_problems.py "
         f"{input_file} "
@@ -47,6 +51,9 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
         + (f" --remove_images" if stage_config.get('remove_images', False) else "")
         + (f" --dataset_name {stage_config.get('dataset_name', None)}" if stage_config.get('dataset_name') else "")
         + (f" --num_options {stage_config.get('num_options', None)}" if stage_config.get('num_options') else "")
+        + (f" --problem_field {problem_field}" if problem_field else "")
+        + (f" --expected_answer_field {expected_answer_field}" if expected_answer_field else "")
+        + (f" --id_field {id_field}" if id_field else "")
         + option_format_regex
     )
     print(cmd)
