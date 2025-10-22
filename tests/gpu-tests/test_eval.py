@@ -175,8 +175,11 @@ def test_hf_eval(server_type, server_args):
 
 @pytest.mark.gpu
 def test_megatron_eval():
-    model_path = require_env_var("NEMO_SKILLS_TEST_MEGATRON_MODEL")
-    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
+    try:
+        model_path = require_env_var("NEMO_SKILLS_TEST_MEGATRON_MODEL")
+        model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
+    except ValueError:
+        pytest.skip("Define NEMO_SKILLS_TEST_MEGATRON_MODEL and NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
 
     if model_type != "qwen":
         raise ValueError(f"Only running this test for qwen models, got {model_type}")
