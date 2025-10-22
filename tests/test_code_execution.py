@@ -466,7 +466,7 @@ async def test_ioi_eval_execution():
         dp = json.loads(next(f))
     evaluator = IOIEvaluator(config={"test_file": meta_path})
     out = await evaluator.eval_single(dp)
-    assert all(v["score"] == 1.0 for v in out["test_case_results"].values())
+    assert all(r.get("score") == 1.0 for s in out["test_case_results"].values() for r in s["outputs"])
 
 
 @pytest.mark.asyncio
