@@ -129,8 +129,9 @@ def process_file(
             # rename keys to standard names
             for current_key, new_key in [(problem_field, "problem"), (expected_answer_field, "expected_answer"), (id_field, "id")]:
                 if current_key in obj:
-                    obj[new_key] = obj[current_key]
-                    del obj[current_key]
+                    if new_key != current_key:
+                        obj[new_key] = obj[current_key]
+                        del obj[current_key]
                     
 
             problem = obj.get("problem", "")
