@@ -3,7 +3,6 @@ base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
 expname: "gpt-oss-generate-solutions"
 suffix: ""  # Suffix for experiment names
 dataset_name: ""  # Optional dataset name for id generation
-is_mcq: False
 
 # run with --stages filter_problems,decontaminate,topics_labeling,difficulty_estimation,aggregate
 
@@ -41,9 +40,8 @@ stages:
     problem_field: problem
     expected_answer_field: expected_answer
     id_field: id
-    is_mcq: ${is_mcq}
     remove_images: True
-    num_options: 4
+    num_options: null
     option_format_regex: null
     deduplicate: True
   
