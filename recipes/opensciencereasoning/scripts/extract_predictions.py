@@ -66,6 +66,8 @@ def collect_predictions(
         samples: List[dict] = []
         with open(file_path) as fin:
             for line in fin:
+                if not line.strip():
+                    continue
                 sample = json.loads(line)
                 predicted_answer = extract_answer(
                     sample["generation"],
@@ -77,7 +79,7 @@ def collect_predictions(
 
                 if predicted_answer is not None:
                     answer_counts[sample["problem"]][predicted_answer] += 1
-                totals[sample["problem"]] += 1
+                    totals[sample["problem"]] += 1
         
         file_samples[file_path] = samples
 
