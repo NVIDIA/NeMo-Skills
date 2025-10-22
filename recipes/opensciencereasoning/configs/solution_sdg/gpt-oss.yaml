@@ -116,7 +116,7 @@ stages:
         server_nodes: 2
         dependent_jobs: 1
         num_random_seeds: 5
-        num_chunks: 5
+        num_chunks: 20
       ctx_params:
         prompt_config: generic/general-boxed
         inference.tokens_to_generate: 16000
@@ -157,15 +157,14 @@ stages:
   
       ctx_params:
         prompt_config: generic/general-boxed
-        inference.tokens_to_generate: 16000
-        inference.extra_body.reasoning_effort: high
-        skip_filled: True
-        inference.temperature: 1.0
-        inference.top_p: 1.0
-        max_concurrent_requests: 1024
-        use_completions_api: true
         code_tags: gpt-oss
         code_execution: true
+        max_concurrent_requests: 1024
+        inference.tokens_to_generate: 16000
+        inference.extra_body.reasoning_effort: high
+        inference.endpoint_type: text
+        inference.temperature: 1.0
+        inference.top_p: 1.0
         server.code_execution.max_code_executions: 100
         chat_template_kwargs.reasoning_effort: high
         chat_template_kwargs.builtin_tools: [python]
