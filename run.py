@@ -10,5 +10,5 @@ eval(
     installation_command="cd /nemo_run/code && pip install -e .",
     output_dir="/workspace/test_2",
     skip_hf_home_check=True,
-    generation_module="/nemo_run/code/some.py",
+    generation_module="some.py",
 )
