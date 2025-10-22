@@ -62,13 +62,16 @@ def collect_predictions(
     answer_counts: DefaultDict[str, Counter] = defaultdict(Counter)
     totals: DefaultDict[str, int] = defaultdict(int)
 
-    for file_path in sorted(input_dir.glob("*.jsonl")):
+    for file_path in input_dir.glob("*.jsonl"):
         samples: List[dict] = []
         with open(file_path) as fin:
             for line in fin:
                 if not line.strip():
                     continue
-                sample = json.loads(line)
+                try:
+                    sample = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
                 predicted_answer = extract_answer(
                     sample["generation"],
                     extract_from_boxed=False if predicted_answer_regex else True,
