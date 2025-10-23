@@ -43,6 +43,7 @@ class SupportedAgentFrameworks(str, Enum):
 class SupportedEvalHarnesses(str, Enum):
     swe_bench = "swe_bench"
     swe_gym = "swe_gym"
+    r2e_gym = "r2e_gym"
 
 
 # Like nemo_skills.inference.generate.InferenceConfig, except most parameters are not passed by default
@@ -186,6 +187,12 @@ cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
 class SweBenchGenerationTask(GenerationTask):
     def __init__(self, cfg: SweBenchGenerationConfig):
         self.cfg = cfg
+
+        if self.cfg.eval_harness not in SupportedEvalHarnesses:
+            raise ValueError(
+                f"Unsupported eval harness: {self.cfg.eval_harness}. "
+                f"Supported harnesses: {', '.join(SupportedEvalHarnesses)}."
+            )
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
@@ -577,6 +584,48 @@ class SweBenchGenerationTask(GenerationTask):
 
         return report_file
 
+    async def _eval_r2e_gym(self, data_point, pred_mounted_path):
+        """
+        Evaluates a patch using the R2E-Gym evaluation harness.
+        pred_mounted_path must be a mounted path to a file in the SWE-bench evaluation format.
+        Returns the absolute (not mounted) path to the evaluation report file.
+        """
+        if self.cfg.eval_harness_repo is None:
+            self.cfg.eval_harness_repo = "https://github.com/ludwig-n/R2E-Gym.git"
+        if self.cfg.eval_harness_commit is None:
+            self.cfg.eval_harness_commit = "local-eval"
+
+        r2e_cmd = (
+            # first installing the R2E-Gym repo
+            "curl -LsSf https://astral.sh/uv/install.sh | sh && "
+            "source /root/.local/bin/env && "
+            "mkdir /root/R2E-Gym && "
+            "cd /root/R2E-Gym && "
+            f"git clone {self.cfg.eval_harness_repo} . && "
+            f"git checkout {self.cfg.eval_harness_commit} && "
+            "uv venv && "
+            "source .venv/bin/activate && "
+            "uv sync && "
+            "uv pip install -e . && "
+            # then running the evaluation
+            f"uv run src/r2egym/agenthub/run/run_local_evaluation.py "
+            f"    --predictions_path gold "
+            f"    --instance_id {data_point['instance_id']} "
+            f"    --timeout {self.cfg.swebench_tests_timeout} "
+            f"    --dataset {self.cfg.input_file} "
+            f"    --output_dir /trajectories_mount/eval-outputs/{data_point['instance_id']}"
+        )
+
+        # Execute SWE-bench evaluation command
+        search_path = os.path.join(self.output_dir, "eval-outputs", data_point["instance_id"], "report.json")
+        return await self._execute_container_command(
+            data_point,
+            r2e_cmd,
+            search_path,
+            mode="eval",
+            timeout=self.cfg.swebench_tests_timeout + 120,
+        )
+
     async def process_single_datapoint(self, data_point, data):
         """Will do all necessary generations to get a single answer for the data point."""
         self.output_dir = Path(self.cfg.output_file).parent
@@ -626,11 +675,8 @@ class SweBenchGenerationTask(GenerationTask):
                     report_file = await self._eval_swe_bench(data_point, pred_mounted_path)
                 elif self.cfg.eval_harness == SupportedEvalHarnesses.swe_gym:
                     report_file = await self._eval_swe_gym(data_point, pred_mounted_path)
-                else:
-                    raise ValueError(
-                        f"Unsupported eval harness: {self.cfg.eval_harness}. "
-                        f"Supported harnesses: {', '.join(SupportedEvalHarnesses)}."
-                    )
+                elif self.cfg.eval_harness == SupportedEvalHarnesses.r2e_gym:
+                    report_file = await self._eval_r2e_gym(data_point, pred_mounted_path)
             except ValueError:
                 LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point["instance_id"])
                 report_json = {
