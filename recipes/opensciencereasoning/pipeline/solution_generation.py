@@ -493,12 +493,13 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     prepared_file = f"{output_dir}/tmp/prepared.jsonl"
     output_path = f"{output_dir}/{OUTPUT_FILE}"
 
+    fields_to_leave = ["problem", "generation"]
     run_cmd(
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/remove_redundant_fields.py "
             f"    --input_file '{input_file}' "
             f"    --output_file '{prepared_file}' "
-            f"    --fields {shlex.quote(json.dumps(["problem", "generation"], ensure_ascii=False))} "
+            f"    --fields {shlex.quote(json.dumps(fields_to_leave, ensure_ascii=False))} "
         ),
         cluster=cluster,
         expname=f"{expname}_prepare_for_sft",
