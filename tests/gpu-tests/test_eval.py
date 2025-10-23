@@ -222,7 +222,24 @@ def test_prepare_and_eval_all_datasets():
 
     config_dir = Path(__file__).absolute().parent
     datasets_dir = Path(__file__).absolute().parents[2] / "nemo_skills" / "dataset"
-    excluded_datasets = {"__pycache__", "ruler", "aai", "human-eval", "mbpp"}
+    # not testing datasets that don't support max_samples, require explicit parameters or are very heavy to prepare
+    excluded_datasets = {
+        "__pycache__",
+        "ruler",
+        "bigcodebench",
+        "livecodebench",
+        "livebench_coding",
+        "livecodebench-pro",
+        "livecodebench-cpp",
+        "ioi24",
+        "ioi25",
+        "bfcl_v3",
+        "swe-bench",
+        "aai",
+        "human-eval",
+        "human-eval-infilling",
+        "mbpp",
+    }
 
     dataset_names = sorted(
         dataset.name
@@ -262,7 +279,7 @@ def test_prepare_and_eval_all_datasets():
     )
 
     collected_datasets = set()
-    common_ctx = "++max_samples=2 ++inference.tokens_to_generate=100"
+    common_ctx = "++max_samples=2 ++inference.tokens_to_generate=100 ++server.enable_soft_fail=True "
 
     if non_judge_datasets:
         output_dir = f"/tmp/nemo-skills-tests/{model_type}/all-datasets-eval"
