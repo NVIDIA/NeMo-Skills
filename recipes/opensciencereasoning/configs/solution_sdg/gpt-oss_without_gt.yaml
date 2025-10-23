@@ -22,6 +22,7 @@ pipeline_stages:
   - difficulty_estimation    # Estimate difficulty of problems
   - generate_solutions       # Generate solutions
   - aggregate                # Aggregate all the metadata into a single file
+  - filter_solutions         # Filter solutions
 
 # Directory structure configuration
 directories:
@@ -31,6 +32,7 @@ directories:
   step-3-generate-solutions: ${base_output_dir}/solution-sdg/step-3-generate-solutions
   step-4-difficulty-estimation: ${base_output_dir}/solution-sdg/step-4-difficulty-estimation
   step-5-aggregate: ${base_output_dir}/solution-sdg/step-5-aggregate
+  step-6-filter-solutions: ${base_output_dir}/solution-sdg/step-6-filter-solutions
 
 # Stage-specific configurations
 stages:
@@ -190,3 +192,14 @@ stages:
       - topics_labeling
       - difficulty_estimation
       - generate_solutions
+
+  filter_solutions:
+    output_dir: ${directories.step-6-filter-solutions}
+    input_file: ${directories.step-5-aggregate}/final_result.jsonl
+    only_correct_solutions: True
+    generation_model_pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    metadata_values:
+      topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
+    dependencies:
+      - aggregate
