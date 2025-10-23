@@ -118,6 +118,16 @@ def get_openhands_install_cmd(repo, commit):
     )
 
 
+def infer_eval_harness(dataset_name):
+    """Attempts to infer the eval harness based on the HuggingFace dataset name."""
+    if "SWE-Gym" in dataset_name:
+        return SupportedEvalHarnesses.swe_gym
+    elif "R2E-Gym" in dataset_name:
+        return SupportedEvalHarnesses.r2e_gym
+    else:
+        return SupportedEvalHarnesses.swe_bench
+
+
 # not inheriting since most parameters are not supported because we don't use our model client here
 # TODO: should we fix that?
 @nested_dataclass(kw_only=True)
@@ -136,7 +146,12 @@ class SweBenchGenerationConfig:
     agent_config: str | None = None
     agent_max_turns: int = 100  # Max iterations for the agent
 
-    eval_harness: SupportedEvalHarnesses  # Which evaluation harness to use
+    # If set, will skip inference and directly evaluate on model patches produced earlier in the same output folder.
+    # TODO: remove this since it's probably only useful as a one time hack.
+    skip_inference: bool = False
+
+    # Which evaluation harness to use. If None, inferred automatically based on the dataset_name field
+    eval_harness: SupportedEvalHarnesses | None = None
 
     # URL of the evaluation harness repo to pass to git clone
     eval_harness_repo: str | None = None
@@ -187,12 +202,6 @@ cs.store(name="base_swebench_generation_config", node=SweBenchGenerationConfig)
 class SweBenchGenerationTask(GenerationTask):
     def __init__(self, cfg: SweBenchGenerationConfig):
         self.cfg = cfg
-
-        if self.cfg.eval_harness not in SupportedEvalHarnesses:
-            raise ValueError(
-                f"Unsupported eval harness: {self.cfg.eval_harness}. "
-                f"Supported harnesses: {', '.join(SupportedEvalHarnesses)}."
-            )
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
@@ -451,7 +460,12 @@ class SweBenchGenerationTask(GenerationTask):
 
         # Execute OpenHands command
         search_path = os.path.join(self.output_dir, "trajectories", data_point["instance_id"], "output.jsonl")
-        out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
+        if self.cfg.skip_inference:
+            out_files = glob.glob(search_path)
+            assert len(out_files) == 1, f"Expected to find one file matching {search_path}, found {len(out_files)}"
+            out_file = out_files[0]
+        else:
+            out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
 
         with open(out_file, "r") as f:
             out_dict = json.loads(f.read().strip())
@@ -535,18 +549,11 @@ class SweBenchGenerationTask(GenerationTask):
         eval_log_dir = f"/trajectories_mount/eval-outputs/{data_point['instance_id']}"
         eval_pred_path = f"{eval_log_dir}/patch.jsonl"
 
-        gold_patch_dict = {
-            "model_name_or_path": "gold",
-            "instance_id": data_point["instance_id"],
-            "model_patch": data_point["patch"],
-        }
-
         openhands_cmd = (
             f"{get_openhands_install_cmd(self.cfg.eval_harness_repo, self.cfg.eval_harness_commit)} && "
             f"poetry run python -m pip install git+https://github.com/SWE-Gym/SWE-Bench-Package.git && "
             f"mkdir -p {eval_log_dir} && "
-            # f"cp {pred_mounted_path} {eval_pred_path} && "
-            f"echo {shlex.quote(json.dumps(gold_patch_dict))} >{eval_pred_path} && "
+            f"cp {pred_mounted_path} {eval_pred_path} && "
             f"poetry run python evaluation/benchmarks/swe_bench/eval_infer.py "
             f"    --input-file {eval_pred_path} "
             f"    --dataset {self.cfg.input_file}"
@@ -609,7 +616,7 @@ class SweBenchGenerationTask(GenerationTask):
             "uv pip install -e . && "
             # then running the evaluation
             f"uv run src/r2egym/agenthub/run/run_local_evaluation.py "
-            f"    --predictions_path gold "
+            f"    --predictions_path {pred_mounted_path} "
             f"    --instance_id {data_point['instance_id']} "
             f"    --timeout {self.cfg.swebench_tests_timeout} "
             f"    --dataset {self.cfg.input_file} "
@@ -636,29 +643,37 @@ class SweBenchGenerationTask(GenerationTask):
         # TODO: what's the right way to support api models, so that our standard parameters for that can be used?
         # TODO: use self.cfg.server.base_url, etc. Can we pass in API key?
 
-        # if "base_url" in self.cfg.server:
-        #     api_base = self.cfg.server.base_url
-        # else:
-        #     api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
+        if "base_url" in self.cfg.server:
+            api_base = self.cfg.server.base_url
+        else:
+            api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
-        # if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
-        #     pred_file = await self._run_swe_agent(data_point, api_base)
-        # elif self.cfg.agent_framework == SupportedAgentFrameworks.openhands:
-        #     pred_file = await self._run_openhands(data_point, api_base)
-        # else:
-        #     raise ValueError(
-        #         f"Unsupported agent framework: {self.cfg.agent_framework}. "
-        #         f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
-        #     )
+        if self.cfg.eval_harness is None:
+            eval_harness = infer_eval_harness(data_point["dataset_name"])
+        elif self.cfg.eval_harness in SupportedEvalHarnesses:
+            eval_harness = self.cfg.eval_harness
+        else:
+            raise ValueError(
+                f"Unsupported evaluation harness: {self.cfg.eval_harness}. "
+                f"Supported harnesses: {', '.join(SupportedEvalHarnesses)}."
+            )
 
-        # pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount")
-        # with open(pred_file, "r") as f:
-        #     trajectory_dict = json.loads(f.read())
+        if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
+            pred_file = await self._run_swe_agent(data_point, api_base)
+        elif self.cfg.agent_framework == SupportedAgentFrameworks.openhands:
+            pred_file = await self._run_openhands(data_point, api_base)
+        else:
+            raise ValueError(
+                f"Unsupported agent framework: {self.cfg.agent_framework}. "
+                f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
+            )
 
-        # # Check if the trajectory has an empty patch before running evaluation
-        # has_patch = trajectory_dict["model_patch"] is not None
-        pred_mounted_path = None
-        has_patch = True
+        pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount")
+        with open(pred_file, "r") as f:
+            trajectory_dict = json.loads(f.read())
+
+        # Check if the trajectory has an empty patch before running evaluation
+        has_patch = trajectory_dict["model_patch"] is not None
 
         if not has_patch:
             report_json = {
@@ -671,11 +686,11 @@ class SweBenchGenerationTask(GenerationTask):
         else:
             # TODO: should we fail on errors here? Seems that json isn't always generated
             try:
-                if self.cfg.eval_harness == SupportedEvalHarnesses.swe_bench:
+                if eval_harness == SupportedEvalHarnesses.swe_bench:
                     report_file = await self._eval_swe_bench(data_point, pred_mounted_path)
-                elif self.cfg.eval_harness == SupportedEvalHarnesses.swe_gym:
+                elif eval_harness == SupportedEvalHarnesses.swe_gym:
                     report_file = await self._eval_swe_gym(data_point, pred_mounted_path)
-                elif self.cfg.eval_harness == SupportedEvalHarnesses.r2e_gym:
+                elif eval_harness == SupportedEvalHarnesses.r2e_gym:
                     report_file = await self._eval_r2e_gym(data_point, pred_mounted_path)
             except ValueError:
                 LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point["instance_id"])
@@ -694,7 +709,7 @@ class SweBenchGenerationTask(GenerationTask):
 
         output_dict = {
             "swe-bench-metrics": report_json[data_point["instance_id"]],
-            "swe-bench-outputs": {},  # trajectory_dict,
+            "swe-bench-outputs": trajectory_dict,
             "generation": "",  # required TODO: we should fix this
         }
 
