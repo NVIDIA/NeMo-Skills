@@ -4,8 +4,6 @@ expname: "gpt-oss-generate-solutions"
 suffix: ""  # Suffix for experiment names
 dataset_name: ""  # Optional dataset name for id generation
 
-# run with --stages filter_problems,decontaminate,topics_labeling,difficulty_estimation,aggregate
-
 # Input file for the first stage (generate_solutions)
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
@@ -22,6 +20,7 @@ pipeline_stages:
   - topics_labeling          # Label topics and subtopics
   - difficulty_estimation    # Estimate difficulty of problems
   - aggregate                # Aggregate all the metadata into a single file
+  - filter_solutions         # Filter solutions
 
 # Directory structure configuration
 directories:
@@ -30,6 +29,7 @@ directories:
   step-2-topics-labeling: ${base_output_dir}/solution-sdg/step-2-topics-labeling
   step-3-difficulty-estimation: ${base_output_dir}/solution-sdg/step-3-difficulty-estimation
   step-4-aggregate: ${base_output_dir}/solution-sdg/step-4-aggregate
+  step-5-filter-solutions: ${base_output_dir}/solution-sdg/step-5-filter-solutions
 
 # Stage-specific configurations
 stages:
@@ -141,4 +141,13 @@ difficulty_estimation:
       - topics_labeling
       - difficulty_estimation
 
-
+  filter_solutions:
+    output_dir: ${directories.step-5-filter-solutions}
+    input_file: ${directories.step-4-aggregate}/final_result.jsonl
+    only_correct_solutions: True
+    generation_model_pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    metadata_values:
+      topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
+    dependencies:
+      - aggregate

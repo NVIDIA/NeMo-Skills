@@ -226,7 +226,14 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
     )
 
 def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
-    """Generate solutions using the provided model/prompt."""
+    """Launch model inference, adds predicted_answer/expected_answer via regex/majority voting, optionally judge, then aggregate per-problem stats.
+
+    Steps:
+      1. Call `generate` to produce raw solver outputs.
+      2. Run `extract_predictions.py`, which applies `predicted_answer_regex` if provided and can populate expected answers using majority voting.
+      3. Optionally judge the generations (math_judge) if `make_judgement` is enabled.
+      4. Invoke `aggregate_solutions.py` to compute per-problem correctness and generation pass rate, writing `final_result.jsonl`.
+    """
     output_dir = stage_config["output_dir"]
     make_majority_voting = stage_config.get("make_majority_voting", None)
     make_judgement = stage_config.get("make_judgement", None)
@@ -387,6 +394,44 @@ def aggregate(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
     )
 
+def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
+    """Submit the filtering job with stage-configured correctness, pass-rate, and metadata constraints.
+
+    Supported filters (see `filter_solutions.py`):
+      - `only_correct_solutions`: keep only samples marked `is_correct`.
+      - `generation_model_pass_rate_range`: JSON `[min, max]` range (min exclusive, max inclusive).
+      - `pass_rate_range`: JSON `[min, max]` range over difficulty pass rates.
+      - `metadata_values`: dict of field -> allowed values.
+
+    Replace `filter_solutions.py` with your own implementation if custom filtering logic is required.
+    """
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    only_correct_solutions = stage_config.get("only_correct_solutions", False)
+    generation_model_pass_rate_range = stage_config.get("generation_model_pass_rate_range", None)
+    pass_rate_range = stage_config.get("pass_rate_range", None)
+    metadata_values = stage_config.get("metadata_values", None)
+
+    generation_model_pass_rate_range_arg = f"    --generation_model_pass_rate_range {shlex.quote(json.dumps(generation_model_pass_rate_range, ensure_ascii=False))} " if generation_model_pass_rate_range else ""
+    pass_rate_range_arg = f"    --pass_rate_range {shlex.quote(json.dumps(pass_rate_range, ensure_ascii=False))} " if pass_rate_range else ""
+    metadata_values_arg = f"    --metadata_values {shlex.quote(json.dumps(metadata_values, ensure_ascii=False))} " if metadata_values else ""
+    only_correct_arg = "    --only_correct_solutions " if only_correct_solutions else ""
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/filter_solutions.py "
+            f"    --input_file '{input_file}' "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
+            f"{only_correct_arg}"
+            f"{generation_model_pass_rate_range_arg} "
+            f"{pass_rate_range_arg} "
+            f"{metadata_values_arg} "
+        ),
+        cluster=cluster,
+        exclusive=False,
+        run_after=run_after,
+        expname=expname,
+    )
+
 stages_map = {
     "filter_problems": filter_problems,
     "decontaminate": decontaminate,
@@ -394,6 +439,7 @@ stages_map = {
     "generate_solutions": generate_solutions,
     "difficulty_estimation": difficulty_estimation,
     "aggregate": aggregate,
+    "filter_solutions": filter_solutions,
 }
 
 
@@ -404,7 +450,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config_path",
         type=str,
-        default=f"{config_dir}/gpt-oss.yaml",
+        default=f"{config_dir}/gpt-oss-seed-data.yaml",
         help="Path to the config file.",
     )
     parser.add_argument(
