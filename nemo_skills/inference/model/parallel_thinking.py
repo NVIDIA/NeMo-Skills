@@ -54,7 +54,7 @@ class ParallelThinkingConfig:
     remove_thinking: bool = True  # Remove thinking tokens from the solution key
     thinking_begin: str = "<think>"
     thinking_end: str = "</think>"
-    endpoint_type: EndpointType = EndpointType.text
+    endpoint_type: EndpointType = EndpointType.chat
     tokenizer: str | None = None
     chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
     start_assistant_response_key: str | None = None  # whether to start assistant response with this key
