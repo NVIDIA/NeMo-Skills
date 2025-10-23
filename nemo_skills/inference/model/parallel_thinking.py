@@ -56,9 +56,7 @@ class ParallelThinkingConfig:
     thinking_end: str = "</think>"
     endpoint_type: EndpointType = EndpointType.chat
     tokenizer: str | None = None
-    chat_template_kwargs: dict = field(
-        default_factory=dict
-    )  # extra parameters to pass to the tokenizer's apply_chat_template method
+    chat_template_kwargs: dict = field(default_factory=dict)
     start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
     # Count the number of tokens in the prompt
