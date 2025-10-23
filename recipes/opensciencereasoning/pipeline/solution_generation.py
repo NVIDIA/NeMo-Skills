@@ -548,7 +548,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config_path",
         type=str,
-        default=f"{config_dir}/gpt-oss-seed-data.yaml",
+        default=f"{config_dir}/gpt-oss-seed-data_without_gt.yaml",
         help="Path to the config file.",
     )
     parser.add_argument(

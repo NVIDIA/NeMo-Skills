@@ -48,6 +48,8 @@ stages:
     num_options: null
     option_format_regex: null
     deduplicate: True
+    dependencies:
+      - initial_dependency
   
   decontaminate:
     output_dir: ${directories.step-1-decontaminate}
@@ -70,8 +72,6 @@ stages:
     output_dir: ${directories.step-2-topics-labeling}
     input_file: ${directories.step-1-decontaminate}/final_result.jsonl
     model: /hf_models/Qwen2.5-32B-Instruct
-    dependencies:
-      - decontaminate
     server_type: sglang
     server_gpus: 8
     server_nodes: 1
@@ -105,6 +105,8 @@ stages:
         - Genetics
         - Molecular Biology
         - General Biology
+    dependencies:
+      - decontaminate
   
   generate_solutions:
     make_majority_voting: False
@@ -171,12 +173,15 @@ stages:
         num_chunks: 5
       ctx_params:
         prompt_config: judge/general-judge
+    
+    dependencies:
+      - generate_solutions
 
   aggregate:
     output_dir: ${directories.step-5-aggregate}
     metadata_files: 
       - ${directories.step-2-topics-labeling}/final_result.jsonl
-      - ${directories.step-3-difficulty-estimation}/final_result.jsonl
+      - ${directories.step-4-difficulty-estimation}/final_result.jsonl
     dependencies:
       - topics_labeling
       - difficulty_estimation
