@@ -7,7 +7,7 @@ eval(
     server_address="https://integrate.api.nvidia.com/v1",
     benchmarks="aime25",
     # installation_command="cd /nemo_run/code && pip install -e .",
-    installation_command="pip install 'git+https://github.com/NVIDIA-NeMo/Eval#subdirectory=packages/nemo-evaluator-launcher[all]'",
+    installation_command="pip install 'git+https://github.com/NVIDIA-NeMo/Eval#subdirectory=packages/nemo-evaluator-launcher'",
     output_dir="/workspace/test_3",
     skip_hf_home_check=True,
     generation_module="nemo_evaluator_runner.py",
