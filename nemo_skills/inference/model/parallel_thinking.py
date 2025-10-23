@@ -56,7 +56,9 @@ class ParallelThinkingConfig:
     thinking_end: str = "</think>"
     endpoint_type: EndpointType = EndpointType.chat
     tokenizer: str | None = None
-    chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
+    chat_template_kwargs: dict = field(
+        default_factory=dict
+    )  # extra parameters to pass to the tokenizer's apply_chat_template method
     start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
     # Count the number of tokens in the prompt
@@ -297,6 +299,9 @@ class ParallelThinkingTask:
 
         for duplicate_key in ["temperature", "tokens_to_generate", "prompt", "endpoint_type"]:
             kwargs.pop(duplicate_key, None)
+
+        LOG.info(f"kwargs: {kwargs}")
+        kwargs["endpoint_type"] = self.cfg.endpoint_type
 
         output_dict.update(
             await self.model.generate_async(
