@@ -28,7 +28,7 @@ LOG = logging.getLogger(__name__)
 REQUIRED_KEYS = ("problem", "expected_answer", "id")
 
 
-def process_file(input_path: Path, output_path: Path, *, keep_metadata: bool) -> None:
+def process_file(input_path: Path, output_path: Path) -> None:
     """
     Prepare inputs for the difficulty estimation stage by keeping core fields.
     """
@@ -54,7 +54,7 @@ def main() -> None:
         raise FileNotFoundError(f"Input file does not exist: {args.input_file}")
 
     LOG.info("Reading input from %s", args.input_file)
-    process_file(args.input_file, args.output_file, keep_metadata=args.keep_metadata)
+    process_file(args.input_file, args.output_file)
 
 
 if __name__ == "__main__":
