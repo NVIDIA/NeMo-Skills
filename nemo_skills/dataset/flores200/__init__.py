@@ -18,3 +18,4 @@
 DATASET_GROUP = "chat"
 METRICS_TYPE = "translation"
 GENERATION_ARGS = "++prompt_config=multilingual/segment-translation"
+EVAL_SPLIT = "devtest"
