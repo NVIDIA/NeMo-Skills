@@ -212,6 +212,68 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             pass
 
 
+def _precompile_solution(problem_id: str, code: str, precompiled_dir: str, sandbox: LocalSandbox) -> str:
+    """Compile the candidate solution once with the precompiled grader and create user_run.sh.
+
+    Returns the directory containing compiled artifacts.
+    """
+    if getattr(sandbox, "_owner_tid", None) != threading.get_ident():
+        sandbox = LocalSandbox()
+        wait_for_sandbox(sandbox)
+        sandbox._owner_tid = threading.get_ident()
+
+    sol_dir = f"/tmp/ioi_user_pre_{problem_id}_{os.getpid()}_{time.time_ns()}"
+    setup_cmds = [
+        f"mkdir -p {sol_dir}/graders",
+        f"cp -r {precompiled_dir}/* {sol_dir}/",
+        f"cat <<'_EOT_' > {sol_dir}/graders/{problem_id}.cpp\n{code}\n_EOT_\n",
+        (
+            "cat <<'_EOT_' > {sol_dir}/graders/user_run.sh\n"
+            "#!/bin/bash\n"
+            f'task="{problem_id}"\n'
+            "memory=2097152\n"
+            "stack_size=2097152\n"
+            'ulimit -v "${memory}"\n'
+            'ulimit -s "${stack_size}"\n'
+            './"${task}"\n'
+            "_EOT_\nchmod +x {sol_dir}/graders/user_run.sh\n"
+        ),
+    ]
+    _sandbox_exec_sync(sandbox, "\n".join(setup_cmds), language="shell", timeout=120)
+
+    compile_command = (
+        f"cd {sol_dir} && "
+        f'SRC="graders/{problem_id}.cpp"; '
+        f'[ -e graders/grader.cpp ] && SRC="$SRC graders/grader.cpp"; '
+        f'[ -e graders/stub.cpp ] && SRC="$SRC graders/stub.cpp"; '
+        f"g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/{problem_id} $SRC"
+    )
+    _sandbox_exec_sync(sandbox, compile_command, language="shell", timeout=120)
+    return sol_dir
+
+
+def run_custom_input_case(task_args: dict, worker_id: int) -> dict:
+    """Run one custom input using a worker sandbox and a precompiled solution dir."""
+    unique_dir = f"/tmp/ioi_user_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
+    sandbox = LocalSandbox()
+    try:
+        setup_script = "\n".join(
+            [
+                f"mkdir -p {unique_dir}/graders",
+                f"cp -r {task_args['compiled_dir']}/* {unique_dir}/",
+            ]
+        )
+        worker_loop.run_until_complete(sandbox.execute_code(setup_script, language="shell", timeout=120))
+        run_cmd = f"cd {unique_dir}/graders && ./user_run.sh <<'_EOT_'\n{task_args['input_content']}\n_EOT_\n"
+        run_res, _ = worker_loop.run_until_complete(sandbox.execute_code(run_cmd, language="shell", timeout=120))
+        return {"stdout": run_res["stdout"], "stderr": run_res["stderr"]}
+    finally:
+        try:
+            worker_loop.run_until_complete(sandbox.execute_code(f"rm -rf {unique_dir}", language="shell", timeout=120))
+        except Exception:
+            pass
+
+
 def extract_final_cpp_block(text):
     pattern = r"```(?:cpp|Cpp)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL)
@@ -363,14 +425,6 @@ class IOIEvaluator(BaseEvaluator):
             )
         pre_dir = self.precompiled_cache[pid]
 
-        # Optional: run user-provided inputs against the compiled solution
-        custom_outputs = []
-        if self.input_tests is not None:
-            entry_id = entry["id"]
-            inputs = self.input_tests[str(entry_id)]
-            if inputs:
-                custom_outputs = await asyncio.to_thread(_run_custom_tests_sync, pid, completion, pre_dir, inputs)
-
         subtask_state = {
             st: {
                 "score": data["subtask_score"],
@@ -428,6 +482,24 @@ class IOIEvaluator(BaseEvaluator):
         for st, data in subtask_state.items():
             score = round(min(data["scores"]) * data["score"], data["precision"]) if data["scores"] else 0.0
             test_case_results[st] = {"score": score, "outputs": data["outputs"]}
+
+        # Run optional user-provided inputs after main evaluation using the same pool
+        custom_outputs = []
+        if self.input_tests is not None:
+            entry_id = entry["id"]
+            inputs = self.input_tests[str(entry_id)]
+            if inputs:
+                compiled_dir = await asyncio.to_thread(_precompile_solution, pid, completion, pre_dir, self.sandbox)
+                input_tasks = [
+                    {
+                        "compiled_dir": compiled_dir,
+                        "input_content": (item["content"] if isinstance(item, dict) else str(item)),
+                    }
+                    for item in inputs
+                ]
+                custom_outputs = await asyncio.to_thread(
+                    self.pool.starmap, run_custom_input_case, [(ta, idx) for idx, ta in enumerate(input_tasks)]
+                )
 
         return {
             "name": entry["name"],
