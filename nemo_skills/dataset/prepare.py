@@ -113,7 +113,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--retries",
         type=int,
-        default=3,
+        default=2,
         help="Number of retries per dataset if preparation fails",
     )
     args, unknown = parser.parse_known_args()

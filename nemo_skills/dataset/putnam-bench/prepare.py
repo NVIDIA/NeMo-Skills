@@ -76,6 +76,18 @@ def get_file_names_from_github(url):
         return []
 
 
+def download_with_retries(url, destination, attempts=3):
+    """Download a file with basic retry logic."""
+    for attempt in range(1, attempts + 1):
+        try:
+            urllib.request.urlretrieve(url, destination)
+            return
+        except Exception as exc:  # noqa: BLE001
+            if attempt == attempts:
+                raise
+            print(f"Retrying download ({attempt}/{attempts}) for {url} due to error: {exc}")
+
+
 def download_dataset(output_path):
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -84,7 +96,7 @@ def download_dataset(output_path):
     for file_name in file_names:
         # download the file if not exists
         if not os.path.exists(os.path.join(output_path, file_name)):
-            urllib.request.urlretrieve(URL_prefix + file_name, os.path.join(output_path, file_name))
+            download_with_retries(URL_prefix + file_name, os.path.join(output_path, file_name))
 
 
 def save_data(data, output_file):
