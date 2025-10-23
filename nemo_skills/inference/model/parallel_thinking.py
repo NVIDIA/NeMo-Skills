@@ -264,9 +264,7 @@ class ParallelThinkingTask:
 
         return solutions, total_num_generated_tokens
 
-    async def _generate_parallel_thinking_contraction(
-        self, prompt: Union[str, List], solutions: List[Dict], **kwargs
-    ) -> Dict:
+    async def _generate_parallel_thinking_contraction(self, prompt: str, solutions: List[Dict], **kwargs) -> Dict:
         """Output which combines the solutions into a single solution/selection."""
 
         num_solutions = len(solutions)
@@ -337,7 +335,7 @@ class ParallelThinkingTask:
             return None
 
     async def _run_genselect(
-        self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs
+        self, prompt: str, solutions: List[Dict], local_random: random.Random, **kwargs
     ) -> tuple[int, Dict]:
         """Run GenSelect to choose the best solution."""
 
@@ -361,7 +359,7 @@ class ParallelThinkingTask:
         }
 
     async def _run_gensynthesis(
-        self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs
+        self, prompt: str, solutions: List[Dict], local_random: random.Random, **kwargs
     ) -> Dict:
         """Run GenSynthesis to synthesize a new solution from a list of candidate solutions."""
 
@@ -416,12 +414,17 @@ class ParallelThinkingTask:
             return output_dict
 
         # Step 2: Run GenSelect/GenSynthesis
+
+        # If the prompt is a list, we need to get the first message's content
+        prompt_str = prompt if isinstance(prompt, str) else prompt[0]["content"]
+        assert isinstance(prompt_str, str), "Prompt must be a string"
+
         if self.cfg.mode == "genselect":
-            output_dict = await self._run_genselect(prompt, solutions, local_random, **kwargs)
+            output_dict = await self._run_genselect(prompt_str, solutions, local_random, **kwargs)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
         else:
             # GenSynthesis
-            output_dict = await self._run_gensynthesis(prompt, solutions, local_random)
+            output_dict = await self._run_gensynthesis(prompt_str, solutions, local_random)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
 
         result[f"{self.cfg.mode}_comparison"] = parallel_thinking_result["generation"]
