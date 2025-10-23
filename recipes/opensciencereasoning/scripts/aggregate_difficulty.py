@@ -18,7 +18,7 @@ import json
 from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
-
+from recipes.opensciencereasoning.scripts.constants import BASE_FIELDS
 
 def main():
     """Postprocess judged generations to add pass_rate_model, pass_rate, pass_at_n.
@@ -58,7 +58,7 @@ def main():
             pass_rate = correct / total if total > 0 else 0.0
             pass_at_n = f"{correct}/{total}" if total > 0 else "0/0"
 
-            sample = {key: value for key, value in sample.items() if key in ["problem", "expected_answer", "id"]}
+            sample = {key: value for key, value in sample.items() if key in BASE_FIELDS}
             sample["pass_rate_model"] = args.pass_rate_model
             sample["pass_rate"] = round(pass_rate, 6)
             sample["pass_at_n"] = pass_at_n

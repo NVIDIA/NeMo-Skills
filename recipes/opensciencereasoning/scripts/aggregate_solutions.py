@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
+from recipes.opensciencereasoning.scripts.constants import BASE_FIELDS
 
 LOG = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ def aggregate_samples(files: Iterable[Path]) -> List[Dict]:
             for line in fin:
                 sample = json.loads(line)
 
-                sample = {key: value for key, value in sample.items() if key in ["problem", "expected_answer", "predicted_answer", "id", "generation", "judgement"]}
+                sample = {key: value for key, value in sample.items() if key in BASE_FIELDS + ["predicted_answer", "generation", "judgement"]}
                 
                 if "judgement" in sample:
                     is_correct = is_correct_judgement(sample['judgement'])

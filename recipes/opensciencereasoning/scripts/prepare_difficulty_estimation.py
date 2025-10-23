@@ -25,7 +25,7 @@ from pathlib import Path
 
 LOG = logging.getLogger(__name__)
 
-REQUIRED_KEYS = ("problem", "expected_answer", "id")
+from recipes.opensciencereasoning.scripts.constants import BASE_FIELDS
 
 
 def process_file(input_path: Path, output_path: Path) -> None:
@@ -36,7 +36,7 @@ def process_file(input_path: Path, output_path: Path) -> None:
 
     with open(input_path) as fin, open(output_path, "w") as fout:
         for line in fin:
-            sample = {key: value for key, value in json.loads(line).items() if key in REQUIRED_KEYS}
+            sample = {key: value for key, value in json.loads(line).items() if key in BASE_FIELDS}
             fout.write(json.dumps(sample) + "\n")
 
 

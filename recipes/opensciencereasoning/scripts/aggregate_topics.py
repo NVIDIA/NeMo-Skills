@@ -16,6 +16,8 @@ import argparse
 import json
 import logging
 
+from recipes.opensciencereasoning.scripts.constants import BASE_FIELDS
+
 def check_topic_structure(sample: dict, topics_structure: dict, names: list):
     """Stepwise validate and normalize hierarchical labels in `sample`.
 
@@ -89,7 +91,7 @@ def aggregate_topics(input_files: dict, output_file: str, topics_structure: dict
     with open(output_file, "w") as f:
         for sample in data.values():
             check_topic_structure(sample, topics_structure, names)
-            sample = {key: value for key, value in sample.items() if key in ["problem", "expected_answer", "id"] + names}
+            sample = {key: value for key, value in sample.items() if key in BASE_FIELDS + names}
             f.write(json.dumps(sample) + "\n")
 
 def main():
