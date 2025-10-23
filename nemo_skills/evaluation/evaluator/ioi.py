@@ -18,7 +18,7 @@ import os
 import re
 import threading
 import time
-from typing import Dict
+from typing import Dict, Optional
 
 from nemo_skills.code_execution.sandbox import LocalSandbox
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator
@@ -32,6 +32,7 @@ class IOIEvaluatorConfig:
     num_workers: int = 16  # number of test workers
     test_batch_size: int = 16  # number of tests to run concurrently
     overwrite: bool = False
+    input_tests_file: Optional[str] = None
 
 
 _precompile_loop_tls = threading.local()
@@ -244,6 +245,52 @@ def add_includes(code: str, problem_id: str) -> str:
     return code_header + code + ("\n" + dummy if dummy else "")
 
 
+def _run_custom_tests_sync(pid: str, code: str, pre_dir: str, inputs) -> list:
+    unique_dir = f"/tmp/ioi_user_{os.getpid()}_{time.time_ns()}"
+    sandbox = LocalSandbox()
+    sandbox._owner_tid = threading.get_ident()
+
+    try:
+        setup_cmds = [
+            f"mkdir -p {unique_dir}/graders",
+            f"cp -r {pre_dir}/* {unique_dir}/",
+            f"cat <<'_EOT_' > {unique_dir}/graders/{pid}.cpp\n{code}\n_EOT_\n",
+            (
+                "cat <<'_EOT_' > {unique_dir}/graders/user_run.sh\n"
+                "#!/bin/bash\n"
+                f'task="{pid}"\n'
+                "memory=2097152\n"
+                "stack_size=2097152\n"
+                'ulimit -v "${memory}"\n'
+                'ulimit -s "${stack_size}"\n'
+                './"${task}"\n'
+                "_EOT_\nchmod +x {unique_dir}/graders/user_run.sh\n"
+            ),
+        ]
+        _sandbox_exec_sync(sandbox, "\n".join(setup_cmds), language="shell", timeout=120)
+
+        compile_command = (
+            f"cd {unique_dir} && "
+            f'SRC="graders/{pid}.cpp"; '
+            f'[ -e graders/grader.cpp ] && SRC="$SRC graders/grader.cpp"; '
+            f'[ -e graders/stub.cpp ] && SRC="$SRC graders/stub.cpp"; '
+            f"g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/{pid} $SRC"
+        )
+        comp = _sandbox_exec_sync(sandbox, compile_command, language="shell", timeout=120)
+        if comp["stderr"]:
+            return [{"stdout": comp["stdout"], "stderr": comp["stderr"]}]
+
+        outs = []
+        for item in inputs:
+            content = item["content"] if isinstance(item, dict) else str(item)
+            run_cmd = f"cd {unique_dir}/graders && ./user_run.sh <<'_EOT_'\n{content}\n_EOT_\n"
+            res = _sandbox_exec_sync(sandbox, run_cmd, language="shell", timeout=120)
+            outs.append({"stdout": res["stdout"], "stderr": res["stderr"]})
+        return outs
+    finally:
+        _sandbox_exec_sync(sandbox, f"rm -rf {unique_dir}", language="shell", timeout=120)
+
+
 class IOIEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 10):
         super().__init__(config, num_parallel_requests)
@@ -254,6 +301,7 @@ class IOIEvaluator(BaseEvaluator):
         self.metadata = None  # type: ignore
         self.precompiled_cache: Dict[str, str] = {}
         self.pool = None  # type: ignore
+        self.input_tests = None  # type: ignore
 
     async def _initialize_runtime(self):
         """Asynchronously create sandbox and related runtime state on first use."""
@@ -280,9 +328,14 @@ class IOIEvaluator(BaseEvaluator):
                 initializer=init_worker,
             )
 
-            return sbox, metadata_local, pool_local
+            input_tests_local = None
+            if self.eval_cfg.input_tests_file and os.path.exists(self.eval_cfg.input_tests_file):
+                with open(self.eval_cfg.input_tests_file, "r") as f:
+                    input_tests_local = json.load(f)
 
-        self.sandbox, self.metadata, self.pool = await asyncio.to_thread(_setup)
+            return sbox, metadata_local, pool_local, input_tests_local
+
+        self.sandbox, self.metadata, self.pool, self.input_tests = await asyncio.to_thread(_setup)
 
     # Internal helper
     async def _evaluate_entry(self, entry: dict) -> dict:
@@ -309,6 +362,14 @@ class IOIEvaluator(BaseEvaluator):
                 self.sandbox,
             )
         pre_dir = self.precompiled_cache[pid]
+
+        # Optional: run user-provided inputs against the compiled solution
+        custom_outputs = []
+        if self.input_tests is not None:
+            entry_id = entry["id"]
+            inputs = self.input_tests[str(entry_id)]
+            if inputs:
+                custom_outputs = await asyncio.to_thread(_run_custom_tests_sync, pid, completion, pre_dir, inputs)
 
         subtask_state = {
             st: {
@@ -372,6 +433,7 @@ class IOIEvaluator(BaseEvaluator):
             "name": entry["name"],
             "subtask": entry["subtask"],
             "test_case_results": test_case_results,
+            "outputs": custom_outputs,
         }
 
     async def eval_full(self, input_files):  # type: ignore[override]
@@ -385,6 +447,8 @@ class IOIEvaluator(BaseEvaluator):
             for s, o in zip(all_samples, outputs):
                 s["test_case_results"] = o["test_case_results"]
                 s["eval_status"] = o["eval_status"]
+                if "outputs" in o:
+                    s["outputs"] = o["outputs"]
 
             jdump(all_samples, jsonl_file, mode="wt")
 
