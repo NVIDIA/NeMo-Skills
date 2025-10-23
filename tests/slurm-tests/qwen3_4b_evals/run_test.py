@@ -102,30 +102,30 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
 
     expname = expname_prefix + "_offline-genselect-genselect"
     genselect_output_dir = f"{workspace}/offline_genselect/genselect"
-    # eval(
-    #     ctx=wrap_arguments(
-    #         f"++inference.temperature=0.6 "
-    #         f"++inference.top_p=0.95 "
-    #         f"++inference.tokens_to_generate=24576 "
-    #         f"++parallel_thinking.mode=genselect "
-    #         f"++parallel_thinking.generation_dir={initial_solutions_output_dir}/eval-results/{benchmark} "
-    #         f"++server.enable_soft_fail=True "
-    #         f"++server.context_limit_retry_strategy=reduce_generation "
-    #         f"++parallel_thinking.count_prompt_tokens=True "
-    #     ),
-    #     cluster=cluster,
-    #     benchmarks="aime24:1",
-    #     model=model,
-    #     server_gpus=2,
-    #     num_jobs=1,
-    #     server_type="sglang",
-    #     output_dir=genselect_output_dir,
-    #     log_dir=f"{genselect_output_dir}/logs",
-    #     expname=expname,
-    #     run_after=initial_solutions_expname,
-    #     wandb_project=wandb_project,
-    #     wandb_name=expname,
-    # )
+    eval(
+        ctx=wrap_arguments(
+            f"++inference.temperature=0.6 "
+            f"++inference.top_p=0.95 "
+            f"++inference.tokens_to_generate=24576 "
+            f"++parallel_thinking.mode=genselect "
+            f"++parallel_thinking.generation_dir={initial_solutions_output_dir}/eval-results/{benchmark} "
+            f"++server.enable_soft_fail=True "
+            f"++server.context_limit_retry_strategy=reduce_generation "
+            f"++parallel_thinking.count_prompt_tokens=True "
+        ),
+        cluster=cluster,
+        benchmarks="aime24:1",
+        model=model,
+        server_gpus=2,
+        num_jobs=1,
+        server_type="sglang",
+        output_dir=genselect_output_dir,
+        log_dir=f"{genselect_output_dir}/logs",
+        expname=expname,
+        run_after=initial_solutions_expname,
+        wandb_project=wandb_project,
+        wandb_name=expname,
+    )
 
     # GenSelect with vllm
     expname = expname_prefix + "_offline-genselect-genselect"
@@ -170,20 +170,20 @@ def main():
 
     prepare_data(ctx=wrap_arguments("bfcl_v3 aime24"))
 
-    # bfcl_expname = eval_qwen3_bfcl(
-    #     workspace=args.workspace,
-    #     cluster=args.cluster,
-    #     expname_prefix=args.expname_prefix,
-    #     wandb_project=args.wandb_project,
-    # )
+    bfcl_expname = eval_qwen3_bfcl(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        expname_prefix=args.expname_prefix,
+        wandb_project=args.wandb_project,
+    )
 
-    # # GenSelect Tests
-    # online_genselect_expname = eval_qwen3_online_genselect(
-    #     workspace=args.workspace,
-    #     cluster=args.cluster,
-    #     expname_prefix=args.expname_prefix,
-    #     wandb_project=args.wandb_project,
-    # )
+    # GenSelect Tests
+    online_genselect_expname = eval_qwen3_online_genselect(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        expname_prefix=args.expname_prefix,
+        wandb_project=args.wandb_project,
+    )
 
     offline_genselect_expname = eval_qwen3_offline_genselect(
         workspace=args.workspace,
@@ -195,20 +195,12 @@ def main():
     # schedule a dependent check job on the cluster and check if the results are as expected
     checker_cmd = f"python tests/slurm-tests/qwen3_4b_evals/check_results.py --workspace {args.workspace} "
 
-    # run_cmd(
-    #     ctx=wrap_arguments(checker_cmd),
-    #     cluster=args.cluster,
-    #     expname=args.expname_prefix + "-check-results",
-    #     log_dir=f"{args.workspace}/check-results-logs",
-    #     run_after=[bfcl_expname, online_genselect_expname, offline_genselect_expname],
-    # )
-
     run_cmd(
         ctx=wrap_arguments(checker_cmd),
         cluster=args.cluster,
         expname=args.expname_prefix + "-check-results",
         log_dir=f"{args.workspace}/check-results-logs",
-        run_after=[offline_genselect_expname],
+        run_after=[bfcl_expname, online_genselect_expname, offline_genselect_expname],
     )
 
 
