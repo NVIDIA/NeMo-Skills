@@ -24,6 +24,7 @@ from nemo_skills.pipeline.cli import generate, run_cmd, wrap_arguments
 
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 from recipes.opensciencereasoning.few_shots import few_shots
+from recipes.opensciencereasoning.scripts.constants import BASE_FIELDS
 
 
 OUTPUT_FILE = "final_result.jsonl"
@@ -326,9 +327,10 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
 
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/prepare_difficulty_estimation.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/remove_redundant_fields.py "
             f"    --input_file '{input_file}' "
             f"    --output_file '{output_dir}/tmp/prepared.jsonl' "
+            f"    --fields {shlex.quote(json.dumps(BASE_FIELDS, ensure_ascii=False))} "
         ),
         cluster=cluster,
         expname=f"{expname}_prepare_difficulty_estimation",
@@ -432,6 +434,57 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
     )
 
+
+def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
+    """Prepare cleaned, instruction-formatted data for SFT training.
+
+    The stage removes non-essential fields from the aggregated solutions and
+    then calls `nemo_skills.training.prepare_data` with the provided prompt
+    configuration and tokenizer so that the resulting `final_result.jsonl`
+    can be used directly for supervised fine-tuning.
+    """
+    output_dir = stage_config["output_dir"]
+    input_file = stage_config["input_file"]
+    prompt_config = stage_config["prompt_config"]
+    tokenizer = stage_config["tokenizer"]
+    prepared_file = f"{output_dir}/tmp/prepared.jsonl"
+    output_path = f"{output_dir}/{OUTPUT_FILE}"
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/remove_redundant_fields.py "
+            f"    --input_file '{input_file}' "
+            f"    --output_file '{prepared_file}' "
+            f"    --fields {shlex.quote(json.dumps(["problem", "generation"], ensure_ascii=False))} "
+        ),
+        cluster=cluster,
+        expname=f"{expname}_prepare_for_sft",
+        run_after=run_after,
+    )
+
+    inline_args = stage_config.get("inline_args", "")
+    cmd = (
+        f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
+        f"    ++input_files='{prepared_file}' "
+        f"    ++output_path='{output_path}' "
+        f"    ++prompt_config={prompt_config} "
+        f"    ++tokenizer={tokenizer} "
+        f"    ++filters.drop_multi_boxed=false "
+        f"    ++filters.remove_len_outlier_problems=false "
+        f"    ++filters.remove_len_outlier_solutions=false "
+        f"    ++filters.trim_solutions=false "
+        f"    ++add_unlabeled=True "
+        f"    {inline_args}"
+    )
+    run_cmd(
+        ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        log_dir=f"{output_dir}/logs",
+        expname=expname,
+        run_after=f"{expname}_prepare_for_sft"
+    )
+
+
 stages_map = {
     "filter_problems": filter_problems,
     "decontaminate": decontaminate,
@@ -440,6 +493,7 @@ stages_map = {
     "difficulty_estimation": difficulty_estimation,
     "aggregate": aggregate,
     "filter_solutions": filter_solutions,
+    "prepare_for_sft": prepare_for_sft,
 }
 
 
