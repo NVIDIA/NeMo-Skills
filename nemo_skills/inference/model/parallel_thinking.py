@@ -408,7 +408,7 @@ class ParallelThinkingTask:
             output_dict["generation"] = ""
             if self.cfg.count_prompt_tokens:
                 # The input doesn't make sense for such cases where there are no solutions
-                output_dict["num_input_tokens"] = None
+                output_dict["num_input_tokens"] = 0
 
             LOG.warning("No solutions found for the prompt, returning empty output")
             return output_dict
