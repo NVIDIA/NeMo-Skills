@@ -30,9 +30,10 @@ def eval_qwen3_bfcl(workspace, cluster, expname_prefix, wandb_project):
         cluster=cluster,
         benchmarks="bfcl_v3",
         model=model,
-        server_gpus=2,
+        server_gpus=1,
         num_jobs=1,
         server_type="vllm",
+        server_args="--async-scheduling --enforce-eager",
         output_dir=workspace,
         expname=expname_prefix,
         wandb_project=wandb_project,
@@ -79,17 +80,17 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
 
     initial_solutions_output_dir = f"{workspace}/offline_genselect/initial_solutions"
     benchmark = "aime24"
-    num_samples = 8
+    num_initial_solutions = 8
 
     # Generate initial solutions
     initial_solutions_expname = expname_prefix + "_offline-genselect-initial-solutions"
     eval(
         ctx=wrap_arguments("++inference.temperature=0.6 ++inference.top_p=0.95 ++inference.tokens_to_generate=24576 "),
         cluster=cluster,
-        benchmarks=f"{benchmark}:{num_samples}",
+        benchmarks=f"{benchmark}:{num_initial_solutions}",
         model=model,
         server_gpus=1,
-        num_jobs=8,
+        num_jobs=1,
         server_type="vllm",
         server_args="--async-scheduling --enforce-eager",
         output_dir=initial_solutions_output_dir,
@@ -141,20 +142,20 @@ def main():
 
     prepare_data(ctx=wrap_arguments("bfcl_v3 aime24"))
 
-    # bfcl_expname = eval_qwen3_bfcl(
-    #     workspace=args.workspace,
-    #     cluster=args.cluster,
-    #     expname_prefix=args.expname_prefix,
-    #     wandb_project=args.wandb_project,
-    # )
+    bfcl_expname = eval_qwen3_bfcl(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        expname_prefix=args.expname_prefix,
+        wandb_project=args.wandb_project,
+    )
 
     # GenSelect Tests
-    # online_genselect_expname = eval_qwen3_online_genselect(
-    #     workspace=args.workspace,
-    #     cluster=args.cluster,
-    #     expname_prefix=args.expname_prefix,
-    #     wandb_project=args.wandb_project,
-    # )
+    online_genselect_expname = eval_qwen3_online_genselect(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        expname_prefix=args.expname_prefix,
+        wandb_project=args.wandb_project,
+    )
 
     offline_genselect_expname = eval_qwen3_offline_genselect(
         workspace=args.workspace,
@@ -171,7 +172,7 @@ def main():
         cluster=args.cluster,
         expname=args.expname_prefix + "-check-results",
         log_dir=f"{args.workspace}/check-results-logs",
-        run_after=[offline_genselect_expname],
+        run_after=[bfcl_expname, online_genselect_expname, offline_genselect_expname],
     )
 
 
