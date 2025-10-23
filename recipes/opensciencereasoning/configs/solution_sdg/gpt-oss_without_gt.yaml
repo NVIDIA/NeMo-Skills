@@ -4,7 +4,6 @@ expname: "gpt-oss-generate-solutions"
 suffix: ""  # Suffix for experiment names
 dataset_name: ""  # Optional dataset name for id generation
 
-
 # Input file for the first stage (generate_solutions)
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
@@ -19,10 +18,11 @@ pipeline_stages:
   - filter_problems          # Filter problems based on format
   - decontaminate            # Decontaminate problems
   - topics_labeling          # Label topics and subtopics
-  - difficulty_estimation    # Estimate difficulty of problems
   - generate_solutions       # Generate solutions
+  - difficulty_estimation    # Estimate difficulty of problems
   - aggregate                # Aggregate all the metadata into a single file
   - filter_solutions         # Filter solutions
+  - prepare_for_sft          # Prepare for SFT
 
 # Directory structure configuration
 directories:
@@ -33,6 +33,7 @@ directories:
   step-4-difficulty-estimation: ${base_output_dir}/solution-sdg/step-4-difficulty-estimation
   step-5-aggregate: ${base_output_dir}/solution-sdg/step-5-aggregate
   step-6-filter-solutions: ${base_output_dir}/solution-sdg/step-6-filter-solutions
+  step-7-prepare-for-sft: ${base_output_dir}/solution-sdg/step-7-prepare-for-sft
 
 # Stage-specific configurations
 stages:
@@ -203,3 +204,11 @@ stages:
       topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
     dependencies:
       - aggregate
+  
+  prepare_for_sft:
+    output_dir: ${directories.step-7-prepare-for-sft}
+    input_file: ${directories.step-6-filter-solutions}/final_result.jsonl
+    prompt_config: generic/math
+    tokenizer: openai/gpt-oss-120b
+    dependencies:
+      - filter_solutions
