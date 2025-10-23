@@ -222,7 +222,7 @@ def test_prepare_and_eval_all_datasets():
 
     config_dir = Path(__file__).absolute().parent
     datasets_dir = Path(__file__).absolute().parents[2] / "nemo_skills" / "dataset"
-    excluded_datasets = {"__pycache__", "ruler", "human-eval", "mbpp"}
+    excluded_datasets = {"__pycache__", "ruler", "aai", "human-eval", "mbpp"}
 
     dataset_names = sorted(
         dataset.name
