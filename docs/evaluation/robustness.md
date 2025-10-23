@@ -30,7 +30,7 @@ from nemo_skills.pipeline.cli import wrap_arguments, robust_eval
 robust_eval(ctx=wrap_arguments(
         "++inference.temperature=0.6 "
         "++inference.top_p=0.95 "
-        "++remove_thinking=True "
+        "++parse_reasoning=True "
     ),
     # OR nemo_skills/prompt/config/robutness/prompt_set_config OR absolute path to .yaml file
     prompt_set_config='robustness/prompt_set_config',

@@ -268,7 +268,7 @@ eval(
     ctx=wrap_arguments( # (2)!
         "++inference.tokens_to_generate=16000 "
         "++inference.temperature=0.6 "
-        "++remove_thinking=True "
+        "++parse_reasoning=True "
     ),
     cluster=cluster,
     model=f"{output_dir}/QwQ-32B",

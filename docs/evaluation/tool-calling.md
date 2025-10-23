@@ -62,7 +62,7 @@ ns eval \
   --server_gpus 2 \
   --server_type vllm \
   --output_dir /workspace/qwen3-4b-client-parsing/ \
-  ++remove_thinking=True \
+  ++parse_reasoning=True \
   ++inference.tokens_to_generate=8192 \
   ++model_name=Qwen/Qwen3-4B-FC \
 ```
@@ -92,7 +92,7 @@ ns eval \
   --server_gpus 2 \
   --server_type vllm \
   --output_dir /workspace/qwen3-4b-server-parsing/ \
-  ++remove_thinking=True \
+  ++parse_reasoning=True \
   ++inference.tokens_to_generate=8192 \
   ++use_client_parsing=False \
   --server_args="--enable-auto-tool-choice --tool-call-parser hermes"
@@ -112,7 +112,7 @@ ns eval \
     --server_gpus=2 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_tool_calling/ \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -125,11 +125,11 @@ ns eval \
 
 ### Configuration Parameters
 
-| Configuration | True | False |
-|---------------|------|-------|
-| `++use_client_parsing` | Default | - |
-| `++model_name` | Required for client parsing | - |
-| `--server_args` | - | Required for server-side parsing |
+| Configuration          | True                        | False                            |
+| ---------------------- | --------------------------- | -------------------------------- |
+| `++use_client_parsing` | Default                     | -                                |
+| `++model_name`         | Required for client parsing | -                                |
+| `--server_args`        | -                           | Required for server-side parsing |
 
 
 

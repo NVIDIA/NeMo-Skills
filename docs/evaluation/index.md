@@ -52,7 +52,7 @@ ns prepare_data ruler --setup=llama_128k --tokenizer_path=meta-llama/Llama-3.1-8
 
 !!! warning
     For correct evaluation of reasoning models, either provide reasoning parser in server args (e.g. `--server_args="--reasoning-parser ..."` for vllm)
-    or set `++remove_thinking=True` as well as an appropriate `++thinking_end` string (which defaults to `</think>`).
+    or set `++parse_reasoning=True` as well as an appropriate `++end_reasoning_string` string (which defaults to `</think>`).
 
 ```bash
 ns eval \

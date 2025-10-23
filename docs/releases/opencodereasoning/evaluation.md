@@ -23,7 +23,7 @@ ns eval \
     --benchmarks=livecodebench:8 \
     --split=test_v6_2408_2505 \
     --server_gpus=1 \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=64000
 ```
 

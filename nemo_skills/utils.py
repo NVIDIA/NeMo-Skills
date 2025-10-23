@@ -32,6 +32,7 @@ from rich.logging import RichHandler
 # isort: off
 import nemo_skills
 from nemo_skills.file_utils import calculate_chunk_indices, unroll_files, jdump, jload, jload_chunk, count_newlines
+
 # isort: on
 
 
@@ -45,23 +46,23 @@ def get_logger_name(file):
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
-def remove_thinking(sample: dict, generation_key: str = "generation", thinking_end: str = "</think>"):
+def parse_reasoning(sample: dict, generation_key: str = "generation", end_reasoning_string: str = "</think>"):
     # not doing anything if generation isn't a string
     # TODO: should we be more explicit about this?
     if not isinstance(sample[generation_key], str):
         return
-    sample[f"_{generation_key}_finished_thinking"] = thinking_end in sample[generation_key]
-    if thinking_end in sample[generation_key]:
+    sample[f"_{generation_key}_finished_thinking"] = end_reasoning_string in sample[generation_key]
+    if end_reasoning_string in sample[generation_key]:
         sample[f"_full_{generation_key}"] = sample[generation_key]
-        sample[generation_key] = sample[generation_key].split(thinking_end)[-1].strip()
+        sample[generation_key] = sample[generation_key].split(end_reasoning_string)[-1].strip()
     else:
         sample[f"_full_{generation_key}"] = sample[generation_key]
         sample[generation_key] = ""  # no end tag, so setting the generation to empty
         LOG.warning(
             "Thinking end tag `%s` not found in generation; setting generation to empty. "
-            "If this happens for every generation, you might have accidentally set ++remove_thinking=True for a "
+            "If this happens for every generation, you might have accidentally set ++parse_reasoning=True for a "
             "non-reasoning model or have incorrect end tag.",
-            thinking_end,
+            end_reasoning_string,
         )
 
 

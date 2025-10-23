@@ -53,7 +53,7 @@ from nemo_skills.utils import (
     get_logger_name,
     get_server_wait_cmd,
     nested_dataclass,
-    remove_thinking,
+    parse_reasoning,
     setup_logging,
 )
 
@@ -178,8 +178,8 @@ class GenerateSolutionsConfig:
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
     # IMPORTANT: do not set this for non-reasoning models as it will make the generations empty!
-    remove_thinking: bool = False
-    thinking_end: str = "</think>"
+    parse_reasoning: bool = False
+    end_reasoning_string: str = "</think>"
 
     # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
     enable_litellm_cache: bool = False
@@ -540,11 +540,11 @@ class GenerationTask:
         for key in output:
             original_data_point.pop(key, None)
         output.update(original_data_point)
-        if self.cfg.remove_thinking:
-            remove_thinking(
+        if self.cfg.parse_reasoning:
+            parse_reasoning(
                 output,
                 self.cfg.generation_key,
-                self.cfg.thinking_end,
+                self.cfg.end_reasoning_string,
             )
 
     def prefill_generation(self, data_point) -> dict | None:

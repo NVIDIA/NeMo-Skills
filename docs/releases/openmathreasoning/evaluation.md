@@ -36,7 +36,7 @@ ns eval \
     --server_gpus=1 \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot \
     --benchmarks=comp-math-24-25:64 \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6
@@ -54,7 +54,7 @@ ns eval \
     --output_dir=/workspace/openmath-nemotron-1.5b-eval-cot \
     --benchmarks=hle:64 \
     --split=math \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++prompt_config=generic/math \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
@@ -104,7 +104,7 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     --with_sandbox \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++code_tags=openmath \
     ++prompt_config=openmath/tir \
     ++inference.endpoint_type=text \
@@ -128,7 +128,7 @@ ns eval \
     --server_gpus=1 \
     --num_jobs=1 \
     --with_sandbox \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++code_tags=openmath \
     ++prompt_config=generic/math \
     ++inference.endpoint_type=text \

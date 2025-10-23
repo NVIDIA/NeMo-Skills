@@ -138,7 +138,7 @@ def test_hf_eval(server_type, server_args):
         f"    --server_args='{server_args}' "
         f"    ++max_samples=164 "
         f"    ++inference.tokens_to_generate=2048 "
-        f"    ++remove_thinking=True "
+        f"    ++parse_reasoning=True "
     )
     subprocess.run(cmd, shell=True, check=True)
 
@@ -240,16 +240,21 @@ def test_prepare_and_eval_all_datasets():
 
     non_judge_datasets = [dataset for dataset in dataset_names if dataset not in judge_datasets]
 
+    data_dir = Path(f"/tmp/nemo-skills-tests/{model_type}/data")
+    docker_rm([str(data_dir)])
+
     prepare_data(
         ctx=wrap_arguments(" ".join(dataset_names)),
         cluster="test-local",
         config_dir=str(config_dir),
+        data_dir=str(data_dir),
         expname=f"prepare-all-datasets-{model_type}",
     )
 
     eval_kwargs = dict(
         cluster="test-local",
         config_dir=str(config_dir),
+        data_dir=str(data_dir),
         model=model_path,
         server_type="sglang",
         server_gpus=1,

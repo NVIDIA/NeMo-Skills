@@ -38,7 +38,7 @@ output_dir = "/workspace/open-reasoning-evals"
 
 def eval_aai(model_size):
     eval(
-        ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++remove_thinking=True "),
+        ctx=wrap_arguments(f"++inference.tokens_to_generate={eval_tokens} ++parse_reasoning=True "),
         cluster=cluster,
         expname=f"eval-aai-{model_size}",
         output_dir=f"{output_dir}/{model_size}",
@@ -61,7 +61,7 @@ def eval_math(model_size):
     ]
     eval(
         ctx=wrap_arguments(
-            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6  ++remove_thinking=True "
+            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6  ++parse_reasoning=True "
         ),
         cluster=cluster,
         expname=f"eval-math-{model_size}",
@@ -79,7 +79,7 @@ def eval_math(model_size):
                 ctx=wrap_arguments(
                     f"++inference.tokens_to_generate={eval_tokens} "
                     "++inference.temperature=0.6 "
-                    "++remove_thinking=True "
+                    "++parse_reasoning=True "
                     "++parallel_thinking.mode=genselect "
                     f"++parallel_thinking.generation_dir={output_dir}/{model_size}/eval-results/{bench} "
                 ),
@@ -97,7 +97,7 @@ def eval_math(model_size):
 def eval_code(model_size):
     eval(
         ctx=wrap_arguments(
-            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++remove_thinking=True "
+            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++parse_reasoning=True "
         ),
         cluster=cluster,
         expname=f"eval-code-{model_size}",
@@ -113,7 +113,7 @@ def eval_code(model_size):
 def eval_science(model_size):
     eval(
         ctx=wrap_arguments(
-            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++prompt_config=eval/aai/mcq-4choices-boxed ++remove_thinking=True "
+            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++prompt_config=eval/aai/mcq-4choices-boxed ++parse_reasoning=True "
         ),
         cluster=cluster,
         expname=f"eval-gpqa-{model_size}",
@@ -125,7 +125,7 @@ def eval_science(model_size):
     )
     eval(
         ctx=wrap_arguments(
-            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++prompt_config=eval/aai/mcq-10choices-boxed ++remove_thinking=True "
+            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++prompt_config=eval/aai/mcq-10choices-boxed ++parse_reasoning=True "
         ),
         cluster=cluster,
         expname=f"eval-mmlu-pro-{model_size}",
@@ -138,7 +138,7 @@ def eval_science(model_size):
     )
     eval(
         ctx=wrap_arguments(
-            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++remove_thinking=True "
+            f"++inference.tokens_to_generate={eval_tokens} ++inference.temperature=0.6 ++parse_reasoning=True "
         ),
         cluster=cluster,
         expname=f"eval-hle-{model_size}",

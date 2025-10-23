@@ -144,8 +144,8 @@ class SweBenchGenerationConfig:
     dry_run: bool = False
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
-    remove_thinking: bool = False
-    thinking_end: str = "</think>"
+    parse_reasoning: bool = False
+    end_reasoning_string: str = "</think>"
 
     # Evaluation setup if requested. If eval_type is set to None, evaluation is skipped
     eval_type: str | None = None  # "lean4-proof", "math", etc.

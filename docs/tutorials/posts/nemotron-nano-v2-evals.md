@@ -121,7 +121,7 @@ ns eval \
     --server_type=vllm \
     --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -139,7 +139,7 @@ ns eval \
     --server_type=vllm \
     --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -158,7 +158,7 @@ ns eval \
     --server_type=vllm \
     --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -178,7 +178,7 @@ ns eval \
     --server_type=vllm \
     --server_gpus=1 \
     --server_args="--mamba_ssm_cache_dtype float32 " \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -204,7 +204,7 @@ ns eval \
     --server_args="--mamba_ssm_cache_dtype float32 " \
     --judge_model="o3-mini-20250131" \
     --extra_judge_args="++inference.tokens_to_generate=4096 ++max_concurrent_requests=8" \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
@@ -233,7 +233,7 @@ ns eval \
                    --tool-parser-plugin \"/workspace/NVIDIA-Nemotron-Nano-9B-v2/nemotron_toolcall_parser_no_streaming.py\" \
                    --tool-call-parser \"nemotron_json\" \
                    --enable-auto-tool-choice" \
-    ++remove_thinking=True \
+    ++parse_reasoning=True \
     ++use_client_parsing=False \
     ++inference.tokens_to_generate=32768 \
     ++inference.temperature=0.6 \
