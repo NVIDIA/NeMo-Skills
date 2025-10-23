@@ -82,7 +82,7 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
     benchmark = "aime24"
     num_initial_solutions = 8
 
-    # Generate initial solutions
+    # 1. Generate initial solutions
     initial_solutions_expname = expname_prefix + "_offline-genselect-initial-solutions"
     eval(
         ctx=wrap_arguments("++inference.temperature=0.6 ++inference.top_p=0.95 ++inference.tokens_to_generate=24576 "),
@@ -100,36 +100,9 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
         wandb_name=initial_solutions_expname,
     )
 
+    # 2. Run GenSelect on initial solutions
     expname = expname_prefix + "_offline-genselect-genselect"
     genselect_output_dir = f"{workspace}/offline_genselect/genselect"
-    eval(
-        ctx=wrap_arguments(
-            f"++inference.temperature=0.6 "
-            f"++inference.top_p=0.95 "
-            f"++inference.tokens_to_generate=24576 "
-            f"++parallel_thinking.mode=genselect "
-            f"++parallel_thinking.generation_dir={initial_solutions_output_dir}/eval-results/{benchmark} "
-            f"++server.enable_soft_fail=True "
-            f"++server.context_limit_retry_strategy=reduce_generation "
-            f"++parallel_thinking.count_prompt_tokens=True "
-        ),
-        cluster=cluster,
-        benchmarks="aime24:1",
-        model=model,
-        server_gpus=2,
-        num_jobs=1,
-        server_type="sglang",
-        output_dir=genselect_output_dir,
-        log_dir=f"{genselect_output_dir}/logs",
-        expname=expname,
-        run_after=initial_solutions_expname,
-        wandb_project=wandb_project,
-        wandb_name=expname,
-    )
-
-    # GenSelect with vllm
-    expname = expname_prefix + "_offline-genselect-genselect"
-    genselect_output_dir = f"{workspace}/offline_genselect/genselect-vllm"
     eval(
         ctx=wrap_arguments(
             f"++inference.temperature=0.6 "
