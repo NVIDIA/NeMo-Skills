@@ -228,7 +228,7 @@ def _precompile_solution(problem_id: str, code: str, precompiled_dir: str, sandb
         f"cp -r {precompiled_dir}/* {sol_dir}/",
         f"cat <<'_EOT_' > {sol_dir}/graders/{problem_id}.cpp\n{code}\n_EOT_\n",
         (
-            "cat <<'_EOT_' > {sol_dir}/graders/user_run.sh\n"
+            f"cat <<'_EOT_' > {sol_dir}/graders/user_run.sh\n"
             "#!/bin/bash\n"
             f'task="{problem_id}"\n'
             "memory=2097152\n"
@@ -236,7 +236,7 @@ def _precompile_solution(problem_id: str, code: str, precompiled_dir: str, sandb
             'ulimit -v "${memory}"\n'
             'ulimit -s "${stack_size}"\n'
             './"${task}"\n'
-            "_EOT_\nchmod +x {sol_dir}/graders/user_run.sh\n"
+            f"_EOT_\nchmod +x {sol_dir}/graders/user_run.sh\n"
         ),
     ]
     _sandbox_exec_sync(sandbox, "\n".join(setup_cmds), language="shell", timeout=120)
@@ -318,7 +318,7 @@ def _run_custom_tests_sync(pid: str, code: str, pre_dir: str, inputs) -> list:
             f"cp -r {pre_dir}/* {unique_dir}/",
             f"cat <<'_EOT_' > {unique_dir}/graders/{pid}.cpp\n{code}\n_EOT_\n",
             (
-                "cat <<'_EOT_' > {unique_dir}/graders/user_run.sh\n"
+                f"cat <<'_EOT_' > {unique_dir}/graders/user_run.sh\n"
                 "#!/bin/bash\n"
                 f'task="{pid}"\n'
                 "memory=2097152\n"
@@ -326,7 +326,7 @@ def _run_custom_tests_sync(pid: str, code: str, pre_dir: str, inputs) -> list:
                 'ulimit -v "${memory}"\n'
                 'ulimit -s "${stack_size}"\n'
                 './"${task}"\n'
-                "_EOT_\nchmod +x {unique_dir}/graders/user_run.sh\n"
+                f"_EOT_\nchmod +x {unique_dir}/graders/user_run.sh\n"
             ),
         ]
         _sandbox_exec_sync(sandbox, "\n".join(setup_cmds), language="shell", timeout=120)
