@@ -349,9 +349,9 @@ class ParallelThinkingTask:
         if sel_solution_idx is None:
             LOG.warning("GenSelect failed to produce valid solution index, falling back to random selection")
             sel_solution_idx = local_random.randint(0, max_idx)
-            genselect_result["selection_successful"] = False
+            genselect_result["generation_successful"] = False
         else:
-            genselect_result["selection_successful"] = True
+            genselect_result["generation_successful"] = True
 
         return {
             self.cfg.solution_key: solutions[sel_solution_idx][self.cfg.solution_key],
@@ -373,9 +373,9 @@ class ParallelThinkingTask:
             LOG.warning("GenSynthesis failed to produce valid solution, falling back to random selection")
             synthesized_solution = local_random.choice(solutions)[self.cfg.solution_key]
             # Add the boolean flag to aid analysis and debugging
-            gensynthesis_result["synthesis_successful"] = False
+            gensynthesis_result["generation_successful"] = False
         else:
-            gensynthesis_result["synthesis_successful"] = True
+            gensynthesis_result["generation_successful"] = True
 
         return {
             self.cfg.solution_key: synthesized_solution,
@@ -398,8 +398,9 @@ class ParallelThinkingTask:
                 "solution_list": [],
                 f"{self.cfg.mode}_comparison": "",
                 f"{self.cfg.mode}_num_generated_tokens": 0,
+                f"{self.cfg.mode}_successful": False,
                 "total_solution_generated_tokens": total_num_generated_tokens,
-                "num_generated_tokens": total_num_generated_tokens,  # No additional tokens for genselect
+                "num_generated_tokens": total_num_generated_tokens,  # No additional tokens for genselect/gensynthesis
                 "num_best_solution_generated_tokens": 0,
             }
 
@@ -409,24 +410,24 @@ class ParallelThinkingTask:
                 # The input doesn't make sense for such cases where there are no solutions
                 output_dict["num_input_tokens"] = None
 
+            LOG.warning("No solutions found for the prompt, returning empty output")
+            return output_dict
+
         # Step 2: Run GenSelect/GenSynthesis
         if self.cfg.mode == "genselect":
             output_dict = await self._run_genselect(prompt, solutions, local_random, **kwargs)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
-            result["genselect_comparison"] = parallel_thinking_result["generation"]
-            result["genselect_selection_successful"] = parallel_thinking_result["selection_successful"]
         else:
             # GenSynthesis
             output_dict = await self._run_gensynthesis(prompt, solutions, local_random)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
-            result["gensynthesis_generation"] = parallel_thinking_result["generation"]
-            result["gensynthesis_synthesis_successful"] = parallel_thinking_result["synthesis_successful"]
 
-        # Add the tokens for parallel thinking
-        result["parallel_thinking_num_generated_tokens"] = parallel_thinking_result.get("num_generated_tokens", 0)
+        result[f"{self.cfg.mode}_comparison"] = parallel_thinking_result["generation"]
+        result[f"{self.cfg.mode}_successful"] = parallel_thinking_result["generation_successful"]
+        result[f"{self.cfg.mode}_num_generated_tokens"] = parallel_thinking_result.get("num_generated_tokens", 0)
 
         # Add the tokens for all the solutions and parallel thinking
-        total_gen_tokens = result["total_solution_generated_tokens"] + result["parallel_thinking_num_generated_tokens"]
+        total_gen_tokens = result["total_solution_generated_tokens"] + result[f"{self.cfg.mode}_num_generated_tokens"]
 
         # TODO: Decide what count of generated tokens do we want to report - the total or the best solution?
         # Current implementation returns the total number of generated tokens
