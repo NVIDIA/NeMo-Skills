@@ -74,7 +74,7 @@ def check_results(eval_dir: str):
         eval_dir, "offline_genselect", "initial_solutions", "eval-results", "aime24", "metrics.json"
     )
     offline_initial_solutions_accuracy = float(
-        load_json(offline_initial_solutions_f)["aime24"]["pass@1[avg-of-1]"]["symbolic_correct"]
+        load_json(offline_initial_solutions_f)["aime24"]["pass@1[avg-of-8]"]["symbolic_correct"]
     )
 
     assert offline_genselect_accuracy >= (offline_initial_solutions_accuracy + 1.0), (
