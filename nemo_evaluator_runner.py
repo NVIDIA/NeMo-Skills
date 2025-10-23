@@ -53,17 +53,18 @@ evaluation:
     config:
       params:
         request_timeout: 3600  # timeout for API requests in seconds
-        parallelism: 1  # number of parallel requests
+        parallelism: 5  # number of parallel requests
+        limit_samples: 5
+
       target:
         api_endpoint:
           adapter_config:
-            use_reasoning: false  # if true, strips reasoning tokens and collects reasoning stats
-            use_system_prompt: true  # enables custom system prompt
-            custom_system_prompt: >-
-              "Think step by step."
+            use_response_logging: true
+            use_request_logging: true
+
   tasks:
     - name: aime_2025_nemo
-      nemo_evaluator_config:  # task-specific configuration for gpqa_diamond
+      nemo_evaluator_config:  # task-specific configuration
         config:
           params:
             temperature: 0.6  # sampling temperature
