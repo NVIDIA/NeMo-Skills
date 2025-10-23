@@ -290,6 +290,8 @@ class ParallelThinkingTask:
             chat_template_kwargs=self.cfg.chat_template_kwargs,
         )
 
+        LOG.info(f"Parallel thinking prompt:\n\n{parallel_thinking_prompt}")
+
         output_dict = {}
         if self.cfg.count_prompt_tokens:
             num_input_tokens = get_token_count(tokenizer=self.hf_tokenizer, messages=parallel_thinking_prompt)

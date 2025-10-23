@@ -51,7 +51,7 @@ def eval_qwen3_online_genselect(workspace, cluster, expname_prefix, wandb_projec
         ctx=wrap_arguments(
             "++inference.temperature=0.6 "
             "++inference.top_p=0.95 "
-            "++inference.tokens_to_generate=16384 "
+            "++inference.tokens_to_generate=24576 "
             "++parallel_thinking.mode=genselect "
             "++server.enable_soft_fail=True "
             "++server.context_limit_retry_strategy=reduce_generation "
@@ -77,40 +77,40 @@ def eval_qwen3_online_genselect(workspace, cluster, expname_prefix, wandb_projec
 def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_project):
     model = "Qwen/Qwen3-4B"
 
-    output_dir = f"{workspace}/offline_genselect/initial_solutions"
+    initial_solutions_output_dir = f"{workspace}/offline_genselect/initial_solutions"
     benchmark = "aime24"
     num_samples = 8
 
     # Generate initial solutions
     initial_solutions_expname = expname_prefix + "_offline-genselect-initial-solutions"
     eval(
-        ctx=wrap_arguments("++inference.temperature=0.6 ++inference.top_p=0.95 ++inference.tokens_to_generate=16384 "),
+        ctx=wrap_arguments("++inference.temperature=0.6 ++inference.top_p=0.95 ++inference.tokens_to_generate=24576 "),
         cluster=cluster,
         benchmarks=f"{benchmark}:{num_samples}",
         model=model,
         server_gpus=1,
-        num_jobs=1,
+        num_jobs=8,
         server_type="vllm",
         server_args="--async-scheduling --enforce-eager",
-        output_dir=output_dir,
-        log_dir=f"{output_dir}/logs",
+        output_dir=initial_solutions_output_dir,
+        log_dir=f"{initial_solutions_output_dir}/logs",
         expname=initial_solutions_expname,
         wandb_project=wandb_project,
         wandb_name=initial_solutions_expname,
     )
 
     expname = expname_prefix + "_offline-genselect-genselect"
-    output_dir = f"{workspace}/offline_genselect/genselect"
+    genselect_output_dir = f"{workspace}/offline_genselect/genselect"
     eval(
         ctx=wrap_arguments(
             f"++inference.temperature=0.6 "
             f"++inference.top_p=0.95 "
-            f"++inference.tokens_to_generate=16384 "
+            f"++inference.tokens_to_generate=24576 "
             f"++parallel_thinking.mode=genselect "
-            f"++parallel_thinking.generation_dir={output_dir}/eval-results/{benchmark} "
+            f"++parallel_thinking.generation_dir={initial_solutions_output_dir}/eval-results/{benchmark} "
             f"++server.enable_soft_fail=True "
             f"++server.context_limit_retry_strategy=reduce_generation "
-            # f"++skip_filled=True "
+            f"++parallel_thinking.count_prompt_tokens=True "
         ),
         cluster=cluster,
         benchmarks="aime24:1",
@@ -119,8 +119,8 @@ def eval_qwen3_offline_genselect(workspace, cluster, expname_prefix, wandb_proje
         num_jobs=1,
         server_type="vllm",
         server_args="--async-scheduling --enforce-eager",
-        output_dir=output_dir,
-        log_dir=f"{output_dir}/logs",
+        output_dir=genselect_output_dir,
+        log_dir=f"{genselect_output_dir}/logs",
         expname=expname,
         run_after=initial_solutions_expname,
         wandb_project=wandb_project,
@@ -149,12 +149,12 @@ def main():
     # )
 
     # GenSelect Tests
-    online_genselect_expname = eval_qwen3_online_genselect(
-        workspace=args.workspace,
-        cluster=args.cluster,
-        expname_prefix=args.expname_prefix,
-        wandb_project=args.wandb_project,
-    )
+    # online_genselect_expname = eval_qwen3_online_genselect(
+    #     workspace=args.workspace,
+    #     cluster=args.cluster,
+    #     expname_prefix=args.expname_prefix,
+    #     wandb_project=args.wandb_project,
+    # )
 
     offline_genselect_expname = eval_qwen3_offline_genselect(
         workspace=args.workspace,
@@ -171,7 +171,7 @@ def main():
         cluster=args.cluster,
         expname=args.expname_prefix + "-check-results",
         log_dir=f"{args.workspace}/check-results-logs",
-        run_after=[online_genselect_expname, offline_genselect_expname],
+        run_after=[offline_genselect_expname],
     )
 
 
