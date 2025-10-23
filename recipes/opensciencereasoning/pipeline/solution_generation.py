@@ -393,7 +393,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
 
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/fill_difficulty.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_difficulty.py "
             f"    --judgement_dir '{output_dir}/judgement' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --pass_rate_model '{generation_params['model'].split('/')[-1]}' "
