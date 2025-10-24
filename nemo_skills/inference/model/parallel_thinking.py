@@ -51,7 +51,9 @@ class ParallelThinkingConfig:
     temperature: float = 0.6
     tokens_to_generate: int | None = None
 
-    parse_reasoning: bool = False
+    parse_reasoning: bool = (
+        True  # Defaulting to True as multiple solutions with reasoning would be too hard to fit in context window
+    )
     end_reasoning_string: str = "</think>"
     endpoint_type: EndpointType = EndpointType.chat
     tokenizer: str | None = None
