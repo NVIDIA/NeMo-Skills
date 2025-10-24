@@ -163,17 +163,6 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             sandbox.execute_code(compile_command, language="shell", timeout=120)
         )
 
-        # On specific linker/undefined symbol error, print the exact solution used
-        try:
-            stderr_text = compile_result.get("stderr", "") or ""
-            if "multiple definition of `main`" in stderr_text or "undefined reference" in stderr_text.lower():
-                print(
-                    "[IOI_DEBUG] run_test_case: solution used for compile (linker/undefined issue):\n"
-                    + task_args.get("generated_code", "")
-                )
-        except Exception:
-            pass
-
         result = {
             "compile_success": not compile_result.get("stderr"),
             "compile_stdout": compile_result.get("stdout", ""),
