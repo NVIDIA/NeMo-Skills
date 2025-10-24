@@ -20,20 +20,8 @@ from pathlib import Path
 import pytest
 from utils import require_env_var
 
-from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, start_server, wrap_arguments
+from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 from tests.conftest import docker_rm
-
-
-def _start_judge_server(config_dir: str, model_path: str, log_dir: str):
-    start_server(
-        cluster="test-local",
-        config_dir=config_dir,
-        model=model_path,
-        server_type="sglang",
-        server_gpus=1,
-        server_nodes=1,
-        log_dir=log_dir,
-    )
 
 
 @pytest.mark.gpu
