@@ -159,9 +159,9 @@ In either case you can always customize the judge prompt by setting a new `++pro
 - Benchmark is defined in [`nemo_skills/dataset/omni-math/__init__.py`](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/dataset/omni-math/__init__.py)
 - Original benchmark source is [here](https://omni-math.github.io/).
 
-### math
+### hendrycks_math
 
-- Benchmark is defined in [`nemo_skills/dataset/math/__init__.py`](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/dataset/math/__init__.py)
+- Benchmark is defined in [`nemo_skills/dataset/hendrycks_math/__init__.py`](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/dataset/hendrycks_math/__init__.py)
 - Original benchmark source is [here](https://github.com/hendrycks/math).
 
 ### math-500

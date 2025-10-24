@@ -108,7 +108,7 @@ as an example.
 First, let's prepare the data if you have not done so yet.
 
 ```bash
-ns prepare_data math
+ns prepare_data hendrycks_math
 ```
 
 Then we can run the generation
@@ -123,7 +123,7 @@ ns generate \
        --num_random_seeds=32 \
        --output_dir=/workspace/synthetic-math-solutions \
        --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
-       ++eval_type=math \
+       ++eval_type=hendrycks_math \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
        ++inference.endpoint_type=text \
@@ -133,7 +133,7 @@ ns generate \
 
 In this case we are assuming you're running on a slurm cluster and have downloaded Llama 3.1 405B.
 
-Note that in this case we use a path to one the train set of the "math" dataset which we prepared with previous command.
+Note that in this case we use a path to one the train set of the "hendrycks_math" dataset which we prepared with previous command.
 We are using a [generic/math](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
 and a tokenizer for the base model
 (we found Llama 3.1 follows few-shots much better without chat tokens).

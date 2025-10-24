@@ -124,6 +124,9 @@ def get_benchmark_args_from_module(
     # this is deprecated, should remove in the future
     prompt_config = get_arg_from_module_or_dict(benchmark_module, "PROMPT_CONFIG", "", override_dict=override_dict)
     generation_args = get_arg_from_module_or_dict(benchmark_module, "GENERATION_ARGS", "", override_dict=override_dict)
+    if benchmark == "math":
+        print(benchmark_module)
+        print(generation_args, "**********************************")
     if prompt_config:
         generation_args = f"++prompt_config={prompt_config} {generation_args}"
     # this is deprecated, should remove in the future

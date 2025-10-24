@@ -29,7 +29,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=512 \
     --output_dir=/workspace/solution-augmentation/math \
-    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/hendrycks_math/train.jsonl \
     ++eval_type=math \
     ++prompt_config=generic/math-base \
     ++examples_type=math_text_detailed \
@@ -72,7 +72,7 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=80 \
     --output_dir=/workspace/problem-augmentation/math \
-    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/hendrycks_math/train.jsonl \
     ++prompt_config=generic/problem-augmentation \
     ++examples_type=math_problem_augmentation \
     ++generation_key=problem \
@@ -221,7 +221,7 @@ Retrieve top-5 similar items from the test sets
 from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 
 
-test_sets = ['gsm8k', 'math', 'amc23', 'aime24']
+test_sets = ['gsm8k', 'hendrycks_math', 'amc23', 'aime24']
 retrieve_from = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
 cmd = (
