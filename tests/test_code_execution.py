@@ -462,11 +462,14 @@ async def test_ioi_eval_execution():
     base = os.path.dirname(__file__)
     data_path = os.path.join(base, "data", "ioi", "test.jsonl")
     meta_path = os.path.join(base, "data", "ioi", "test_metadata.json")
+    inputs_path = os.path.join(base, "data", "ioi", "custom_inputs.json")
     with open(data_path, "r", encoding="utf-8") as f:
         dp = json.loads(next(f))
-    evaluator = IOIEvaluator(config={"test_file": meta_path})
+    evaluator = IOIEvaluator(config={"test_file": meta_path, "input_tests_file": inputs_path})
     out = await evaluator.eval_single(dp)
     assert all(r.get("score") == 1.0 for s in out["test_case_results"].values() for r in s["outputs"])
+    assert isinstance(out.get("outputs"), list) and len(out["outputs"]) == 1
+    assert "stdout" in out["outputs"][0] and "stderr" in out["outputs"][0]
 
 
 @pytest.mark.asyncio
