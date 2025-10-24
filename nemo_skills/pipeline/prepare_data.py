@@ -27,7 +27,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 # TODO: read this from init.py
-DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24", "ojbench"]
+DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24"]
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -48,7 +48,7 @@ def prepare_data(
     partition: str = typer.Option(None, help="Slurm partition to use"),
     qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="Time-min slurm parameter"),
-    num_gpus: int | None = typer.Option(None, help="Number of GPUs to use"),
+    num_gpus: int | None = typer.Option(None, help="Number of GPUs per node to use"),
     num_nodes: int = typer.Option(1, help="Number of nodes to use"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount"),
     run_after: List[str] = typer.Option(None, help="List of expnames that this job depends on before starting"),
