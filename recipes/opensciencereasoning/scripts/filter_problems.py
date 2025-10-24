@@ -100,7 +100,8 @@ def process_file(
     option_format_regex: str = None,
     problem_field: str = "problem",
     expected_answer_field: str = "expected_answer",
-    id_field: str = "id"
+    id_field: str = "id",
+    remove_expected_answer: bool = False
 ):
     input_file = Path(input_file)
     output_file = Path(output_file)
@@ -125,13 +126,14 @@ def process_file(
                 dropped += 1
                 continue
 
+            if remove_expected_answer:
+                del obj["expected_answer"]
+
             # rename keys to standard names
             for current_key, new_key in [(problem_field, "problem"), (expected_answer_field, "expected_answer"), (id_field, "id")]:
-                if current_key in obj:
-                    if new_key != current_key:
-                        obj[new_key] = obj[current_key]
-                        del obj[current_key]
-                    
+                if current_key in obj and new_key != current_key:
+                    obj[new_key] = obj[current_key]
+                    del obj[current_key]
 
             problem = obj.get("problem", "")
             if not problem or not problem.strip():
@@ -206,6 +208,7 @@ if __name__ == "__main__":
     parser.add_argument("--option_format_regex", type=str, help="Filter by option format regex (e.g. '^[A-Z]\\)')")
     parser.add_argument("--problem_field", type=str, help="Field in the JSONL file that contains the problem")
     parser.add_argument("--expected_answer_field", type=str, help="Field in the JSONL file that contains the expected answer")
+    parser.add_argument("--remove_expected_answer", action="store_true", help="Remove expected answer from samples")
     parser.add_argument("--id_field", type=str, help="Field in the JSONL file that contains the id")
 
     args = parser.parse_args()
@@ -219,5 +222,6 @@ if __name__ == "__main__":
         option_format_regex=args.option_format_regex,
         problem_field=args.problem_field,
         expected_answer_field=args.expected_answer_field,
-        id_field=args.id_field
+        id_field=args.id_field,
+        remove_expected_answer=args.remove_expected_answer
     )

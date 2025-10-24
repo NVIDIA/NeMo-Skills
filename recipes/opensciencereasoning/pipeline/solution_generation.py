@@ -44,6 +44,7 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
 
     problem_field = stage_config.get("problem_field", None)
     expected_answer_field = stage_config.get("expected_answer_field", None)
+    remove_expected_answer = stage_config.get("remove_expected_answer", None)
     id_field = stage_config.get("id_field", None)
 
     cmd = (
@@ -56,10 +57,10 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
         + (f" --num_options {stage_config.get('num_options', None)}" if stage_config.get('num_options') else "")
         + (f" --problem_field {problem_field}" if problem_field else "")
         + (f" --expected_answer_field {expected_answer_field}" if expected_answer_field else "")
+        + (f" --remove_expected_answer {remove_expected_answer}" if remove_expected_answer else "")
         + (f" --id_field {id_field}" if id_field else "")
         + option_format_regex
     )
-    print(cmd)
     
     wrapped_cmd = wrap_arguments(cmd)
     run_cmd(
@@ -103,6 +104,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
     run_cmd(
         cluster=cluster,
         container="nemo-skills",
+        log_dir=f"{output_dir}/logs",
         expname=f"{expname}_retrieve_similar",
         run_after=run_after,
         exclusive=False,
@@ -140,6 +142,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
                 f"    --with_duplicates False "
             )
         ),
+        log_dir=f"{output_dir}/logs",
         cluster=cluster,
         exclusive=False,
         run_after=f"{expname}_check_contamination",
@@ -185,6 +188,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
                 f"    --generation_key {shlex.quote(name)} "
                 f"{extra_args}"
             ),
+            log_dir=f"{output_dir}/tmp/logs",
             cluster=cluster,
             exclusive=False,
             expname=f"{expname}-prepare-for-{name}-labeling-{i}",
@@ -220,6 +224,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
             f"    --topics_structure {shlex.quote(json.dumps(topics_structure, ensure_ascii=False))} "
             f"    --names {shlex.quote(json.dumps(generation_keys, ensure_ascii=False))} "
         ),
+        log_dir=f"{output_dir}/logs",
         cluster=cluster,
         exclusive=False,
         expname=expname,
@@ -269,6 +274,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
             f"{majority_voting_args} "
         ),
         cluster=cluster,
+        log_dir=f"{generation_dir}/logs",
         expname=f"{expname}_extract_predictions",
         run_after=f"{expname}_generate_solutions",
     )
@@ -295,6 +301,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
         ),
         cluster=cluster,
         expname=expname,
+        log_dir=f"{output_dir}/logs",
         run_after=[f"{expname}_extract_predictions", f"{expname}_judgement"],
     )
 
@@ -333,6 +340,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
             f"    --fields {shlex.quote(json.dumps(BASE_FIELDS, ensure_ascii=False))} "
         ),
         cluster=cluster,
+        log_dir=f"{output_dir}/tmp/logs",
         expname=f"{expname}_prepare_difficulty_estimation",
         run_after=run_after,
     )
@@ -367,6 +375,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
         ),
         cluster=cluster,
         exclusive=False,
+        log_dir=f"{output_dir}/logs",
         run_after=f"{expname}-judgement",
         expname=expname,
     )
@@ -392,6 +401,7 @@ def aggregate(cluster, expname, run_after, stage_config, **kwargs):
         ),
         cluster=cluster,
         exclusive=False,
+        log_dir=f"{output_dir}/logs",
         run_after=run_after,
         expname=expname,
     )
@@ -430,6 +440,7 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
         ),
         cluster=cluster,
         exclusive=False,
+        log_dir=f"{output_dir}/logs",
         run_after=run_after,
         expname=expname,
     )
@@ -459,11 +470,14 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
             f"    --fields {shlex.quote(json.dumps(fields_to_leave, ensure_ascii=False))} "
         ),
         cluster=cluster,
+        log_dir=f"{output_dir}/tmp/logs",
         expname=f"{expname}_prepare_for_sft",
         run_after=run_after,
     )
 
-    inline_args = stage_config.get("inline_args", "")
+    prepare_data_kwargs = stage_config.get("prepare_data_kwargs", {})
+    prepare_data_ctx_params = prepare_ctx_kwargs(prepare_data_kwargs.get("ctx_params", {}))
+
     cmd = (
         f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
         f"    ++input_files='{prepared_file}' "
@@ -475,7 +489,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         f"    ++filters.remove_len_outlier_solutions=false "
         f"    ++filters.trim_solutions=false "
         f"    ++add_unlabeled=True "
-        f"    {inline_args}"
+        f"    {prepare_data_ctx_params}"
     )
     run_cmd(
         ctx=wrap_arguments(cmd),
