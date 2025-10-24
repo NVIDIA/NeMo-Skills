@@ -488,8 +488,11 @@ def generate(
         skip_hf_home_check=skip_hf_home_check,
     )
 
+    # TODO: remove after https://github.com/NVIDIA-NeMo/Skills/issues/578 is resolved as default will be single job
+    sequential = True if cluster_config["executor"] in ["local", "none"] else False
+
     # Pass _reuse_exp to pipeline.run() to add jobs to existing experiment
-    result = pipeline.run(dry_run=dry_run, _reuse_exp=_reuse_exp)
+    result = pipeline.run(dry_run=dry_run, _reuse_exp=_reuse_exp, sequential=sequential)
     return result
 
 
