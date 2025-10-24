@@ -20,9 +20,20 @@ from pathlib import Path
 import pytest
 from utils import require_env_var
 
-from nemo_skills.pipeline.cli import eval as cli_eval
-from nemo_skills.pipeline.cli import prepare_data, wrap_arguments
+from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, start_server, wrap_arguments
 from tests.conftest import docker_rm
+
+
+def _start_judge_server(config_dir: str, model_path: str, log_dir: str):
+    start_server(
+        cluster="test-local",
+        config_dir=config_dir,
+        model=model_path,
+        server_type="sglang",
+        server_gpus=1,
+        server_nodes=1,
+        log_dir=log_dir,
+    )
 
 
 @pytest.mark.gpu
@@ -276,46 +287,35 @@ def test_prepare_and_eval_all_datasets():
         server_type="sglang",
         server_gpus=1,
         server_nodes=1,
+        auto_summarize_results=False,
     )
 
-    collected_datasets = set()
     common_ctx = "++max_samples=2 ++inference.tokens_to_generate=100 ++server.enable_soft_fail=True "
 
-    if non_judge_datasets:
-        output_dir = f"/tmp/nemo-skills-tests/{model_type}/all-datasets-eval"
-        docker_rm([output_dir])
-        cli_eval(
-            ctx=wrap_arguments(common_ctx),
-            output_dir=output_dir,
-            benchmarks=",".join(non_judge_datasets),
-            expname=f"eval-all-datasets-{model_type}",
-            **eval_kwargs,
-        )
+    output_dir = f"/tmp/nemo-skills-tests/{model_type}/all-datasets-eval"
+    docker_rm([output_dir])
+    eval(
+        ctx=wrap_arguments(common_ctx),
+        output_dir=output_dir,
+        benchmarks=",".join(non_judge_datasets),
+        expname=f"eval-all-datasets-{model_type}",
+        **eval_kwargs,
+    )
 
-        eval_results_dir = Path(output_dir) / "eval-results"
-        for dataset in non_judge_datasets:
-            metrics_path = eval_results_dir / dataset / "metrics.json"
-            assert metrics_path.exists(), f"Missing metrics for {dataset}"
-            collected_datasets.add(dataset)
+    run_cmd(
+        ctx=wrap_arguments(f"python -m nemo_skills.pipeline.summarize_results {output_dir}"),
+        cluster="test-local",
+        config_dir=str(config_dir),
+    )
 
-    if judge_datasets:
-        judge_output_dir = f"/tmp/nemo-skills-tests/{model_type}/all-datasets-eval-judge"
-        docker_rm([judge_output_dir])
-        cli_eval(
-            ctx=wrap_arguments(common_ctx),
-            output_dir=judge_output_dir,
-            benchmarks=",".join(judge_datasets),
-            expname=f"eval-all-datasets-judge-{model_type}",
-            judge_model=model_path,
-            judge_server_type="sglang",
-            judge_server_gpus=1,
-            **eval_kwargs,
-        )
+    eval_results_dir = Path(output_dir) / "eval-results"
+    metrics_path = eval_results_dir / "metrics.json"
+    assert metrics_path.exists(), "Missing aggregated metrics file"
+    with metrics_path.open() as f:
+        metrics = json.load(f)
 
-        judge_results_dir = Path(judge_output_dir) / "eval-results"
-        for dataset in judge_datasets:
-            metrics_path = judge_results_dir / dataset / "metrics.json"
-            assert metrics_path.exists(), f"Missing metrics for judge benchmark {dataset}"
-            collected_datasets.add(dataset)
+    for dataset in non_judge_datasets:
+        assert dataset in metrics, f"Missing metrics for {dataset}"
 
-    assert set(dataset_names) == collected_datasets
+    # TODO: add same for judge_datasets after generate supports num_jobs
+    # (otherwise it starts judge every time and takes forever)

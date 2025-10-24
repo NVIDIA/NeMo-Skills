@@ -122,7 +122,6 @@ def get_dataset_module(dataset, data_dir=None, cluster_config=None, extra_datase
     3. extra_datasets parameter if defined
     4. `NEMO_SKILLS_EXTRA_DATASETS` environment variable
     """
-    print(dataset)
     try:
         dataset_module, data_path, is_on_cluster = get_default_dataset_module(dataset, data_dir, cluster_config)
     except ModuleNotFoundError:

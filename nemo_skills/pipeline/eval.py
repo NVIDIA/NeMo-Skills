@@ -423,6 +423,7 @@ def eval(
                 expname=f"{expname}-{benchmark}-judge",
                 log_dir=log_dir + "/judge",
                 cluster=cluster,
+                config_dir=config_dir,
                 partition=partition,
                 qos=qos,
                 time_min=time_min,
