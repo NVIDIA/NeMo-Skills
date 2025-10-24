@@ -50,16 +50,16 @@ def main():
 
     checker_cmd = f"python tests/slurm-tests/omr_simple_recipe/check_results.py --workspace {args.workspace} --backend {' '.join(args.backend)}"
 
+    final_eval_name = [f"{args.expname_prefix}-final-eval-{training_backend}" for training_backend in args.backend]
+
     run_cmd(
         ctx=wrap_arguments(checker_cmd),
         cluster=args.cluster,
         expname=args.expname_prefix + "-check-results",
         log_dir=f"{args.workspace}/check-results-logs",
-        run_after=[  # these are launched in simplified recipe
-            f"{args.expname_prefix}-final-eval",
-            f"{args.expname_prefix}-baseline-eval",
-        ],
-        reuse_code=False,
+        # these are launched in simplified recipe
+        run_after=final_eval_name + [f"{args.expname_prefix}-baseline-eval"],
+        reuse_code=True,
     )
 
 

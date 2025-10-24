@@ -24,7 +24,7 @@ from nemo_skills.pipeline.cli import (
 )
 
 
-def prepare(workspace, cluster, num_gpus, expname_prefix, backend, wandb_params):
+def prepare(workspace, cluster, expname_prefix):
     # data preparation needs to run locally without container, so not wrapping with run_cmd
     prepare_datasets(["aime24", "aime25"])
 
@@ -46,7 +46,7 @@ def prepare(workspace, cluster, num_gpus, expname_prefix, backend, wandb_params)
     )
 
 
-def run_sdg(workspace, cluster, num_gpus, expname_prefix, backend, wandb_params):
+def run_sdg(workspace, cluster, num_gpus, expname_prefix, wandb_params):
     postprocess_cmd = (
         f"python {workspace}/postprocess_problem_extraction.py "
         f"    {workspace}/sdg/problems/output.jsonl "
@@ -62,7 +62,7 @@ def run_sdg(workspace, cluster, num_gpus, expname_prefix, backend, wandb_params)
         expname=f"{expname_prefix}-problem-extraction",
         run_after=f"{expname_prefix}-download-assets",
         model="Qwen/Qwen2.5-14B-Instruct",
-        server_type="vllm",
+        server_type="sglang",
         server_gpus=num_gpus,
         log_samples=not wandb_params["disable_wandb"],
         # using prefix as group to make it easier to see all sdg steps together
@@ -145,7 +145,7 @@ def final_eval(workspace, cluster, num_gpus, expname_prefix, backend, wandb_para
     # launching evaluation
     for training_backend in backend:
         eval(
-            ctx=wrap_arguments("++inference.tokens_to_generate=16384 "),
+            ctx=wrap_arguments("++inference.tokens_to_generate=16384 ++parse_reasoning=True "),
             cluster=cluster,
             model=f"{workspace}/training-{training_backend}/qwen2.5-14b-improved-hf",
             server_type="vllm",
@@ -153,14 +153,14 @@ def final_eval(workspace, cluster, num_gpus, expname_prefix, backend, wandb_para
             benchmarks="aime24:8,aime25:8",
             output_dir=f"{workspace}/evals/after-training-{training_backend}",
             num_jobs=1,
-            expname=f"{expname_prefix}-final-eval",
+            expname=f"{expname_prefix}-final-eval-{training_backend}",
             run_after=f"{expname_prefix}-training-{training_backend}",
             wandb_name=f"{expname_prefix}-final-eval" if not wandb_params["disable_wandb"] else None,
             wandb_project=wandb_params["wandb_project"],
         )
 
 
-def initial_eval(workspace, cluster, num_gpus, expname_prefix, backend, wandb_params):
+def initial_eval(workspace, cluster, num_gpus, expname_prefix, wandb_params):
     # launching evaluation
     eval(
         ctx=wrap_arguments(""),
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         "disable_wandb": args.disable_wandb,
         "wandb_project": args.wandb_project,
     }
-    args = (
+    common_args = (
         args.workspace,
         args.cluster,
         args.num_gpus,
@@ -232,8 +232,20 @@ if __name__ == "__main__":
         args.backend,
         wandb_params,
     )
-    prepare(*args)
-    initial_eval(*args)
-    run_sdg(*args)
-    run_training(*args)
-    final_eval(*args)
+    prepare(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
+    initial_eval(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        num_gpus=args.num_gpus,
+        expname_prefix=args.expname_prefix,
+        wandb_params=wandb_params,
+    )
+    run_sdg(
+        workspace=args.workspace,
+        cluster=args.cluster,
+        num_gpus=args.num_gpus,
+        expname_prefix=args.expname_prefix,
+        wandb_params=wandb_params,
+    )
+    run_training(*common_args)
+    final_eval(*common_args)
