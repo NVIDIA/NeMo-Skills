@@ -51,9 +51,8 @@ class ParallelThinkingConfig:
     temperature: float = 0.6
     tokens_to_generate: int | None = None
 
-    parse_reasoning: bool = (
-        True  # Defaulting to True as multiple solutions with reasoning would be too hard to fit in context window
-    )
+    parse_reasoning: bool = False
+    parse_reasoning_solutions: bool = True  # Whether to parse the reasoning for the solutions.
     end_reasoning_string: str = "</think>"
     endpoint_type: EndpointType = EndpointType.chat
     tokenizer: str | None = None
@@ -152,7 +151,7 @@ class ParallelThinkingTask:
         generation_results = await asyncio.gather(*tasks)
         solutions = []
         for generation_result in generation_results:
-            if self.cfg.parse_reasoning:
+            if self.cfg.parse_reasoning_solutions:
                 parse_reasoning(
                     generation_result,
                     generation_key=self.cfg.solution_key,
@@ -194,7 +193,7 @@ class ParallelThinkingTask:
             with open(input_file, "r") as f:
                 for line in f:
                     data_point = json.loads(line)
-                    if self.cfg.parse_reasoning:
+                    if self.cfg.parse_reasoning_solutions:
                         parse_reasoning(
                             data_point,
                             generation_key=self.cfg.solution_key,
