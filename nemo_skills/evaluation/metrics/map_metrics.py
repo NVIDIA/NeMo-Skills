@@ -36,6 +36,7 @@ from nemo_skills.evaluation.metrics.mrcr_metrics import MRCRMetrics
 from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 from nemo_skills.evaluation.metrics.simpleqa_metrics import SimpleQAMetrics
 from nemo_skills.evaluation.metrics.translation_metrics import TranslationMetrics
+from nemo_skills.evaluation.metrics.speechlm_metrics import SpeechLMMetrics
 
 METRICS_MAP = {
     "math": MathMetrics,
@@ -60,6 +61,7 @@ METRICS_MAP = {
     "livebench_coding": LiveCodeBenchMetrics,
     "translation": TranslationMetrics,
     "human_eval_infilling": HumanEvalInfillingMetrics,
+    "speechlm": SpeechLMMetrics,
 }
 
 
