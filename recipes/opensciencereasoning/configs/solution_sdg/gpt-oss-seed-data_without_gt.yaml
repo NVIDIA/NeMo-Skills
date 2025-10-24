@@ -44,6 +44,7 @@ stages:
     problem_field: problem
     expected_answer_field: expected_answer
     id_field: id
+    remove_expected_answer: ${stages.generate_solutions.make_majority_voting}
     remove_images: True
     num_options: null
     option_format_regex: null
@@ -202,5 +203,8 @@ stages:
     input_file: ${directories.step-6-filter-solutions}/final_result.jsonl
     prompt_config: generic/math
     tokenizer: openai/gpt-oss-120b
+    prepare_data_kwargs:
+      ctx_params:
+        code_tags: gpt-oss
     dependencies:
       - filter_solutions
