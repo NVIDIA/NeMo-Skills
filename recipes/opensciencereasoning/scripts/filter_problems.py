@@ -133,7 +133,7 @@ def process_file(
                     obj[new_key] = obj[current_key]
                     del obj[current_key]
 
-            if remove_expected_answer:
+            if remove_expected_answer and "expected_answer" in obj:
                 del obj["expected_answer"]
             
 
