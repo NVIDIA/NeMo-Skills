@@ -658,7 +658,7 @@ def add_task(
         )
 
 
-def run_exp(exp, cluster_config, sequential=False, dry_run=False):
+def run_exp(exp, cluster_config, sequential=None, dry_run=False):
     """If sequential is not specified, using True locally and False otherwise.
 
     If it is specified, it will be used as is.
@@ -666,6 +666,9 @@ def run_exp(exp, cluster_config, sequential=False, dry_run=False):
     if dry_run:
         LOG.info("Dry run mode is enabled, not running the experiment.")
         return
+
+    if sequential is None:
+        sequential = cluster_config["executor"] == "local" or cluster_config["executor"] == "none"
 
     if "mounts" in cluster_config:
         # Can only check cluster mounts here, not those added to add_task
