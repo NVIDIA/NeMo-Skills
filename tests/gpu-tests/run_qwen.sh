@@ -7,7 +7,7 @@ export NEMO_SKILLS_TEST_MODEL_TYPE=qwen
 # Switch to Qwen3 model for other tests
 export NEMO_SKILLS_TEST_HF_MODEL=Qwen/Qwen3-1.7B
 # generation/evaluation tests
-pytest tests/gpu-tests/test_eval.py -s -x -k test_prepare_and_eval_all_datasets
+pytest tests/gpu-tests/test_eval.py -s -x
 pytest tests/gpu-tests/test_generate.py -s -x
 pytest tests/gpu-tests/test_judge.py -s -x
 pytest tests/gpu-tests/test_run_cmd_llm_infer.py -s -x
