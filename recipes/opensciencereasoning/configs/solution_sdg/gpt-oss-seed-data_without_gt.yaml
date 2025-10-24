@@ -33,7 +33,6 @@ directories:
   step-4-difficulty-estimation: ${base_output_dir}/solution-sdg/step-4-difficulty-estimation
   step-5-aggregate: ${base_output_dir}/solution-sdg/step-5-aggregate
   step-6-filter-solutions: ${base_output_dir}/solution-sdg/step-6-filter-solutions
-  step-7-prepare-for-sft: ${base_output_dir}/solution-sdg/step-7-prepare-for-sft
 
 # Stage-specific configurations
 stages:
@@ -191,24 +190,8 @@ stages:
     output_dir: ${directories.step-6-filter-solutions}
     input_file: ${directories.step-5-aggregate}/final_result.jsonl
     only_correct_solutions: False
-    generation_model_pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     metadata_values:
       topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
     dependencies:
       - aggregate
-  
-  prepare_for_sft:
-    output_dir: ${directories.step-7-prepare-for-sft}
-    input_file: ${directories.step-6-filter-solutions}/final_result.jsonl
-    prompt_config: generic/math
-    tokenizer: openai/gpt-oss-120b
-    prepare_data_kwargs:
-      ctx_args: >-
-        ++filters.drop_multi_boxed=false
-        ++filters.remove_len_outlier_problems=false
-        ++filters.remove_len_outlier_solutions=false
-        ++filters.trim_solutions=false
-        ++code_tags=gpt-oss
-    dependencies:
-      - filter_solutions

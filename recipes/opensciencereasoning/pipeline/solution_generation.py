@@ -453,8 +453,6 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     """
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
-    prompt_config = stage_config["prompt_config"]
-    tokenizer = stage_config["tokenizer"]
     prepared_file = f"{output_dir}/tmp/prepared.jsonl"
     output_path = f"{output_dir}/{OUTPUT_FILE}"
 
@@ -479,8 +477,6 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
         f"    ++input_files='{prepared_file}' "
         f"    ++output_path='{output_path}' "
-        f"    ++prompt_config={prompt_config} "
-        f"    ++tokenizer={tokenizer} "
         f"    ++add_unlabeled=True "
         f"    {prepare_data_ctx_args}"
     )
