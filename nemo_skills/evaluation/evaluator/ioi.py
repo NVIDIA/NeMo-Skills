@@ -163,11 +163,12 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             sandbox.execute_code(compile_command, language="shell", timeout=120)
         )
 
-        # On specific linker error, print the exact solution used
+        # On specific linker/undefined symbol error, print the exact solution used
         try:
-            if "multiple definition of `main`" in (compile_result.get("stderr", "") or ""):
+            stderr_text = compile_result.get("stderr", "") or ""
+            if "multiple definition of `main`" in stderr_text or "undefined reference" in stderr_text.lower():
                 print(
-                    "[IOI_DEBUG] run_test_case: solution used for compile (due to multiple main):\n"
+                    "[IOI_DEBUG] run_test_case: solution used for compile (linker/undefined issue):\n"
                     + task_args.get("generated_code", "")
                 )
         except Exception:
@@ -284,10 +285,11 @@ def _precompile_solution(problem_id: str, code: str, precompiled_dir: str, sandb
         print("[IOI_DEBUG] precompile_solution: compile stdout:\n" + comp.get("stdout", ""))
         if comp.get("stderr"):
             print("[IOI_DEBUG] precompile_solution: compile stderr:\n" + comp.get("stderr", ""))
-            if "multiple definition of `main`" in comp.get("stderr", ""):
+            stderr_text = comp.get("stderr", "")
+            if "multiple definition of `main`" in stderr_text or "undefined reference" in stderr_text.lower():
                 try:
                     print(
-                        "[IOI_DEBUG] precompile_solution: solution used for compile (due to multiple main):\n" + code
+                        "[IOI_DEBUG] precompile_solution: solution used for compile (linker/undefined issue):\n" + code
                     )
                 except Exception:
                     pass
@@ -420,9 +422,10 @@ def _run_custom_tests_sync(pid: str, code: str, pre_dir: str, inputs) -> list:
         comp = _sandbox_exec_sync(sandbox, compile_command, language="shell", timeout=120)
         if comp["stderr"]:
             try:
-                if "multiple definition of `main`" in (comp.get("stderr", "") or ""):
+                stderr_text = comp.get("stderr", "") or ""
+                if "multiple definition of `main`" in stderr_text or "undefined reference" in stderr_text.lower():
                     print(
-                        "[IOI_DEBUG] _run_custom_tests_sync: solution used for compile (due to multiple main):\n"
+                        "[IOI_DEBUG] _run_custom_tests_sync: solution used for compile (linker/undefined issue):\n"
                         + code
                     )
             except Exception:
