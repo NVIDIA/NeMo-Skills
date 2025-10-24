@@ -51,6 +51,7 @@ target:
 evaluation:
   nemo_evaluator_config:  # global config settings that apply to all tasks
     config:
+      output_dir: /results_overriden
       params:
         request_timeout: 3600  # timeout for API requests in seconds
         parallelism: 5  # number of parallel requests
@@ -61,6 +62,9 @@ evaluation:
           adapter_config:
             use_response_logging: true
             use_request_logging: true
+    target:
+      api_endpoint:
+        api_key: API_KEY_BOO
 
   tasks:
     - name: aime_2025_nemo
