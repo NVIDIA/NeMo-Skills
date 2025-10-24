@@ -52,7 +52,10 @@ def prepare_datasets(
         dataset_path = datasets_dir / dataset_name
         attempts = max(1, retries + 1)
         for attempt in range(1, attempts + 1):
-            print(f"Preparing {dataset_name} (attempt {attempt}/{attempts})")
+            if attempts > 1:
+                print(f"Preparing {dataset_name} (attempt {attempt}/{attempts})")
+            else:
+                print(f"Preparing {dataset_name}")
             try:
                 subprocess.run(
                     f"{sys.executable} {dataset_path / 'prepare.py'} {extra_args}",
@@ -113,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--retries",
         type=int,
-        default=1,
+        default=0,
         help="Number of retries per dataset if preparation fails",
     )
     args, unknown = parser.parse_known_args()
