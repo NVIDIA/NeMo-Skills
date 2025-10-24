@@ -34,7 +34,6 @@ from nemo_skills.evaluation.evaluator.math import (
 )
 from nemo_skills.evaluation.evaluator.mcq import eval_mcq
 from nemo_skills.evaluation.evaluator.mrcr import eval_mrcr
-from nemo_skills.evaluation.evaluator.ojbench import eval_ojbench
 from nemo_skills.evaluation.evaluator.ruler import eval_ruler
 from nemo_skills.evaluation.evaluator.scicode import eval_scicode
 
@@ -52,7 +51,6 @@ EVALUATOR_MAP = {
     "scicode": eval_scicode,
     "mrcr": eval_mrcr,
     "bigcodebench": eval_bigcodebench,
-    "ojbench": eval_ojbench,
     "human_eval_infilling": eval_human_eval_infilling,
 }
 
