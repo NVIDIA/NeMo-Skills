@@ -32,9 +32,6 @@ OUTPUT_FILE = "final_result.jsonl"
 def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
 
-def prepare_ctx_kwargs(ctx_params: dict):
-    ctx_params = " ".join(map(lambda x: f"++{x[0]}={x[1]}", ctx_params.items()))
-    return ctx_params
 
 def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
     input_file = stage_config.get("input_file")
@@ -248,18 +245,18 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     generation_kwargs = stage_config.get("generation_kwargs", {})
     judge_kwargs = stage_config.get("judge_kwargs", {})
 
-    generation_params = generation_kwargs.get("params", {})
-    ctx_params = prepare_ctx_kwargs(generation_kwargs.get("ctx_params", {}))
-    judge_ctx_args = prepare_ctx_kwargs(judge_kwargs.get("ctx_params", {}))
-    judge_params = judge_kwargs.get("params", {})
+    generation_args = generation_kwargs.get("args", {})
+    ctx_args = generation_kwargs.get("ctx_args", "")
+    judge_ctx_args = judge_kwargs.get("ctx_args", "")
+    judge_args = judge_kwargs.get("args", {})
 
     generate(
-        ctx=wrap_arguments(ctx_params),
+        ctx=wrap_arguments(ctx_args),
         cluster=cluster,
         output_dir=f"{output_dir}/generation",
         expname=f"{expname}_generate_solutions",
         run_after=run_after,
-        **generation_params,
+        **generation_args,
     )
     generation_dir = f"{output_dir}/with_predictions"
 
@@ -288,7 +285,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
             output_dir=f"{output_dir}/judgement",
             expname=f"{expname}_judgement",
             run_after=f"{expname}_extract_predictions",
-            **judge_params,
+            **judge_args,
         )
         generation_dir = f"{output_dir}/judgement"
 
@@ -297,7 +294,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_solutions.py "
             f"    --input_dir '{generation_dir}' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
-            f"    --generation_model '{generation_params['model'].split('/')[-1]}' "
+            f"    --generation_model '{generation_args['model'].split('/')[-1]}' "
         ),
         cluster=cluster,
         expname=expname,
@@ -325,11 +322,11 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
     generation_kwargs = stage_config.get("generation_kwargs", {})
     judge_kwargs = stage_config.get("judge_kwargs", {})
 
-    generation_params = generation_kwargs.get("params", {})
-    generation_ctx_args = prepare_ctx_kwargs(generation_kwargs.get("ctx_params", {}))
+    generation_args = generation_kwargs.get("args", {})
+    generation_ctx_args = generation_kwargs.get("ctx_args", "")
 
-    judge_params = judge_kwargs.get("params", {})
-    judge_ctx_params = prepare_ctx_kwargs(judge_kwargs.get("ctx_params", {}))
+    judge_args = judge_kwargs.get("args", {})
+    judge_ctx_args = judge_kwargs.get("ctx_args", "")
     
 
     run_cmd(
@@ -352,18 +349,18 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
         output_dir=f"{output_dir}/generation",
         expname=f"{expname}-generation",
         run_after=f"{expname}_prepare_difficulty_estimation",
-        **generation_params,
+        **generation_args,
     )
 
     generate(
-        ctx=wrap_arguments(judge_ctx_params),
+        ctx=wrap_arguments(judge_ctx_args),
         generation_type="math_judge",
         cluster=cluster,
         input_dir=f"{output_dir}/generation",
         output_dir=f"{output_dir}/judgement",
         expname=f"{expname}-judgement",
         run_after=f"{expname}-generation",
-        **judge_params,
+        **judge_args,
     )
 
     run_cmd(
@@ -371,7 +368,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_difficulty.py "
             f"    --judgement_dir '{output_dir}/judgement' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
-            f"    --pass_rate_model '{generation_params['model'].split('/')[-1]}' "
+            f"    --pass_rate_model '{generation_args['model'].split('/')[-1]}' "
         ),
         cluster=cluster,
         exclusive=False,
@@ -476,7 +473,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     )
 
     prepare_data_kwargs = stage_config.get("prepare_data_kwargs", {})
-    prepare_data_ctx_params = prepare_ctx_kwargs(prepare_data_kwargs.get("ctx_params", {}))
+    prepare_data_ctx_args = prepare_data_kwargs.get("ctx_args", "")
 
     cmd = (
         f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
@@ -484,12 +481,8 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         f"    ++output_path='{output_path}' "
         f"    ++prompt_config={prompt_config} "
         f"    ++tokenizer={tokenizer} "
-        f"    ++filters.drop_multi_boxed=false "
-        f"    ++filters.remove_len_outlier_problems=false "
-        f"    ++filters.remove_len_outlier_solutions=false "
-        f"    ++filters.trim_solutions=false "
         f"    ++add_unlabeled=True "
-        f"    {prepare_data_ctx_params}"
+        f"    {prepare_data_ctx_args}"
     )
     run_cmd(
         ctx=wrap_arguments(cmd),

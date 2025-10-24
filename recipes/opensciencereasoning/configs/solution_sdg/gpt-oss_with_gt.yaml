@@ -111,7 +111,7 @@ stages:
     input_file: ${directories.step-1-decontaminate}/final_result.jsonl  # Should have expected answers
 
     generation_kwargs:
-      params:
+      args:
         model: /hf_models/Qwen3-30B-A3B
         server_type: vllm
         server_gpus: 8
@@ -119,21 +119,21 @@ stages:
         dependent_jobs: 1
         num_random_seeds: 5
         num_chunks: 20
-      ctx_params:
-        prompt_config: generic/general-boxed
-        inference.tokens_to_generate: 16000
+      ctx_args: >-
+        ++prompt_config=generic/general-boxed
+        ++inference.tokens_to_generate=16000
     
     judge_kwargs:
-      params:
+      args:
         model: /hf_models/Qwen2.5-32B-Instruct
         server_type: vllm
         server_gpus: 8
         server_nodes: 1
-        num_random_seeds: ${stages.difficulty_estimation.generation_kwargs.params.num_random_seeds}
+        num_random_seeds: ${stages.difficulty_estimation.generation_kwargs.args.num_random_seeds}
         dependent_jobs: 1
         num_chunks: 5
-      ctx_params:
-        prompt_config: judge/general-judge
+      ctx_args: >-
+        ++prompt_config=judge/general-judge
     
     dependencies:
       - decontaminate
@@ -145,7 +145,7 @@ stages:
     make_judgement: True
   
     generation_kwargs:
-      params:
+      args:
         input_file: ${directories.step-1-decontaminate}/final_result.jsonl
         model: /hf_models/gpt-oss-120b
         server_type: vllm
@@ -157,29 +157,29 @@ stages:
         with_sandbox: True
         server_args: "--async-scheduling"
   
-      ctx_params:
-        prompt_config: generic/general-boxed
-        code_tags: gpt-oss
-        code_execution: true
-        max_concurrent_requests: 1024
-        inference.tokens_to_generate: 16000
-        inference.extra_body.reasoning_effort: high
-        inference.endpoint_type: text
-        inference.temperature: 1.0
-        inference.top_p: 1.0
-        server.code_execution.max_code_executions: 100
-        chat_template_kwargs.reasoning_effort: high
-        chat_template_kwargs.builtin_tools: [python]
+      ctx_args: >-
+        ++prompt_config=generic/general-boxed
+        ++code_tags=gpt-oss
+        ++code_execution=true
+        ++max_concurrent_requests=1024
+        ++inference.tokens_to_generate=16000
+        ++inference.extra_body.reasoning_effort=high
+        ++inference.endpoint_type=text
+        ++inference.temperature=1.0
+        ++inference.top_p=1.0
+        ++server.code_execution.max_code_executions=100
+        ++chat_template_kwargs.reasoning_effort=high
+        ++chat_template_kwargs.builtin_tools=[python]
 
     judge_kwargs:
-      ctx_params:
-        prompt_config: judge/general-judge
-      params:
+      ctx_args: >-
+        ++prompt_config=judge/general-judge
+      args:
         model: /hf_models/Qwen2.5-32B-Instruct
         server_type: vllm
         server_gpus: 8
         server_nodes: 1
-        num_random_seeds: ${stages.generate_solutions.generation_kwargs.params.num_random_seeds}
+        num_random_seeds: ${stages.generate_solutions.generation_kwargs.args.num_random_seeds}
         dependent_jobs: 1
         num_chunks: 5
   
@@ -214,7 +214,11 @@ stages:
     prompt_config: generic/math
     tokenizer: openai/gpt-oss-120b
     prepare_data_kwargs:
-      ctx_params:
-        code_tags: gpt-oss
+      ctx_args: >-
+        ++filters.drop_multi_boxed=false
+        ++filters.remove_len_outlier_problems=false
+        ++filters.remove_len_outlier_solutions=false
+        ++filters.trim_solutions=false
+        ++code_tags=gpt-oss
     dependencies:
       - filter_solutions
