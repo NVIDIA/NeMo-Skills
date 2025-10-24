@@ -241,6 +241,26 @@ def _precompile_solution(problem_id: str, code: str, precompiled_dir: str, sandb
     ]
     _sandbox_exec_sync(sandbox, "\n".join(setup_cmds), language="shell", timeout=120)
 
+    # Debug: verify directory layout before compilation
+    dbg_pre = _sandbox_exec_sync(
+        sandbox,
+        (
+            f"cd {sol_dir} && echo '[IOI_DEBUG] precompile_solution: before compile' && pwd && "
+            f"echo 'sol_dir={sol_dir}' && echo 'precompiled_dir={precompiled_dir}' && "
+            "echo '[IOI_DEBUG] tree (top):' && ls -la && "
+            "echo '[IOI_DEBUG] tree graders:' && ls -la graders || true && "
+            "echo '[IOI_DEBUG] show user_run.sh:' && sed -n '1,120p' graders/user_run.sh || true"
+        ),
+        language="shell",
+        timeout=120,
+    )
+    try:
+        print(dbg_pre.get("stdout", ""))
+        if dbg_pre.get("stderr"):
+            print(dbg_pre.get("stderr", ""))
+    except Exception:
+        pass
+
     compile_command = (
         f"cd {sol_dir} && "
         f'SRC="graders/{problem_id}.cpp"; '
@@ -248,7 +268,31 @@ def _precompile_solution(problem_id: str, code: str, precompiled_dir: str, sandb
         f'[ -e graders/stub.cpp ] && SRC="$SRC graders/stub.cpp"; '
         f"g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/{problem_id} $SRC"
     )
-    _sandbox_exec_sync(sandbox, compile_command, language="shell", timeout=120)
+    comp = _sandbox_exec_sync(sandbox, compile_command, language="shell", timeout=120)
+
+    try:
+        print("[IOI_DEBUG] precompile_solution: compile stdout:\n" + comp.get("stdout", ""))
+        if comp.get("stderr"):
+            print("[IOI_DEBUG] precompile_solution: compile stderr:\n" + comp.get("stderr", ""))
+    except Exception:
+        pass
+    dbg_post = _sandbox_exec_sync(
+        sandbox,
+        (
+            f"cd {sol_dir} && echo '[IOI_DEBUG] precompile_solution: after compile' && pwd && "
+            "echo '[IOI_DEBUG] list graders:' && ls -la graders || true && "
+            f"echo '[IOI_DEBUG] binary status for {problem_id}:' && "
+            f"( [ -f graders/{problem_id} ] && (ls -la graders/{problem_id}; file graders/{problem_id}) || echo 'missing' )"
+        ),
+        language="shell",
+        timeout=120,
+    )
+    try:
+        print(dbg_post.get("stdout", ""))
+        if dbg_post.get("stderr"):
+            print(dbg_post.get("stderr", ""))
+    except Exception:
+        pass
     return sol_dir
 
 
@@ -264,6 +308,24 @@ def run_custom_input_case(task_args: dict, worker_id: int) -> dict:
             ]
         )
         worker_loop.run_until_complete(sandbox.execute_code(setup_script, language="shell", timeout=120))
+
+        # Debug: verify copied contents and expected binary path before running
+        debug_cmd = (
+            f"cd {unique_dir} && echo '[IOI_DEBUG] run_custom_input_case: pre-run' && pwd && "
+            f"echo 'unique_dir={unique_dir}' && echo 'compiled_dir={task_args['compiled_dir']}' && "
+            "echo '[IOI_DEBUG] list top:' && ls -la && "
+            "cd graders && echo '[IOI_DEBUG] in graders:' && pwd && ls -la && "
+            "echo '[IOI_DEBUG] show user_run.sh:' && sed -n '1,120p' user_run.sh || true && "
+            "TASK=$(grep '^task=\"' user_run.sh | head -n1 | cut -d '\"' -f2); echo '[IOI_DEBUG] TASK='\"$TASK\" && "
+            '( [ -f "$TASK" ] && (ls -la "$TASK"; file "$TASK") || echo \'[IOI_DEBUG] binary missing in graders\' )'
+        )
+        dbg_out, _ = worker_loop.run_until_complete(sandbox.execute_code(debug_cmd, language="shell", timeout=120))
+        try:
+            print(dbg_out.get("stdout", ""))
+            if dbg_out.get("stderr"):
+                print(dbg_out.get("stderr", ""))
+        except Exception:
+            pass
         run_cmd = f"cd {unique_dir}/graders && ./user_run.sh <<'_EOT_'\n{task_args['input_content']}\n_EOT_\n"
         run_res, _ = worker_loop.run_until_complete(sandbox.execute_code(run_cmd, language="shell", timeout=120))
         return {"stdout": run_res["stdout"], "stderr": run_res["stderr"]}
