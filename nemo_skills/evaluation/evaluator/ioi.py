@@ -163,6 +163,16 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
             sandbox.execute_code(compile_command, language="shell", timeout=120)
         )
 
+        # On specific linker error, print the exact solution used
+        try:
+            if "multiple definition of `main`" in (compile_result.get("stderr", "") or ""):
+                print(
+                    "[IOI_DEBUG] run_test_case: solution used for compile (due to multiple main):\n"
+                    + task_args.get("generated_code", "")
+                )
+        except Exception:
+            pass
+
         result = {
             "compile_success": not compile_result.get("stderr"),
             "compile_stdout": compile_result.get("stdout", ""),
@@ -274,6 +284,13 @@ def _precompile_solution(problem_id: str, code: str, precompiled_dir: str, sandb
         print("[IOI_DEBUG] precompile_solution: compile stdout:\n" + comp.get("stdout", ""))
         if comp.get("stderr"):
             print("[IOI_DEBUG] precompile_solution: compile stderr:\n" + comp.get("stderr", ""))
+            if "multiple definition of `main`" in comp.get("stderr", ""):
+                try:
+                    print(
+                        "[IOI_DEBUG] precompile_solution: solution used for compile (due to multiple main):\n" + code
+                    )
+                except Exception:
+                    pass
     except Exception:
         pass
     dbg_post = _sandbox_exec_sync(
@@ -402,6 +419,14 @@ def _run_custom_tests_sync(pid: str, code: str, pre_dir: str, inputs) -> list:
         )
         comp = _sandbox_exec_sync(sandbox, compile_command, language="shell", timeout=120)
         if comp["stderr"]:
+            try:
+                if "multiple definition of `main`" in (comp.get("stderr", "") or ""):
+                    print(
+                        "[IOI_DEBUG] _run_custom_tests_sync: solution used for compile (due to multiple main):\n"
+                        + code
+                    )
+            except Exception:
+                pass
             return [{"stdout": comp["stdout"], "stderr": comp["stderr"]}]
 
         outs = []
