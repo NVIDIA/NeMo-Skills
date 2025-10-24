@@ -126,14 +126,16 @@ def process_file(
                 dropped += 1
                 continue
 
-            if remove_expected_answer:
-                del obj[expected_answer_field]
 
             # rename keys to standard names
             for current_key, new_key in [(problem_field, "problem"), (expected_answer_field, "expected_answer"), (id_field, "id")]:
                 if current_key in obj and new_key != current_key:
                     obj[new_key] = obj[current_key]
                     del obj[current_key]
+
+            if remove_expected_answer:
+                del obj["expected_answer"]
+            
 
             problem = obj.get("problem", "")
             if not problem or not problem.strip():
