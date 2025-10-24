@@ -27,7 +27,7 @@ from typing import Dict, List, Optional, Union
 from transformers import AutoTokenizer
 
 from nemo_skills.prompt.utils import get_prompt, get_token_count
-from nemo_skills.utils import get_logger_name, nested_dataclass, remove_thinking
+from nemo_skills.utils import get_logger_name, nested_dataclass, parse_reasoning
 
 from .base import BaseModel, EndpointType
 
@@ -51,12 +51,11 @@ class ParallelThinkingConfig:
     temperature: float = 0.6
     tokens_to_generate: int | None = None
 
-    remove_thinking: bool = True  # Remove thinking tokens from the solution key
-    thinking_begin: str = "<think>"
-    thinking_end: str = "</think>"
-    endpoint_type: EndpointType = EndpointType.text
+    parse_reasoning: bool = False
+    end_reasoning_string: str = "</think>"
+    endpoint_type: EndpointType = EndpointType.chat
     tokenizer: str | None = None
-    chat_template_kwargs: dict | None = None  # extra parameters to pass to the tokenizer's apply_chat_template method
+    chat_template_kwargs: dict = field(default_factory=dict)
     start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
     # Count the number of tokens in the prompt
@@ -69,6 +68,7 @@ class ParallelThinkingConfig:
     gensynthesis: GenSynthesisSpecificConfig = field(default_factory=GenSynthesisSpecificConfig)
 
     # Solution related parameters
+    solution_length_cap: int | None = 16384  # If specified, will filter out solutions that are longer than this length
     window_size: int = 8  # Number of solutions compared in a single request
     solution_key: str = "generation"  # Key used for identifying the solution content
     filter_incomplete_solutions: bool = True  # Filter out incomplete solutions
@@ -150,13 +150,19 @@ class ParallelThinkingTask:
         generation_results = await asyncio.gather(*tasks)
         solutions = []
         for generation_result in generation_results:
-            if self.cfg.remove_thinking:
-                remove_thinking(
+            if self.cfg.parse_reasoning:
+                parse_reasoning(
                     generation_result,
                     generation_key=self.cfg.solution_key,
-                    thinking_begin=self.cfg.thinking_begin,
-                    thinking_end=self.cfg.thinking_end,
+                    end_reasoning_string=self.cfg.end_reasoning_string,
                 )
+
+            if self.cfg.solution_length_cap is not None:
+                if len(generation_result[self.cfg.solution_key]) > self.cfg.solution_length_cap:
+                    LOG.debug(
+                        f"Solution filtered out: length {len(generation_result[self.cfg.solution_key])} exceeds cap {self.cfg.solution_length_cap}"
+                    )
+                    continue
 
             solutions.append(
                 {
@@ -186,13 +192,20 @@ class ParallelThinkingTask:
             with open(input_file, "r") as f:
                 for line in f:
                     data_point = json.loads(line)
-                    if self.cfg.remove_thinking:
-                        remove_thinking(
+                    if self.cfg.parse_reasoning:
+                        parse_reasoning(
                             data_point,
                             generation_key=self.cfg.solution_key,
-                            thinking_begin=self.cfg.thinking_begin,
-                            thinking_end=self.cfg.thinking_end,
+                            end_reasoning_string=self.cfg.end_reasoning_string,
                         )
+
+                    if self.cfg.solution_length_cap is not None:
+                        if len(data_point[self.cfg.solution_key]) > self.cfg.solution_length_cap:
+                            LOG.debug(
+                                f"Solution filtered out: length {len(data_point[self.cfg.solution_key])} exceeds cap {self.cfg.solution_length_cap}"
+                            )
+                            continue
+
                     # TODO: Making an assumption that the prompt doesn't require all the data for few-shot prompting
                     # Hashing the prompt to get the key for the solutions
                     prompt = self.hash_prompt(self.orig_prompt_filler(data_point, data=None))
@@ -225,11 +238,8 @@ class ParallelThinkingTask:
             # Remove unfinished solutions
             filtered_solutions = []
             for solution in solutions:
-                # Check if thinking_begin is in the solution and thinking_end is not in the solution
-                if (
-                    self.cfg.thinking_begin in solution[self.cfg.solution_key]
-                    and self.cfg.thinking_end not in solution[self.cfg.solution_key]
-                ):
+                if solution[self.cfg.solution_key] == "":
+                    LOG.warning("Solution is empty, skipping")
                     continue
                 else:
                     filtered_solutions.append(solution)
@@ -245,9 +255,7 @@ class ParallelThinkingTask:
 
         return solutions, total_num_generated_tokens
 
-    async def _generate_parallel_thinking_contraction(
-        self, prompt: Union[str, List], solutions: List[Dict], **kwargs
-    ) -> Dict:
+    async def _generate_parallel_thinking_contraction(self, prompt: str, solutions: List[Dict], **kwargs) -> Dict:
         """Output which combines the solutions into a single solution/selection."""
 
         num_solutions = len(solutions)
@@ -271,6 +279,8 @@ class ParallelThinkingTask:
             chat_template_kwargs=self.cfg.chat_template_kwargs,
         )
 
+        LOG.info(f"Parallel thinking prompt:\n\n{parallel_thinking_prompt}")
+
         output_dict = {}
         if self.cfg.count_prompt_tokens:
             num_input_tokens = get_token_count(tokenizer=self.hf_tokenizer, messages=parallel_thinking_prompt)
@@ -278,6 +288,9 @@ class ParallelThinkingTask:
 
         for duplicate_key in ["temperature", "tokens_to_generate", "prompt", "endpoint_type"]:
             kwargs.pop(duplicate_key, None)
+
+        LOG.info(f"kwargs: {kwargs}")
+        kwargs["endpoint_type"] = self.cfg.endpoint_type
 
         output_dict.update(
             await self.model.generate_async(
@@ -316,7 +329,7 @@ class ParallelThinkingTask:
             return None
 
     async def _run_genselect(
-        self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs
+        self, prompt: str, solutions: List[Dict], local_random: random.Random, **kwargs
     ) -> tuple[int, Dict]:
         """Run GenSelect to choose the best solution."""
 
@@ -330,9 +343,9 @@ class ParallelThinkingTask:
         if sel_solution_idx is None:
             LOG.warning("GenSelect failed to produce valid solution index, falling back to random selection")
             sel_solution_idx = local_random.randint(0, max_idx)
-            genselect_result["selection_successful"] = False
+            genselect_result["generation_successful"] = False
         else:
-            genselect_result["selection_successful"] = True
+            genselect_result["generation_successful"] = True
 
         return {
             self.cfg.solution_key: solutions[sel_solution_idx][self.cfg.solution_key],
@@ -340,7 +353,7 @@ class ParallelThinkingTask:
         }
 
     async def _run_gensynthesis(
-        self, prompt: Union[str, List], solutions: List[Dict], local_random: random.Random, **kwargs
+        self, prompt: str, solutions: List[Dict], local_random: random.Random, **kwargs
     ) -> Dict:
         """Run GenSynthesis to synthesize a new solution from a list of candidate solutions."""
 
@@ -354,9 +367,9 @@ class ParallelThinkingTask:
             LOG.warning("GenSynthesis failed to produce valid solution, falling back to random selection")
             synthesized_solution = local_random.choice(solutions)[self.cfg.solution_key]
             # Add the boolean flag to aid analysis and debugging
-            gensynthesis_result["synthesis_successful"] = False
+            gensynthesis_result["generation_successful"] = False
         else:
-            gensynthesis_result["synthesis_successful"] = True
+            gensynthesis_result["generation_successful"] = True
 
         return {
             self.cfg.solution_key: synthesized_solution,
@@ -373,14 +386,15 @@ class ParallelThinkingTask:
         solutions, total_num_generated_tokens = await self._get_multiple_solutions(prompt, local_random, **kwargs)
         result["total_solution_generated_tokens"] = total_num_generated_tokens
 
-        if not solutions:
+        if solutions is None or len(solutions) == 0:
             output_dict = {
                 self.cfg.solution_key: "",
                 "solution_list": [],
                 f"{self.cfg.mode}_comparison": "",
                 f"{self.cfg.mode}_num_generated_tokens": 0,
+                f"{self.cfg.mode}_successful": False,
                 "total_solution_generated_tokens": total_num_generated_tokens,
-                "num_generated_tokens": total_num_generated_tokens,  # No additional tokens for genselect
+                "num_generated_tokens": total_num_generated_tokens,  # No additional tokens for genselect/gensynthesis
                 "num_best_solution_generated_tokens": 0,
             }
 
@@ -388,26 +402,31 @@ class ParallelThinkingTask:
             output_dict["generation"] = ""
             if self.cfg.count_prompt_tokens:
                 # The input doesn't make sense for such cases where there are no solutions
-                output_dict["num_input_tokens"] = None
+                output_dict["num_input_tokens"] = 0
+
+            LOG.warning("No solutions found for the prompt, returning empty output")
+            return output_dict
 
         # Step 2: Run GenSelect/GenSynthesis
+
+        # If the prompt is a list, we need to get the first message's content
+        prompt_str = prompt if isinstance(prompt, str) else prompt[0]["content"]
+        assert isinstance(prompt_str, str), "Prompt must be a string"
+
         if self.cfg.mode == "genselect":
-            output_dict = await self._run_genselect(prompt, solutions, local_random, **kwargs)
+            output_dict = await self._run_genselect(prompt_str, solutions, local_random, **kwargs)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
-            result["genselect_comparison"] = parallel_thinking_result["generation"]
-            result["genselect_selection_successful"] = parallel_thinking_result["selection_successful"]
         else:
             # GenSynthesis
-            output_dict = await self._run_gensynthesis(prompt, solutions, local_random)
+            output_dict = await self._run_gensynthesis(prompt_str, solutions, local_random)
             parallel_thinking_result = output_dict["parallel_thinking_result"]
-            result["gensynthesis_generation"] = parallel_thinking_result["generation"]
-            result["gensynthesis_synthesis_successful"] = parallel_thinking_result["synthesis_successful"]
 
-        # Add the tokens for parallel thinking
-        result["parallel_thinking_num_generated_tokens"] = parallel_thinking_result.get("num_generated_tokens", 0)
+        result[f"{self.cfg.mode}_comparison"] = parallel_thinking_result["generation"]
+        result[f"{self.cfg.mode}_successful"] = parallel_thinking_result["generation_successful"]
+        result[f"{self.cfg.mode}_num_generated_tokens"] = parallel_thinking_result.get("num_generated_tokens", 0)
 
         # Add the tokens for all the solutions and parallel thinking
-        total_gen_tokens = result["total_solution_generated_tokens"] + result["parallel_thinking_num_generated_tokens"]
+        total_gen_tokens = result["total_solution_generated_tokens"] + result[f"{self.cfg.mode}_num_generated_tokens"]
 
         # TODO: Decide what count of generated tokens do we want to report - the total or the best solution?
         # Current implementation returns the total number of generated tokens
