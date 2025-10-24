@@ -127,7 +127,7 @@ def process_file(
                 continue
 
             if remove_expected_answer:
-                del obj["expected_answer"]
+                del obj[expected_answer_field]
 
             # rename keys to standard names
             for current_key, new_key in [(problem_field, "problem"), (expected_answer_field, "expected_answer"), (id_field, "id")]:
