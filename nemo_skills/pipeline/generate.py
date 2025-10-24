@@ -218,9 +218,6 @@ def generate(
     ),
     qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    eval_args: str = typer.Option(
-        None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
-    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -345,8 +342,9 @@ def generate(
     if generation_module is None:
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
-    if os.sep in generation_module:
-        generation_task = import_from_path(generation_module)
+    if generation_module.endswith(".py") or os.sep in generation_module:
+        path_suffix = ".py" if not generation_module.endswith(".py") else ""
+        generation_task = import_from_path(generation_module + path_suffix)
     else:
         generation_task = importlib.import_module(generation_module)
     if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
@@ -407,7 +405,6 @@ def generate(
                 random_seed=seed,
                 output_dir=output_dir,
                 extra_arguments=extra_arguments,
-                eval_args=eval_args,
                 chunk_id=chunk_id,
                 num_chunks=num_chunks,
                 preprocess_cmd=preprocess_cmd,
@@ -491,8 +488,11 @@ def generate(
         skip_hf_home_check=skip_hf_home_check,
     )
 
+    # TODO: remove after https://github.com/NVIDIA-NeMo/Skills/issues/578 is resolved as default will be single job
+    sequential = True if cluster_config["executor"] in ["local", "none"] else False
+
     # Pass _reuse_exp to pipeline.run() to add jobs to existing experiment
-    result = pipeline.run(dry_run=dry_run, _reuse_exp=_reuse_exp)
+    result = pipeline.run(dry_run=dry_run, _reuse_exp=_reuse_exp, sequential=sequential)
     return result
 
 
