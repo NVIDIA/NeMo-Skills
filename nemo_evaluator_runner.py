@@ -64,7 +64,7 @@ evaluation:
             use_request_logging: true
     target:
       api_endpoint:
-        api_key: API_KEY_BOO
+        api_key: API_KEY
 
   tasks:
     - name: aime_2025_nemo
@@ -81,7 +81,11 @@ evaluation:
         f.write(yml_file)
 
     # WIPP: this is hardcoded config
-    cfg = RunConfig.from_hydra(config_dir=folder, config_name="config")
+    cfg = RunConfig.from_hydra(
+        config_dir=folder,
+        config_name="config",
+        hydra_overrides=["++evaluation.nemo_evaluator_config.config.output_dir=" + "/some"],
+    )
 
     logger.info("Created launcher config", cfg=cfg)
     return cfg
