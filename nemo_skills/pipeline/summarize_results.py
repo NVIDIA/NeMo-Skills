@@ -339,7 +339,7 @@ def summarize_results(
                 results[get_subset_name(benchmark, subset)].update(subset_metrics)
         else:
             results[benchmark].update(metrics["_all_"])
-
+        print(f"WIPP metrics in summarize_results: {metrics}")
         if len(metrics) > 1:
             for subset, subset_metrics in metrics.items():
                 metrics_to_print[get_subset_name(benchmark, subset)] = metrics_calculator.metrics_to_print()
@@ -371,6 +371,7 @@ def summarize_results(
             for metric_key, format_fn in metrics_to_print[benchmark].items():
                 metric_value = metrics[metric_key]
                 formatted_value = format_fn(metric_key, metric_value, metrics)
+                print(f"WIPP formatted val {formatted_value}")
                 if formatted_value is not None:
                     max_widths[metric_key] = max(
                         max_widths.get(metric_key, len(metric_key)),
