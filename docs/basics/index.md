@@ -100,7 +100,7 @@ executor: local
 containers:
   # some containers are public and we pull them
   trtllm: nvcr.io/nvidia/tensorrt-llm/release:1.0.0
-  vllm: vllm/vllm-openai:v0.10.1.1
+  vllm: vllm/vllm-openai:v0.11.0
   # some containers are custom and we will build them locally before running the job
   # you can always pre-build them as well
   nemo-skills: dockerfile:dockerfiles/Dockerfile.nemo-skills
