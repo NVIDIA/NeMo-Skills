@@ -152,6 +152,7 @@ stages:
     input_file: ${directories.step-4-aggregate}/final_result.jsonl
     only_correct_solutions: False
     pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    is_ground_truth_answer_present: True
     metadata_values:
       topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
     dependencies:

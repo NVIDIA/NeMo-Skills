@@ -471,11 +471,13 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     generation_model_pass_rate_range = stage_config.get("generation_model_pass_rate_range", None)
     pass_rate_range = stage_config.get("pass_rate_range", None)
     metadata_values = stage_config.get("metadata_values", None)
+    is_ground_truth_answer_present = stage_config.get("is_ground_truth_answer_present", False)
 
     generation_model_pass_rate_range_arg = f"    --generation_model_pass_rate_range {shlex.quote(json.dumps(generation_model_pass_rate_range, ensure_ascii=False))} " if generation_model_pass_rate_range else ""
     pass_rate_range_arg = f"    --pass_rate_range {shlex.quote(json.dumps(pass_rate_range, ensure_ascii=False))} " if pass_rate_range else ""
     metadata_values_arg = f"    --metadata_values {shlex.quote(json.dumps(metadata_values, ensure_ascii=False))} " if metadata_values else ""
     only_correct_arg = "    --only_correct_solutions " if only_correct_solutions else ""
+    is_ground_truth_answer_present_arg = "    --is_ground_truth_answer_present " if is_ground_truth_answer_present else ""
     run_cmd(
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/filter_solutions.py "
@@ -485,6 +487,7 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
             f"{generation_model_pass_rate_range_arg} "
             f"{pass_rate_range_arg} "
             f"{metadata_values_arg} "
+            f"{is_ground_truth_answer_present_arg} "
         ),
         cluster=cluster,
         exclusive=False,

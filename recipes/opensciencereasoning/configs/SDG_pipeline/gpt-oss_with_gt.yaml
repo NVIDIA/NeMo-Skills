@@ -207,6 +207,7 @@ stages:
     only_correct_solutions: True
     generation_model_pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    is_ground_truth_answer_present: True
     metadata_values:
       topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
     dependencies:
