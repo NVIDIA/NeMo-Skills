@@ -462,8 +462,12 @@ class SweBenchGenerationTask(GenerationTask):
         search_path = os.path.join(self.output_dir, "trajectories", data_point["instance_id"], "output.jsonl")
         if self.cfg.skip_inference:
             out_files = glob.glob(search_path)
-            assert len(out_files) == 1, f"Expected to find one file matching {search_path}, found {len(out_files)}"
-            out_file = out_files[0]
+            if not out_files:
+                return None  # skip this instance entirely
+            elif len(out_files) > 1:  # impossible in this case because there are no *'s in the path
+                raise ValueError(f"Found multiple files matching {search_path}: {out_files}")
+            else:
+                out_file = out_files[0]
         else:
             out_file = await self._execute_container_command(data_point, openhands_cmd, search_path, mode="agent")
 
@@ -667,6 +671,18 @@ class SweBenchGenerationTask(GenerationTask):
                 f"Unsupported agent framework: {self.cfg.agent_framework}. "
                 f"Supported frameworks: {', '.join(SupportedAgentFrameworks)}."
             )
+
+        if pred_file is None:
+            # Skip instance and return a dummy object
+            return {
+                "swe-bench-metrics": {
+                    "resolved": None,
+                    "patch_exists": None,
+                    "patch_successfully_applied": None,
+                },
+                "swe-bench-outputs": {},
+                "generation": "",
+            }
 
         pred_mounted_path = pred_file.replace(str(self.output_dir), "/trajectories_mount")
         with open(pred_file, "r") as f:
