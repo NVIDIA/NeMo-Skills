@@ -75,7 +75,7 @@ class ICPCMetrics(BaseMetrics):
         return ["total"] + list(self.problem_scores.keys())
 
     def metrics_to_print(self):
-        metrics_to_print = {"correct": as_int, "total": as_int, "solved": as_int, "average_run_time": as_float}
+        metrics_to_print = {"correct": as_int, "total": as_int, "solved": as_int, "average_number_of_runs": as_float}
         return metrics_to_print
 
 
