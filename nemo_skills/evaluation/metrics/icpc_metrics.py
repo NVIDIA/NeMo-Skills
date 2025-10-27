@@ -42,7 +42,6 @@ class ICPCMetrics(BaseMetrics):
  
 
     def get_metrics(self):
-        total_score = total_round_robin = 0.0
         self.problem_scores = {}
         self.correct_submissions = {}
         self.total_submissions = {}
