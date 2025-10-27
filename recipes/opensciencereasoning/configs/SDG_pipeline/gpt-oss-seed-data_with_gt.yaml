@@ -40,7 +40,7 @@ stages:
     problem_field: problem
     expected_answer_field: expected_answer
     id_field: id
-    remove_expected_answer: ${stages.generate_solutions.make_majority_voting}
+    remove_expected_answer: False
     remove_images: True
     num_options: null
     option_format_regex: null
