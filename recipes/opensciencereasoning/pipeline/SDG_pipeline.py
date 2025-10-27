@@ -361,8 +361,8 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
       - Runs LLM-based judging (math_judge) over those generations to get Yes/No per sample.
       - Postprocesses the judgements to append three keys to the final results file:
         - difficulty_model: the model used for generation
-        - pass_rate: decimal fraction of correct judgements (e.g., 0.5)
-        - pass_at_n: formatted fraction "correct/total" (e.g., 2/4)
+        - difficulty_model_pass_rate: decimal fraction of correct judgements (e.g., 0.5)
+        - difficulty_model_pass_at_n: formatted fraction "correct/total" (e.g., 2/4)
 
     Note: The judging step extracts predicted answers using the \\boxed{...} convention.
     It will only work out-of-the-box when generations include a final answer in boxed format.
@@ -419,7 +419,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_difficulty.py "
             f"    --judgement_dir '{output_dir}/judgement' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
-            f"    --pass_rate_model '{generation_args['model'].split('/')[-1]}' "
+            f"    --difficulty_model '{generation_args['model'].split('/')[-1]}' "
         ),
         cluster=cluster,
         exclusive=False,
@@ -460,7 +460,7 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     Supported filters (see `filter_solutions.py`):
       - `only_correct_solutions`: keep only samples marked `is_correct`.
       - `generation_model_pass_rate_range`: JSON `[min, max]` range (min exclusive, max inclusive).
-      - `pass_rate_range`: JSON `[min, max]` range over difficulty pass rates.
+      - `difficulty_model_pass_rate_range`: JSON `[min, max]` range over difficulty pass rates.
       - `metadata_values`: dict of field -> allowed values.
 
     Replace `filter_solutions.py` with your own implementation if custom filtering logic is required.
@@ -469,12 +469,12 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     input_file = stage_config["input_file"]
     only_correct_solutions = stage_config.get("only_correct_solutions", False)
     generation_model_pass_rate_range = stage_config.get("generation_model_pass_rate_range", None)
-    pass_rate_range = stage_config.get("pass_rate_range", None)
+    difficulty_model_pass_rate_range = stage_config.get("difficulty_model_pass_rate_range", None)
     metadata_values = stage_config.get("metadata_values", None)
     is_ground_truth_answer_present = stage_config.get("is_ground_truth_answer_present", False)
 
     generation_model_pass_rate_range_arg = f"    --generation_model_pass_rate_range {shlex.quote(json.dumps(generation_model_pass_rate_range, ensure_ascii=False))} " if generation_model_pass_rate_range else ""
-    pass_rate_range_arg = f"    --pass_rate_range {shlex.quote(json.dumps(pass_rate_range, ensure_ascii=False))} " if pass_rate_range else ""
+    difficulty_model_pass_rate_range_arg = f"    --difficulty_model_pass_rate_range {shlex.quote(json.dumps(difficulty_model_pass_rate_range, ensure_ascii=False))} " if difficulty_model_pass_rate_range else ""
     metadata_values_arg = f"    --metadata_values {shlex.quote(json.dumps(metadata_values, ensure_ascii=False))} " if metadata_values else ""
     only_correct_arg = "    --only_correct_solutions " if only_correct_solutions else ""
     is_ground_truth_answer_present_arg = "    --is_ground_truth_answer_present " if is_ground_truth_answer_present else ""
@@ -485,7 +485,7 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"{only_correct_arg}"
             f"{generation_model_pass_rate_range_arg} "
-            f"{pass_rate_range_arg} "
+            f"{difficulty_model_pass_rate_range_arg} "
             f"{metadata_values_arg} "
             f"{is_ground_truth_answer_present_arg} "
         ),

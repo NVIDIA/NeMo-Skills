@@ -29,7 +29,7 @@ def record_passes_filters(
     record: dict,
     only_correct: bool = False,
     gen_pass_rate_bounds: Optional[Sequence[Optional[float]]] = None,
-    pass_rate_bounds: Optional[Sequence[Optional[float]]] = None,
+    difficulty_pass_rate_bounds: Optional[Sequence[Optional[float]]] = None,
     majority_voting_agreement_rate_bounds: Optional[Sequence[Optional[float]]] = None,
     is_ground_truth_answer_present: bool = False,
     metadata_filters: Optional[Dict[str, List[str]]] = None,
@@ -40,7 +40,7 @@ def record_passes_filters(
         return False
     if gen_pass_rate_bounds and (gen_pass_rate_bounds[0] >= record["generation_model_pass_rate"] or gen_pass_rate_bounds[1] < record["generation_model_pass_rate"]):
         return False
-    if pass_rate_bounds and (pass_rate_bounds[0] >= record["pass_rate"] or pass_rate_bounds[1] < record["pass_rate"]):
+    if difficulty_pass_rate_bounds and (difficulty_pass_rate_bounds[0] >= record["difficulty_model_pass_rate"] or difficulty_pass_rate_bounds[1] < record["difficulty_model_pass_rate"]):
         return False
     if majority_voting_agreement_rate_bounds and (majority_voting_agreement_rate_bounds[0] >= record["majority_voting_agreement_rate"] or majority_voting_agreement_rate_bounds[1] < record["majority_voting_agreement_rate"]):
         return False
@@ -73,7 +73,7 @@ def parse_args() -> argparse.Namespace:
         help="JSON array [min, max] (min exclusive, max inclusive) for generation_model_pass_rate",
     )
     parser.add_argument(
-        "--pass_rate_range",
+        "--difficulty_model_pass_rate_range",
         type=json.loads,
         default=None,
         help="JSON array [min, max] (min exclusive, max inclusive) for pass_rate",
@@ -129,7 +129,7 @@ def main() -> None:
                 record,
                 only_correct=args.only_correct_solutions,
                 gen_pass_rate_bounds=args.generation_model_pass_rate_range,
-                pass_rate_bounds=args.pass_rate_range,
+                difficulty_pass_rate_bounds=args.difficulty_model_pass_rate_range,
                 majority_voting_agreement_rate_bounds=args.majority_voting_agreement_rate_range,
                 is_ground_truth_answer_present=args.is_ground_truth_answer_present,
                 metadata_filters=metadata_filters,

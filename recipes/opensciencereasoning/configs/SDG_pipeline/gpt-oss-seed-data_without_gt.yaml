@@ -189,7 +189,7 @@ stages:
     output_dir: ${directories.step-6-filter-solutions}
     input_file: ${directories.step-5-aggregate}/final_result.jsonl
     only_correct_solutions: False
-    pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    difficulty_model_pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     majority_voting_agreement_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     is_ground_truth_answer_present: True
     metadata_values:
