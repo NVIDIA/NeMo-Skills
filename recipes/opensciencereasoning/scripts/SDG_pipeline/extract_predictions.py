@@ -75,7 +75,7 @@ def collect_predictions(
                 sample["predicted_answer"] = predicted_answer
                 samples.append(sample)
 
-                if predicted_answer is not None:
+                if predicted_answer:
                     answer_counts[sample["problem"]][predicted_answer] += 1
                     totals[sample["problem"]] += 1
         
@@ -108,7 +108,7 @@ def main() -> None:
         with open(destination, "w") as fout:
             for sample in samples:
                 if args.majority_voting or "expected_answer" not in sample:
-                    majority_answer = None
+                    majority_answer = ""
                     counter = answer_counts.get(sample["problem"], Counter())
                     if counter:
                         majority_answer, majority_votes = counter.most_common(1)[0]
