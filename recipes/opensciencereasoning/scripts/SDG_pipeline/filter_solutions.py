@@ -30,6 +30,7 @@ def record_passes_filters(
     only_correct: bool = False,
     gen_pass_rate_bounds: Optional[Sequence[Optional[float]]] = None,
     pass_rate_bounds: Optional[Sequence[Optional[float]]] = None,
+    majority_voting_agreement_rate_bounds: Optional[Sequence[Optional[float]]] = None,
     metadata_filters: Optional[Dict[str, List[str]]] = None,
 ) -> bool:
     """Return True when a record satisfies correctness, pass-rate, and metadata constraints."""
@@ -40,7 +41,8 @@ def record_passes_filters(
         return False
     if pass_rate_bounds and (pass_rate_bounds[0] >= record["pass_rate"] or pass_rate_bounds[1] < record["pass_rate"]):
         return False
-    
+    if majority_voting_agreement_rate_bounds and (majority_voting_agreement_rate_bounds[0] >= record["majority_voting_agreement_rate"] or majority_voting_agreement_rate_bounds[1] < record["majority_voting_agreement_rate"]):
+        return False
     for field, allowed in metadata_filters.items():
         candidate = record.get(field)
         if candidate not in allowed:
@@ -71,6 +73,12 @@ def parse_args() -> argparse.Namespace:
         type=json.loads,
         default=None,
         help="JSON array [min, max] (min exclusive, max inclusive) for pass_rate",
+    )
+    parser.add_argument(
+        "--majority_voting_agreement_rate_range",
+        type=json.loads,
+        default=None,
+        help="JSON array [min, max] (min exclusive, max inclusive) for majority_voting_agreement_rate",
     )
     parser.add_argument(
         "--metadata_values",
@@ -113,6 +121,7 @@ def main() -> None:
                 only_correct=args.only_correct_solutions,
                 gen_pass_rate_bounds=args.generation_model_pass_rate_range,
                 pass_rate_bounds=args.pass_rate_range,
+                majority_voting_agreement_rate_bounds=args.majority_voting_agreement_rate_range,
                 metadata_filters=metadata_filters,
             ):
                 fout.write(json.dumps(record, ensure_ascii=False) + "\n")

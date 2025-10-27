@@ -34,6 +34,14 @@ def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
 
 
 def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
+    """The script performs several cleanup steps on the incoming JSONL: 
+    it renames user-provided keys to the canonical `problem`/`expected_answer`/`id`, 
+    can drop the original expected answer when majority voting will be used later, 
+    removes duplicate problems, filters out samples referencing images, enforces 
+    an MCQ option count and optional regex pattern, and moves all remaining fields 
+    into a `metadata` mapping. The resulting filtered dataset is written to 
+    `final_result.jsonl` inside `output_dir` for downstream stages.
+    """
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
     option_format_regex = stage_config.get('option_format_regex', None)
@@ -45,7 +53,7 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
     id_field = stage_config.get("id_field", None)
 
     cmd = (
-        f"python /nemo_run/code/recipes/opensciencereasoning/scripts/filter_problems.py "
+        f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/filter_problems.py "
         f"{input_file} "
         f"{output_dir}/{OUTPUT_FILE}"
         + (f" --deduplicate" if stage_config.get('deduplicate', False) else "")
@@ -132,7 +140,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
     run_cmd(
         ctx=wrap_arguments(
             (
-                f"python /nemo_run/code/recipes/opensciencereasoning/scripts/decontaminate.py "
+                f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/decontaminate.py "
                 f"    --input_path '{input_file}' "
                 f"    --dec_path '{output_dir}/decontaminate/output.jsonl' "
                 f"    --save_path {output_dir}/{OUTPUT_FILE} "
@@ -177,7 +185,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         extra_args = f"    --topic_key {shlex.quote(str(prev_name))} " if prev_name else ""
         run_cmd(
             ctx=wrap_arguments(
-                f"python /nemo_run/code/recipes/opensciencereasoning/scripts/prepare_topics.py "
+                f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/prepare_topics.py "
                 f"    --input_file '{input_file}' "
                 f"    --output_file '{output_dir}/tmp/prepared_for_{name}_labeling.jsonl' "
                 f"    --topics_to_choose {shlex.quote(topics_json)} "
@@ -193,7 +201,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         )
         generate(
             ctx=wrap_arguments(
-                f"++prompt_config=/nemo_run/code/recipes/opensciencereasoning/prompts/topics_labeling.yaml "
+                f"++prompt_config=/nemo_run/code/recipes/opensciencereasoning/prompts/SDG_pipeline/topics_labeling.yaml "
                 f"++generation_key={name} ",
             ),
             cluster=cluster,
@@ -215,7 +223,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
 
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_topics.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_topics.py "
             f"    --input_files {shlex.quote(json.dumps(save_paths, ensure_ascii=False))} "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --topics_structure {shlex.quote(json.dumps(topics_structure, ensure_ascii=False))} "
@@ -264,7 +272,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     majority_voting_args = f"    --majority_voting '{make_majority_voting}' " if make_majority_voting else ""
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/extract_predictions.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/extract_predictions.py "
             f"    --input_dir '{output_dir}/generation' "
             f"    --output_dir '{generation_dir}' "
             f"{predicted_answer_regex_args} "
@@ -291,7 +299,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
 
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_solutions.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_solutions.py "
             f"    --input_dir '{generation_dir}' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --generation_model '{generation_args['model'].split('/')[-1]}' "
@@ -331,7 +339,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
 
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/remove_redundant_fields.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/remove_redundant_fields.py "
             f"    --input_file '{input_file}' "
             f"    --output_file '{output_dir}/tmp/prepared.jsonl' "
             f"    --fields {shlex.quote(json.dumps(BASE_FIELDS, ensure_ascii=False))} "
@@ -365,7 +373,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
 
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_difficulty.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_difficulty.py "
             f"    --judgement_dir '{output_dir}/judgement' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --pass_rate_model '{generation_args['model'].split('/')[-1]}' "
@@ -391,7 +399,7 @@ def aggregate(cluster, expname, run_after, stage_config, **kwargs):
     solutions_path_arg = f"    --solutions_path {shlex.quote(str(solutions_path))} " if solutions_path is not None else ""
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/aggregate_matadata.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_matadata.py "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --metadata_files {shlex.quote(json.dumps(metadata_files, ensure_ascii=False))} "
             f"{solutions_path_arg}"
@@ -427,7 +435,7 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     only_correct_arg = "    --only_correct_solutions " if only_correct_solutions else ""
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/filter_solutions.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/filter_solutions.py "
             f"    --input_file '{input_file}' "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"{only_correct_arg}"
@@ -459,7 +467,7 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     fields_to_leave = ["problem", "generation"]
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/remove_redundant_fields.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/remove_redundant_fields.py "
             f"    --input_file '{input_file}' "
             f"    --output_file '{prepared_file}' "
             f"    --fields {shlex.quote(json.dumps(fields_to_leave, ensure_ascii=False))} "
@@ -504,7 +512,7 @@ stages_map = {
 if __name__ == "__main__":
     config_dir = Path(__file__).parents[1] / "configs" / "solution_sdg"
 
-    parser = argparse.ArgumentParser(description="OpenMathReasoning-1 solution generation pipeline")
+    parser = argparse.ArgumentParser(description="ScienceReasoning data generation pipeline")
     parser.add_argument(
         "--config_path",
         type=str,
