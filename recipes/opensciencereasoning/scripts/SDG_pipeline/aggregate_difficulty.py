@@ -21,18 +21,18 @@ from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from recipes.opensciencereasoning.scripts.SDG_pipeline.constants import BASE_FIELDS
 
 def main():
-    """Postprocess judged generations to add pass_rate_model, pass_rate, pass_at_n.
+    """Postprocess judged generations to add difficulty_model, difficulty_model_pass_rate, difficulty_model_pass_at_n.
 
     This script expects judged outputs. It aggregates Yes/No judgements per problem across
     seeds and writes enriched samples with:
-      - pass_rate_model: model used for generations
-      - pass_rate: decimal ratio correct/total (e.g., 0.5)
-      - pass_at_n: string fraction "correct/total" (e.g., 2/4)
+      - difficulty_model: model used for generations
+      - difficulty_model_pass_rate: decimal ratio correct/total (e.g., 0.5)
+      - difficulty_model_pass_at_n: string fraction "correct/total" (e.g., 2/4)
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--judgement_dir", required=True, help="Directory with judgement output-rs*.jsonl files")
     parser.add_argument("--output_file", required=True, help="Where to write updated final_result.jsonl")
-    parser.add_argument("--pass_rate_model", required=True, help="Model used for generations to record")
+    parser.add_argument("--difficulty_model_pass_rate", required=True, help="Model used for generations to record")
     args = parser.parse_args()
 
     # Aggregate judgements per id across random seeds
@@ -59,9 +59,9 @@ def main():
             pass_at_n = f"{correct}/{total}" if total > 0 else "0/0"
 
             sample = {key: value for key, value in sample.items() if key in BASE_FIELDS}
-            sample["pass_rate_model"] = args.pass_rate_model
-            sample["pass_rate"] = round(pass_rate, 6)
-            sample["pass_at_n"] = pass_at_n
+            sample["difficulty_model"] = args.pass_rate_model
+            sample["difficulty_model_pass_rate"] = round(pass_rate, 6)
+            sample["difficulty_model_pass_at_n"] = pass_at_n
             fout.write(json.dumps(sample) + "\n")
 
 
