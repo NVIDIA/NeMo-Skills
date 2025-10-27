@@ -40,16 +40,17 @@ def main():
     samples =[]
 
     files = sorted(glob.glob(f"{args.judgement_dir}/output*.jsonl"))
-    for path in files:
+    for i, path in enumerate(files):
         with open(path) as f:
             for line in f:
                 sample = json.loads(line)
-                samples.append(sample)
+                if i == 0:
+                    samples.append(sample)
                 judgements_by_problem[sample['problem']]['total'] += 1
                 judgements_by_problem[sample['problem']]['correct'] += 1 if is_correct_judgement(sample['judgement']) else 0
 
     # Write updated records with required keys
-    with open(args.output_file, "wt", encoding="utf-8") as fout:
+    with open(args.output_file, "w") as fout:
         for sample in samples:
             stats = judgements_by_problem[sample["problem"]]
             total = stats["total"]
