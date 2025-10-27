@@ -1,6 +1,6 @@
 cluster: local
 base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
-expname: "gpt-oss-generate-solutions"
+expname: "gpt-oss-generate-data"
 suffix: ""  # Suffix for experiment names
 dataset_name: ""  # Optional dataset name for id generation
 
@@ -22,7 +22,6 @@ pipeline_stages:
   - difficulty_estimation    # Estimate difficulty of problems
   - aggregate                # Aggregate all the metadata into a single file
   - filter_solutions         # Filter solutions
-  - prepare_for_sft          # Prepare for SFT
 
 # Directory structure configuration
 directories:
@@ -191,6 +190,7 @@ stages:
     input_file: ${directories.step-5-aggregate}/final_result.jsonl
     only_correct_solutions: False
     pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    majority_voting_agreement_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     metadata_values:
       topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
     dependencies:

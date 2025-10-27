@@ -1,6 +1,6 @@
 cluster: local
 base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
-expname: "gpt-oss-generate-solutions"
+expname: "gpt-oss-generate-data"
 suffix: ""  # Suffix for experiment names
 dataset_name: ""  # Optional dataset name for id generation
 
@@ -207,6 +207,7 @@ stages:
     only_correct_solutions: True
     generation_model_pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     pass_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
+    majority_voting_agreement_rate_range: [-1.0, 1.0] # minimum exclusive, maximum inclusive
     metadata_values:
       topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
     dependencies:
