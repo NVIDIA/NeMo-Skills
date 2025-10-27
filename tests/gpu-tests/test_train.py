@@ -31,7 +31,8 @@ def test_sft_nemo_rl(backend):
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl/{backend}"
 
     # need to clean up current cluster configuration as we mount /tmp and it causes problems
-    docker_rm(["/tmp/ray/ray_current_cluster", output_dir])
+    # need to clean up cache folder as otherwise megatron backend might fail when checkpoint format changes
+    docker_rm(["/tmp/ray/ray_current_cluster", "/mnt/datadrive/nemo-skills-test-data/hf-cache/nemo_rl/", output_dir])
 
     sft_nemo_rl(
         ctx=wrap_arguments(
@@ -67,6 +68,7 @@ def test_sft_nemo_rl(backend):
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
+        server_args="--enforce-eager",
     )
 
     metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
@@ -85,7 +87,8 @@ def test_sft_nemo_rl_messages_format():
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl-messages/megatron"
 
     # need to clean up current cluster configuration as we mount /tmp and it causes problems
-    docker_rm(["/tmp/ray/ray_current_cluster", output_dir])
+    # need to clean up cache folder as otherwise megatron backend might fail when checkpoint format changes
+    docker_rm(["/tmp/ray/ray_current_cluster", "/mnt/datadrive/nemo-skills-test-data/hf-cache/nemo_rl/", output_dir])
 
     sft_nemo_rl(
         ctx=wrap_arguments(
@@ -121,6 +124,7 @@ def test_sft_nemo_rl_messages_format():
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
+        server_args="--enforce-eager",
     )
 
     metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
@@ -139,7 +143,8 @@ def test_grpo_nemo_rl(backend):
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-grpo-nemo-rl/{backend}"
 
     # need to clean up current cluster configuration as we mount /tmp and it causes problems
-    docker_rm(["/tmp/ray/ray_current_cluster", output_dir])
+    # need to clean up cache folder as otherwise megatron backend might fail when checkpoint format changes
+    docker_rm(["/tmp/ray/ray_current_cluster", "/mnt/datadrive/nemo-skills-test-data/hf-cache/nemo_rl/", output_dir])
 
     grpo_nemo_rl(
         ctx=wrap_arguments(
@@ -178,6 +183,7 @@ def test_grpo_nemo_rl(backend):
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
+        server_args="--enforce-eager",
     )
 
     metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
