@@ -16,7 +16,7 @@ import argparse
 import json
 import logging
 
-from recipes.opensciencereasoning.scripts.constants import BASE_FIELDS
+from recipes.opensciencereasoning.scripts.SDG_pipeline.constants import BASE_FIELDS
 
 def check_topic_structure(sample: dict, topics_structure: dict, names: list):
     """Stepwise validate and normalize hierarchical labels in `sample`.
