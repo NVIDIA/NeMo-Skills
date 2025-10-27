@@ -59,7 +59,7 @@ def main():
             pass_at_n = f"{correct}/{total}" if total > 0 else "0/0"
 
             sample = {key: value for key, value in sample.items() if key in BASE_FIELDS}
-            sample["difficulty_model"] = args.pass_rate_model
+            sample["difficulty_model"] = args.difficulty_model_pass_rate
             sample["difficulty_model_pass_rate"] = round(pass_rate, 6)
             sample["difficulty_model_pass_at_n"] = pass_at_n
             fout.write(json.dumps(sample) + "\n")
