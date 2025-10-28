@@ -521,7 +521,6 @@ class Pipeline:
             else nullcontext()
         )
 
-        assert exec_config["num_gpus"] is None  # WIPP
         with env_context:
             return get_executor(
                 cluster_config=cluster_config,
@@ -619,7 +618,6 @@ class Pipeline:
                 container_image = self._resolve_container(exec_config, command, cluster_config)
                 # Pass external dependencies only to the first executor (SLURM doesn't support per-component dependencies in hetjobs)
                 exec_dependencies = external_deps if (het_idx == 0 and comp_idx == 0) else None
-                assert exec_config["num_gpus"] is None  # WIPP
                 executor = self._create_executor(
                     command,
                     exec_config,

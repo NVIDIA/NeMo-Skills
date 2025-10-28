@@ -253,10 +253,7 @@ def get_executor(
         additional_kwargs = {"entrypoint": ""}
         if gpus_per_node is None or gpus_per_node == 0:
             additional_kwargs["runtime"] = "runc"
-        # wipp
-        print(f"WIPP num_gpus_per_node {gpus_per_node}")
-        assert gpus_per_node is None  # WIPP
-        d = DockerExecutor(
+        return DockerExecutor(
             container_image=resolved_container,
             packager=packager,
             ipc_mode="host",
@@ -271,7 +268,6 @@ def get_executor(
             env_vars=env_vars,
             additional_kwargs=additional_kwargs,
         )
-        print(f"WIPP executor {d}")
 
     if not heterogeneous:
         env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"
