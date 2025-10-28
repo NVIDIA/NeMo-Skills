@@ -42,7 +42,8 @@ The templates differ along two axes:
 - [`aggregate`](scripts/SDG_pipeline/aggregate_matadata.py): Merges metadata (`metadata_files`) and optional solution glob (`solutions_path`) into `final_result.jsonl`. The resulting records combine base fields with appended metadata and solution statistics.
 - [`filter_solutions`](scripts/SDG_pipeline/filter_solutions.py): Applies correctness/pass-rate/metadata filters. Parameters: `only_correct_solutions`, `generation_model_pass_rate_range`, `difficulty_model_pass_rate_range`, `majority_voting_agreement_rate_range`, `metadata_values`. The filtered output preserves the same schema as the input `final_result.jsonl`.
 - [`prepare_for_sft`](pipeline/SDG_pipeline.py): Calls `nemo_skills.training.prepare_data` via the configured `prepare_data_kwargs` (tokenizer, prompt config, formatting toggles). Outputs an instruction-tuning JSONL file.
-- [`convert_to_messages`](): Converts the instruction-tuning JSONL file into messages format.
+- [`convert_to_messages`](scripts/SDG_pipeline/convert_to_messages.py): Converts the instruction-tuning JSONL file into messages format.
+- [`bucket`](scripts/SDG_pipeline/calculate_tkn_len_and_bucket.py): Appends `out_token_length` to each sample and optionally shard data into token-length buckets. It emits per-bucket files (e.g., `{stem}_bucket_16000.jsonl`) plus an overflow file alongside log summaries of bucket counts and percentages.
 
 ### How `filter_problems` Filters Data
 1. Normalizes field names based on the configured aliases (`problem_field`, `expected_answer_field`, `id_field`).

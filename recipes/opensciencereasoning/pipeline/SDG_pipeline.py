@@ -521,7 +521,14 @@ def convert_to_messages_format(cluster, expname, run_after, stage_config, **kwar
     )
 
 def bucket(cluster, expname, run_after, stage_config, **kwargs):
+    """Bucket samples by token length using the configured tokenizer.
 
+    Each record is augmented with its `out_token_length`, which is the
+    per-sample statistic written back to the JSONL output. It emits one JSONL file 
+    per configured bucket (for example `{stem}_bucket_16000.jsonl`) plus an overflow 
+    file, placing samples into the file whose upper bound matches their token length. 
+    Bucket counts and percentages are also reported via the script's logs.
+    """
     input_file = stage_config["input_file"]
     output_dir = stage_config["output_dir"]
 
