@@ -307,7 +307,7 @@ def sft_nemo_rl(
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
     sbatch_arguments: str | dict = typer.Option(
         "",
-        help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a python dictionary invoking from code.",
+        help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(

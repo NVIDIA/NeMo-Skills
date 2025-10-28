@@ -83,7 +83,7 @@ def start_server(
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
     sbatch_arguments: str | dict = typer.Option(
         "",
-        help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a python dictionary invoking from code.",
+        help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
 ):
     """Self-host a model server."""
