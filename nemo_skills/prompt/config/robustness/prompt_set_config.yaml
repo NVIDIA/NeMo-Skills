@@ -1,46 +1,25 @@
 gpqa:
-  - nemo_skills/prompt/config/robustness/mcq_prompts/1.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/2.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/3.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/4.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/5.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/6.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/7.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/8.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/9.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/10.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/11.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/12.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/13.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/14.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/15.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/16.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/17.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/18.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/19.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/20.yaml
-  - nemo_skills/prompt/config/robustness/mcq_prompts/21.yaml
+  - robustness/mcq_v1/aai_1
+  - robustness/mcq_v1/aai_2
+  - robustness/mcq_v1/boxed_1
+  - robustness/mcq_v1/boxed_2
+  - [robustness/mcq_v1/correct_1, '(?i)The correct answer choice is\:*\**\s*\**([A-Za-z])']
+  - [robustness/mcq_v1/correct_2, '(?i)The correct answer choice is\:*\**\s*\**([A-Za-z])']
+  - [robustness/mcq_v1/final_answer_1, '(?i)Final answer\b[\s\n\*\-–—\[:]*([A-Z])']
+  - [robustness/mcq_v1/final_answer_2, '(?i)Final answer\b[\s\n\*\-–—\[:]*([A-Z])']
+  - [robustness/mcq_v1/angle_brackets_1, '<<([A-Za-z])>>']
+  - [robustness/mcq_v1/angle_brackets_2, '<<([A-Za-z])>>']
+
 
 
 comp-math-24-25:
-  - nemo_skills/prompt/config/robustness/math_prompts/1.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/2.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/3.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/4.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/5.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/6.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/7.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/8.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/9.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/10.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/11.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/12.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/13.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/14.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/15.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/16.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/17.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/18.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/19.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/20.yaml
-  - nemo_skills/prompt/config/robustness/math_prompts/21.yaml
+  - robustness/math_prompts/boxed_1.yaml
+  - robustness/math_prompts/boxed_2.yaml
+  - robustness/math_prompts/boxed_3.yaml
+  - robustness/math_prompts/boxed_4.yaml
+  - robustness/math_prompts/boxed_5.yaml
+  - robustness/math_prompts/boxed_6.yaml
+  - robustness/math_prompts/boxed_7.yaml
+  - robustness/math_prompts/boxed_8.yaml
+  - robustness/math_prompts/boxed_aai.yaml
+  - robustness/math_prompts/boxed_general.yaml
