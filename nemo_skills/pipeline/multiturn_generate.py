@@ -254,18 +254,47 @@ def multiturn_generate(
     # Multi-turn generation client (runs in group A, talks to both servers)
     # Use lambda for cross-component hostname references
     def build_client_command():
-        return _build_multiturn_generation_command(
+        server_a_host_ref = server_a.hostname_ref()
+        server_b_host_ref = server_b.hostname_ref()
+        server_a_port_ref = server_a.meta_ref("port")
+        server_b_port_ref = server_b.meta_ref("port")
+
+        # Add debug logging to show what's being resolved
+        # Note: The hostname_ref() returns shell substitution strings that need evaluation
+        debug_cmd = (
+            "echo '=== CLIENT DEBUG ===' && "
+            "echo 'My hostname: '$(hostname) && "
+            f"echo 'server_a het_group_index: {server_a.het_group_index}' && "
+            f"echo 'server_b het_group_index: {server_b.het_group_index}' && "
+            "echo 'SLURM_JOB_NODELIST_HET_GROUP_0='$SLURM_JOB_NODELIST_HET_GROUP_0 && "
+            "echo 'SLURM_JOB_NODELIST_HET_GROUP_1='$SLURM_JOB_NODELIST_HET_GROUP_1 && "
+            # Test scontrol command directly
+            "echo 'Testing scontrol for het group 0:' && "
+            "(command -v scontrol && scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_0 | head -n1) || echo 'scontrol failed' && "
+            "echo 'Testing scontrol for het group 1:' && "
+            "(command -v scontrol && scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_1 | head -n1) || echo 'scontrol failed' && "
+            # Actually evaluate the shell substitutions to see what they resolve to
+            f"SERVER_A_RESOLVED={server_a_host_ref} && "
+            f"SERVER_B_RESOLVED={server_b_host_ref} && "
+            f"echo 'Resolved server_a: '$SERVER_A_RESOLVED:{server_a_port_ref} && "
+            f"echo 'Resolved server_b: '$SERVER_B_RESOLVED:{server_b_port_ref} && "
+            "echo '===================' && "
+        )
+
+        gen_cmd = _build_multiturn_generation_command(
             input_file=input_file,
             output_file=f"{output_dir}/conversations.jsonl",
-            server_a_hostname=server_a.hostname_ref(),
-            server_a_port=server_a.meta_ref("port"),
-            server_b_hostname=server_b.hostname_ref(),
-            server_b_port=server_b.meta_ref("port"),
+            server_a_hostname=server_a_host_ref,
+            server_a_port=server_a_port_ref,
+            server_b_hostname=server_b_host_ref,
+            server_b_port=server_b_port_ref,
             num_turns=num_turns,
             model_a_name=model_a,
             model_b_name=model_b,
             extra_arguments=extra_arguments,
         )
+
+        return debug_cmd + gen_cmd
 
     client = Command(
         command=build_client_command,

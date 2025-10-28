@@ -65,6 +65,16 @@ def vllm_server_command(
         server_entrypoint=entrypoint,
     )
 
+    # Add debug logging at start of server command
+    debug_prefix = (
+        "echo '=== SERVER DEBUG ===' && "
+        "echo 'Hostname: '$(hostname) && "
+        "echo 'Port: " + str(port) + "' && "
+        "env | grep SLURM | sort && "
+        "echo '===================' && "
+    )
+    cmd = debug_prefix + cmd
+
     metadata = {
         "port": port,
         "log_prefix": "server",

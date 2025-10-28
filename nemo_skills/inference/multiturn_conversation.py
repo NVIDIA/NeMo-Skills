@@ -41,6 +41,7 @@ Output format:
 import asyncio
 import json
 import logging
+import os
 import sys
 from dataclasses import field
 from pathlib import Path
@@ -50,6 +51,7 @@ import hydra
 from tqdm import tqdm
 
 from nemo_skills.inference.model import get_model
+from nemo_skills.inference.model.base import EndpointType
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -146,11 +148,74 @@ def main(cfg: MultiTurnConfig):
     # Create model clients
     LOG.info("Connecting to model servers...")
 
+    # DEBUG: Log SLURM environment variables
+    LOG.info("=== SLURM Environment Debug ===")
+    for var in sorted(os.environ.keys()):
+        if "SLURM" in var:
+            LOG.info(f"  {var}={os.environ[var]}")
+    LOG.info("=== End SLURM Debug ===")
+
     # Parse server addresses
     server_a_host, server_a_port = cfg.server_a_address.rsplit(":", 1)
     server_b_host, server_b_port = cfg.server_b_address.rsplit(":", 1)
 
+    LOG.info("DEBUG: Parsed server addresses:")
+    LOG.info(f"  Server A: {server_a_host}:{server_a_port}")
+    LOG.info(f"  Server B: {server_b_host}:{server_b_port}")
+
+    # Wait for servers to be ready before proceeding
+    import time
+
+    import httpx
+
+    LOG.info("Waiting for servers to be ready...")
+    servers_to_check = {
+        "Server A": f"http://{server_a_host}:{server_a_port}/v1/models",
+        "Server B": f"http://{server_b_host}:{server_b_port}/v1/models",
+    }
+
+    timeout = 600  # 10 minutes
+    poll_interval = 5  # seconds
+    deadline = time.time() + timeout
+    ready_servers = set()
+
+    while time.time() < deadline:
+        for name, url in servers_to_check.items():
+            if name in ready_servers:
+                continue
+            try:
+                resp = httpx.get(url, timeout=5.0)
+                if resp.status_code == 200:
+                    LOG.info(f"✓ {name} is ready! Models: {resp.json()}")
+                    ready_servers.add(name)
+            except Exception:
+                pass  # Server not ready yet
+
+        if len(ready_servers) == len(servers_to_check):
+            LOG.info("All servers are ready!")
+            break
+
+        time.sleep(poll_interval)
+    else:
+        missing = set(servers_to_check.keys()) - ready_servers
+        raise TimeoutError(f"Servers not ready after {timeout}s. Still waiting for: {', '.join(missing)}")
+
+    # Query what models the servers think they're serving
+    try:
+        resp_a = httpx.get(f"http://{server_a_host}:{server_a_port}/v1/models", timeout=5.0)
+        LOG.info(f"DEBUG: Server A models endpoint: {resp_a.json()}")
+    except Exception as e:
+        LOG.warning(f"Could not query server A models: {e}")
+
+    try:
+        resp_b = httpx.get(f"http://{server_b_host}:{server_b_port}/v1/models", timeout=5.0)
+        LOG.info(f"DEBUG: Server B models endpoint: {resp_b.json()}")
+    except Exception as e:
+        LOG.warning(f"Could not query server B models: {e}")
+
     # Configure server params
+    # For vLLM, the model name should match what the server reports
+    # Typically it's the path used to start the server
     cfg.server_a.model = cfg.model_a_name
     cfg.server_a.host = server_a_host
     cfg.server_a.port = server_a_port  # Keep as string
@@ -163,9 +228,15 @@ def main(cfg: MultiTurnConfig):
     server_a_dict = {k: v for k, v in cfg.server_a.__dict__.items() if v != ""}
     server_b_dict = {k: v for k, v in cfg.server_b.__dict__.items() if v != ""}
 
+    LOG.info(f"DEBUG: Creating model_a with config: {server_a_dict}")
+    LOG.info(f"DEBUG: Creating model_b with config: {server_b_dict}")
+
     # Create model instances (do NOT pass inference params here - those go to API calls)
     model_a = get_model(**server_a_dict)
     model_b = get_model(**server_b_dict)
+
+    LOG.info(f"DEBUG: model_a.litellm_kwargs: {model_a.litellm_kwargs}")
+    LOG.info(f"DEBUG: model_b.litellm_kwargs: {model_b.litellm_kwargs}")
 
     LOG.info("Successfully connected to both model servers")
 
@@ -295,7 +366,9 @@ async def generate_conversations(
                     try:
                         # Get inference params for current model
                         inference_params = inference_a.__dict__ if is_model_a else inference_b.__dict__
-                        response_data = await model.call_async(messages, **inference_params)
+                        response_data = await model.generate_async(
+                            prompt=messages, endpoint_type=EndpointType.chat, **inference_params
+                        )
                         response_content = response_data.get("generation", "")
 
                         # Record turn
