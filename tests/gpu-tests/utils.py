@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# settings that define how evaluation should be done by default (all can be changed from cmdline)
-DATASET_GROUP = "code"
-METRICS_TYPE = "ojbench"
-EVAL_SPLIT = "test_python"
-EVAL_ARGS = "++eval_type=ojbench"
-REQUIRES_SANDBOX = True
-KEEP_MOUNTS_FOR_SANDBOX = True
-GENERATION_ARGS = "++prompt_config=generic/default"
+import os
+
+
+def require_env_var(var_name: str) -> str:
+    """Raise a ValueError if the environment variable is not set."""
+    value = os.getenv(var_name)
+    if not value:
+        raise ValueError(f"Define {var_name} to run this test")
+    return value

@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from pathlib import Path
 
 import pytest
+from utils import require_env_var
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
 from nemo_skills.pipeline.cli import eval, grpo_nemo_rl, sft_nemo_rl, wrap_arguments
@@ -25,17 +25,14 @@ from tests.conftest import docker_rm
 @pytest.mark.gpu
 @pytest.mark.parametrize("backend", ["fsdp", "megatron"])
 def test_sft_nemo_rl(backend):
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl/{backend}"
 
     # need to clean up current cluster configuration as we mount /tmp and it causes problems
-    docker_rm(["/tmp/ray/ray_current_cluster", output_dir])
+    # need to clean up cache folder as otherwise megatron backend might fail when checkpoint format changes
+    docker_rm(["/tmp/ray/ray_current_cluster", "/mnt/datadrive/nemo-skills-test-data/hf-cache/nemo_rl/", output_dir])
 
     sft_nemo_rl(
         ctx=wrap_arguments(
@@ -71,6 +68,7 @@ def test_sft_nemo_rl(backend):
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
+        server_args="--enforce-eager",
     )
 
     metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
@@ -83,17 +81,14 @@ def test_sft_nemo_rl(backend):
 @pytest.mark.gpu
 def test_sft_nemo_rl_messages_format():
     """Test SFT training with messages format data and infer_from_data chat template."""
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-sft-nemo-rl-messages/megatron"
 
     # need to clean up current cluster configuration as we mount /tmp and it causes problems
-    docker_rm(["/tmp/ray/ray_current_cluster", output_dir])
+    # need to clean up cache folder as otherwise megatron backend might fail when checkpoint format changes
+    docker_rm(["/tmp/ray/ray_current_cluster", "/mnt/datadrive/nemo-skills-test-data/hf-cache/nemo_rl/", output_dir])
 
     sft_nemo_rl(
         ctx=wrap_arguments(
@@ -129,6 +124,7 @@ def test_sft_nemo_rl_messages_format():
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
+        server_args="--enforce-eager",
     )
 
     metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
@@ -138,19 +134,17 @@ def test_sft_nemo_rl_messages_format():
     assert metrics["num_entries"] == 10
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("backend", ["fsdp", "megatron"])
 def test_grpo_nemo_rl(backend):
-    model_path = os.getenv("NEMO_SKILLS_TEST_HF_MODEL")
-    if not model_path:
-        pytest.skip("Define NEMO_SKILLS_TEST_HF_MODEL to run this test")
-    model_type = os.getenv("NEMO_SKILLS_TEST_MODEL_TYPE")
-    if not model_type:
-        pytest.skip("Define NEMO_SKILLS_TEST_MODEL_TYPE to run this test")
+    model_path = require_env_var("NEMO_SKILLS_TEST_HF_MODEL")
+    model_type = require_env_var("NEMO_SKILLS_TEST_MODEL_TYPE")
 
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/test-grpo-nemo-rl/{backend}"
 
     # need to clean up current cluster configuration as we mount /tmp and it causes problems
-    docker_rm(["/tmp/ray/ray_current_cluster", output_dir])
+    # need to clean up cache folder as otherwise megatron backend might fail when checkpoint format changes
+    docker_rm(["/tmp/ray/ray_current_cluster", "/mnt/datadrive/nemo-skills-test-data/hf-cache/nemo_rl/", output_dir])
 
     grpo_nemo_rl(
         ctx=wrap_arguments(
@@ -189,6 +183,7 @@ def test_grpo_nemo_rl(backend):
         server_gpus=1,
         server_nodes=1,
         num_jobs=1,
+        server_args="--enforce-eager",
     )
 
     metrics = ComputeMetrics(benchmark="gsm8k").compute_metrics(
