@@ -7,7 +7,7 @@ import re
 import sys
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # --- Fast JSON (optional) ----------------------------------------------------
 try:  # orjson is significantly faster; fallback to std json
@@ -139,15 +139,6 @@ def parse_line_to_openai_format(json_line: str) -> Tuple[List[Dict], Dict]:
 
 
 # --- Workers -----------------------------------------------------------------
-
-
-def _process_single_line(payload: Tuple[int, int, str]):
-    seq_id, original_line_number, line = payload
-    try:
-        openai_messages, extra = parse_line_to_openai_format(line)
-        return seq_id, _json_dumps({**extra, "messages": openai_messages}), None
-    except ValueError as e:
-        return seq_id, None, f"Skipping line {original_line_number} due to error: {e}"
 
 
 def _process_batch(payloads: List[Tuple[int, int, str]]):  # batch variant to reduce IPC overhead

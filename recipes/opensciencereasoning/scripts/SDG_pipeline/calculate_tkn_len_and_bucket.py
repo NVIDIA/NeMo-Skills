@@ -2,7 +2,7 @@
 import os
 import sys
 import logging
-from typing import List, Dict
+from typing import List
 from pathlib import Path
 
 from transformers import AutoTokenizer
