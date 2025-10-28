@@ -520,21 +520,19 @@ class GenerationTask:
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
-        LOG.info("Test 1")
         with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
             generations = [json.loads(line) for line in fin]
-        LOG.info("Test 2")
+
         ordered_generations = [None] * len(generations)
         for gen_dict in generations:
             async_pos = gen_dict.pop(self.cfg.async_position_key)
             ordered_generations[async_pos] = gen_dict
-        LOG.info("Test 3")
+
         with open(self.cfg.output_file, "wt", encoding="utf-8") as fout:
             for gen_dict in ordered_generations:
                 fout.write(json.dumps(gen_dict) + "\n")
-        LOG.info("Test 4")
+
         Path(self.cfg.output_file + '-async').unlink()
-        LOG.info("Test 5")
 
     def generate(self):
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
@@ -560,10 +558,12 @@ class GenerationTask:
                 if output_path.exists():
                     output_path.unlink()
 
+        LOG.info("Test 1")
         asyncio.run(self.async_loop(data))
+        LOG.info("Test 2")
 
         self.postprocess()
-
+        LOG.info("Test 3")
         # Clean up the LLM client to prevent hanging
         if hasattr(self.llm, 'close'):
             self.llm.close()
