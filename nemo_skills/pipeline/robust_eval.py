@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import logging
 from copy import deepcopy
 from pathlib import Path
@@ -63,20 +64,20 @@ def robust_eval(
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     **ns_eval_kwargs,
 ):
-    """Run evaluation on multiple prompts and benchmarks to measure LLM robustness against changes in prompt.
-       robust_eval runs "ns eval" for each prompt and benchmark combination, creates folders with benchmark names containing every prompt result in a separate folder.
-       Afterwards, runs summarize_robustness to aggregate the metrics across prompts for each benchmark and save in summarize_robustness folder in main output_dir.
-       Usage is the same as "ns eval" with the addition of the --prompt_set_config argument, a yaml containing the list of prompts to use for each benchmark.
-
+    """\b
+    Run evaluation on multiple prompts and benchmarks to measure LLM robustness against changes in prompt.
+    robust_eval runs "ns eval" for each prompt and benchmark combination, creates folders with benchmark names containing every prompt result in a separate folder.
+    Afterwards, runs summarize_robustness to aggregate the metrics across prompts for each benchmark and save in summarize_robustness folder in main output_dir.
+    Usage is the same as "ns eval" with the addition of the --prompt_set_config argument, a yaml containing the list of prompts to use for each benchmark.
+    \b
     Note: prompt_set_config should be a yaml file with the following structure: (example in /nemo_skills/prompt/config/robustness/prompt_set_config.yaml)
-    ```
-    <benchmark_name>:
-      - <path_to_prompt_1>
-      - <path_to_prompt_2>
-      ...
-    <another_benchmark_name>:
-        - <path_to_prompt_1>
-        - <path_to_prompt_2>
+    benchmark_name:
+        - path_to_prompt_1
+        - path_to_prompt_2
+        ...
+    another_benchmark_name:
+        - path_to_prompt_1
+        - path_to_prompt_2
         ...
     All other arguments are "ns eval" arguments.
     """
@@ -104,9 +105,12 @@ def robust_eval(
                 LOG.info(f"Running prompt: {prompt}")
                 # deepcopy ctx and ns_eval_kwargs in case smth is changes in _eval
                 prompt_context = deepcopy(ctx)
+                if isinstance(prompt, list):
+                    prompt, extract_regex = prompt
+                    prompt_context.args.append(f"++eval_config.extract_regex='\"{extract_regex}\"'")
                 prompt_context.args.append(f"++prompt_config={prompt}")
                 prompt_kwargs = deepcopy(ns_eval_kwargs)
-                prompt_kwargs["expname"] = expname + f"_{benchmark_name}_{Path(prompt).stem}"
+                prompt_kwargs["expname"] = expname + f"_{Path(prompt).stem}"
                 _eval(
                     ctx=prompt_context,
                     output_dir=f"{output_dir}/{benchmark_name}/{Path(prompt).stem}",
@@ -117,12 +121,13 @@ def robust_eval(
                     reuse_code=reuse_code,
                     **prompt_kwargs,
                 )
-                dependent_tasks.append(prompt_kwargs["expname"])
+                dependent_tasks.append({prompt_kwargs["expname"]})
+
         sum_rob_command = f"python -m nemo_skills.pipeline.summarize_robustness {output_dir}"
         _ = pipeline_utils.add_task(
             exp,
             cmd=sum_rob_command,
-            task_name=f"{expname}:sum_robustness",
+            task_name=f"{expname}-sum_robustness",
             log_dir=f"{output_dir}/summarize_robustness",
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
@@ -134,6 +139,17 @@ def robust_eval(
         pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
 
+original_sig = inspect.signature(_eval)
+new_param = inspect.Parameter(
+    "prompt_set_config",
+    inspect.Parameter.KEYWORD_ONLY,
+    default=typer.Option(..., help="Yaml file containing list of prompts per benchmark"),
+    annotation=str,
+)
+new_params = list(original_sig.parameters.values()) + [new_param]
+robust_eval.__signature__ = original_sig.replace(parameters=new_params)
+
 if __name__ == "__main__":
     typer.main.get_command_name = lambda name: name
+
     app()
