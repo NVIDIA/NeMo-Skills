@@ -457,42 +457,40 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
 def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
     """Prepare cleaned, instruction-formatted data for SFT training.
 
-    The stage removes non-essential fields from the aggregated solutions and
-    then calls `nemo_skills.training.prepare_data` with the provided prompt
+    The stage calls `nemo_skills.training.prepare_data` with the provided prompt
     configuration and tokenizer so that the resulting `final_result.jsonl`
     can be used directly for supervised fine-tuning.
     """
     output_dir = stage_config["output_dir"]
     input_file = stage_config["input_file"]
-    prepared_file = f"{output_dir}/tmp/prepared.jsonl"
-    output_path = f"{output_dir}/{OUTPUT_FILE}"
-
-    fields_to_leave = ["problem", "generation"]
-    run_cmd(
-        ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/remove_redundant_fields.py "
-            f"    --input_file '{input_file}' "
-            f"    --output_file '{prepared_file}' "
-            f"    --fields {shlex.quote(json.dumps(fields_to_leave, ensure_ascii=False))} "
-        ),
-        cluster=cluster,
-        log_dir=f"{output_dir}/tmp/logs",
-        expname=f"{expname}_prepare_for_sft",
-        run_after=run_after,
-    )
 
     prepare_data_kwargs = stage_config.get("prepare_data_kwargs", {})
     prepare_data_ctx_args = prepare_data_kwargs.get("ctx_args", "")
 
     cmd = (
         f"mkdir -p {output_dir} && python -m nemo_skills.training.prepare_data "
-        f"    ++input_files='{prepared_file}' "
-        f"    ++output_path='{output_path}' "
+        f"    ++input_files='{input_file}' "
+        f"    ++output_path='{output_dir}/prepared.jsonl' "
         f"    ++add_unlabeled=True "
+        f"    ++add_incorrect=True "
+        f"    ++exclude_optional_keys=False "
         f"    {prepare_data_ctx_args}"
     )
     run_cmd(
         ctx=wrap_arguments(cmd),
+        cluster=cluster,
+        log_dir=f"{output_dir}/logs",
+        expname=f"{expname}_prepare_for_sft",
+        run_after=run_after,
+    )
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_metadata.py "
+            f"    --solutions_path '{output_dir}/prepared.jsonl' "
+            f"    --metadata_files {shlex.quote(json.dumps([input_file], ensure_ascii=False))} "
+            f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
+        ),
         cluster=cluster,
         log_dir=f"{output_dir}/logs",
         expname=expname,
