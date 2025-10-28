@@ -15,25 +15,29 @@ initial_dependency: None
 
 # Define the full sequence of stages for this mode
 pipeline_stages:
-  - filter_problems          # Filter problems based on format
-  - decontaminate            # Decontaminate problems
-  - topics_labeling          # Label topics and subtopics
-  - generate_solutions       # Generate solutions
-  - difficulty_estimation    # Estimate difficulty of problems
-  - aggregate                # Aggregate all the metadata into a single file
-  - filter_solutions         # Filter solutions
-  - prepare_for_sft          # Prepare for SFT
+  - filter_problems             # Filter problems based on format
+  - decontaminate               # Decontaminate problems
+  - topics_labeling             # Label topics and subtopics
+  - generate_solutions          # Generate solutions
+  - difficulty_estimation       # Estimate difficulty of problems
+  - aggregate                   # Aggregate all the metadata into a single file
+  - filter_solutions            # Filter solutions
+  - prepare_for_sft             # Prepare for SFT
+  - convert_to_messages_format  # Convert to messages format for training
+  - bucket                      # Bucket by token length
 
 # Directory structure configuration
 directories:
   step-0-filter-problems: ${base_output_dir}/solution-sdg/step-0-filter-problems
   step-1-decontaminate: ${base_output_dir}/solution-sdg/step-1-decontaminate
   step-2-topics-labeling: ${base_output_dir}/solution-sdg/step-2-topics-labeling
-  step-3-generate-solutions: ${base_output_dir}/solution-sdg/step-3-generate-solutions
+  step-3-generate-solutions: ${base_output_dir}/solution-sdg/step-3-generate-solutions-no-tool
   step-4-difficulty-estimation: ${base_output_dir}/solution-sdg/step-4-difficulty-estimation
-  step-5-aggregate: ${base_output_dir}/solution-sdg/step-5-aggregate
-  step-6-filter-solutions: ${base_output_dir}/solution-sdg/step-6-filter-solutions
-  step-7-prepare-for-sft: ${base_output_dir}/solution-sdg/step-7-prepare-for-sft
+  step-5-aggregate: ${base_output_dir}/solution-sdg/step-5-aggregate-no-tool
+  step-6-filter-solutions: ${base_output_dir}/solution-sdg/step-6-filter-solutions-no-tool
+  step-7-prepare-for-sft: ${base_output_dir}/solution-sdg/step-7-prepare-for-sft-no-tool
+  step-8-convert-to-messages-format: ${base_output_dir}/solution-sdg/step-8-convert-to-messages-format-no-tool
+  step-9-bucket: ${base_output_dir}/solution-sdg/step-9-bucket-no-tool
 
 # Stage-specific configurations
 stages:
@@ -113,9 +117,7 @@ stages:
     make_judgement: True
 
     reasoning_effort: ++chat_template_kwargs.reasoning_effort=high
-    builtin_tools: ++chat_template_kwargs.builtin_tools=[python]
     prompt_config: ++prompt_config=generic/general-boxed
-    code_tags: ++code_tags=gpt-oss
 
     generation_kwargs:
       args:
@@ -127,21 +129,16 @@ stages:
         dependent_jobs: 1
         num_chunks: 20
         num_random_seeds: 5
-        with_sandbox: True
         server_args: "--async-scheduling"
   
       ctx_args: >-
         ${stages.generate_solutions.prompt_config}
-        ${stages.generate_solutions.code_tags}
-        ++code_execution=true
         ++max_concurrent_requests=1024
         ++inference.tokens_to_generate=16000
         ++inference.endpoint_type=text
         ++inference.temperature=1.0
         ++inference.top_p=1.0
-        ++server.code_execution.max_code_executions=100
         ${stages.generate_solutions.reasoning_effort}
-        ${stages.generate_solutions.builtin_tools}
 
     judge_kwargs:
       ctx_args: >-
@@ -233,3 +230,18 @@ stages:
         ++assistant_end=\"'<|return|>'\" 
     dependencies:
       - filter_solutions
+
+  convert_to_messages_format:
+    output_file: ${directories.step-8-convert-to-messages-format}/${dataset_name}_no_tool.jsonl
+    input_file: ${directories.step-7-prepare-for-sft}/final_result.jsonl
+    dependencies:
+      - prepare_for_sft
+  
+  bucket:
+    input_file: ${directories.step-7-prepare-for-sft}/final_result.jsonl
+    output_dir: ${directories.step-9-bucket}
+    tokenizer_path: /hf_models/Qwen2.5-32B-Instruct
+    bucket_sizes:
+      - 16000
+      - 32000
+      - 64000
