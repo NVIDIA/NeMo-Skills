@@ -624,6 +624,9 @@ class GenerationTask:
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
 
+        # First wait for sandbox to be initialized (if needed)
+        await self.wait_for_sandbox()
+
         # Initialize output lock for thread-safe writing
         if self.output_lock is None:
             self.output_lock = asyncio.Lock()
@@ -696,6 +699,10 @@ class GenerationTask:
             return
         server_start_cmd = get_server_wait_cmd(server_address)
         subprocess.run(server_start_cmd, shell=True, check=True)
+
+    async def wait_for_sandbox(self):
+        if hasattr(self, "sandbox"):
+            await self.sandbox.wait_for_sandbox()
 
     def setup_litellm_cache(self):
         if self.cfg.enable_litellm_cache:

@@ -253,6 +253,15 @@ class Sandbox(abc.ABC):
             return "timeout"
         return determine_proof_status(output)
 
+    async def wait_for_sandbox(self, timeout: int = 120):
+        while True:
+            try:
+                output, _ = await self.sandbox.execute_code("print('test')", language="python", timeout=timeout)
+                if output.get("process_status") == "completed":
+                    return
+            except Exception:
+                await asyncio.sleep(1)
+
 
 class LocalSandbox(Sandbox):
     """Locally hosted sandbox."""
