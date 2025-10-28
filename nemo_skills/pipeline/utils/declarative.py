@@ -593,7 +593,7 @@ class Pipeline:
             job_level_gpus = (
                 group.hardware.num_gpus if (not heterogeneous and has_multiple_components and group.hardware) else None
             )
-
+            assert job_level_gpus is None
             for comp_idx, command in enumerate(group.commands):
                 # Assign het_group_index ONLY for heterogeneous jobs (per-job, not global)
                 # Non-heterogeneous jobs use localhost, so het_group_index should remain None

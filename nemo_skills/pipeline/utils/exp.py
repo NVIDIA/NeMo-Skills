@@ -248,7 +248,15 @@ def get_executor(
     if cluster_config["executor"] == "local":
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
         resolved_container = resolve_container_image(container, cluster_config)
-        return DockerExecutor(
+        # If no GPUs requested, force CPU runtime to avoid NVIDIA prestart hooks on hosts
+        # without nvidia-container-toolkit / drivers.
+        additional_kwargs = {"entrypoint": ""}
+        if gpus_per_node is None or gpus_per_node == 0:
+            additional_kwargs["runtime"] = "runc"
+        # wipp
+        print(f"WIPP num_gpus_per_node {gpus_per_node}")
+        assert gpus_per_node is None
+        d = DockerExecutor(
             container_image=resolved_container,
             packager=packager,
             ipc_mode="host",
@@ -261,8 +269,9 @@ def get_executor(
             num_gpus=-1 if gpus_per_node else None,
             network="host",
             env_vars=env_vars,
-            additional_kwargs={"entrypoint": ""},
+            additional_kwargs=additional_kwargs,
         )
+        print(f"WIPP executor {d}")
 
     if not heterogeneous:
         env_vars["SLURM_MASTER_NODE"] = "$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n1)"

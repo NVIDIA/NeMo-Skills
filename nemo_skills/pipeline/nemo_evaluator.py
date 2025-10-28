@@ -199,14 +199,14 @@ def nemo_evaluator(
             command=eval_cmd,
             container=container_id,  # key or full image
             # gpus=job_gpus or None, WIPP
-            gpus=0,
+            gpus=None,
             nodes=job_nodes or 1,
             name=f"{expname}-{idx}" if len(groups) > 1 else expname,
             metadata={
                 "log_prefix": "main",
                 "environment": group_envs.get((container_id, sig), {}),
                 # "gpus": job_gpus or None, WIPP
-                "gpus": 0,
+                "gpus": None,
             },
         )
 
