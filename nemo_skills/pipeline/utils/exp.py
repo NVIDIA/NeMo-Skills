@@ -212,7 +212,7 @@ def get_executor(
         partition: SLURM partition override. If omitted, inferred from `gpus_per_node`
             and `cluster_config`.
         qos: SLURM QOS.
-        time_min: Minimum time in minutes to request (e.g., for backfill).
+        time_min: Minimum time to request (e.g., for backfill). Needs to be in"HH:MM:SS" format
         dependencies: SLURM job handles to depend on. The dependency type is taken from
             `cluster_config['dependency_type']` (default: "afterany").
         extra_package_dirs: Additional directories to package with the code for remote
