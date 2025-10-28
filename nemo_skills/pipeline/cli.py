@@ -35,6 +35,7 @@ from nemo_skills.pipeline.start_server import start_server
 from nemo_skills.pipeline.summarize_results import summarize_results
 from nemo_skills.pipeline.summarize_robustness import summarize_robustness
 from nemo_skills.pipeline.verl.ppo import ppo_verl
+from nemo_skills.pipeline.nemo_evaluator import nemo_evaluator
 
 typer.main.get_command_name = lambda name: name
 

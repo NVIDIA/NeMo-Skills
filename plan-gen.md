@@ -139,17 +139,18 @@ Planned (to match the design in this plan):
 ### Practical example (target UX via `ns nemo_evaluator`)
 
 ```bash
+# Run the provided example config from the repo tests folder
 ns nemo_evaluator \
   --cluster local \
   --output_dir /results \
   --expname evaluator-run \
-  --tasks aime_2025_nemo \
-  ++nemo_eval_config_dir=/configs/evaluator \
-  ++nemo_eval_config_name=config
+  --tasks ifeval \
+  ++nemo_eval_config_dir=tests/data/nemo_evaluator \
+  ++nemo_eval_config_name=example-eval-config
 ```
 
 Notes:
-- `output_dir` is used for logs and `.done` tracking; evaluator output placement should be controlled via its Hydra config (e.g., `++evaluation.nemo_evaluator_config.config.output_dir=/results`).
+- `output_dir` is used for logs and `.done` tracking; evaluator output placement is controlled via the Hydra config (e.g., in `tests/data/nemo_evaluator/example-eval-config.yaml`).
 - If chunking/seeds are supported in this subcommand, they only affect orchestration; the evaluator command itself is agnostic.
 
 ### Task-based container selection via evaluator mapping

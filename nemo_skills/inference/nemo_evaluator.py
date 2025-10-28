@@ -1,18 +1,30 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.
-# Licensed under the Apache License, Version 2.0
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from __future__ import annotations
 
+import logging
 import subprocess
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-try:  # Python 3.11+
-    import tomllib  # type: ignore[attr-defined]
-except Exception:  # pragma: no cover
-    import tomli as tomllib  # type: ignore[no-redef]
+import hydra
+from omegaconf import OmegaConf
 
 from nemo_skills.inference.generate import GenerationTask
+from nemo_skills.utils import get_logger_name, setup_logging
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @dataclass(kw_only=True)
@@ -21,6 +33,10 @@ class NemoEvaluatorConfig:
     nemo_eval_config_dir: Optional[str] = None
     nemo_eval_config_name: str = "config"
     stream_subprocess_output: bool = True
+    # Task/mapping knobs (forwarded to launcher or used internally)
+    tasks: Optional[List[str]] = None
+    latest_mapping: bool = False
+    tasks_mapping_toml: Optional[str] = None
 
 
 class NemoEvaluatorGeneration(GenerationTask):
@@ -29,48 +45,18 @@ class NemoEvaluatorGeneration(GenerationTask):
         return ""
 
     @staticmethod
-    def _process_mapping(mapping_toml: Dict[str, Any]) -> Dict[tuple[str, str], Dict[str, Any]]:
-        """Local processing of mapping.toml into expected dict structure.
-        Mirrors nemo_evaluator_launcher.common.mapping._process_mapping.
-        """
-        mapping: Dict[tuple[str, str], Dict[str, Any]] = {}
-        for harness_name, harness_data in mapping_toml.items():
-            if not isinstance(harness_data, dict) or "tasks" not in harness_data:
-                # skip unrelated keys
-                continue
-            tasks_by_endpoint = harness_data["tasks"]
-            for endpoint_type, tasks in tasks_by_endpoint.items():
-                for task_name, task_data in tasks.items():
-                    key = (harness_name, task_name)
-                    entry = {
-                        "task": task_name,
-                        "harness": harness_name,
-                        "container": harness_data.get("container"),
-                        "endpoint_type": endpoint_type,
-                    }
-                    if isinstance(task_data, dict):
-                        entry.update(task_data)
-                    mapping[key] = entry
-        return mapping
-
-    @staticmethod
     def _load_mapping(
         latest: bool = False, mapping_toml: Optional[str] = None
     ) -> Dict[tuple[str, str], Dict[str, Any]]:
-        """Load mapping via launcher if available; fallback to local toml parser when not installed.
-        Only the subset used by tests is implemented.
-        """
+        """Load mapping via nemo_evaluator_launcher (required)."""
         try:
             from nemo_evaluator_launcher.common.mapping import load_tasks_mapping as _ltm  # type: ignore
-
-            return _ltm(latest=latest, mapping_toml=mapping_toml)
-        except Exception:
-            # Fallback requires mapping_toml
-            if not mapping_toml:
-                raise RuntimeError("nemo_evaluator_launcher is not available and mapping_toml was not provided")
-            with open(mapping_toml, "rb") as f:
-                raw = tomllib.load(f)
-            return NemoEvaluatorGeneration._process_mapping(raw)
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError(
+                "nemo_evaluator_launcher is required for evaluator task mapping. "
+                "Install with: pip install nemo-evaluator-launcher"
+            ) from e
+        return _ltm(latest=latest, mapping_toml=mapping_toml)
 
     @staticmethod
     def _get_task_from_mapping(query: str, mapping: Dict[tuple[str, str], Dict[str, Any]]) -> Dict[str, Any]:
@@ -137,24 +123,132 @@ class NemoEvaluatorGeneration(GenerationTask):
             parts.extend(passthrough_overrides)
         return " ".join(parts)
 
+    # ---- Testable hooks for launcher integration ----
+    @staticmethod
+    def build_run_config(config_dir: str, config_name: str, overrides: Optional[List[str]] = None):
+        try:
+            from nemo_evaluator_launcher.api import RunConfig  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError(
+                "nemo_evaluator_launcher is required. Install with: pip install nemo-evaluator-launcher"
+            ) from e
+        return RunConfig.from_hydra(
+            config_dir=config_dir,
+            config_name=config_name,
+            hydra_overrides=overrides or [],
+        )
+
+    @staticmethod
+    def resolve_task_def(mapping: Dict[tuple[str, str], Dict[str, Any]], task_query: str) -> Dict[str, Any]:
+        try:
+            from nemo_evaluator_launcher.common.mapping import get_task_from_mapping  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError(
+                "nemo_evaluator_launcher is required for evaluator task mapping. "
+                "Install with: pip install nemo-evaluator-launcher"
+            ) from e
+        return get_task_from_mapping(task_query, mapping)
+
+    @staticmethod
+    def build_task_command(run_cfg, task_cfg, task_def) -> tuple[str, str]:
+        try:
+            from nemo_evaluator_launcher.common.helpers import get_eval_factory_command  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError(
+                "nemo_evaluator_launcher is required. Install with: pip install nemo-evaluator-launcher"
+            ) from e
+        cmd_struct = get_eval_factory_command(run_cfg, task_cfg, task_def)
+        return cmd_struct.cmd, cmd_struct.debug
+
+    @staticmethod
+    def execute_shell_command(cmd: str, stream: bool) -> int:
+        stdout = subprocess.PIPE if stream else subprocess.DEVNULL
+        process = subprocess.Popen(cmd, shell=True, stdout=stdout, text=True, bufsize=1)
+        if stream and process.stdout is not None:
+            for line in process.stdout:
+                print(line.rstrip())
+            process.stdout.close()
+        process.wait()
+        return process.returncode
+
     def __init__(self, cfg: NemoEvaluatorConfig | None = None):
-        # Skip LLM/model initialization; this class acts as a thin wrapper
         self.cfg = cfg or NemoEvaluatorConfig()
 
-    def generate(self):  # pragma: no cover - end-to-end wiring will be tested separately later
-        # Placeholder: execute an evaluator command if provided via cfg; otherwise, no-op
-        cmd = self.build_eval_command(
-            tasks=[],
-            nemo_eval_config_dir=self.cfg.nemo_eval_config_dir,
-            nemo_eval_config_name=self.cfg.nemo_eval_config_name,
-            passthrough_overrides=[],
+    def generate(self):
+        if not self.cfg.nemo_eval_config_dir:
+            raise ValueError("nemo_eval_config_dir is required to build evaluator RunConfig")
+
+        # Build launcher RunConfig
+        run_cfg = self.build_run_config(
+            config_dir=self.cfg.nemo_eval_config_dir,
+            config_name=self.cfg.nemo_eval_config_name,
+            overrides=[],
         )
-        try:
-            # Using a no-op echo to validate command format without side effects
-            _ = subprocess.list2cmdline(cmd.split())
-        except Exception as e:
-            raise RuntimeError(f"Failed to build evaluator command: {e}")
+
+        # Determine tasks to run
+        requested_tasks = self.cfg.tasks
+        tasks_to_run: List[str]
+        if requested_tasks:
+            tasks_to_run = requested_tasks
+        else:
+            # Use tasks from the Hydra config if none explicitly requested
+            tasks_to_run = [getattr(t, "name", None) for t in getattr(run_cfg.evaluation, "tasks", [])]
+            tasks_to_run = [t for t in tasks_to_run if t]
+        LOG.info(f"WIPP req tasks {requested_tasks}")
+        if not tasks_to_run:
+            LOG.warning("No tasks requested or found in config; nothing to run")
+            return
+
+        # Load mapping and run each task sequentially
+        mapping = self._load_mapping(
+            latest=self.cfg.latest_mapping,
+            mapping_toml=self.cfg.tasks_mapping_toml,
+        )
+
+        name_to_task_cfg = {getattr(t, "name", None): t for t in getattr(run_cfg.evaluation, "tasks", [])}
+        for task_name in tasks_to_run:
+            task_cfg = name_to_task_cfg.get(task_name)
+            if task_cfg is None:
+                LOG.warning(
+                    "Task %s not present in run_cfg.evaluation.tasks; proceeding with default task cfg", task_name
+                )
+                # Some launchers may allow constructing a default task_cfg shape; here we require presence
+                # Continue to next task rather than fail-hard
+                continue
+
+            task_def = self.resolve_task_def(mapping, task_name)
+            cmd, debug = self.build_task_command(run_cfg, task_cfg, task_def)
+            LOG.info("Generated evaluator command", extra={"cmd": cmd, "debug": debug})
+
+            rc = self.execute_shell_command(cmd, self.cfg.stream_subprocess_output)
+            if rc != 0:
+                raise RuntimeError(f"Evaluator for task {task_name} exited with code {rc}")
 
 
 # Keep symbol for pipeline dynamic import compatibility if needed
 GENERATION_TASK_CLASS = NemoEvaluatorGeneration
+
+
+# Hydra entrypoint to allow `python -m nemo_skills.inference.nemo_evaluator ++overrides`
+@hydra.main(version_base=None, config_name=None)
+def main(cfg):  # cfg is an OmegaConf DictConfig built from ++ overrides
+    setup_logging()
+    cfg_dict = OmegaConf.to_container(cfg, resolve=True) or {}
+    # Normalize tasks: accept comma-delimited string or list
+    tasks_val = cfg_dict.get("tasks")
+    if isinstance(tasks_val, str):
+        tasks_val = [t.strip() for t in tasks_val.split(",") if t.strip()]
+    evaluator_cfg = NemoEvaluatorConfig(
+        nemo_eval_config_dir=cfg_dict.get("nemo_eval_config_dir"),
+        nemo_eval_config_name=str(cfg_dict.get("nemo_eval_config_name", "config")),
+        stream_subprocess_output=bool(cfg_dict.get("stream_subprocess_output", True)),
+        tasks=tasks_val,
+        latest_mapping=bool(cfg_dict.get("latest_mapping", False)),
+        tasks_mapping_toml=cfg_dict.get("tasks_mapping_toml"),
+    )
+    task = NemoEvaluatorGeneration(evaluator_cfg)
+    task.generate()
+
+
+if __name__ == "__main__":
+    main()
