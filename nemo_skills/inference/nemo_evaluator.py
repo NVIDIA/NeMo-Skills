@@ -33,10 +33,8 @@ class NemoEvaluatorConfig:
     nemo_eval_config_dir: Optional[str] = None
     nemo_eval_config_name: str = "config"
     stream_subprocess_output: bool = True
-    # Task/mapping knobs (forwarded to launcher or used internally)
+    # Tasks
     tasks: Optional[List[str]] = None
-    latest_mapping: bool = False
-    tasks_mapping_toml: Optional[str] = None
 
 
 class NemoEvaluatorGeneration(GenerationTask):
@@ -45,9 +43,7 @@ class NemoEvaluatorGeneration(GenerationTask):
         return ""
 
     @staticmethod
-    def _load_mapping(
-        latest: bool = False, mapping_toml: Optional[str] = None
-    ) -> Dict[tuple[str, str], Dict[str, Any]]:
+    def _load_mapping() -> Dict[tuple[str, str], Dict[str, Any]]:
         """Load mapping via nemo_evaluator_launcher (required)."""
         try:
             from nemo_evaluator_launcher.common.mapping import load_tasks_mapping as _ltm  # type: ignore
@@ -56,7 +52,7 @@ class NemoEvaluatorGeneration(GenerationTask):
                 "nemo_evaluator_launcher is required for evaluator task mapping. "
                 "Install with: pip install nemo-evaluator-launcher"
             ) from e
-        return _ltm(latest=latest, mapping_toml=mapping_toml)
+        return _ltm(latest=False)
 
     @staticmethod
     def _get_task_from_mapping(query: str, mapping: Dict[tuple[str, str], Dict[str, Any]]) -> Dict[str, Any]:
@@ -89,10 +85,8 @@ class NemoEvaluatorGeneration(GenerationTask):
         cls,
         *,
         task_queries: List[str],
-        use_latest: bool = False,
-        mapping_toml: Optional[str] = None,
     ) -> str:
-        mapping = cls._load_mapping(latest=use_latest, mapping_toml=mapping_toml)
+        mapping = cls._load_mapping()
         containers = set()
         for q in task_queries:
             task_info = cls._get_task_from_mapping(q, mapping)
@@ -123,7 +117,7 @@ class NemoEvaluatorGeneration(GenerationTask):
             parts.extend(passthrough_overrides)
         return " ".join(parts)
 
-    # ---- Testable hooks for launcher integration ----
+    # Testable hooks for launcher integration
     @staticmethod
     def build_run_config(config_dir: str, config_name: str, overrides: Optional[List[str]] = None):
         try:
@@ -200,10 +194,7 @@ class NemoEvaluatorGeneration(GenerationTask):
             return
 
         # Load mapping and run each task sequentially
-        mapping = self._load_mapping(
-            latest=self.cfg.latest_mapping,
-            mapping_toml=self.cfg.tasks_mapping_toml,
-        )
+        mapping = self._load_mapping()
 
         name_to_task_cfg = {getattr(t, "name", None): t for t in getattr(run_cfg.evaluation, "tasks", [])}
         for task_name in tasks_to_run:
@@ -243,8 +234,6 @@ def main(cfg):  # cfg is an OmegaConf DictConfig built from ++ overrides
         nemo_eval_config_name=str(cfg_dict.get("nemo_eval_config_name", "config")),
         stream_subprocess_output=bool(cfg_dict.get("stream_subprocess_output", True)),
         tasks=tasks_val,
-        latest_mapping=bool(cfg_dict.get("latest_mapping", False)),
-        tasks_mapping_toml=cfg_dict.get("tasks_mapping_toml"),
     )
     task = NemoEvaluatorGeneration(evaluator_cfg)
     task.generate()

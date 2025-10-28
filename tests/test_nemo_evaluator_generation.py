@@ -3,6 +3,7 @@
 
 import importlib
 import textwrap
+from collections import defaultdict
 
 import pytest
 
@@ -48,53 +49,80 @@ def _import_generation_class():
 
 
 def test_get_client_container_single_task(sample_mapping_toml):
+    pytest.importorskip("nemo_evaluator_launcher")
     Gen = _import_generation_class()
     get_client_container = getattr(Gen, "get_client_container", None)
     if get_client_container is None:
         pytest.skip("get_client_container not implemented yet")
+    # Use latest mapping from launcher and pick any task
+    from nemo_evaluator_launcher.common.mapping import load_tasks_mapping
 
-    container = get_client_container(
-        task_queries=["math_harness.aime_2025_nemo"], use_latest=False, mapping_toml=sample_mapping_toml
-    )
-    assert container == "nvcr.io/nvidia/eval-factory/simple-evals:25.08.1"
+    mp = load_tasks_mapping(latest=True)
+    (harness, task), info = next(iter(mp.items()))
+    fq = f"{harness}.{task}"
+    container = get_client_container(task_queries=[fq])
+    assert container == info.get("container")
 
 
 def test_get_client_container_multi_same_container(sample_mapping_toml):
+    pytest.importorskip("nemo_evaluator_launcher")
     Gen = _import_generation_class()
     get_client_container = getattr(Gen, "get_client_container", None)
     if get_client_container is None:
         pytest.skip("get_client_container not implemented yet")
+    from nemo_evaluator_launcher.common.mapping import load_tasks_mapping
 
-    # Both tasks do not exist under same harness; keep single existing task twice to verify set logic
-    container = get_client_container(
-        task_queries=["math_harness.aime_2025_nemo", "other_harness.aime_2025_nemo"],
-        use_latest=False,
-        mapping_toml=sample_mapping_toml,
-    )
-    assert container == "nvcr.io/nvidia/eval-factory/simple-evals:25.08.1"
+    mp = load_tasks_mapping(latest=True)
+    by_container = defaultdict(list)
+    for (h, t), info in mp.items():
+        by_container[info.get("container")].append((h, t))
+    pair = next(((c, tasks) for c, tasks in by_container.items() if len(tasks) >= 2), None)
+    if not pair:
+        pytest.skip("No two tasks with same container found in current mapping")
+    container_expect, tasks_list = pair
+    q = [f"{h}.{t}" for h, t in tasks_list[:2]]
+    container = get_client_container(task_queries=q)
+    assert container == container_expect
 
 
 def test_get_client_container_conflict(sample_mapping_toml):
+    pytest.importorskip("nemo_evaluator_launcher")
     Gen = _import_generation_class()
     get_client_container = getattr(Gen, "get_client_container", None)
     if get_client_container is None:
         pytest.skip("get_client_container not implemented yet")
+    from nemo_evaluator_launcher.common.mapping import load_tasks_mapping
 
+    mp = load_tasks_mapping(latest=True)
+    items = list(mp.items())
+    # Find two tasks with different containers
+    first_h, first_t = items[0][0]
+    first_c = items[0][1].get("container")
+    second = next(((h, t, info) for (h, t), info in items[1:] if info.get("container") != first_c), None)
+    if second is None:
+        pytest.skip("No conflict containers available in mapping")
+    second_h, second_t, _ = second
     with pytest.raises(Exception):
-        get_client_container(
-            task_queries=["aime_2025_nemo", "humaneval"], use_latest=False, mapping_toml=sample_mapping_toml
-        )
+        get_client_container(task_queries=[f"{first_h}.{first_t}", f"{second_h}.{second_t}"])
 
 
 def test_get_client_container_ambiguous(sample_mapping_toml):
+    pytest.importorskip("nemo_evaluator_launcher")
     Gen = _import_generation_class()
     get_client_container = getattr(Gen, "get_client_container", None)
     if get_client_container is None:
         pytest.skip("get_client_container not implemented yet")
+    from nemo_evaluator_launcher.common.mapping import load_tasks_mapping
 
-    # Query without harness when multiple harnesses contain same task must error
+    mp = load_tasks_mapping(latest=True)
+    task_to_harnesses = defaultdict(list)
+    for (h, t) in mp.keys():
+        task_to_harnesses[t].append(h)
+    ambiguous = next((t for t, hs in task_to_harnesses.items() if len(hs) >= 2), None)
+    if not ambiguous:
+        pytest.skip("No ambiguous task names found in current mapping")
     with pytest.raises(Exception):
-        get_client_container(task_queries=["aime_2025_nemo"], use_latest=False, mapping_toml=sample_mapping_toml)
+        get_client_container(task_queries=[ambiguous])
 
 
 def test_build_eval_command_includes_overrides(sample_mapping_toml):
