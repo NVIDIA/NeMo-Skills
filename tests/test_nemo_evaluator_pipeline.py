@@ -15,6 +15,7 @@ def _import_pipeline_cmd():
 
 
 def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
+    pytest.importorskip("nemo_evaluator_launcher")
     mod = _import_pipeline_cmd()
     app = getattr(mod, "app", None)
     command_fn = getattr(mod, "nemo_evaluator", None)
@@ -24,8 +25,8 @@ def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
     # Simulate Typer call via function directly; ensure no exceptions for dry_run
     class Ctx:
         args = [
-            "++nemo_eval_config_dir=/configs/evaluator",
-            "++nemo_eval_config_name=config",
+            "++nemo_eval_config_dir=tests/data/nemo_evaluator",
+            "++nemo_eval_config_name=example-eval-config",
         ]
 
     # Provide minimal valid args
@@ -34,7 +35,7 @@ def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
         cluster=None,
         output_dir=str(tmp_path / "out"),
         expname="evaluator-test",
-        tasks="aime_2025_nemo",
+        tasks="ifeval",
         job_gpus=0,
         job_nodes=1,
         partition=None,
@@ -50,8 +51,6 @@ def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
         run_after=None,
         dependent_jobs=0,
         dry_run=True,
-        latest_mapping=False,
-        tasks_mapping_toml=None,
     )
 
     # Should not raise; actual Pipeline.run is expected to handle dry_run path

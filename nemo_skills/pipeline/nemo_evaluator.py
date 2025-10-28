@@ -8,7 +8,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import typer
 
@@ -63,11 +63,15 @@ def nemo_evaluator(
     # Config discovery
     config_dir: str = typer.Option(None, help="Where to search for cluster configs"),
     dry_run: bool = typer.Option(False, help="If True, validate without submitting the job"),
-    # Mapping flags
-    latest_mapping: bool = typer.Option(False, help="Use the latest evaluator task mapping from remote"),
-    tasks_mapping_toml: str = typer.Option(None, help="Path to a local mapping.toml for evaluator tasks"),
+    # Evaluator mapping/config knobs
+    latest_mapping: bool = typer.Option(
+        False, help="If True, use latest upstream task mapping from nemo_evaluator_launcher"
+    ),
+    tasks_mapping_toml: Optional[str] = typer.Option(
+        None, help="Path to a local mapping.toml to resolve harness/task containers"
+    ),
 ):
-    """Run Nemo Evaluator tasks via nemo-skills orchestration (no server hosting).
+    """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
     Extra Hydra overrides for the underlying evaluator generator can be passed positionally and will be
     forwarded to the Python -m invocation, e.g. ++nemo_eval_config_dir=..., ++nemo_eval_config_name=..., etc.
@@ -93,42 +97,128 @@ def nemo_evaluator(
         check_mounted_paths=False,
     )
 
-    # Build evaluator command (do not start servers)
+    # Helpers for container + env resolution
+    def _parse_override_flag(args: List[str], key: str) -> Optional[str]:
+        prefix = f"++{key}="
+        for a in args:
+            if a.startswith(prefix):
+                return a[len(prefix) :]
+        return None
+
+    def _normalize_env_map(value) -> Dict[str, str]:
+        env: Dict[str, str] = {}
+        if value is None:
+            return env
+        if isinstance(value, dict):
+            for k, v in value.items():
+                if isinstance(k, str) and isinstance(v, (str, int, float)):
+                    env[k] = str(v)
+            return env
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                if not isinstance(item, str) or "=" not in item:
+                    raise ValueError(f"Invalid env var entry: {item!r}; expected 'KEY=VALUE' string")
+                k, v = item.split("=", 1)
+                env[k] = v
+            return env
+        raise ValueError("env_vars must be a dict or list of 'KEY=VALUE' strings")
+
+    # Now preparing the config for the launcher
+    # 1)  tasks from CLI
     task_list = [t.strip() for t in tasks.split(",") if t.strip()]
-    tasks_arg = ",".join(task_list)
 
-    eval_cmd = (
-        "export HYDRA_FULL_ERROR=1 && "
-        "python -m nemo_skills.inference.nemo_evaluator "
-        f"++tasks={tasks_arg} "
-        f"{extra_overrides}"
-    )
+    # 2) Resolve container per task via launcher mapping
+    from nemo_evaluator_launcher.common.mapping import get_task_from_mapping, load_tasks_mapping  # type: ignore
 
-    # Create client command only (no server component)
-    client_cmd = Command(
-        command=eval_cmd,
-        container=cluster_config["containers"].get("nemo-skills", "nemo-skills"),
-        gpus=job_gpus or None,
-        nodes=job_nodes or 1,
-        name=expname,
-        metadata={"log_prefix": "main"},
-    )
+    mapping = load_tasks_mapping(latest=False)
 
-    group = CommandGroup(
-        commands=[client_cmd],
-        hardware=HardwareConfig(
-            partition=partition,
-            qos=qos,
-            time_min=time_min,
-            exclusive=exclusive,
-            num_gpus=job_gpus or None,
-            num_nodes=job_nodes or 1,
-        ),
-        name=expname,
-        log_dir=log_dir,
-    )
+    def _task_to_container(task_query: str) -> str:
+        # Accept 'task' or 'harness.task'
+        task_def = get_task_from_mapping(task_query, mapping)
+        container = task_def.get("container")
+        if not container:
+            raise ValueError(f"No container specified for task {task_query!r} in nemo_evaluator_launcher's mapping")
+        return container
 
-    jobs = [{"name": expname, "group": group}]
+    # 3) Build launcher RunConfig to collect env_vars: use same overrides the evaluator will receive
+    from nemo_evaluator_launcher.api import RunConfig  # type: ignore
+
+    cfg_dir = _parse_override_flag(ctx.args, "nemo_eval_config_dir")
+    cfg_name = _parse_override_flag(ctx.args, "nemo_eval_config_name") or "config"
+    run_cfg = None
+    if cfg_dir:
+        run_cfg = RunConfig.from_hydra(config_dir=cfg_dir, config_name=cfg_name, hydra_overrides=list(ctx.args))
+
+    # 4) Build per-task env maps (global overlaid by per-task)
+    global_env: Dict[str, str] = {}
+    per_task_env: Dict[str, Dict[str, str]] = {}
+    if run_cfg is not None:
+        evaluation = getattr(run_cfg, "evaluation", None)
+        if evaluation is not None:
+            global_env = _normalize_env_map(getattr(evaluation, "env_vars", None))
+            # Build name->task cfg map to fetch per-task envs
+            tasks_cfg = getattr(evaluation, "tasks", []) or []
+            name_to_task = {getattr(t, "name", None): t for t in tasks_cfg if getattr(t, "name", None)}
+            for tq in task_list:
+                tname = tq.split(".", 1)[-1]
+                tcfg = name_to_task.get(tname)
+                env_map = dict(global_env)
+                if tcfg is not None:
+                    env_map.update(_normalize_env_map(getattr(tcfg, "env_vars", None)))
+                per_task_env[tq] = env_map
+
+    # 5) Group tasks by (container, env_signature)
+    def _env_signature(env: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
+        return tuple(sorted(env.items()))
+
+    groups: Dict[Tuple[str, Tuple[Tuple[str, str], ...]], List[str]] = {}
+    group_envs: Dict[Tuple[str, Tuple[Tuple[str, str], ...]], Dict[str, str]] = {}
+    for tq in task_list:
+        cont = _task_to_container(tq)
+        env_map = per_task_env.get(tq, global_env)
+        sig = _env_signature(env_map)
+        key = (cont, sig)
+        groups.setdefault(key, []).append(tq)
+        group_envs[key] = env_map
+
+    # 6) Build jobs per group
+    jobs = []
+    for idx, ((container_id, sig), group_tasks) in enumerate(groups.items()):
+        tasks_arg = ",".join(group_tasks)
+        eval_cmd = (
+            "export HYDRA_FULL_ERROR=1 && "
+            "python -m nemo_skills.inference.nemo_evaluator "
+            f"++tasks={tasks_arg} "
+            f"{extra_overrides}"
+        )
+
+        client_cmd = Command(
+            command=eval_cmd,
+            container=container_id,  # key or full image
+            gpus=job_gpus or None,
+            nodes=job_nodes or 1,
+            name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+            metadata={
+                "log_prefix": "main",
+                "environment": group_envs.get((container_id, sig), {}),
+            },
+        )
+
+        group = CommandGroup(
+            commands=[client_cmd],
+            hardware=HardwareConfig(
+                partition=partition,
+                qos=qos,
+                time_min=time_min,
+                exclusive=exclusive,
+                num_gpus=job_gpus or None,
+                num_nodes=job_nodes or 1,
+            ),
+            name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+            log_dir=log_dir,
+        )
+
+        jobs.append({"name": group.name, "group": group})
 
     pipeline = Pipeline(
         name=expname,
