@@ -41,12 +41,13 @@ Output format:
 import asyncio
 import json
 import logging
-import os
 import sys
+import time
 from dataclasses import field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import httpx
 import hydra
 from tqdm import tqdm
 
@@ -55,6 +56,52 @@ from nemo_skills.inference.model.base import EndpointType
 from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+def wait_for_servers_ready(
+    servers: Dict[str, str],
+    timeout: int = 600,
+    poll_interval: int = 5,
+) -> Dict[str, Dict]:
+    """Wait for model servers to be ready before proceeding.
+
+    Args:
+        servers: Dict mapping server names to /v1/models endpoint URLs
+        timeout: Maximum time to wait in seconds (default: 10 minutes)
+        poll_interval: Time between health check attempts in seconds
+
+    Returns:
+        Dict mapping server names to their model info from /v1/models endpoint
+
+    Raises:
+        TimeoutError: If servers are not ready within timeout period
+    """
+    LOG.info(f"Waiting for {len(servers)} server(s) to be ready (timeout: {timeout}s)...")
+
+    deadline = time.time() + timeout
+    ready_servers = {}
+
+    while time.time() < deadline:
+        for name, url in servers.items():
+            if name in ready_servers:
+                continue
+            try:
+                resp = httpx.get(url, timeout=5.0)
+                if resp.status_code == 200:
+                    model_info = resp.json()
+                    LOG.info(f"✓ {name} is ready!")
+                    ready_servers[name] = model_info
+            except Exception:
+                pass  # Server not ready yet
+
+        if len(ready_servers) == len(servers):
+            LOG.info("All servers are ready!")
+            return ready_servers
+
+        time.sleep(poll_interval)
+
+    missing = set(servers.keys()) - set(ready_servers.keys())
+    raise TimeoutError(f"Servers not ready after {timeout}s. Still waiting for: {', '.join(missing)}")
 
 
 @nested_dataclass(kw_only=True)
@@ -145,73 +192,19 @@ def main(cfg: MultiTurnConfig):
                     existing_conversations[conv_id] = conv
         LOG.info(f"Found {len(existing_conversations)} existing conversations, will skip those")
 
-    # Create model clients
-    LOG.info("Connecting to model servers...")
-
-    # DEBUG: Log SLURM environment variables
-    LOG.info("=== SLURM Environment Debug ===")
-    for var in sorted(os.environ.keys()):
-        if "SLURM" in var:
-            LOG.info(f"  {var}={os.environ[var]}")
-    LOG.info("=== End SLURM Debug ===")
-
     # Parse server addresses
     server_a_host, server_a_port = cfg.server_a_address.rsplit(":", 1)
     server_b_host, server_b_port = cfg.server_b_address.rsplit(":", 1)
 
-    LOG.info("DEBUG: Parsed server addresses:")
-    LOG.info(f"  Server A: {server_a_host}:{server_a_port}")
-    LOG.info(f"  Server B: {server_b_host}:{server_b_port}")
+    LOG.info(f"Server A: {cfg.model_a_name} @ {server_a_host}:{server_a_port}")
+    LOG.info(f"Server B: {cfg.model_b_name} @ {server_b_host}:{server_b_port}")
 
     # Wait for servers to be ready before proceeding
-    import time
-
-    import httpx
-
-    LOG.info("Waiting for servers to be ready...")
     servers_to_check = {
         "Server A": f"http://{server_a_host}:{server_a_port}/v1/models",
         "Server B": f"http://{server_b_host}:{server_b_port}/v1/models",
     }
-
-    timeout = 600  # 10 minutes
-    poll_interval = 5  # seconds
-    deadline = time.time() + timeout
-    ready_servers = set()
-
-    while time.time() < deadline:
-        for name, url in servers_to_check.items():
-            if name in ready_servers:
-                continue
-            try:
-                resp = httpx.get(url, timeout=5.0)
-                if resp.status_code == 200:
-                    LOG.info(f"✓ {name} is ready! Models: {resp.json()}")
-                    ready_servers.add(name)
-            except Exception:
-                pass  # Server not ready yet
-
-        if len(ready_servers) == len(servers_to_check):
-            LOG.info("All servers are ready!")
-            break
-
-        time.sleep(poll_interval)
-    else:
-        missing = set(servers_to_check.keys()) - ready_servers
-        raise TimeoutError(f"Servers not ready after {timeout}s. Still waiting for: {', '.join(missing)}")
-
-    # Query what models the servers think they're serving
-    try:
-        resp_a = httpx.get(f"http://{server_a_host}:{server_a_port}/v1/models", timeout=5.0)
-        LOG.info(f"DEBUG: Server A models endpoint: {resp_a.json()}")
-    except Exception as e:
-        LOG.warning(f"Could not query server A models: {e}")
-
-    try:
-        resp_b = httpx.get(f"http://{server_b_host}:{server_b_port}/v1/models", timeout=5.0)
-        LOG.info(f"DEBUG: Server B models endpoint: {resp_b.json()}")
-    except Exception as e:
-        LOG.warning(f"Could not query server B models: {e}")
+    wait_for_servers_ready(servers_to_check)
 
     # Configure server params
     # For vLLM, the model name should match what the server reports
@@ -228,17 +221,9 @@ def main(cfg: MultiTurnConfig):
     server_a_dict = {k: v for k, v in cfg.server_a.__dict__.items() if v != ""}
     server_b_dict = {k: v for k, v in cfg.server_b.__dict__.items() if v != ""}
 
-    LOG.info(f"DEBUG: Creating model_a with config: {server_a_dict}")
-    LOG.info(f"DEBUG: Creating model_b with config: {server_b_dict}")
-
     # Create model instances (do NOT pass inference params here - those go to API calls)
     model_a = get_model(**server_a_dict)
     model_b = get_model(**server_b_dict)
-
-    LOG.info(f"DEBUG: model_a.litellm_kwargs: {model_a.litellm_kwargs}")
-    LOG.info(f"DEBUG: model_b.litellm_kwargs: {model_b.litellm_kwargs}")
-
-    LOG.info("Successfully connected to both model servers")
 
     # Run conversation generation
     results = asyncio.run(
