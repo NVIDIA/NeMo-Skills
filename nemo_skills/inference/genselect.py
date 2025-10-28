@@ -38,6 +38,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 @nested_dataclass(kw_only=True)
 class GenSelectConfig(GenerateSolutionsConfig):
     """Genselect parameters."""
+
     input_file: str
     output_file: str
 
@@ -100,6 +101,7 @@ class GenSelectTask(GenerationTask):
         return judgment
 
     def postprocess(self):
+        print("Postprocessing...")
         single_correctness_instances_file = Path(self.cfg.input_file).parent / "single_correctness_instances.jsonl"
         single_correctness_instances = [json.loads(line) for line in open(single_correctness_instances_file, "r")]
 

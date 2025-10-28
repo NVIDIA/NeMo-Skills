@@ -560,7 +560,12 @@ class GenerationTask:
 
         asyncio.run(self.async_loop(data))
 
+        print("Async loop completed")
         self.postprocess()
+
+        # Clean up the LLM client to prevent hanging
+        if hasattr(self.llm, 'close'):
+            self.llm.close()
 
 
 GENERATION_TASK_CLASS = GenerationTask

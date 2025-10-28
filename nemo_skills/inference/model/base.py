@@ -100,7 +100,28 @@ class BaseModel:
         litellm.client_session = httpx.Client(limits=httpx_limits)
         litellm.aclient_session = httpx.AsyncClient(limits=httpx_limits)
 
+    def close(self):
+        """Close the httpx client sessions."""
+        import asyncio
+
+        if hasattr(litellm, 'client_session') and litellm.client_session:
+            litellm.client_session.close()
+
+        if hasattr(litellm, 'aclient_session') and litellm.aclient_session:
+            # Close the async client - use asyncio.run to create a fresh event loop
+            try:
+                asyncio.run(litellm.aclient_session.aclose())
+            except Exception:
+                # If that fails, try to close it using an existing loop
+                try:
+                    loop = asyncio.get_event_loop()
+                    if not loop.is_closed():
+                        loop.run_until_complete(litellm.aclient_session.aclose())
+                except Exception:
+                    pass  # Best effort cleanup
+
     def __del__(self):
+        self.close()
         if self._tunnel:
             self._tunnel.stop()
 

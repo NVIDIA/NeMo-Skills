@@ -56,6 +56,11 @@ class OnlineGenSelectWrapper:
         self.genselect_prompt = get_prompt(self.cfg.prompt_config, prompt_template=self.cfg.prompt_template)
         self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
+    def close(self):
+        """Close the wrapped model."""
+        if hasattr(self.model, 'close'):
+            self.model.close()
+
     def _extract_judgment(self, generation: str, max_idx: int) -> Optional[int]:
         """Extract the judgment index from GenSelect generation."""
         judgment = None

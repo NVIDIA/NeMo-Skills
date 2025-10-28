@@ -48,6 +48,11 @@ class CodeExecutionWrapper:
         self.sandbox = sandbox
         self.config = config
 
+    def close(self):
+        """Close the wrapped model."""
+        if hasattr(self.model, 'close'):
+            self.model.close()
+
     async def _generate_single(
         self,
         prompt: str | list[dict],
