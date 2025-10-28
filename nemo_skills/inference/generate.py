@@ -496,7 +496,9 @@ class GenerationTask:
             else:
                 remaining_data_points.append(data_point)
 
+        LOG.info("Testing if async loop is working...")
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
+        LOG.info("Testing if async loop is working... done")
 
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
