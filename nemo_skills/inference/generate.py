@@ -501,12 +501,15 @@ class GenerationTask:
         LOG.info("Testing if async loop is working... done")
 
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
+            LOG.info("Test 1")
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
+                LOG.info("Test 2")
                 async with self.output_lock:
                     self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
 
             # Create tasks for all remaining data points
+            LOG.info("Test 3")
             tasks = []
             for data_point in remaining_data_points:
                 task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
@@ -514,10 +517,13 @@ class GenerationTask:
 
             # Wait for all tasks to complete
             if tasks:
+                LOG.info("Test 4")
                 await asyncio.gather(*tasks)
 
+            LOG.info("Test 5")
             pbar.close()
 
+        LOG.info("Test 6")
         self.restore_async_order()
 
     def restore_async_order(self):
