@@ -192,15 +192,21 @@ def nemo_evaluator(
             f"{extra_overrides}"
         )
 
+        # Ensure CPU-only runs don't request GPUs from DockerExecutor:
+        # When job_gpus == 0, explicitly set metadata.gpus = None so
+        # exec_config["num_gpus"] becomes None (not 0), preventing GPU runtime selection.
         client_cmd = Command(
             command=eval_cmd,
             container=container_id,  # key or full image
-            gpus=job_gpus or None,
+            # gpus=job_gpus or None, WIPP
+            gpus=0,
             nodes=job_nodes or 1,
             name=f"{expname}-{idx}" if len(groups) > 1 else expname,
             metadata={
                 "log_prefix": "main",
                 "environment": group_envs.get((container_id, sig), {}),
+                # "gpus": job_gpus or None, WIPP
+                "gpus": 0,
             },
         )
 
