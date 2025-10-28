@@ -136,7 +136,6 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
         # Prepare input and expected output files
         file_creation_commands.append(f"cat <<'_EOT_' > {unique_dir}/input.txt\n{task_args['test_input']}\n_EOT_\n")
-        
 
         setup_script = "\n".join(file_creation_commands)
         sandbox = LocalSandbox()
@@ -146,7 +145,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         if setup_result.get("stderr"):
             raise Exception(f"File setup failed: {setup_result['stderr']}")
 
-        #prepare the output file
+        # prepare the output file
         file_creation_commands = []
         file_creation_commands.append(
             f"cat <<'_EOT_' > {unique_dir}/correct_output.txt\n{task_args['test_output']}\n_EOT_\n"
@@ -160,10 +159,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
         # 2. Compile only the problem solution (skip checker/grader recompilation)
         # Compile the solution together with optional grader/stub sources without
         # recompiling the checker/manager again.
-        compile_command = (
-            f"cd {unique_dir} && "            
-            f"./compile.sh"
-        )
+        compile_command = f"cd {unique_dir} && ./compile.sh"
         compile_result, _ = worker_loop.run_until_complete(
             sandbox.execute_code(compile_command, language="shell", timeout=120)
         )
@@ -235,8 +231,8 @@ def add_includes(code: str, problem_id: str) -> str:
     if "using namespace std;" not in code and "std::" not in code:
         code_header += "\nusing namespace std;\n\n"
     # add missing dummy implementations for ICPC 25 triples problem
-   
-    return code_header + code + "\n" 
+
+    return code_header + code + "\n"
 
 
 class ICPCEvaluator(BaseEvaluator):
@@ -304,10 +300,10 @@ class ICPCEvaluator(BaseEvaluator):
             )
         pre_dir = self.precompiled_cache[pid]
 
-        problem_state = {                      
-            "outputs": [],   
-            "scores": [],             
-            "passed": True,            
+        problem_state = {
+            "outputs": [],
+            "scores": [],
+            "passed": True,
         }
 
         all_tests = [(tname, t) for tname, t in problem_metadata["tests"].items()]
@@ -351,11 +347,8 @@ class ICPCEvaluator(BaseEvaluator):
                         f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
                     )
 
-        test_case_results = { "score": problem_state["passed"], "outputs": problem_state["outputs"] }        
-        return {
-            "name": entry["name"],
-            "test_case_results": test_case_results
-        }
+        test_case_results = {"score": problem_state["passed"], "outputs": problem_state["outputs"]}
+        return {"name": entry["name"], "test_case_results": test_case_results}
 
     async def eval_full(self, input_files):  # type: ignore[override]
         for jsonl_file in unroll_files(input_files):

@@ -13,8 +13,7 @@
 # limitations under the License.
 from collections import defaultdict
 
-from nemo_skills.evaluation.metrics.base import BaseMetrics
-from nemo_skills.evaluation.metrics.base import BaseMetrics, as_int, as_percentage, as_float
+from nemo_skills.evaluation.metrics.base import BaseMetrics, as_float, as_int
 
 
 class ICPCMetrics(BaseMetrics):
@@ -24,8 +23,8 @@ class ICPCMetrics(BaseMetrics):
 
     def update(self, predictions):
         super().update(predictions)
-#        self._compute_pass_at_k(predictions)
-        if predictions:            
+        #        self._compute_pass_at_k(predictions)
+        if predictions:
             self.predictions_by_problem[predictions[0]["name"]].extend(predictions)
 
     def _get_score_dict(self, p):
@@ -35,38 +34,31 @@ class ICPCMetrics(BaseMetrics):
         submission = submissions[0]
         scores = []
         for submission in submissions:
-            scores.append(submission["test_case_results"]["score"])            
+            scores.append(submission["test_case_results"]["score"])
         return scores
-        
-        
- 
 
     def get_metrics(self):
-        total_score = total_round_robin = 0.0
         self.problem_scores = {}
         self.correct_submissions = {}
         self.total_submissions = {}
         for name, submission in self.predictions_by_problem.items():
             if self.correct_submissions.get(name) is None:
-                    self.correct_submissions[name] = 0
+                self.correct_submissions[name] = 0
             if self.total_submissions.get(name) is None:
                 self.total_submissions[name] = 0
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
-            scores =self.get_problem_score(submission)              
+            scores = self.get_problem_score(submission)
             self.correct_submissions[name] += sum(1 for value in scores if value)
             self.problem_scores[name] = sum(1 for value in scores if value) > 0
-            self.total_submissions[name] += len(submission)   
+            self.total_submissions[name] += len(submission)
         self.print_problem_scores()
         metrics_dict = {}
         for name, scores in self.problem_scores.items():
-            metrics_dict[name] = {
-                "correct": self.correct_submissions[name],
-                "total": self.total_submissions[name]
-            }
+            metrics_dict[name] = {"correct": self.correct_submissions[name], "total": self.total_submissions[name]}
         metrics_dict["total"] = {
             "solved": sum(1 for value in self.correct_submissions.values() if value > 0),
-            "average_run_time": sum(self.total_submissions.values()) / len(self.total_submissions.values())    
+            "average_run_time": sum(self.total_submissions.values()) / len(self.total_submissions.values()),
         }
         return metrics_dict
 
@@ -78,13 +70,14 @@ class ICPCMetrics(BaseMetrics):
         metrics_to_print = {"correct": as_int, "total": as_int, "solved": as_int, "average_number_of_runs": as_float}
         return metrics_to_print
 
-
     def reset(self):
         super().reset()
         self.predictions_by_problem = defaultdict(list)
         self.problem_scores = {}
 
     def print_problem_scores(self):
-        print("---------------------------------Problem and subtask scores---------------------------------")       
+        print("---------------------------------Problem and subtask scores---------------------------------")
         for name, scores in self.problem_scores.items():
-            print(f"# {name}: {scores} self.correct_submissions[name]: {self.correct_submissions[name]} self.total_submissions[name]: {self.total_submissions[name]}")
+            print(
+                f"# {name}: {scores} self.correct_submissions[name]: {self.correct_submissions[name]} self.total_submissions[name]: {self.total_submissions[name]}"
+            )
