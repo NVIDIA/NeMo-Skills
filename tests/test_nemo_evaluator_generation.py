@@ -54,7 +54,7 @@ def test_get_client_container_single_task(sample_mapping_toml):
         pytest.skip("get_client_container not implemented yet")
 
     container = get_client_container(
-        task_queries=["aime_2025_nemo"], use_latest=False, mapping_toml=sample_mapping_toml
+        task_queries=["math_harness.aime_2025_nemo"], use_latest=False, mapping_toml=sample_mapping_toml
     )
     assert container == "nvcr.io/nvidia/eval-factory/simple-evals:25.08.1"
 
@@ -67,7 +67,7 @@ def test_get_client_container_multi_same_container(sample_mapping_toml):
 
     # Both tasks do not exist under same harness; keep single existing task twice to verify set logic
     container = get_client_container(
-        task_queries=["aime_2025_nemo", "math_harness.aime_2025_nemo"],
+        task_queries=["math_harness.aime_2025_nemo", "other_harness.aime_2025_nemo"],
         use_latest=False,
         mapping_toml=sample_mapping_toml,
     )
