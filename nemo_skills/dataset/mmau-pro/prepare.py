@@ -59,10 +59,10 @@ def format_entry(entry, with_audio=False):
     
     if entry.get('audio_path'):
         if isinstance(entry['audio_path'], list):
-            entry['audio_path'] = ['/datasets/mmau-pro/' + path if not path.startswith('/') else path for path in entry['audio_path']]
+            entry['audio_path'] = ['/dataset/mmau-pro/' + path if not path.startswith('/') else path for path in entry['audio_path']]
         else:
             if not entry['audio_path'].startswith('/'):
-                entry['audio_path'] = '/datasets/mmau-pro/' + entry['audio_path']
+                entry['audio_path'] = '/dataset/mmau-pro/' + entry['audio_path']
     
     formatted_entry = {
         "expected_answer": entry['answer'],
