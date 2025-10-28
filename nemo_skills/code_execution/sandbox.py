@@ -256,7 +256,7 @@ class Sandbox(abc.ABC):
     async def wait_for_sandbox(self, timeout: int = 5):
         while True:
             try:
-                output, _ = await self.sandbox.execute_code("print('test')", language="python", timeout=timeout)
+                output, _ = await self.execute_code("print('test')", language="python", timeout=timeout)
                 if output.get("process_status") == "completed":
                     return
             except Exception:
