@@ -388,7 +388,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
 def aggregate(cluster, expname, run_after, stage_config, **kwargs):
     """Aggregate per-problem metadata and solutions into a final JSONL.
 
-    This stage invokes `scripts/aggregate_matadata.py` to:
+    This stage invokes `scripts/aggregate_metadata.py` to:
       - Merge metadata from `stage_config["metadata_files"]` (JSON list), if provided.
       - Optionally merge solutions from `stage_config["solutions_path"]`, which should be a glob pattern.
     """
@@ -399,7 +399,7 @@ def aggregate(cluster, expname, run_after, stage_config, **kwargs):
     solutions_path_arg = f"    --solutions_path {shlex.quote(str(solutions_path))} " if solutions_path is not None else ""
     run_cmd(
         ctx=wrap_arguments(
-            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_matadata.py "
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_metadata.py "
             f"    --output_file '{output_dir}/{OUTPUT_FILE}' "
             f"    --metadata_files {shlex.quote(json.dumps(metadata_files, ensure_ascii=False))} "
             f"{solutions_path_arg}"
