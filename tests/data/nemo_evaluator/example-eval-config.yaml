@@ -44,6 +44,7 @@ evaluation:
     API_KEY: ${oc.env:NGC_API_TOKEN}
   nemo_evaluator_config: # global config settings that apply to all tasks
     config:
+      output_dir: /workspace/evals
       params:
         request_timeout: 3600 # timeout for API requests in seconds
         parallelism: 1 # number of parallel requests
