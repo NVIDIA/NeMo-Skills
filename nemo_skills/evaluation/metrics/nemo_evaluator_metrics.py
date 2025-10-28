@@ -34,8 +34,6 @@ class NemoEvaluatorMetrics(BaseMetrics):
     def update(self, predictions):
         super().update(predictions)
 
-    print("WIPP predictions: {predictions}")
-
     def metrics_to_print(self):
         """Control which metrics are displayed in the summary table."""
 
