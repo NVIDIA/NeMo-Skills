@@ -540,6 +540,49 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         run_after=f"{expname}_prepare_for_sft"
     )
 
+def convert_to_messages_format(cluster, expname, run_after, stage_config, **kwargs):
+
+    """Convert the final results into a messages format for chat-based models.
+
+    This stage reads the `input_file`, reformats each sample into a messages
+    structure suitable for chat models, and writes the output to `final_result.jsonl`.
+    """
+    input_file = stage_config["input_file"]
+    output_file = stage_config["output_file"]
+    output_dir = Path(output_file).parent
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/convert_to_messages.py "
+            f"  {input_file} "
+            f"  {output_file} "
+        ),
+        cluster=cluster,
+        log_dir=f"{output_dir}/logs",
+        expname=expname,
+        run_after=run_after,
+    )
+
+def bucket(cluster, expname, run_after, stage_config, **kwargs):
+
+    input_file = stage_config["input_file"]
+    output_dir = stage_config["output_dir"]
+
+    run_cmd(
+        ctx=wrap_arguments(
+            f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/calculate_tkn_len_and_bucket.py "
+            f"  {input_file} "
+            f"  --output_dir {output_dir} "
+            f"  --to_bucket "
+            f"  --bucket_sizes {' '.join(map(str, stage_config.get('bucket_sizes', [16000, 32000, 64000])))} "
+            f"  --tokenizer_path {stage_config.get('tokenizer_path')} "
+        ),
+        cluster=cluster,
+        log_dir=f"{output_dir}/logs",
+        expname=expname,
+        run_after=run_after,
+    )
+
 
 stages_map = {
     "filter_problems": filter_problems,
@@ -550,6 +593,8 @@ stages_map = {
     "aggregate": aggregate,
     "filter_solutions": filter_solutions,
     "prepare_for_sft": prepare_for_sft,
+    "convert_to_messages_format": convert_to_messages_format,
+    "bucket": bucket,
 }
 
 
