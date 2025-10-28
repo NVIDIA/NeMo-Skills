@@ -496,20 +496,15 @@ class GenerationTask:
             else:
                 remaining_data_points.append(data_point)
 
-        LOG.info("Testing if async loop is working...")
         pbar = tqdm(total=len(remaining_data_points), desc="Remaining generations")
-        LOG.info("Testing if async loop is working... done")
 
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
-            LOG.info("Test 1")
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
-                LOG.info("Test 2")
                 async with self.output_lock:
                     self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
 
             # Create tasks for all remaining data points
-            LOG.info("Test 3")
             tasks = []
             for data_point in remaining_data_points:
                 task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
@@ -517,30 +512,29 @@ class GenerationTask:
 
             # Wait for all tasks to complete
             if tasks:
-                LOG.info("Test 4")
                 await asyncio.gather(*tasks)
 
-            LOG.info("Test 5")
             pbar.close()
 
-        LOG.info("Test 6")
         self.restore_async_order()
 
     def restore_async_order(self):
         # After we are done, need to restore the order and resave without position ids
+        LOG.info("Test 1")
         with open(self.cfg.output_file + '-async', "rt", encoding="utf-8") as fin:
             generations = [json.loads(line) for line in fin]
-
+        LOG.info("Test 2")
         ordered_generations = [None] * len(generations)
         for gen_dict in generations:
             async_pos = gen_dict.pop(self.cfg.async_position_key)
             ordered_generations[async_pos] = gen_dict
-
+        LOG.info("Test 3")
         with open(self.cfg.output_file, "wt", encoding="utf-8") as fout:
             for gen_dict in ordered_generations:
                 fout.write(json.dumps(gen_dict) + "\n")
-
+        LOG.info("Test 4")
         Path(self.cfg.output_file + '-async').unlink()
+        LOG.info("Test 5")
 
     def generate(self):
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
@@ -568,7 +562,6 @@ class GenerationTask:
 
         asyncio.run(self.async_loop(data))
 
-        print("Async loop completed")
         self.postprocess()
 
         # Clean up the LLM client to prevent hanging
