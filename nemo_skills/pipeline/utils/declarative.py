@@ -190,7 +190,12 @@ class Command:
         if self.het_group_index is None:
             return "127.0.0.1"  # Local fallback
         # For heterogeneous SLURM jobs, resolve nodelist to actual hostname
-        return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
+        # Try scontrol first, fall back to hostname command if scontrol not available
+        return (
+            f"$(command -v scontrol >/dev/null 2>&1 && "
+            f"scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1 || "
+            f"hostname)"
+        )
 
     def meta_ref(self, key: str) -> str:
         """Get metadata value (like port). Fails if key not found."""
@@ -571,6 +576,13 @@ class Pipeline:
         executors: List = []
         het_group_indices: List[int] = []
 
+        # Assign het_group_indices FIRST (before any prepare_for_execution calls)
+        # This is critical for cross-component references in lambdas
+        if heterogeneous:
+            for het_idx, group in enumerate(groups):
+                for command in group.commands:
+                    command.het_group_index = het_idx
+
         # In heterogeneous jobs, collect environment from all commands for cross-component refs
         shared_env_vars: Dict[str, str] = {}
         if heterogeneous:
@@ -595,12 +607,8 @@ class Pipeline:
             )
 
             for comp_idx, command in enumerate(group.commands):
-                # Assign het_group_index ONLY for heterogeneous jobs (per-job, not global)
-                # Non-heterogeneous jobs use localhost, so het_group_index should remain None
-                if heterogeneous:
-                    command.het_group_index = het_idx
-                else:
-                    command.het_group_index = None
+                # Note: het_group_index already assigned above for heterogeneous jobs
+                # For non-heterogeneous jobs, it remains None (using localhost)
 
                 final_cmd, exec_config = self._prepare_command(command, cluster_config)
                 commands.append(final_cmd)
