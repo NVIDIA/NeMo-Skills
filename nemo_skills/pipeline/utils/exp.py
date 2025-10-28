@@ -255,7 +255,7 @@ def get_executor(
             additional_kwargs["runtime"] = "runc"
         # wipp
         print(f"WIPP num_gpus_per_node {gpus_per_node}")
-        assert gpus_per_node is None
+        assert gpus_per_node is None  # WIPP
         d = DockerExecutor(
             container_image=resolved_container,
             packager=packager,
