@@ -70,6 +70,11 @@ def nemo_evaluator(
     tasks_mapping_toml: Optional[str] = typer.Option(
         None, help="Path to a local mapping.toml to resolve harness/task containers"
     ),
+    # Optional per-container installation step before running evaluator
+    install_cmd: Optional[str] = typer.Option(
+        None,
+        help="Shell command to run inside container before evaluator (e.g., pip install -r /workspace/reqs.txt)",
+    ),
 ):
     """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
@@ -201,6 +206,7 @@ def nemo_evaluator(
             gpus=job_gpus or None,
             nodes=job_nodes or 1,
             name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+            installation_command=install_cmd,
             metadata={
                 "log_prefix": "main",
                 "environment": group_envs.get((container_id, sig), {}),
