@@ -11,6 +11,7 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 import typer
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
@@ -114,19 +115,26 @@ def nemo_evaluator(
         env: Dict[str, str] = {}
         if value is None:
             return env
+
+        # Gracefully handle OmegaConf containers
+
+        if isinstance(value, (DictConfig, ListConfig)):
+            value = OmegaConf.to_object(value)
+
+        # Mapping form: {KEY: VALUE}
         if isinstance(value, dict):
             for k, v in value.items():
-                if isinstance(k, str) and isinstance(v, (str, int, float)):
+                if not isinstance(k, str):
+                    continue
+                # Accept common scalar types and cast to str
+                if isinstance(v, (str, int, float, bool)) or v is None:
+                    env[k] = "" if v is None else str(v)
+                else:
                     env[k] = str(v)
             return env
-        if isinstance(value, (list, tuple)):
-            for item in value:
-                if not isinstance(item, str) or "=" not in item:
-                    raise ValueError(f"Invalid env var entry: {item!r}; expected 'KEY=VALUE' string")
-                k, v = item.split("=", 1)
-                env[k] = v
-            return env
-        raise ValueError("env_vars must be a dict or list of 'KEY=VALUE' strings")
+
+        # Single string is ambiguous; require explicit forms
+        raise ValueError("env_vars must be a dict")
 
     # Now preparing the config for the launcher
     # 1)  tasks from CLI
