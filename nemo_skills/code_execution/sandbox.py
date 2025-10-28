@@ -253,7 +253,7 @@ class Sandbox(abc.ABC):
             return "timeout"
         return determine_proof_status(output)
 
-    async def wait_for_sandbox(self, timeout: int = 120):
+    async def wait_for_sandbox(self, timeout: int = 5):
         while True:
             try:
                 output, _ = await self.sandbox.execute_code("print('test')", language="python", timeout=timeout)
