@@ -81,7 +81,7 @@ def start_server(
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
-    sbatch_arguments: str | dict = typer.Option(
+    sbatch_arguments: str = typer.Option(
         "",
         help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),

@@ -106,7 +106,7 @@ def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> 
     return timeout_str
 
 
-def parse_sbatch_arguments(sbatch_arguments: str | dict | None, exclusive: bool | None = None) -> dict | None:
+def parse_sbatch_arguments(sbatch_arguments: str | None, exclusive: bool | None = None) -> dict | None:
     """
     Parse sbatch arguments from either a JSON string or a dictionary.
 

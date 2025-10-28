@@ -163,7 +163,7 @@ def train_megatron_lm(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
-    sbatch_arguments: str | dict = typer.Option(
+    sbatch_arguments: str = typer.Option(
         "",
         help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
