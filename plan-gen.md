@@ -290,6 +290,43 @@ Rationale: The evaluator task definition is the source of truth for which contai
   - Explicit override: if the user passes `--client_container`, the pipeline should prefer the override and skip classmethod resolution.
   - Mapping availability: support `latest` and `mapping_toml` knobs; if mapping cannot be loaded, fall back to the default `nemo-skills` container with a warning.
 
+### Testing plan (minimal mocking, high-confidence)
+
+- Unit tests (no network, minimal mocks):
+  - Container resolution:
+    - Single-task maps to one container via `get_client_container` using a small local `mapping.toml` (pass via `mapping_toml`).
+    - Multiple tasks map to the same container (OK).
+    - Multiple tasks map to different containers -> raises helpful error.
+    - Ambiguous task name without harness -> raises with suggested fully-qualified options.
+  - Command builder:
+    - `build_eval_command` includes `++nemo_eval_config_dir/name` and forwards passthrough overrides.
+    - Tasks are embedded correctly (either via generator `--tasks` or `++evaluation.tasks=...` when supported).
+    - Shell-safe: spaces/quotes in paths do not break the command (basic cases).
+  - CLI parsing (Typer):
+    - `--tasks` comma list parsed to list.
+    - `--job_gpus/--job_nodes` are integers and optional.
+    - Mapping flags `--latest_mapping/--tasks_mapping_toml` accepted and forwarded.
+
+- Pipeline orchestration (local executor, no server):
+  - Dry run builds a `Pipeline` with exactly one client `Command` and no server `Command`.
+  - Client `Command.container` equals container resolved by `get_client_container`.
+  - HardwareConfig reflects `--job_gpus/--job_nodes` on the client.
+  - `.done` tracking is wired: command string ends with touch of the `.done` file (single-job path). If chunking is added later, verify merge pattern.
+  - Optional sandbox off by default; enabled when `--with_sandbox`.
+
+- Error handling and edge cases:
+  - Unknown/ambiguous `--tasks` -> fails fast with clear message; no Pipeline is run.
+  - Mapping download failure path (when `--latest_mapping`) -> falls back to packaged mapping (simulate by pointing to bad URL or mocking downloader to raise; prefer packaged-path test without network).
+  - Non-zero evaluator exit (simulate by substituting a failing command via a test hook in `build_eval_command`) -> task fails, `.done` not touched.
+
+- Optional smoke (skipped if deps missing):
+  - If `nemo_evaluator_launcher` is installed, run a tiny evaluator config that produces a benign command and verify stdout is streamed (can be a very small config or a mocked task that echoes). Mark as `xfail` when package is unavailable.
+
+Notes on minimizing mocks:
+- Prefer passing a temporary `mapping.toml` via `mapping_toml` over mocking `load_tasks_mapping`.
+- Prefer `dry_run` and command string assertions over intercepting subprocess.
+- If a failing command is needed, inject via a narrow test hook in `build_eval_command` or environment flag rather than broad patching.
+
 ### Clarification questions
 - Will tasks be provided entirely via the Hydra config under `evaluation.tasks`? Any defaults you want us to assume?
 - Should we forbid starting an inference server in this flow (override `get_server_command_fn` to a no-op), or keep it possible in case some evaluator targets rely on locally hosted models?
