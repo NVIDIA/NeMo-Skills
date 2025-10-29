@@ -411,6 +411,26 @@ async def generate_conversations(
     return results
 
 
+class MultiTurnGenerationTask:
+    """Task class for multi-turn conversation generation (required by pipeline)."""
+
+    @classmethod
+    def get_generation_default_args(cls) -> str:
+        """Returns default arguments for multi-turn generation."""
+        return ""
+
+    @classmethod
+    def get_server_command_fn(cls) -> callable:
+        """Returns the function to build server commands."""
+        from nemo_skills.pipeline.utils import get_server_command
+
+        return get_server_command
+
+
+# Required by pipeline to identify this as a generation module
+GENERATION_TASK_CLASS = MultiTurnGenerationTask
+
+
 def run():
     setup_logging(disable_hydra_logs=False)
     help_message = get_help_message(MultiTurnConfig)

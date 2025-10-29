@@ -150,14 +150,13 @@ def _create_commandgroup_from_config(
     # 1. Add server if server_config is provided
     if server_config is not None and int(server_config["num_gpus"]) > 0:
         server_type = server_config["server_type"]
-        # Get container from server_config if provided, otherwise fall back to cluster config
-        if "container" in server_config:
-            server_container = server_config.pop("container")
-        else:
-            server_container = cluster_config["containers"][server_type]
 
-        # Call server command builder directly with cluster_config
-        cmd, num_tasks = get_server_command_fn(**server_config, cluster_config=cluster_config)
+        # Get container (don't pop, just access)
+        server_container = server_config.get("container") or cluster_config["containers"][server_type]
+
+        # Build server command (filter out container key for get_server_command_fn)
+        server_config_for_cmd = {k: v for k, v in server_config.items() if k != "container"}
+        cmd, num_tasks = get_server_command_fn(**server_config_for_cmd, cluster_config=cluster_config)
 
         # Set group GPU/node requirements from server config
         group_gpus = server_config["num_gpus"]
@@ -287,21 +286,12 @@ def _create_job_unified(
         if server_config is not None and int(server_config.get("num_gpus", 0)) > 0:
             server_type = server_config["server_type"]
 
-            # Get container
-            if "container" in server_config:
-                server_container = server_config.pop("container")
-            else:
-                server_container = cluster_config["containers"][server_type]
+            # Get container (don't pop, just access)
+            server_container = server_config.get("container") or cluster_config["containers"][server_type]
 
-            # Build server command
-            # Rename model_path key to match what server commands expect
-            server_config_copy = server_config.copy()
-            if "model_path" in server_config_copy:
-                server_config_copy["model"] = server_config_copy.pop("model_path")
-            if "server_port" in server_config_copy:
-                server_config_copy["port"] = server_config_copy.pop("server_port")
-
-            cmd, num_tasks = get_server_command_fn(**server_config_copy, cluster_config=cluster_config)
+            # Build server command (filter out container key for get_server_command_fn)
+            server_config_for_cmd = {k: v for k, v in server_config.items() if k != "container"}
+            cmd, num_tasks = get_server_command_fn(**server_config_for_cmd, cluster_config=cluster_config)
 
             # Set group GPU/node requirements from server config
             group_gpus = server_config["num_gpus"]
