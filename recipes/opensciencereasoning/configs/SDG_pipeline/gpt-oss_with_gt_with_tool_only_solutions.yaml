@@ -1,14 +1,14 @@
-cluster: local
-base_output_dir: "/workspace/opensciencereasoning/gpt-oss"
+cluster: dfw
+
 expname: "gpt-oss-generate-data"
 suffix: ""  # Suffix for experiment names
-dataset_name: ""  # Optional dataset name for id generation
-
+dataset_name: "aops_mcq"  # Optional dataset name for id generation
+base_output_dir: "/workspace/DATA/_data/tmp1/${dataset_name}"
 # Input file for the first stage (generate_solutions)
 # It must include the field "problem"
 # All the data in this file will be processed with the same prompt
 # Make sure the problems fit the prompt you are using
-input_file: ""
+input_file: "/workspace/DATA/_data/seed_data/mcq/aops_mcq.jsonl"
 
 # Can define initial dependency for the `generate_solutions` stage to run after
 initial_dependency: None
@@ -16,7 +16,6 @@ initial_dependency: None
 # Define the full sequence of stages for this mode
 pipeline_stages:
   - generate_solutions          # Generate solutions
-  - aggregate                   # Aggregate all the metadata into a single file
   - filter_solutions            # Filter solutions
   - prepare_for_sft             # Prepare for SFT
   - convert_to_messages_format  # Convert to messages format for training
@@ -51,8 +50,8 @@ stages:
         server_gpus: 8
         server_nodes: 1
         dependent_jobs: 1
-        num_chunks: 20
-        num_random_seeds: 5
+        num_chunks: 2
+        num_random_seeds: 1
         with_sandbox: True
         server_args: "--async-scheduling"
   
@@ -79,10 +78,8 @@ stages:
         server_nodes: 1
         num_random_seeds: ${stages.generate_solutions.generation_kwargs.args.num_random_seeds}
         dependent_jobs: 1
-        num_chunks: 5
+        num_chunks: 2
   
-    dependencies:
-      - decontaminate
 
   filter_solutions:
     output_dir: ${directories.step-2-filter-solutions}
@@ -94,7 +91,7 @@ stages:
     metadata_values:
       topic: ["Biology", "Chemistry", "Physics", "Mathematics", "Other", "undefined"]
     dependencies:
-      - aggregate
+      - generate_solutions
   
   prepare_for_sft:
     output_dir: ${directories.step-3-prepare-for-sft}
@@ -130,5 +127,6 @@ stages:
       - 16000
       - 32000
       - 64000
+  
     dependencies:
       - prepare_for_sft
