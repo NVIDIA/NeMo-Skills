@@ -276,12 +276,7 @@ class Sandbox(abc.ABC):
                 return False
 
     def wait_for_sandbox(self, timeout: int = 5):
-        while True:
-            try:
-                if self._check_ready(timeout=timeout):
-                    return
-            except Exception:
-                pass
+        while not self._check_ready(timeout=timeout):
             time.sleep(1)
 
 
