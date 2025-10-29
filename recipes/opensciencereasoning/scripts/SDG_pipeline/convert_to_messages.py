@@ -1,3 +1,18 @@
+#!/usr/bin/env python3
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import json as _json_std
 import logging
@@ -53,13 +68,13 @@ def parse_line_to_openai_format(json_line: str) -> Tuple[List[Dict], Dict]:
     """
     try:
         data = _json_loads(json_line)
-        input_str = data['input']
-        output_str = data['output']
+        input_str = data["input"]
+        output_str = data["output"]
     except Exception as e:  # broad for speed (JSONDecodeError/KeyError)
         raise ValueError(f"Invalid JSON or missing keys: {e}")
 
     # retain all other keys
-    extra_fields = {k: v for k, v in data.items() if k not in ('input', 'output')}
+    extra_fields = {k: v for k, v in data.items() if k not in ("input", "output")}
 
     messages: List[Dict] = []
     tool_call_counter = 0
@@ -71,29 +86,29 @@ def parse_line_to_openai_format(json_line: str) -> Tuple[List[Dict], Dict]:
 
     for i, match in enumerate(matches):
         parts = match.groupdict()
-        source_info = parts['source_info'].strip()
-        content = parts['content'].strip()
-        terminator = parts['terminator']
+        source_info = parts["source_info"].strip()
+        content = parts["content"].strip()
+        terminator = parts["terminator"]
 
         if "system" in source_info:
             messages.append({"role": "system", "content": content})
             continue
-        
+
         if "user" in source_info:
             messages.append({"role": "user", "content": content})
             continue
 
         # Flush buffer if it exists before processing a new message that isn't a tool call
-        if assistant_reasoning_buffer and 'to=python code' not in source_info:
+        if assistant_reasoning_buffer and "to=python code" not in source_info:
             messages.append(assistant_reasoning_buffer)
             assistant_reasoning_buffer = None
 
-        if 'to=assistant' in source_info:  # tool response
+        if "to=assistant" in source_info:  # tool response
             tool_name = "stateful_python_code_exec"
             tool_call_id = f"call_{tool_call_counter - 1}"
             messages.append({"role": "tool", "tool_call_id": tool_call_id, "name": tool_name, "content": content})
         else:  # assistant side
-            if 'to=python code' in source_info:  # tool call
+            if "to=python code" in source_info:  # tool call
                 if not assistant_reasoning_buffer:
                     assistant_reasoning_buffer = {"role": "assistant"}
                 tool_call_id = f"call_{tool_call_counter}"
@@ -109,7 +124,7 @@ def parse_line_to_openai_format(json_line: str) -> Tuple[List[Dict], Dict]:
                 assistant_reasoning_buffer = None
                 tool_call_counter += 1
             else:  # reasoning / final answer
-                is_final_answer = (terminator == '<|return|>') or (i == len(matches) - 1 and terminator != '<|call|>')
+                is_final_answer = (terminator == "<|return|>") or (i == len(matches) - 1 and terminator != "<|call|>")
                 if is_final_answer:
                     messages.append({"role": "assistant", "content": content})
                 else:
@@ -214,8 +229,8 @@ def main():
         "orjson" if _orjson else "stdlib",
     )
 
-    input_stream = open(args.input_file, 'r', encoding='utf-8') if args.input_file != '-' else sys.stdin
-    output_stream = open(args.output_file, 'w', encoding='utf-8') if args.output_file != '-' else sys.stdout
+    input_stream = open(args.input_file, "r", encoding="utf-8") if args.input_file != "-" else sys.stdin
+    output_stream = open(args.output_file, "w", encoding="utf-8") if args.output_file != "-" else sys.stdout
 
     # Sequential path (still can benefit from orjson + precompiled regex)
     if args.workers == 1:
@@ -227,7 +242,7 @@ def main():
                     continue
                 try:
                     openai_messages, extra = parse_line_to_openai_format(line)
-                    output_stream.write(_json_dumps({**extra, "messages": openai_messages}) + '\n')
+                    output_stream.write(_json_dumps({**extra, "messages": openai_messages}) + "\n")
                 except ValueError as e:
                     errors += 1
                     logger.warning("Skipping line %d due to error: %s", i + 1, e)
@@ -289,7 +304,7 @@ def main():
                 while next_to_write in pending_results:
                     out_line, err = pending_results.pop(next_to_write)
                     if out_line is not None:
-                        output_stream.write(out_line + '\n')
+                        output_stream.write(out_line + "\n")
                         processed += 1
                     if err:
                         logger.warning(err)
@@ -324,7 +339,7 @@ def main():
             while next_to_write in pending_results:
                 out_line, err = pending_results.pop(next_to_write)
                 if out_line is not None:
-                    output_stream.write(out_line + '\n')
+                    output_stream.write(out_line + "\n")
                     processed += 1
                 if err:
                     logger.warning(err)
@@ -355,4 +370,3 @@ def main():
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     main()
-
