@@ -14,7 +14,7 @@
 import importlib
 import logging
 import os
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import typer
 
@@ -44,6 +44,81 @@ LOG = logging.getLogger(get_logger_name(__file__))
 # TODO: add num_jobs here for consistency with eval?
 
 
+def _normalize_models_config(
+    model: Optional[str | List[str]],
+) -> List[str]:
+    """
+    Normalize model specification to list.
+
+    Args:
+        model: Single model path or list of model paths
+
+    Returns:
+        List of model paths
+
+    Raises:
+        ValueError: If model is None
+    """
+    if model is None:
+        raise ValueError("Must specify --model")
+    if isinstance(model, str):
+        return [model]
+    return list(model)
+
+
+def _normalize_parameter(
+    param_value: Any,
+    num_models: int,
+    param_name: str,
+) -> List[Any]:
+    """
+    Normalize a parameter to a per-model list.
+
+    Logic:
+    1. If param_value is a list:
+       - If length == num_models: use as-is
+       - If length == 1: broadcast to all models
+       - Otherwise: error
+    2. If param_value is scalar: broadcast to all models
+    3. Return list of length num_models
+
+    Args:
+        param_value: Parameter value (scalar or list)
+        num_models: Number of models
+        param_name: Name of parameter (for error messages)
+
+    Returns:
+        List of parameter values (one per model)
+
+    Raises:
+        ValueError: If list length doesn't match num_models
+
+    Examples:
+        >>> _normalize_parameter(8, 3, "server_gpus")
+        [8, 8, 8]
+        >>> _normalize_parameter([8, 16], 2, "server_gpus")
+        [8, 16]
+        >>> _normalize_parameter([8], 3, "server_gpus")
+        [8, 8, 8]
+    """
+    if not isinstance(param_value, list):
+        # Scalar: broadcast
+        return [param_value] * num_models
+
+    if len(param_value) == num_models:
+        # List matches: use as-is
+        return list(param_value)
+
+    if len(param_value) == 1:
+        # Single-element list: broadcast
+        return param_value * num_models
+
+    raise ValueError(
+        f"Parameter {param_name} has {len(param_value)} values but {num_models} models specified. "
+        f"Must be 1 value (broadcast) or {num_models} values (per-model)."
+    )
+
+
 def _create_commandgroup_from_config(
     generation_cmd: str,
     server_config: Optional[Dict],
@@ -68,6 +143,10 @@ def _create_commandgroup_from_config(
 
     components = []
 
+    # Track GPU/node requirements for this group (from server config)
+    group_gpus = 0
+    group_nodes = 1
+
     # 1. Add server if server_config is provided
     if server_config is not None and int(server_config["num_gpus"]) > 0:
         server_type = server_config["server_type"]
@@ -80,19 +159,23 @@ def _create_commandgroup_from_config(
         # Call server command builder directly with cluster_config
         cmd, num_tasks = get_server_command_fn(**server_config, cluster_config=cluster_config)
 
+        # Set group GPU/node requirements from server config
+        group_gpus = server_config["num_gpus"]
+        group_nodes = server_config["num_nodes"]
+
         # Create metadata dict
         metadata = {
             "num_tasks": num_tasks,
-            "gpus": server_config["num_gpus"],
-            "nodes": server_config["num_nodes"],
+            "gpus": group_gpus,
+            "nodes": group_nodes,
             "log_prefix": "server",
         }
 
         server_cmd = Command(
             command=cmd,
             container=server_container,
-            gpus=server_config["num_gpus"],
-            nodes=server_config["num_nodes"],
+            gpus=group_gpus,
+            nodes=group_nodes,
             name=task_name,
             metadata=metadata,
         )
@@ -131,22 +214,174 @@ def _create_commandgroup_from_config(
 
         components.append(sandbox_cmd)
 
-    # Find maximum GPUs/nodes needed by any component for the HardwareConfig
-    # The job-level resource request must be the maximum across all components
-    max_gpus = max((comp.gpus or 0) for comp in components)
-    max_nodes = max((comp.nodes or 1) for comp in components)
-
     return CommandGroup(
         commands=components,
         hardware=HardwareConfig(
             partition=partition,
-            num_gpus=max_gpus,
-            num_nodes=max_nodes,
+            num_gpus=group_gpus,
+            num_nodes=group_nodes,
             sbatch_kwargs=sbatch_kwargs,
         ),
         name=task_name,
         log_dir=log_dir,
     )
+
+
+def _create_job_unified(
+    models: List[str],
+    server_configs: List[Optional[Dict]],
+    generation_cmd: str,
+    cluster_config: Dict,
+    installation_command: Optional[str],
+    get_server_command_fn: Callable,
+    with_sandbox: bool,
+    sandbox_port: Optional[int],
+    partition: Optional[str],
+    keep_mounts_for_sandbox: bool,
+    task_name: str,
+    log_dir: str,
+    sbatch_kwargs: Optional[Dict] = None,
+) -> Dict:
+    """
+    Create a job for n models (unified for n=1 and n>1).
+
+    Structure:
+    - Group 0: Model 0 server + client + (optional sandbox)
+    - Group 1: Model 1 server (if n>1)
+    - Group N: Model N server (if n>1)
+
+    For n=1, returns a single-element list. The Pipeline automatically
+    optimizes single-group lists to use efficient single-group jobs.
+
+    Args:
+        models: List of model paths
+        server_configs: List of server configurations (one per model, None if not hosting)
+        generation_cmd: Command to run the generation client
+        cluster_config: Cluster configuration
+        installation_command: Installation command to run before client
+        get_server_command_fn: Function to build server commands
+        with_sandbox: Whether to include sandbox
+        sandbox_port: Port for sandbox
+        partition: Slurm partition
+        keep_mounts_for_sandbox: Whether to keep mounts for sandbox
+        task_name: Name for the task
+        log_dir: Directory for logs
+        sbatch_kwargs: Additional sbatch kwargs (including qos, time_min, exclusive, etc.)
+
+    Returns:
+        Job dict with "groups" key (list of CommandGroup objects)
+    """
+
+    num_models = len(models)
+    groups = []
+
+    # Create groups for each model
+    for idx, (model_path, server_config) in enumerate(zip(models, server_configs)):
+        components = []
+
+        # Track GPU/node requirements for this group (from server config)
+        group_gpus = 0
+        group_nodes = 1
+
+        # 1. Add server if needed
+        if server_config is not None and int(server_config.get("num_gpus", 0)) > 0:
+            server_type = server_config["server_type"]
+
+            # Get container
+            if "container" in server_config:
+                server_container = server_config.pop("container")
+            else:
+                server_container = cluster_config["containers"][server_type]
+
+            # Build server command
+            # Rename model_path key to match what server commands expect
+            server_config_copy = server_config.copy()
+            if "model_path" in server_config_copy:
+                server_config_copy["model"] = server_config_copy.pop("model_path")
+            if "server_port" in server_config_copy:
+                server_config_copy["port"] = server_config_copy.pop("server_port")
+
+            cmd, num_tasks = get_server_command_fn(**server_config_copy, cluster_config=cluster_config)
+
+            # Set group GPU/node requirements from server config
+            group_gpus = server_config["num_gpus"]
+            group_nodes = server_config["num_nodes"]
+
+            metadata = {
+                "num_tasks": num_tasks,
+                "gpus": group_gpus,
+                "nodes": group_nodes,
+                "log_prefix": f"server_{idx}" if num_models > 1 else "server",
+            }
+
+            server_cmd = Command(
+                command=cmd,
+                container=server_container,
+                gpus=group_gpus,
+                nodes=group_nodes,
+                name=f"model_{idx}_server" if num_models > 1 else "server",
+                metadata=metadata,
+            )
+            components.append(server_cmd)
+
+        # 2. Group 0 gets the client
+        if idx == 0:
+            client_env = {}
+            if with_sandbox and sandbox_port is not None:
+                client_env["NEMO_SKILLS_SANDBOX_PORT"] = str(sandbox_port)
+
+            client_cmd = Command(
+                command=generation_cmd,
+                container=cluster_config["containers"]["nemo-skills"],
+                name="generation_client" if num_models > 1 else task_name,
+                installation_command=installation_command,
+                metadata={
+                    "log_prefix": "main",
+                    "environment": client_env,
+                },
+            )
+            components.append(client_cmd)
+
+            # 3. Add sandbox to group 0 if requested
+            #   Only Group 0 is needed because we do not currently have a way
+            #   to route requests between multiple sandboxes
+            if with_sandbox:
+                cmd, metadata = sandbox_command(
+                    cluster_config=cluster_config,
+                    port=sandbox_port,
+                )
+                metadata["log_prefix"] = "sandbox" if num_models == 1 else "sandbox_0"
+
+                sandbox_cmd = Command(
+                    command=cmd,
+                    container=cluster_config["containers"]["sandbox"],
+                    name="sandbox" if num_models == 1 else "sandbox_0",
+                    metadata=metadata,
+                )
+                components.append(sandbox_cmd)
+
+        # Only create group if it has components (skip empty groups for pre-hosted models)
+        if components:
+            # Create group with explicitly tracked GPU/node requirements
+            # (Client and sandbox components have no GPUs, only server does)
+            group = CommandGroup(
+                commands=components,
+                hardware=HardwareConfig(
+                    partition=partition,
+                    num_gpus=group_gpus,
+                    num_nodes=group_nodes,
+                    sbatch_kwargs=sbatch_kwargs,
+                ),
+                name=f"model_{idx}_group" if num_models > 1 else task_name,
+                log_dir=log_dir,
+            )
+            groups.append(group)
+
+    return {
+        "name": task_name,
+        "groups": groups,
+        "dependencies": None,
+    }
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -177,21 +412,34 @@ def generate(
         "If not specified, will use the registered generation module for the "
         "generation type (which is required in this case).",
     ),
-    model: str = typer.Option(None, help="Path to the model or model name in API"),
-    server_address: str = typer.Option(
-        None, help="Use ip:port for self-hosted models or the API url if using model providers"
+    model: str | List[str] = typer.Option(
+        None, help="Path to the model(s) or model name(s) in API. Single value or list for multi-model generation"
     ),
-    server_type: pipeline_utils.SupportedServers = typer.Option(..., help="Type of server to use"),
-    server_gpus: int = typer.Option(None, help="Number of GPUs to use if hosting the model"),
-    server_nodes: int = typer.Option(1, help="Number of nodes required for hosting LLM server"),
-    server_args: str = typer.Option("", help="Any extra arguments to pass to the server"),
-    server_entrypoint: str = typer.Option(
+    server_address: str | List[str] = typer.Option(
+        None,
+        help="Use ip:port for self-hosted models or the API url if using model providers. "
+        "Single value (broadcast) or list (per-model)",
+    ),
+    server_type: pipeline_utils.SupportedServers | List[pipeline_utils.SupportedServers] = typer.Option(
+        ..., help="Type of server to use. Single value (broadcast) or list (per-model)"
+    ),
+    server_gpus: int | List[int] = typer.Option(
+        None, help="Number of GPUs to use if hosting the model. Single value (broadcast) or list (per-model)"
+    ),
+    server_nodes: int | List[int] = typer.Option(
+        1, help="Number of nodes required for hosting LLM server. Single value (broadcast) or list (per-model)"
+    ),
+    server_args: str | List[str] = typer.Option(
+        "", help="Any extra arguments to pass to the server. Single value (broadcast) or list (per-model)"
+    ),
+    server_entrypoint: str | List[str] = typer.Option(
         None,
         help="Path to the entrypoint of the server. "
-        "If not specified, will use the default entrypoint for the server type.",
+        "If not specified, will use the default entrypoint for the server type. Single value (broadcast) or list (per-model)",
     ),
-    server_container: str = typer.Option(
-        None, help="Override container image for the hosted server (if server_gpus is set)"
+    server_container: str | List[str] = typer.Option(
+        None,
+        help="Override container image for the hosted server (if server_gpus is set). Single value (broadcast) or list (per-model)",
     ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
@@ -292,10 +540,40 @@ def generate(
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
-    try:
-        server_type = server_type.value
-    except AttributeError:
-        pass
+    # ===== NORMALIZE MODELS AND PARAMETERS TO LISTS =====
+    models_list = _normalize_models_config(model)
+    num_models = len(models_list)
+
+    LOG.info(f"Number of models: {num_models}")
+    for idx, model_name in enumerate(models_list):
+        LOG.info(f"  Model {idx}: {model_name}")
+
+    # Convert server_type enum(s) to string(s)
+    def convert_server_type_to_string(server_type):
+        return server_type.value if hasattr(server_type, "value") else server_type
+
+    if isinstance(server_type, list):
+        server_type = [convert_server_type_to_string(st) for st in server_type]
+    else:
+        server_type = convert_server_type_to_string(server_type)
+    # Normalize all server parameters
+    server_types_list = _normalize_parameter(server_type, num_models, "server_type")
+    server_gpus_list = _normalize_parameter(server_gpus, num_models, "server_gpus")
+    server_nodes_list = _normalize_parameter(server_nodes, num_models, "server_nodes")
+    server_args_list = _normalize_parameter(server_args, num_models, "server_args")
+    server_entrypoints_list = _normalize_parameter(server_entrypoint, num_models, "server_entrypoint")
+    server_containers_list = _normalize_parameter(server_container, num_models, "server_container")
+
+    # Handle server_address (can be None)
+    if server_address is not None:
+        server_addresses_list = _normalize_parameter(server_address, num_models, "server_address")
+    else:
+        server_addresses_list = [None] * num_models
+
+    # Validate multi-model requirements
+    if num_models > 1:
+        if generation_type is None:
+            raise ValueError("Multi-model generation requires --generation-type to be specified")
 
     if log_samples:
         wandb_parameters = {
@@ -310,8 +588,6 @@ def generate(
         )
     else:
         wandb_parameters = None
-
-    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
 
     if random_seeds and num_random_seeds:
         raise ValueError("Cannot specify both random_seeds and num_random_seeds")
@@ -340,8 +616,6 @@ def generate(
         mount_map={output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
-
-    original_server_address = server_address
 
     if generation_module is not None and generation_type is not None:
         raise ValueError("Cannot specify both generation_module and generation_type. ")
@@ -393,27 +667,41 @@ def generate(
                 chunk_id=None,
             )
         for chunk_id in chunk_ids:
-            # Configure client (same as before)
-            server_config, server_address, extra_arguments = pipeline_utils.configure_client(
-                model=model,
-                server_type=server_type,
-                server_address=original_server_address,
-                server_gpus=server_gpus,
-                server_nodes=server_nodes,
-                server_args=server_args,
-                server_entrypoint=server_entrypoint,
-                server_container=server_container,
-                extra_arguments=extra_arguments_original,
-                get_random_port=get_random_port,
-            )
+            # ===== UNIFIED PATH: Configure all servers and build unified command =====
 
-            # Build generation command (same as before)
+            server_configs = []
+            server_addresses_resolved = []
+
+            # Configure each server
+            for idx in range(num_models):
+                # Determine port allocation per server (standard logic works for both single and multi-model)
+                get_random_port_for_server = pipeline_utils.should_get_random_port(server_gpus_list[idx], exclusive)
+
+                srv_config, srv_address, _ = pipeline_utils.configure_client(
+                    model=models_list[idx],
+                    server_type=server_types_list[idx],
+                    server_address=server_addresses_list[idx],
+                    server_gpus=server_gpus_list[idx],
+                    server_nodes=server_nodes_list[idx],
+                    server_args=server_args_list[idx],
+                    server_entrypoint=server_entrypoints_list[idx],
+                    server_container=server_containers_list[idx],
+                    extra_arguments="",  # Don't pass extra args to server config
+                    get_random_port=get_random_port_for_server,
+                )
+                server_configs.append(srv_config)
+                server_addresses_resolved.append(srv_address)
+
+            # Build generation command (unified for single and multi-model)
             cmd = pipeline_utils.get_generation_cmd(
                 input_file=input_file,
                 input_dir=input_dir,
                 random_seed=seed,
                 output_dir=output_dir,
-                extra_arguments=extra_arguments,
+                server_addresses=server_addresses_resolved,
+                model_names=models_list,
+                num_models=num_models,
+                extra_arguments=extra_arguments_original,
                 chunk_id=chunk_id,
                 num_chunks=num_chunks,
                 preprocess_cmd=preprocess_cmd,
@@ -435,21 +723,21 @@ def generate(
 
             for dep_idx in range(dependent_jobs + 1):
                 # Allocate sandbox port if needed
-                # This must be done BEFORE creating CommandGroup so client knows the port
+                # This must be done BEFORE creating job so client knows the port
                 if with_sandbox:
-                    current_sandbox_port = get_free_port(strategy="random") if get_random_port else 6000
+                    current_sandbox_port = get_free_port(strategy="random") if get_random_port_for_server else 6000
                 else:
                     current_sandbox_port = None
 
-                # Create CommandGroup for this task
-                cmd_group = _create_commandgroup_from_config(
+                job_spec = _create_job_unified(
+                    models=models_list,
+                    server_configs=[cfg.copy() if cfg else None for cfg in server_configs],
                     generation_cmd=cmd,
-                    server_config=server_config.copy() if server_config else None,
-                    with_sandbox=with_sandbox,
-                    sandbox_port=current_sandbox_port,
                     cluster_config=cluster_config,
                     installation_command=installation_command,
                     get_server_command_fn=generation_task.get_server_command_fn(),
+                    with_sandbox=with_sandbox,
+                    sandbox_port=current_sandbox_port,
                     partition=partition,
                     keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                     task_name=task_name,
@@ -459,6 +747,7 @@ def generate(
 
                 # Use unique internal job name for dependency tracking, but same task_name
                 internal_job_name = f"{task_name}-dep{dep_idx}" if dep_idx > 0 else task_name
+                job_spec["name"] = internal_job_name
 
                 # Build dependencies: first job in chain gets external dependencies, rest chain to previous
                 if dep_idx == 0:
@@ -472,11 +761,7 @@ def generate(
                     # Subsequent jobs in chain depend on previous job (use job object, not string)
                     job_deps = [prev_job]
 
-                job_spec = {
-                    "name": internal_job_name,
-                    "group": cmd_group,
-                    "dependencies": job_deps,
-                }
+                job_spec["dependencies"] = job_deps
                 jobs.append(job_spec)
                 prev_job = job_spec  # Track for next iteration
 

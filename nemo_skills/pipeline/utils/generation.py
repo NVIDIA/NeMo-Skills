@@ -188,6 +188,10 @@ def get_generation_cmd(
     wandb_parameters=None,
     with_sandbox: bool = False,
     script: str = "nemo_skills.inference.generate",
+    # Optional: for multi-model generation
+    server_addresses: list[str] | None = None,
+    model_names: list[str] | None = None,
+    num_models: int | None = None,
 ):
     """Construct the generation command for language model inference."""
     if input_file is None and input_dir is None:
@@ -217,6 +221,24 @@ def get_generation_cmd(
     else:
         # It's a module name, use -m flag
         cmd += f"python -m {script} {common_args} "
+
+    # Add server addresses and models if provided (for multi-model generation)
+    if server_addresses is not None and model_names is not None and num_models is not None:
+        if num_models == 1:
+            # Backward compatible: pass as scalar
+            if server_addresses[0]:
+                cmd += f"++server_address={server_addresses[0]} "
+            if model_names[0]:
+                cmd += f"++model={model_names[0]} "
+        else:
+            # Multi-model: pass as lists
+            # Format as comma-separated for Hydra list syntax
+            server_addresses_arg = ",".join(server_addresses)
+            cmd += f"++server_addresses=[{server_addresses_arg}] "
+
+            model_names_arg = ",".join(model_names)
+            cmd += f"++model_names=[{model_names_arg}] "
+
     job_end_cmd = ""
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations

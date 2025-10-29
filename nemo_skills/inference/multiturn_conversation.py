@@ -105,21 +105,6 @@ def wait_for_servers_ready(
 
 
 @nested_dataclass(kw_only=True)
-class ServerConfig:
-    """Configuration for server connection."""
-
-    server_type: str = "vllm"  # Type of server (vllm, sglang, trtllm, etc.)
-    model: str = ""  # Model path or name (set from parent config)
-    host: str = "127.0.0.1"  # Server host (resolved at runtime)
-    port: str = "5000"  # Server port (resolved at runtime - must be string)
-    ssh_server: Optional[str] = None
-    ssh_key_path: Optional[str] = None
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    max_retries: int = 3
-
-
-@nested_dataclass(kw_only=True)
 class MultiTurnInferenceConfig:
     """Configuration for multi-turn conversation inference."""
 
@@ -137,26 +122,41 @@ class MultiTurnConfig:
 
     input_file: str  # JSONL file with initial prompts (each line should have a "problem" or "question" field)
     output_file: str  # Where to save the conversations
-    server_a_address: str  # Address of model A server (ip:port)
-    server_b_address: str  # Address of model B server (ip:port)
+
+    # Multi-model configuration
+    server_addresses: List[str] = field(default_factory=list)  # List of server addresses for N models
+    model_names: List[str] = field(default_factory=list)  # List of model names for N models
+
     num_turns: int = 4  # Number of conversation turns
-    model_a_name: str = "model_a"  # Name to use for model A in output
-    model_b_name: str = "model_b"  # Name to use for model B in output
 
-    # Inference parameters for model A
+    # Inference parameters for each model
     inference_a: MultiTurnInferenceConfig = field(default_factory=MultiTurnInferenceConfig)
-    # Inference parameters for model B
     inference_b: MultiTurnInferenceConfig = field(default_factory=MultiTurnInferenceConfig)
-
-    # Server configuration for model A
-    server_a: ServerConfig = field(default_factory=ServerConfig)
-    # Server configuration for model B
-    server_b: ServerConfig = field(default_factory=ServerConfig)
 
     # Control settings
     skip_filled: bool = True  # Skip conversations that are already complete
     max_concurrent: int = 10  # Maximum concurrent API calls
     starting_prompt_key: str = "problem"  # Key in input JSONL containing the initial prompt
+
+    # Server configuration (optional, for advanced use cases)
+    server_type: str = "vllm"
+
+    def __post_init__(self):
+        """Validate configuration."""
+        if not self.server_addresses:
+            raise ValueError("Must specify server_addresses for multi-turn conversation")
+
+        if len(self.server_addresses) < 2:
+            raise ValueError(f"Multi-turn conversation requires at least 2 models, got {len(self.server_addresses)}")
+
+        # Ensure model_names matches server_addresses
+        if not self.model_names:
+            self.model_names = [f"model_{i}" for i in range(len(self.server_addresses))]
+        elif len(self.model_names) != len(self.server_addresses):
+            raise ValueError(
+                f"Number of model_names ({len(self.model_names)}) must match "
+                f"number of server_addresses ({len(self.server_addresses)})"
+            )
 
 
 @hydra.main(version_base=None, config_path=None)
@@ -165,8 +165,9 @@ def main(cfg: MultiTurnConfig):
     LOG.info("Multi-turn conversation configuration:")
     LOG.info(f"  Input file: {cfg.input_file}")
     LOG.info(f"  Output file: {cfg.output_file}")
-    LOG.info(f"  Model A: {cfg.model_a_name} @ {cfg.server_a_address}")
-    LOG.info(f"  Model B: {cfg.model_b_name} @ {cfg.server_b_address}")
+    LOG.info(f"  Number of models: {len(cfg.server_addresses)}")
+    for idx, (model_name, address) in enumerate(zip(cfg.model_names, cfg.server_addresses)):
+        LOG.info(f"  Model {idx}: {model_name} @ {address}")
     LOG.info(f"  Number of turns: {cfg.num_turns}")
 
     # Read input prompts
@@ -192,38 +193,34 @@ def main(cfg: MultiTurnConfig):
                     existing_conversations[conv_id] = conv
         LOG.info(f"Found {len(existing_conversations)} existing conversations, will skip those")
 
-    # Parse server addresses
-    server_a_host, server_a_port = cfg.server_a_address.rsplit(":", 1)
-    server_b_host, server_b_port = cfg.server_b_address.rsplit(":", 1)
+    # Wait for all servers to be ready before proceeding
+    servers_to_check = {}
+    for idx, address in enumerate(cfg.server_addresses):
+        host, port = address.rsplit(":", 1)
+        servers_to_check[f"Server {idx}"] = f"http://{host}:{port}/v1/models"
 
-    LOG.info(f"Server A: {cfg.model_a_name} @ {server_a_host}:{server_a_port}")
-    LOG.info(f"Server B: {cfg.model_b_name} @ {server_b_host}:{server_b_port}")
-
-    # Wait for servers to be ready before proceeding
-    servers_to_check = {
-        "Server A": f"http://{server_a_host}:{server_a_port}/v1/models",
-        "Server B": f"http://{server_b_host}:{server_b_port}/v1/models",
-    }
     wait_for_servers_ready(servers_to_check)
 
-    # Configure server params
-    # For vLLM, the model name should match what the server reports
-    # Typically it's the path used to start the server
-    cfg.server_a.model = cfg.model_a_name
-    cfg.server_a.host = server_a_host
-    cfg.server_a.port = server_a_port  # Keep as string
-    cfg.server_b.model = cfg.model_b_name
-    cfg.server_b.host = server_b_host
-    cfg.server_b.port = server_b_port  # Keep as string
+    # Create model instances directly from server addresses
+    model_clients = []
+    for idx, (address, model_name) in enumerate(zip(cfg.server_addresses, cfg.model_names)):
+        host, port = address.rsplit(":", 1)
+        LOG.info(f"Creating client for Server {idx}: {model_name} @ {host}:{port}")
 
-    # Convert server configs to dict for get_model
-    # Filter out empty strings but keep all other values
-    server_a_dict = {k: v for k, v in cfg.server_a.__dict__.items() if v != ""}
-    server_b_dict = {k: v for k, v in cfg.server_b.__dict__.items() if v != ""}
+        server_config = {
+            "server_type": cfg.server_type,
+            "model": model_name,
+            "host": host,
+            "port": port,
+        }
 
-    # Create model instances (do NOT pass inference params here - those go to API calls)
-    model_a = get_model(**server_a_dict)
-    model_b = get_model(**server_b_dict)
+        model_client = get_model(**server_config)
+        model_clients.append(model_client)
+
+    # For now, we still use model_a and model_b for the conversation logic
+    # (assumes 2 models - can be extended later)
+    model_a = model_clients[0]
+    model_b = model_clients[1]
 
     # Run conversation generation
     results = asyncio.run(
@@ -233,8 +230,8 @@ def main(cfg: MultiTurnConfig):
             model_a=model_a,
             model_b=model_b,
             num_turns=cfg.num_turns,
-            model_a_name=cfg.model_a_name,
-            model_b_name=cfg.model_b_name,
+            model_a_name=cfg.model_names[0],
+            model_b_name=cfg.model_names[1] if len(cfg.model_names) > 1 else cfg.model_names[0],
             starting_prompt_key=cfg.starting_prompt_key,
             max_concurrent=cfg.max_concurrent,
             inference_a=cfg.inference_a,
