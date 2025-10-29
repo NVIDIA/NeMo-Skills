@@ -22,6 +22,7 @@ import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils.cluster import parse_sbatch_arguments
 from nemo_skills.pipeline.utils.commands import sandbox_command
 from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
 from nemo_skills.pipeline.utils.server import get_free_port
@@ -53,6 +54,7 @@ def _create_commandgroup_from_config(
     keep_mounts_for_sandbox: bool,
     task_name: str,
     log_dir: str,
+    sbatch_kwargs: Optional[Dict] = None,
 ) -> CommandGroup:
     """Create a CommandGroup from server_config.
 
@@ -141,6 +143,7 @@ def _create_commandgroup_from_config(
             exclusive=exclusive,
             num_gpus=max_gpus,
             num_nodes=max_nodes,
+            extra_slurm_kwargs=sbatch_kwargs,
         ),
         name=task_name,
         log_dir=log_dir,
@@ -271,6 +274,10 @@ def generate(
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_arguments: str = typer.Option(
+        "",
+        help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -371,6 +378,9 @@ def generate(
     if _task_dependencies is None:
         _task_dependencies = []
 
+    # Parse sbatch arguments
+    sbatch_kwargs = parse_sbatch_arguments(sbatch_arguments, exclusive)
+
     # Build jobs list using declarative interface
     jobs = []
     all_job_names = []
@@ -447,6 +457,7 @@ def generate(
                     keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                     task_name=task_name,
                     log_dir=log_dir,
+                    sbatch_kwargs=sbatch_kwargs,
                 )
 
                 # Use unique internal job name for dependency tracking, but same task_name

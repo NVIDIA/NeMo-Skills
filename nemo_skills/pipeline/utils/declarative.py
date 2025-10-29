@@ -255,6 +255,7 @@ class HardwareConfig:
     exclusive: bool = False
     num_gpus: Optional[int] = None
     num_nodes: Optional[int] = None
+    extra_slurm_kwargs: Optional[dict] = None
 
 
 class CommandGroup:
@@ -537,7 +538,7 @@ class Pipeline:
                 overlap=overlap,
                 mounts=exec_config.get("mounts"),
                 with_ray=self.with_ray,
-                slurm_kwargs={"exclusive": hardware.exclusive} if (hardware and hardware.exclusive) else None,
+                slurm_kwargs=hardware.extra_slurm_kwargs,
                 dependencies=dependencies,
             )
 
