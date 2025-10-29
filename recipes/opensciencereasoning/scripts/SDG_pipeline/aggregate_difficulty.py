@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import argparse
 import glob
 import json
@@ -19,6 +20,7 @@ from collections import defaultdict
 
 from nemo_skills.evaluation.metrics.utils import is_correct_judgement
 from recipes.opensciencereasoning.scripts.SDG_pipeline.constants import BASE_FIELDS
+
 
 def main():
     """Postprocess judged generations to add difficulty_model, difficulty_model_pass_rate, difficulty_model_pass_at_n.
@@ -37,7 +39,7 @@ def main():
 
     # Aggregate judgements per id across random seeds
     judgements_by_problem = defaultdict(lambda: {"total": 0, "correct": 0})
-    samples =[]
+    samples = []
 
     files = sorted(glob.glob(f"{args.judgement_dir}/output*.jsonl"))
     for i, path in enumerate(files):
@@ -46,8 +48,10 @@ def main():
                 sample = json.loads(line)
                 if i == 0:
                     samples.append(sample)
-                judgements_by_problem[sample['problem']]['total'] += 1
-                judgements_by_problem[sample['problem']]['correct'] += 1 if is_correct_judgement(sample['judgement']) else 0
+                judgements_by_problem[sample["problem"]]["total"] += 1
+                judgements_by_problem[sample["problem"]]["correct"] += (
+                    1 if is_correct_judgement(sample["judgement"]) else 0
+                )
 
     # Write updated records with required keys
     with open(args.output_file, "w") as fout:
@@ -68,5 +72,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

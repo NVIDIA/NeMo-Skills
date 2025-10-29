@@ -12,13 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import re
-import sys
-import logging
-from pathlib import Path
 
 # --- Fast JSON ---
 import json as _json_std
+import logging
+import re
+import sys
+from pathlib import Path
+
 try:
     import orjson as _orjson  # type: ignore
 
@@ -40,7 +41,7 @@ except Exception:
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 
 
@@ -48,8 +49,10 @@ logging.basicConfig(
 # Helpers
 # ---------------------------------------------------
 
+
 def extract_dataset_name(input_path: str) -> str:
     return Path(input_path).stem
+
 
 def generate_id(dataset_name: str, line_index: str) -> str:
     """Generate a unique id."""
@@ -62,33 +65,37 @@ def count_options(problem):
     Assumes options start with 'A) ', 'B) ', etc. and are separated by double newlines.
     Supported format: 'Question\n\nA) option text'\nB) option text\n...
     """
-    parts = problem.split('\n\n')
+    parts = problem.split("\n\n")
     options_part = None
     for part in parts:
-        if part.startswith('A) '):
+        if part.startswith("A) "):
             options_part = part
             break
     if not options_part:
         return 0
-    
-    for i, option in enumerate(options_part.split('\n')):
+
+    for i, option in enumerate(options_part.split("\n")):
         if not option.startswith(f"{chr(ord('A') + i)}) "):
             return i
     return i + 1
+
 
 def match_option_format(text: str, pattern: str) -> bool:
     """Check if option format matches given regex pattern at least once."""
     return bool(re.search(pattern, text))
 
+
 def contains_image(problem: str) -> bool:
-    extensions = ['.png', '.jpg', '.jpeg', '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.svg']
+    extensions = [".png", ".jpg", ".jpeg", ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".svg"]
     if any(ext in problem for ext in extensions):
         return True
     return False
 
+
 # ---------------------------------------------------
 # Main filtering function
 # ---------------------------------------------------
+
 
 def process_file(
     input_file: str,
@@ -101,7 +108,7 @@ def process_file(
     problem_field: str = "problem",
     expected_answer_field: str = "expected_answer",
     id_field: str = "id",
-    remove_expected_answer: bool = False
+    remove_expected_answer: bool = False,
 ):
     input_file = Path(input_file)
     output_file = Path(output_file)
@@ -113,8 +120,7 @@ def process_file(
     kept = 0
     dropped = 0
 
-    with open(input_file, "r", encoding="utf-8") as fin, \
-         open(output_file, "w", encoding="utf-8") as fout:
+    with open(input_file, "r", encoding="utf-8") as fin, open(output_file, "w", encoding="utf-8") as fout:
         for index, line in enumerate(fin):
             line = line.strip()
             if not line:
@@ -126,16 +132,18 @@ def process_file(
                 dropped += 1
                 continue
 
-
             # rename keys to standard names
-            for current_key, new_key in [(problem_field, "problem"), (expected_answer_field, "expected_answer"), (id_field, "id")]:
+            for current_key, new_key in [
+                (problem_field, "problem"),
+                (expected_answer_field, "expected_answer"),
+                (id_field, "id"),
+            ]:
                 if current_key in obj and new_key != current_key:
                     obj[new_key] = obj[current_key]
                     del obj[current_key]
 
             if remove_expected_answer and "expected_answer" in obj:
                 del obj["expected_answer"]
-            
 
             problem = obj.get("problem", "")
             if not problem or not problem.strip():
@@ -144,7 +152,7 @@ def process_file(
 
             # ensure id
             if "id" not in obj:
-                logging.warning(f"⚠️ Missing id, generating one.")
+                logging.warning("⚠️ Missing id, generating one.")
                 obj["id"] = generate_id(dataset_name, index)
 
             # deduplicate
@@ -204,12 +212,16 @@ if __name__ == "__main__":
     parser.add_argument("input_file", type=str, help="Path to input JSONL file")
     parser.add_argument("output_file", type=str, help="Path to output JSONL file")
     parser.add_argument("--deduplicate", action="store_true", help="Remove duplicate problems")
-    parser.add_argument("--dataset_name", type=str, help="Dataset name (optional). If not provided, derived from filename")
+    parser.add_argument(
+        "--dataset_name", type=str, help="Dataset name (optional). If not provided, derived from filename"
+    )
     parser.add_argument("--num_options", type=int, default=None, help="Filter by number of options")
     parser.add_argument("--remove_images", action="store_true", help="Remove images from problems")
     parser.add_argument("--option_format_regex", type=str, help="Filter by option format regex (e.g. '^[A-Z]\\)')")
     parser.add_argument("--problem_field", type=str, help="Field in the JSONL file that contains the problem")
-    parser.add_argument("--expected_answer_field", type=str, help="Field in the JSONL file that contains the expected answer")
+    parser.add_argument(
+        "--expected_answer_field", type=str, help="Field in the JSONL file that contains the expected answer"
+    )
     parser.add_argument("--remove_expected_answer", action="store_true", help="Remove expected answer from samples")
     parser.add_argument("--id_field", type=str, help="Field in the JSONL file that contains the id")
 
@@ -225,5 +237,5 @@ if __name__ == "__main__":
         problem_field=args.problem_field,
         expected_answer_field=args.expected_answer_field,
         id_field=args.id_field,
-        remove_expected_answer=args.remove_expected_answer
+        remove_expected_answer=args.remove_expected_answer,
     )

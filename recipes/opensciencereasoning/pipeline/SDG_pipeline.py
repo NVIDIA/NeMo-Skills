@@ -14,9 +14,9 @@
 
 import argparse
 import json
-from pathlib import Path
 import shlex
 import sys
+from pathlib import Path
 
 from omegaconf import OmegaConf
 
@@ -26,25 +26,25 @@ sys.path.append(str(Path(__file__).resolve().parents[3]))
 from recipes.opensciencereasoning.few_shots import few_shots
 from recipes.opensciencereasoning.scripts.SDG_pipeline.constants import BASE_FIELDS
 
-
 OUTPUT_FILE = "final_result.jsonl"
+
 
 def get_stage_expname(base_expname: str, stage_name: str, suffix: str):
     return f"{base_expname}-{stage_name.replace('_', '-')}-{suffix}"
 
 
 def filter_problems(cluster: str, expname: str, run_after: str, stage_config: dict, **kwargs):
-    """The script performs several cleanup steps on the incoming JSONL: 
-    it renames user-provided keys to the canonical `problem`/`expected_answer`/`id`, 
-    can drop the original expected answer when majority voting will be used later, 
-    removes duplicate problems, filters out samples referencing images, enforces 
-    an MCQ option count and optional regex pattern, and moves all remaining fields 
-    into a `metadata` mapping. The resulting filtered dataset is written to 
+    """The script performs several cleanup steps on the incoming JSONL:
+    it renames user-provided keys to the canonical `problem`/`expected_answer`/`id`,
+    can drop the original expected answer when majority voting will be used later,
+    removes duplicate problems, filters out samples referencing images, enforces
+    an MCQ option count and optional regex pattern, and moves all remaining fields
+    into a `metadata` mapping. The resulting filtered dataset is written to
     `final_result.jsonl` inside `output_dir` for downstream stages.
     """
     input_file = stage_config.get("input_file")
     output_dir = stage_config["output_dir"]
-    option_format_regex = stage_config.get('option_format_regex', None)
+    option_format_regex = stage_config.get("option_format_regex", None)
     option_format_regex = f" --option_format_regex '{option_format_regex}' " if option_format_regex else ""
 
     problem_field = stage_config.get("problem_field", None)
@@ -56,20 +56,20 @@ def filter_problems(cluster: str, expname: str, run_after: str, stage_config: di
         f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/filter_problems.py "
         f"{input_file} "
         f"{output_dir}/{OUTPUT_FILE}"
-        + (f" --deduplicate" if stage_config.get('deduplicate', False) else "")
-        + (f" --remove_images" if stage_config.get('remove_images', False) else "")
-        + (f" --dataset_name {stage_config.get('dataset_name', None)}" if stage_config.get('dataset_name') else "")
-        + (f" --num_options {stage_config.get('num_options', None)}" if stage_config.get('num_options') else "")
+        + (" --deduplicate" if stage_config.get("deduplicate", False) else "")
+        + (" --remove_images" if stage_config.get("remove_images", False) else "")
+        + (f" --dataset_name {stage_config.get('dataset_name', None)}" if stage_config.get("dataset_name") else "")
+        + (f" --num_options {stage_config.get('num_options', None)}" if stage_config.get("num_options") else "")
         + (f" --problem_field {problem_field}" if problem_field else "")
         + (f" --expected_answer_field {expected_answer_field}" if expected_answer_field else "")
         + (f" --remove_expected_answer {remove_expected_answer}" if remove_expected_answer else "")
         + (f" --id_field {id_field}" if id_field else "")
         + option_format_regex
     )
-    
+
     wrapped_cmd = wrap_arguments(cmd)
     run_cmd(
-        cluster=cluster, 
+        cluster=cluster,
         container="nemo-skills",
         log_dir=f"{output_dir}/logs",
         expname=expname,
@@ -113,7 +113,7 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
         expname=f"{expname}_retrieve_similar",
         run_after=run_after,
         exclusive=False,
-        installation_command="pip install torch sentence-transformers", # TODO remove
+        installation_command="pip install torch sentence-transformers",  # TODO remove
         ctx=wrap_arguments(cmd),
     )
 
@@ -130,12 +130,9 @@ def decontaminate(cluster: str, expname: str, run_after: str, stage_config: dict
         run_after=f"{expname}_retrieve_similar",
         exclusive=False,
         num_chunks=num_chunks,
-        ctx=wrap_arguments(
-            f"++check_both_ways=True "
-        ),
+        ctx=wrap_arguments("++check_both_ways=True "),
         dependent_jobs=dependent_jobs,
     )
-
 
     run_cmd(
         ctx=wrap_arguments(
@@ -197,7 +194,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
             cluster=cluster,
             exclusive=False,
             expname=f"{expname}-prepare-for-{name}-labeling-{i}",
-            run_after=first_dep if i == 0 else f"{expname}-{prev_name}-labeling-{i-1}",
+            run_after=first_dep if i == 0 else f"{expname}-{prev_name}-labeling-{i - 1}",
         )
         generate(
             ctx=wrap_arguments(
@@ -236,6 +233,7 @@ def topics_labeling(cluster: str, expname: str, run_after: str, stage_config: di
         run_after=f"{expname}-{name}-labeling-{i}",
     )
 
+
 def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     """Launch model inference, adds predicted_answer/expected_answer via regex/majority voting, optionally judge, then aggregate per-problem stats.
 
@@ -268,7 +266,9 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
     )
     generation_dir = f"{output_dir}/with_predictions"
 
-    predicted_answer_regex_args = f"    --predicted_answer_regex '{predicted_answer_regex}' " if predicted_answer_regex else ""
+    predicted_answer_regex_args = (
+        f"    --predicted_answer_regex '{predicted_answer_regex}' " if predicted_answer_regex else ""
+    )
     majority_voting_args = f"    --majority_voting '{make_majority_voting}' " if make_majority_voting else ""
     run_cmd(
         ctx=wrap_arguments(
@@ -283,7 +283,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
         expname=f"{expname}_extract_predictions",
         run_after=f"{expname}_generate_solutions",
     )
-    
+
     if make_judgement:
         generate(
             ctx=wrap_arguments(judge_ctx_args),
@@ -310,6 +310,7 @@ def generate_solutions(cluster, expname, run_after, stage_config, **kwargs):
         run_after=[f"{expname}_extract_predictions", f"{expname}_judgement"],
     )
 
+
 def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
     """Run difficulty estimation generation, judge correctness, and postprocess metrics.
 
@@ -335,7 +336,6 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
 
     judge_args = judge_kwargs.get("args", {})
     judge_ctx_args = judge_kwargs.get("ctx_args", "")
-    
 
     run_cmd(
         ctx=wrap_arguments(
@@ -385,6 +385,7 @@ def difficulty_estimation(cluster, expname, run_after, stage_config, **kwargs):
         expname=expname,
     )
 
+
 def aggregate(cluster, expname, run_after, stage_config, **kwargs):
     """Aggregate per-problem metadata and solutions into a final JSONL.
 
@@ -396,7 +397,9 @@ def aggregate(cluster, expname, run_after, stage_config, **kwargs):
     metadata_files = stage_config.get("metadata_files", [])
     solutions_path = stage_config.get("solutions_path", None)
 
-    solutions_path_arg = f"    --solutions_path {shlex.quote(str(solutions_path))} " if solutions_path is not None else ""
+    solutions_path_arg = (
+        f"    --solutions_path {shlex.quote(str(solutions_path))} " if solutions_path is not None else ""
+    )
     run_cmd(
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/aggregate_metadata.py "
@@ -410,6 +413,7 @@ def aggregate(cluster, expname, run_after, stage_config, **kwargs):
         run_after=run_after,
         expname=expname,
     )
+
 
 def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     """Submit the filtering job with stage-configured correctness, pass-rate, and metadata constraints.
@@ -430,11 +434,25 @@ def filter_solutions(cluster, expname, run_after, stage_config, **kwargs):
     metadata_values = stage_config.get("metadata_values", None)
     is_ground_truth_answer_present = stage_config.get("is_ground_truth_answer_present", False)
 
-    generation_model_pass_rate_range_arg = f"    --generation_model_pass_rate_range {shlex.quote(json.dumps(generation_model_pass_rate_range, ensure_ascii=False))} " if generation_model_pass_rate_range else ""
-    difficulty_model_pass_rate_range_arg = f"    --difficulty_model_pass_rate_range {shlex.quote(json.dumps(difficulty_model_pass_rate_range, ensure_ascii=False))} " if difficulty_model_pass_rate_range else ""
-    metadata_values_arg = f"    --metadata_values {shlex.quote(json.dumps(metadata_values, ensure_ascii=False))} " if metadata_values else ""
+    generation_model_pass_rate_range_arg = (
+        f"    --generation_model_pass_rate_range {shlex.quote(json.dumps(generation_model_pass_rate_range, ensure_ascii=False))} "
+        if generation_model_pass_rate_range
+        else ""
+    )
+    difficulty_model_pass_rate_range_arg = (
+        f"    --difficulty_model_pass_rate_range {shlex.quote(json.dumps(difficulty_model_pass_rate_range, ensure_ascii=False))} "
+        if difficulty_model_pass_rate_range
+        else ""
+    )
+    metadata_values_arg = (
+        f"    --metadata_values {shlex.quote(json.dumps(metadata_values, ensure_ascii=False))} "
+        if metadata_values
+        else ""
+    )
     only_correct_arg = "    --only_correct_solutions " if only_correct_solutions else ""
-    is_ground_truth_answer_present_arg = "    --is_ground_truth_answer_present " if is_ground_truth_answer_present else ""
+    is_ground_truth_answer_present_arg = (
+        "    --is_ground_truth_answer_present " if is_ground_truth_answer_present else ""
+    )
     run_cmd(
         ctx=wrap_arguments(
             f"python /nemo_run/code/recipes/opensciencereasoning/scripts/SDG_pipeline/filter_solutions.py "
@@ -494,11 +512,11 @@ def prepare_for_sft(cluster, expname, run_after, stage_config, **kwargs):
         cluster=cluster,
         log_dir=f"{output_dir}/logs",
         expname=expname,
-        run_after=f"{expname}_prepare_for_sft"
+        run_after=f"{expname}_prepare_for_sft",
     )
 
-def convert_to_messages_format(cluster, expname, run_after, stage_config, **kwargs):
 
+def convert_to_messages_format(cluster, expname, run_after, stage_config, **kwargs):
     """Convert the final results into a messages format for chat-based models.
 
     This stage reads the `input_file`, reformats each sample into a messages
@@ -520,13 +538,14 @@ def convert_to_messages_format(cluster, expname, run_after, stage_config, **kwar
         run_after=run_after,
     )
 
+
 def bucket(cluster, expname, run_after, stage_config, **kwargs):
     """Bucket samples by token length using the configured tokenizer.
 
     Each record is augmented with its `out_token_length`, which is the
-    per-sample statistic written back to the JSONL output. It emits one JSONL file 
-    per configured bucket (for example `{stem}_bucket_16000.jsonl`) plus an overflow 
-    file, placing samples into the file whose upper bound matches their token length. 
+    per-sample statistic written back to the JSONL output. It emits one JSONL file
+    per configured bucket (for example `{stem}_bucket_16000.jsonl`) plus an overflow
+    file, placing samples into the file whose upper bound matches their token length.
     Bucket counts and percentages are also reported via the script's logs.
     """
     input_file = stage_config["input_file"]

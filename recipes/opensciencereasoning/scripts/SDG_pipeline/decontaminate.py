@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
+
 import argparse
+import json
 import logging
+
 
 def main():
     """Filter the input dataset based on contamination check results.
@@ -24,9 +26,7 @@ def main():
 
     If `--with_duplicates` is False, repeated problems are emitted once.
     """
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     parser = argparse.ArgumentParser(
         description="Decontaminate the input file. Reads contamination decisions and filters the input JSONL."
@@ -64,17 +64,17 @@ def main():
         for line in fin:
             sample = json.loads(line)
             if not sample:
-                logging.warning(f"Skipping empty line")
+                logging.warning("Skipping empty line")
                 continue
-            if not sample['contaminated']:
-                dec.add(sample['problem'])
+            if not sample["contaminated"]:
+                dec.add(sample["problem"])
 
     with open(args.input_path) as fin, open(args.save_path, "w") as fout:
         for line in fin:
             sample = json.loads(line)
-            if sample['problem'] in dec:
+            if sample["problem"] in dec:
                 if not args.with_duplicates:
-                    dec.remove(sample['problem'])
+                    dec.remove(sample["problem"])
                 fout.write(line)
 
 

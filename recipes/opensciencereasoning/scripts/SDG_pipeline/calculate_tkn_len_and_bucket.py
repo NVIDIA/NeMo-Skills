@@ -1,15 +1,27 @@
 #!/usr/bin/env python3
-import os
-import sys
-import logging
-from typing import List
-from pathlib import Path
-
-from transformers import AutoTokenizer
-
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # ---- Fast JSON (prefer orjson) ----
 import json as _json_std
+import logging
+import sys
+from pathlib import Path
+from typing import List
+
+from transformers import AutoTokenizer
+
 try:  # pragma: no cover - best effort
     import orjson as _orjson  # type: ignore
 
@@ -28,22 +40,25 @@ except Exception:  # pragma: no cover
     def _json_dumps(obj) -> str:  # type: ignore
         return _json_std.dumps(obj, ensure_ascii=False)
 
+
 # ------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 
 # ------------------------------------------------------------
 # Utility Functions
 # ------------------------------------------------------------
 
+
 def compute_token_length(text: str, tokenizer: AutoTokenizer) -> int:
     """Compute number of tokens for a given text."""
     if not text:
         return 0
     return len(tokenizer(text, add_special_tokens=False)["input_ids"])
+
 
 def bucket_index(length: int, bucket_sizes: List[int]) -> int:
     """Return bucket index (upper bound) for given length."""
@@ -52,9 +67,11 @@ def bucket_index(length: int, bucket_sizes: List[int]) -> int:
             return size
     return -1  # overflow
 
+
 # ------------------------------------------------------------
 # Core logic
 # ------------------------------------------------------------
+
 
 def process_jsonl(
     input_path: str,
@@ -99,11 +116,11 @@ def process_jsonl(
                     length = compute_token_length(out_text, tokenizer)
                     obj["out_token_length"] = length
                     dumped = _json_dumps(obj)
-                
+
                 else:
                     length = obj["out_token_length"]
                     dumped = line  # already has the field
-                    
+
                 if to_bucket:
                     b = bucket_index(length, bucket_sizes)
                     if b != -1:
@@ -140,6 +157,7 @@ def process_jsonl(
     else:
         logging.info(f"💾 Saved to {output_path}")
 
+
 # ------------------------------------------------------------
 # Entry point
 # ------------------------------------------------------------
@@ -151,12 +169,17 @@ if __name__ == "__main__":
     parser.add_argument("input_file", type=str, help="Path to input .jsonl file")
     parser.add_argument("--output_dir", type=str, required=True, help="Directory to save processed files")
     parser.add_argument("--to_bucket", action="store_true", help="Whether to bucket results by token length")
-    parser.add_argument("--bucket_sizes", default=[16000, 32000, 64000], nargs="+", type=int, help="List of bucket size upper limits (e.g. 16000, 32000, 64000)")
+    parser.add_argument(
+        "--bucket_sizes",
+        default=[16000, 32000, 64000],
+        nargs="+",
+        type=int,
+        help="List of bucket size upper limits (e.g. 16000, 32000, 64000)",
+    )
     parser.add_argument("--tokenizer_path", type=str, help="Model name for tokenizer")
 
     args = parser.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_path, trust_remote_code=True)
-
 
     process_jsonl(args.input_file, args.output_dir, tokenizer, args.to_bucket, args.bucket_sizes)
