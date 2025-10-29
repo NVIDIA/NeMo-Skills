@@ -1,25 +1,30 @@
 gpqa:
-  - robustness/mcq_v1/aai_1
-  - robustness/mcq_v1/aai_2
-  - robustness/mcq_v1/boxed_1
-  - robustness/mcq_v1/boxed_2
-  - [robustness/mcq_v1/correct_1, '(?i)The correct answer choice is\:*\**\s*\**([A-Za-z])']
-  - [robustness/mcq_v1/correct_2, '(?i)The correct answer choice is\:*\**\s*\**([A-Za-z])']
-  - [robustness/mcq_v1/final_answer_1, '(?i)Final answer\b[\s\n\*\-–—\[:]*([A-Z])']
-  - [robustness/mcq_v1/final_answer_2, '(?i)Final answer\b[\s\n\*\-–—\[:]*([A-Z])']
-  - [robustness/mcq_v1/angle_brackets_1, '<<([A-Za-z])>>']
-  - [robustness/mcq_v1/angle_brackets_2, '<<([A-Za-z])>>']
-
+  - prompt_config: robustness/mcq_prompts/aai_1
+  - prompt_config: robustness/mcq_prompts/aai_2
+  - prompt_config: robustness/mcq_prompts/boxed_1
+  - prompt_config: robustness/mcq_prompts/boxed_2
+  - prompt_config: robustness/mcq_prompts/correct_1
+    extract_regex: '(?i)The correct answer choice is\:*\**\s*\**([A-Za-z])'
+  - prompt_config: robustness/mcq_prompts/correct_2
+    extract_regex: '(?i)The correct answer choice is\:*\**\s*\**([A-Za-z])'
+  - prompt_config: robustness/mcq_prompts/final_answer_1
+    extract_regex: '(?i)Final answer\b[\s\n\*\-–—\[:]*([A-Z])'
+  - prompt_config: robustness/mcq_prompts/final_answer_2
+    extract_regex: '(?i)Final answer\b[\s\n\*\-–—\[:]*([A-Z])'
+  - prompt_config: robustness/mcq_prompts/angle_brackets_1
+    extract_regex: '<<([A-Za-z])>>'
+  - prompt_config: robustness/mcq_prompts/angle_brackets_2
+    extract_regex: '<<([A-Za-z])>>'
 
 
 comp-math-24-25:
-  - robustness/math_prompts/boxed_1.yaml
-  - robustness/math_prompts/boxed_2.yaml
-  - robustness/math_prompts/boxed_3.yaml
-  - robustness/math_prompts/boxed_4.yaml
-  - robustness/math_prompts/boxed_5.yaml
-  - robustness/math_prompts/boxed_6.yaml
-  - robustness/math_prompts/boxed_7.yaml
-  - robustness/math_prompts/boxed_8.yaml
-  - robustness/math_prompts/boxed_aai.yaml
-  - robustness/math_prompts/boxed_general.yaml
+  - prompt_config: robustness/math_prompts/boxed_1
+  - prompt_config: robustness/math_prompts/boxed_2
+  - prompt_config: robustness/math_prompts/boxed_3
+  - prompt_config: robustness/math_prompts/boxed_4
+  - prompt_config: robustness/math_prompts/boxed_5
+  - prompt_config: robustness/math_prompts/boxed_6
+  - prompt_config: robustness/math_prompts/boxed_7
+  - prompt_config: robustness/math_prompts/boxed_8
+  - prompt_config: robustness/math_prompts/boxed_aai
+  - prompt_config: robustness/math_prompts/boxed_general

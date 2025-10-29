@@ -93,7 +93,7 @@ def math_equal(gt_answer, predicted_answer, take_modulo: int | None = None, **kw
 
 
 def extract_answer(
-    string: str, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$", relaxed=True
+    string: str, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$", relaxed=False
 ):
     """Extract Answer String from \\boxed expression or based on regex
     If relaxed=True: try both methods, boxed first.

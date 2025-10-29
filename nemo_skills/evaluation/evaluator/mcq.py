@@ -35,14 +35,14 @@ class MCQEvaluatorConfig(BaseEvaluatorConfig):
     # if relaxed is False:
     #   if extract_from_boxed is True -> extract from boxed{} ONLY
     #   else extract from regex ONLY
-    relaxed: bool = True
+    relaxed: bool = False
 
 
 def eval_mcq(cfg):
     eval_config = MCQEvaluatorConfig(**cfg)
 
     def extract_letter(
-        text, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$", relaxed=True
+        text, extract_from_boxed: bool = True, extract_regex: str = r"The final answer is (.+)$", relaxed=False
     ):
         # extract prediction from boxed{} or regex
         extracted_answer = extract_answer(

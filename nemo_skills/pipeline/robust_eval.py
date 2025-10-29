@@ -14,17 +14,25 @@
 import inspect
 import logging
 from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 
 import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
+from nemo_skills.dataset.utils import ExtraDatasetType, get_dataset_module
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.eval import eval as _eval
 from nemo_skills.prompt.utils import load_config
 from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+@dataclass
+class Prompt:
+    prompt_config: str  # path to prompt config
+    extract_regex: str = None  # optional regex to extract answer from model output
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -48,6 +56,22 @@ def robust_eval(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     expname: str = typer.Option("robust_eval", help="Name of the experiment"),
+    data_dir: str = typer.Option(
+        None,
+        help="Path to the data directory. If not specified, will use the default nemo_skills/dataset path. "
+        "Can also specify through NEMO_SKILLS_DATA_DIR environment variable.",
+    ),
+    extra_datasets: str = typer.Option(
+        None,
+        help="Path to a custom dataset folder that will be searched in addition to the main one. "
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS.",
+    ),
+    extra_datasets_type: ExtraDatasetType = typer.Option(
+        "local",
+        envvar="NEMO_SKILLS_EXTRA_DATASETS_TYPE",
+        help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
+        "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
+    ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
     reuse_code_exp: str = typer.Option(
         None,
@@ -105,23 +129,38 @@ def robust_eval(
                 LOG.info(f"Running prompt: {prompt}")
                 # deepcopy ctx and ns_eval_kwargs in case smth is changes in _eval
                 prompt_context = deepcopy(ctx)
-                if isinstance(prompt, list):
-                    prompt, extract_regex = prompt
-                    prompt_context.args.append(f"++eval_config.extract_regex='\"{extract_regex}\"'")
-                prompt_context.args.append(f"++prompt_config={prompt}")
+                prompt = Prompt(**prompt)
+                if prompt.extract_regex:
+                    prompt_context.args.append(f"++eval_config.extract_regex='\"{prompt.extract_regex}\"'")
+                prompt_context.args.append(f"++prompt_config={prompt.prompt_config}")
+                # ensure relaxed answer extraction for multichoice benchmarks
+                benchmark_module, _, _ = get_dataset_module(
+                    benchmark_name,
+                    data_dir=data_dir,
+                    cluster_config=cluster,
+                    extra_datasets=extra_datasets,
+                    extra_datasets_type=extra_datasets_type,
+                )
+                if benchmark_module.METRICS_TYPE == "multichoice":
+                    prompt_context.args.append("++eval_config.relaxed=True ")
+
                 prompt_kwargs = deepcopy(ns_eval_kwargs)
-                prompt_kwargs["expname"] = expname + f"_{Path(prompt).stem}"
+                prompt_name = Path(prompt.prompt_config).stem
+                prompt_kwargs["expname"] = f"{expname}_{prompt_name}"
                 _eval(
                     ctx=prompt_context,
-                    output_dir=f"{output_dir}/{benchmark_name}/{Path(prompt).stem}",
+                    output_dir=f"{output_dir}/{benchmark_name}/{prompt_name}",
                     benchmarks=benchmark,
                     cluster=cluster,
                     config_dir=config_dir,
                     dry_run=dry_run,
                     reuse_code=reuse_code,
+                    data_dir=data_dir,
+                    extra_datasets=extra_datasets,
+                    extra_datasets_type=extra_datasets_type,
                     **prompt_kwargs,
                 )
-                dependent_tasks.append({prompt_kwargs["expname"]})
+                dependent_tasks.append(prompt_kwargs["expname"])
 
         sum_rob_command = f"python -m nemo_skills.pipeline.summarize_robustness {output_dir}"
         _ = pipeline_utils.add_task(
@@ -139,6 +178,7 @@ def robust_eval(
         pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)
 
 
+# Copy the signature from eval and add prompt_set_config argument
 original_sig = inspect.signature(_eval)
 new_param = inspect.Parameter(
     "prompt_set_config",
