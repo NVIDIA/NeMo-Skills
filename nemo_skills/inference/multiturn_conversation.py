@@ -321,9 +321,6 @@ async def generate_conversations(
                     },
                 }
 
-                # Track current message for next turn
-                current_message = initial_prompt
-
                 # Generate turns
                 for turn_idx in range(num_turns):
                     is_model_a = turn_idx % 2 == 0
@@ -331,21 +328,43 @@ async def generate_conversations(
                     speaker = "model_a" if is_model_a else "model_b"
                     model_name = model_a_name if is_model_a else model_b_name
 
-                    # Create messages for the LLM
-                    # For first turn, just use the initial prompt
-                    # For subsequent turns, build conversation history
+                    # Create messages for the LLM with clear engagement structure
                     if turn_idx == 0:
-                        messages = [{"role": "user", "content": current_message}]
+                        # First turn: respond to the initial prompt
+                        system_msg = "You are in a conversation. Keep your responses concise (2-3 sentences)."
+                        messages = [
+                            {"role": "system", "content": system_msg},
+                            {"role": "user", "content": initial_prompt},
+                        ]
                     else:
-                        # Build conversation history
-                        messages = [{"role": "user", "content": initial_prompt}]
-                        for prev_turn in conversation["turns"]:
-                            # Alternate roles based on who spoke
-                            if prev_turn["speaker"] == "model_a":
-                                role = "assistant" if is_model_a else "user"
-                            else:
-                                role = "user" if is_model_a else "assistant"
+                        # Subsequent turns: Focus on the immediate exchange
+                        # Show just the last 2-3 turns to keep context clear
+                        system_msg = (
+                            f"You are in a conversation about: '{initial_prompt}'\n"
+                            f"Keep your responses concise (2-3 sentences) and engage with what the other person just said."
+                        )
+                        messages = [{"role": "system", "content": system_msg}]
+
+                        # Show recent history (last 4 turns or all if fewer)
+                        recent_turns = (
+                            conversation["turns"][-4:] if len(conversation["turns"]) > 4 else conversation["turns"]
+                        )
+
+                        for prev_turn in recent_turns:
+                            # From current model's perspective:
+                            # - Its own previous messages are "assistant"
+                            # - The other model's messages are "user"
+                            is_own_turn = prev_turn["speaker"] == speaker
+                            role = "assistant" if is_own_turn else "user"
                             messages.append({"role": role, "content": prev_turn["content"]})
+
+                        # Last message should always be from the other model (role="user")
+                        # Add explicit engagement instruction
+                        if messages[-1]["role"] == "user":
+                            messages[-1]["content"] += (
+                                "\n\n[Respond to the above. Engage with their specific points - "
+                                "agree/disagree, ask a follow-up, challenge, or build on their idea.]"
+                            )
 
                     # Generate response
                     try:
@@ -365,9 +384,6 @@ async def generate_conversations(
                                 "turn_idx": turn_idx,
                             }
                         )
-
-                        # Update current message for next turn
-                        current_message = response_content
 
                     except Exception as e:
                         LOG.error(f"Error generating turn {turn_idx} for conversation {idx}: {e}")
