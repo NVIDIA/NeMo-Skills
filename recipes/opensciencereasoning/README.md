@@ -5,12 +5,15 @@ This folder provides templates, prompts, and scripts for the automated pipeline 
 ## Pipeline Templates
 - [`gpt-oss-seed-data_with_gt.yaml`](configs/SDG_pipeline/gpt-oss-seed-data_with_gt.yaml)
 - [`gpt-oss-seed-data_without_gt.yaml`](configs/SDG_pipeline/gpt-oss-seed-data_without_gt.yaml)
-- [`gpt-oss_with_gt.yaml`](configs/SDG_pipeline/gpt-oss_with_gt.yaml)
-- [`gpt-oss_without_gt.yaml`](configs/SDG_pipeline/gpt-oss_without_gt.yaml)
+- [`gpt-oss_with_gt_with_tool.yaml`](configs/SDG_pipeline/gpt-oss_with_gt_with_tool.yaml)
+- [`gpt-oss_with_gt_no_tool.yaml`](configs/SDG_pipeline/gpt-oss_with_gt_no_tool.yaml)
+- [`gpt-oss_without_gt_with_tool.yaml`](configs/SDG_pipeline/gpt-oss_without_gt_with_tool.yaml)
+- [`gpt-oss_without_gt_no_tool.yaml`](configs/SDG_pipeline/gpt-oss_without_gt_no_tool.yaml)
 
 The templates differ along two axes:
 - **Seed vs. SFT data**: SFT recipes add supervised fine-tuning preparation (input/output records and multi-turn message format).
 - **With vs. without GT answers**: When answers are missing the pipeline schedules solution generation and majority voting to recover them before downstream stages.
+- **With vs. without tool use**: When tool use is enabled, the generation stages are configured to use the tool-augmented model and prompts (currently only python tool is supported).
 
 ## Seed Data Flow
 - Deduplicate and clean incoming problems via [`filter_problems`](scripts/SDG_pipeline/filter_problems.py).
@@ -21,7 +24,7 @@ The templates differ along two axes:
 
 ## SFT Data Flow
 - Runs every step from the seed flow.
-- Adds SFT formatting: [`generate_solutions`](pipeline/SDG_pipeline.py) always runs to gather model reasoning traces, then [`prepare_for_sft`](pipeline/SDG_pipeline.py) and [`convert_to_messages`]() convert the results into instruction-tuning-friendly JSONL files (both input-output pairs and chat message format).
+- Adds SFT formatting: [`generate_solutions`](pipeline/SDG_pipeline.py) always runs to gather model reasoning traces, then [`prepare_for_sft`](pipeline/SDG_pipeline.py) and [`convert_to_messages`]() convert the results into instruction-tuning-friendly JSONL files (both input-output pairs and chat message format). Runs bucketing based on token length via [`bucket`](scripts/SDG_pipeline/calculate_tkn_len_and_bucket.py).
 
 ## Stage Reference
 - [`filter_problems`](scripts/SDG_pipeline/filter_problems.py): Required first step. Accepts `input_file`, `output_dir`, and optional field names (`problem_field`, `expected_answer_field`, `id_field`). Supports deduplication (`deduplicate`), removal of samples with image references (`remove_images`), MCQ option counting (`num_options`), and an option regex check (`option_format_regex`). Produces `final_result.jsonl` where each record has:
