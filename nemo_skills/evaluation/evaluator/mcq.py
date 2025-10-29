@@ -35,7 +35,7 @@ class MCQEvaluatorConfig(BaseEvaluatorConfig):
     # if relaxed is False:
     #   if extract_from_boxed is True -> extract from boxed{} ONLY
     #   else extract from regex ONLY
-    relaxed: bool = False
+    relaxed: bool = True
 
 
 def eval_mcq(cfg):
