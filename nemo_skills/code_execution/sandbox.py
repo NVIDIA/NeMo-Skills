@@ -253,11 +253,34 @@ class Sandbox(abc.ABC):
             return "timeout"
         return determine_proof_status(output)
 
+    async def _check_ready(self, timeout: float = 5.0) -> bool:
+        """Readiness check against the sandbox health endpoint."""
+        url = f"http://{self.host}:{self.port}/health"
+
+        if self.ssh_server and self.ssh_key_path:
+            # For SSH tunneling, use threads since there's no async version
+            import sshtunnel_requests
+
+            def ssh_health_request():
+                sshtunnel_request = sshtunnel_requests.from_url(f"ssh://{self.ssh_server}:22", self.ssh_key_path)
+                return sshtunnel_request.get(url=url, timeout=timeout)
+
+            try:
+                output = await asyncio.to_thread(ssh_health_request)
+                return 200 <= output.status_code < 300
+            except Exception:
+                return False
+        else:
+            try:
+                response = await self.http_session.get(url=url, timeout=timeout)
+                return 200 <= response.status_code < 300
+            except Exception:
+                return False
+
     async def wait_for_sandbox(self, timeout: int = 5):
         while True:
             try:
-                output, _ = await self.execute_code("print('test')", language="python", timeout=timeout)
-                if output.get("process_status") == "completed":
+                if await self._check_ready(timeout=timeout):
                     return
             except Exception:
                 await asyncio.sleep(1)
