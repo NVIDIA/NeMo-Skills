@@ -229,7 +229,7 @@ def _create_commandgroup_from_config(
 def _create_job_unified(
     models: List[str],
     server_configs: List[Optional[Dict]],
-    generation_cmd: str,
+    generation_cmd_params: Dict,
     cluster_config: Dict,
     installation_command: Optional[str],
     get_server_command_fn: Callable,
@@ -255,7 +255,7 @@ def _create_job_unified(
     Args:
         models: List of model paths
         server_configs: List of server configurations (one per model, None if not hosting)
-        generation_cmd: Command to run the generation client
+        generation_cmd_params: Dict of parameters to build client command lambda
         cluster_config: Cluster configuration
         installation_command: Installation command to run before client
         get_server_command_fn: Function to build server commands
@@ -273,6 +273,7 @@ def _create_job_unified(
 
     num_models = len(models)
     groups = []
+    server_commands = []  # Track server Command objects for hostname references
 
     # Create groups for each model
     for idx, (model_path, server_config) in enumerate(zip(models, server_configs)):
@@ -302,6 +303,7 @@ def _create_job_unified(
                 "gpus": group_gpus,
                 "nodes": group_nodes,
                 "log_prefix": f"server_{idx}" if num_models > 1 else "server",
+                "port": server_config["server_port"],  # Store port for meta_ref
             }
 
             server_cmd = Command(
@@ -313,6 +315,10 @@ def _create_job_unified(
                 metadata=metadata,
             )
             components.append(server_cmd)
+            server_commands.append(server_cmd)
+        else:
+            # No server for this model (pre-hosted)
+            server_commands.append(None)
 
         # 2. Group 0 gets the client
         if idx == 0:
@@ -320,8 +326,32 @@ def _create_job_unified(
             if with_sandbox and sandbox_port is not None:
                 client_env["NEMO_SKILLS_SANDBOX_PORT"] = str(sandbox_port)
 
+            # Build client command as lambda (works for both n=1 and n>1)
+            # Unified approach: always use lambda with hostname_ref() for runtime address resolution
+            def build_client_command():
+                # Build server addresses list using hostname_ref() and meta_ref()
+                runtime_addresses = []
+                for server_idx, server_cmd in enumerate(server_commands):
+                    if server_cmd is not None:
+                        # Hosted server: use hostname and port from metadata
+                        # For n=1, this resolves to localhost; for n>1, to actual node hostname
+                        addr = f"{server_cmd.hostname_ref()}:{server_cmd.meta_ref('port')}"
+                    else:
+                        # Pre-hosted: use the original address from config
+                        addr = generation_cmd_params["server_addresses_prehosted"][server_idx]
+                    runtime_addresses.append(addr)
+
+                # Build command with runtime-resolved addresses
+                cmd_str = pipeline_utils.get_generation_cmd(
+                    server_addresses=runtime_addresses,
+                    **{k: v for k, v in generation_cmd_params.items() if k not in ["server_addresses_prehosted"]},
+                )
+                return pipeline_utils.wrap_python_path(cmd_str)
+
+            client_command = build_client_command
+
             client_cmd = Command(
-                command=generation_cmd,
+                command=client_command,
                 container=cluster_config["containers"]["nemo-skills"],
                 name="generation_client" if num_models > 1 else task_name,
                 installation_command=installation_command,
@@ -679,28 +709,29 @@ def generate(
                     extra_arguments="",  # Don't pass extra args to server config
                     get_random_port=get_random_port_for_server,
                 )
-                server_configs.append(srv_config)
-                server_addresses_resolved.append(srv_address)
+            server_configs.append(srv_config)
+            server_addresses_resolved.append(srv_address)
 
-            # Build generation command (unified for single and multi-model)
-            cmd = pipeline_utils.get_generation_cmd(
-                input_file=input_file,
-                input_dir=input_dir,
-                random_seed=seed,
-                output_dir=output_dir,
-                server_addresses=server_addresses_resolved,
-                model_names=models_list,
-                num_models=num_models,
-                extra_arguments=extra_arguments_original,
-                chunk_id=chunk_id,
-                num_chunks=num_chunks,
-                preprocess_cmd=preprocess_cmd,
-                postprocess_cmd=postprocess_cmd,
-                wandb_parameters=wandb_parameters if seed_idx == 0 else None,
-                script=generation_module,
-                with_sandbox=with_sandbox,
-            )
-            cmd = pipeline_utils.wrap_python_path(cmd=cmd)
+            # Build generation command parameters
+            # For heterogeneous jobs (hosted servers), we'll build a lambda with hostname_ref()
+            # Store parameters that will be used in the lambda
+            cmd_params = {
+                "input_file": input_file,
+                "input_dir": input_dir,
+                "random_seed": seed,
+                "output_dir": output_dir,
+                "model_names": models_list,
+                "num_models": num_models,
+                "extra_arguments": extra_arguments_original,
+                "chunk_id": chunk_id,
+                "num_chunks": num_chunks,
+                "preprocess_cmd": preprocess_cmd,
+                "postprocess_cmd": postprocess_cmd,
+                "wandb_parameters": wandb_parameters if seed_idx == 0 else None,
+                "script": generation_module,
+                "server_addresses_prehosted": server_addresses_resolved,  # For pre-hosted fallback
+            }
+            cmd = cmd_params  # Pass params dict for lambda construction
 
             # Base task name (shared across all dependent jobs in the chain)
             task_name = f"{expname}-rs{seed}" if seed is not None else expname
@@ -722,7 +753,7 @@ def generate(
                 job_spec = _create_job_unified(
                     models=models_list,
                     server_configs=[cfg.copy() if cfg else None for cfg in server_configs],
-                    generation_cmd=cmd,
+                    generation_cmd_params=cmd,
                     cluster_config=cluster_config,
                     installation_command=installation_command,
                     get_server_command_fn=generation_task.get_server_command_fn(),
