@@ -168,8 +168,6 @@ def get_executor(
     log_prefix: str = "main",
     mounts=None,
     partition=None,
-    qos=None,
-    time_min=None,
     dependencies=None,
     extra_package_dirs: tuple[str] | None = None,
     heterogeneous=False,
@@ -211,8 +209,6 @@ def get_executor(
             taken from `cluster_config`.
         partition: SLURM partition override. If omitted, inferred from `gpus_per_node`
             and `cluster_config`.
-        qos: SLURM QOS.
-        time_min: Minimum time to request (e.g., for backfill). Needs to be in"HH:MM:SS" format
         dependencies: SLURM job handles to depend on. The dependency type is taken from
             `cluster_config['dependency_type']` (default: "afterany").
         extra_package_dirs: Additional directories to package with the code for remote
@@ -294,7 +290,7 @@ def get_executor(
 
     timeout = get_slurm_timeout_str(cluster_config, partition, with_save_delay=False)
 
-    additional_parameters = {"time_min": time_min} if time_min is not None else {}
+    additional_parameters = {}
     if cluster_config.get("mail_type") is not None:
         additional_parameters["mail_type"] = cluster_config["mail_type"]
     if cluster_config.get("mail_user") is not None:
@@ -335,7 +331,6 @@ def get_executor(
     executor_params = {
         "account": cluster_config["account"],
         "partition": partition,
-        "qos": qos,
         "nodes": num_nodes,
         "ntasks_per_node": tasks_per_node,
         "tunnel": get_tunnel(cluster_config),
@@ -429,8 +424,6 @@ def add_task(
     num_nodes=1,
     log_dir=None,
     partition=None,
-    qos=None,
-    time_min=None,
     with_sandbox=False,
     keep_mounts_for_sandbox=False,
     sandbox_port: int | None = None,
@@ -539,8 +532,6 @@ def add_task(
             tasks_per_node=num_server_tasks,
             gpus_per_node=server_config["num_gpus"],
             partition=partition,
-            qos=qos,
-            time_min=time_min,
             dependencies=dependencies,
             job_name=task_name,
             log_dir=log_dir,
@@ -584,8 +575,6 @@ def add_task(
                         tasks_per_node=cur_tasks,
                         gpus_per_node=num_gpus if server_config is None else 0,
                         partition=partition,
-                        qos=qos,
-                        time_min=time_min,
                         dependencies=dependencies,
                         job_name=task_name,
                         log_dir=log_dir,
@@ -629,7 +618,6 @@ def add_task(
                 tasks_per_node=1,
                 gpus_per_node=0,
                 partition=partition,
-                time_min=time_min,
                 mounts=None if keep_mounts_for_sandbox else [],
                 dependencies=dependencies,
                 job_name=task_name,

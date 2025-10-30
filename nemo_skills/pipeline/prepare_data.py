@@ -20,7 +20,11 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.run_cmd import run_cmd as _run_cmd
-from nemo_skills.pipeline.utils import get_cluster_config, get_env_variables
+from nemo_skills.pipeline.utils import (
+    get_cluster_config,
+    get_env_variables,
+    parse_sbatch_kwargs,
+)
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -66,6 +70,10 @@ def prepare_data(
     skip_hf_home_check: bool | None = typer.Option(
         None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
 ):
     """Prepare datasets by running python -m nemo_skills.dataset.prepare.
@@ -129,14 +137,14 @@ def prepare_data(
             )
         # TODO: automatically add it to cluster config based on user prompt?
 
+    slurm_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
+
     return _run_cmd(
         ctx=ctx,
         cluster=cluster_config,
         command=command,
         expname=expname,
         partition=partition,
-        qos=qos,
-        time_min=time_min,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         mount_paths=mount_paths,
@@ -150,6 +158,7 @@ def prepare_data(
         exclusive=exclusive,
         check_mounted_paths=check_mounted_paths,
         skip_hf_home_check=skip_hf_home_check,
+        sbatch_kwargs=slurm_kwargs,
     )
 
 

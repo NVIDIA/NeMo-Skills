@@ -31,12 +31,16 @@ from nemo_skills.pipeline.utils import (
     get_mounted_path,
     get_nsight_cmd,
     get_timeout_str,
-    parse_sbatch_arguments,
+    parse_sbatch_kwargs,
     resolve_mount_paths,
     run_exp,
     temporary_env_update,
 )
-from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
+from nemo_skills.utils import (
+    get_logger_name,
+    setup_logging,
+    validate_wandb_project_name,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -309,9 +313,9 @@ def grpo_nemo_rl(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
-    sbatch_arguments: str = typer.Option(
+    sbatch_kwargs: str = typer.Option(
         "",
-        help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
@@ -384,7 +388,7 @@ def grpo_nemo_rl(
 
     server_config = None
     env_update = {"RAY_LOG_SYNC_FREQUENCY": 20} if profile_step_range else {}
-    slurm_kwargs = parse_sbatch_arguments(sbatch_arguments, exclusive)
+    slurm_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
 
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
@@ -401,8 +405,6 @@ def grpo_nemo_rl(
                     cluster_config=cluster_config,
                     server_config=server_config,
                     partition=partition,
-                    qos=qos,
-                    time_min=time_min,
                     run_after=run_after,
                     reuse_code=reuse_code,
                     reuse_code_exp=reuse_code_exp,
@@ -429,8 +431,6 @@ def grpo_nemo_rl(
                 container=cluster_config["containers"]["nemo-rl"],
                 cluster_config=cluster_config,
                 partition=partition,
-                qos=qos,
-                time_min=time_min,
                 num_nodes=1,
                 num_tasks=1,
                 num_gpus=num_gpus,
@@ -460,8 +460,6 @@ def grpo_nemo_rl(
                     container=cluster_config["containers"]["nemo-rl"],
                     cluster_config=cluster_config,
                     partition=partition,
-                    qos=qos,
-                    time_min=time_min,
                     num_nodes=1,
                     num_tasks=1,
                     num_gpus=num_gpus,
@@ -488,8 +486,6 @@ def grpo_nemo_rl(
                 container=cluster_config["containers"]["nemo-rl"],
                 cluster_config=cluster_config,
                 partition=partition,
-                qos=qos,
-                time_min=time_min,
                 num_nodes=1,
                 num_tasks=1,
                 num_gpus=num_gpus,
