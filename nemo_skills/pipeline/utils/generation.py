@@ -215,26 +215,18 @@ def get_generation_cmd(
     # Handle file paths vs module names
     common_args = f"++skip_filled=True ++input_file={input_file} ++output_file={output_file}"
     if script.endswith(".py") or os.sep in script:
-        # It's a file path, run it directly with .py extension
         script_path = script if script.endswith(".py") else f"{script}.py"
         cmd += f"python {script_path} {common_args} "
-        LOG.debug(f"Building command with script path: {script_path}")
     else:
-        # It's a module name, use -m flag
         cmd += f"python -m {script} {common_args} "
-        LOG.debug(f"Building command with module: {script}")
 
-    # Add server addresses and models if provided (for multi-model generation)
     if server_addresses is not None and model_names is not None and num_models is not None:
         if num_models == 1:
-            # Backward compatible: pass as scalar
             if server_addresses[0]:
                 cmd += f"++server_address={server_addresses[0]} "
             if model_names[0]:
                 cmd += f"++model={model_names[0]} "
         else:
-            # Multi-model: pass as lists
-            # Format as comma-separated for Hydra list syntax
             server_addresses_arg = ",".join(server_addresses)
             cmd += f"++server_addresses=[{server_addresses_arg}] "
 

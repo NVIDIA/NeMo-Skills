@@ -180,10 +180,8 @@ def _create_job_unified(
         if server_config is not None and int(server_config.get("num_gpus", 0)) > 0:
             server_type = server_config["server_type"]
 
-            # Get container (don't pop, just access)
             server_container = server_config.get("container") or cluster_config["containers"][server_type]
 
-            # Build server command (filter out container key for get_server_command_fn)
             server_config_for_cmd = {k: v for k, v in server_config.items() if k != "container"}
             cmd, num_tasks = get_server_command_fn(**server_config_for_cmd, cluster_config=cluster_config)
 
@@ -196,7 +194,7 @@ def _create_job_unified(
                 "gpus": group_gpus,
                 "nodes": group_nodes,
                 "log_prefix": f"server_{idx}" if num_models > 1 else "server",
-                "port": server_config["server_port"],  # Store port for meta_ref
+                "port": server_config["server_port"],
             }
 
             server_cmd = Command(
@@ -219,15 +217,11 @@ def _create_job_unified(
             if with_sandbox and sandbox_port is not None:
                 client_env["NEMO_SKILLS_SANDBOX_PORT"] = str(sandbox_port)
 
-            # Build client command as lambda (works for both n=1 and n>1)
-            # Unified approach: always use lambda with hostname_ref() for runtime address resolution
+            # Build client command as lambda
             def build_client_command():
-                # Build server addresses list using hostname_ref() and meta_ref()
                 runtime_addresses = []
                 for server_idx, server_cmd in enumerate(server_commands):
                     if server_cmd is not None:
-                        # Hosted server: use hostname and port from metadata
-                        # For n=1, this resolves to localhost; for n>1, to actual node hostname
                         addr = f"{server_cmd.hostname_ref()}:{server_cmd.meta_ref('port')}"
                     else:
                         # Pre-hosted: use the original address from config
@@ -275,8 +269,6 @@ def _create_job_unified(
 
         # Only create group if it has components (skip empty groups for pre-hosted models)
         if components:
-            # Create group with explicitly tracked GPU/node requirements
-            # (Client and sandbox components have no GPUs, only server does)
             group = CommandGroup(
                 commands=components,
                 hardware=HardwareConfig(
@@ -581,9 +573,7 @@ def generate(
             server_configs = []
             server_addresses_resolved = []
 
-            # Configure each server
             for idx in range(num_models):
-                # Determine port allocation per server (standard logic works for both single and multi-model)
                 get_random_port_for_server = pipeline_utils.should_get_random_port(server_gpus_list[idx], exclusive)
 
                 srv_config, srv_address, _ = pipeline_utils.configure_client(
@@ -601,9 +591,6 @@ def generate(
             server_configs.append(srv_config)
             server_addresses_resolved.append(srv_address)
 
-            # Build generation command parameters
-            # For heterogeneous jobs (hosted servers), we'll build a lambda with hostname_ref()
-            # Store parameters that will be used in the lambda
             cmd_params = {
                 "input_file": input_file,
                 "input_dir": input_dir,
@@ -618,10 +605,9 @@ def generate(
                 "postprocess_cmd": postprocess_cmd,
                 "wandb_parameters": wandb_parameters if seed_idx == 0 else None,
                 "script": generation_module,
-                "server_addresses_prehosted": server_addresses_resolved,  # For pre-hosted fallback
+                "server_addresses_prehosted": server_addresses_resolved,
             }
-            LOG.info(f"Generation script will be: {generation_module}")
-            cmd = cmd_params  # Pass params dict for lambda construction
+            cmd = cmd_params
 
             # Base task name (shared across all dependent jobs in the chain)
             task_name = f"{expname}-rs{seed}" if seed is not None else expname
