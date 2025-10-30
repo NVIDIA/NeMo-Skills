@@ -573,10 +573,14 @@ def generate(
             server_configs = []
             server_addresses_resolved = []
 
+            # For n=1, we need extra_arguments from configure_client
+            # For n>1, we build server addresses ourselves
+            extra_args_from_first_server = extra_arguments_original
+
             for idx in range(num_models):
                 get_random_port_for_server = pipeline_utils.should_get_random_port(server_gpus_list[idx], exclusive)
 
-                srv_config, srv_address, _ = pipeline_utils.configure_client(
+                srv_config, srv_address, srv_extra_args = pipeline_utils.configure_client(
                     model=models_list[idx],
                     server_type=server_types_list[idx],
                     server_address=server_addresses_list[idx],
@@ -585,11 +589,15 @@ def generate(
                     server_args=server_args_list[idx],
                     server_entrypoint=server_entrypoints_list[idx],
                     server_container=server_containers_list[idx],
-                    extra_arguments="",  # Don't pass extra args to server config
+                    extra_arguments=extra_arguments_original if idx == 0 else "",
                     get_random_port=get_random_port_for_server,
                 )
             server_configs.append(srv_config)
             server_addresses_resolved.append(srv_address)
+
+                # For n=1, use the extra_arguments from configure_client (has server config)
+                if idx == 0 and num_models == 1:
+                    extra_args_from_first_server = srv_extra_args
 
             cmd_params = {
                 "input_file": input_file,
@@ -598,7 +606,7 @@ def generate(
                 "output_dir": output_dir,
                 "model_names": models_list,
                 "num_models": num_models,
-                "extra_arguments": extra_arguments_original,
+                "extra_arguments": extra_args_from_first_server,
                 "chunk_id": chunk_id,
                 "num_chunks": num_chunks,
                 "preprocess_cmd": preprocess_cmd,
