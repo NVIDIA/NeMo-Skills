@@ -221,17 +221,14 @@ def get_generation_cmd(
         cmd += f"python -m {script} {common_args} "
 
     if server_addresses is not None and model_names is not None and num_models is not None:
-        if num_models == 1:
-            if server_addresses[0]:
-                cmd += f"++server_address={server_addresses[0]} "
-            if model_names[0]:
-                cmd += f"++model={model_names[0]} "
-        else:
+        if num_models > 1:
+            # Multi-model: pass as lists
             server_addresses_arg = ",".join(server_addresses)
             cmd += f"++server_addresses=[{server_addresses_arg}] "
 
             model_names_arg = ",".join(model_names)
             cmd += f"++model_names=[{model_names_arg}] "
+        # For n=1: server_address/model are already in extra_arguments from configure_client
 
     job_end_cmd = ""
 
