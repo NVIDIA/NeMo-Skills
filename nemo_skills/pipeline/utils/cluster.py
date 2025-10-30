@@ -126,26 +126,26 @@ def parse_sbatch_kwargs(sbatch_kwargs: str | dict | None, **kwargs) -> dict | No
     Raises:
         ValueError: If sbatch_kwargs is a string but cannot be parsed as JSON.
     """
-    sbatch_kwargs = {key: value for key, value in kwargs.items() if value is not None}
+    full_sbatch_kwargs = {key: value for key, value in kwargs.items() if value is not None}
 
     if sbatch_kwargs:
         if isinstance(sbatch_kwargs, dict):
             # Already a dictionary, just update
-            sbatch_kwargs.update(sbatch_kwargs)
+            full_sbatch_kwargs.update(sbatch_kwargs)
         elif isinstance(sbatch_kwargs, str):
             # Parse JSON string
             try:
                 sbatch_kwargs = json.loads(sbatch_kwargs)
-                sbatch_kwargs.update(sbatch_kwargs)
+                full_sbatch_kwargs.update(sbatch_kwargs)
             except json.JSONDecodeError as e:
                 raise ValueError(f"Failed to parse sbatch_kwargs with JSON: {e}")
         else:
             raise ValueError(f"sbatch_kwargs must be a string or dict, got {type(sbatch_kwargs).__name__}")
 
-    if not len(sbatch_kwargs):
+    if not len(full_sbatch_kwargs):
         return None
 
-    return sbatch_kwargs
+    return full_sbatch_kwargs
 
 
 def get_env_variables(cluster_config):
