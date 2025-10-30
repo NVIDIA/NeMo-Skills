@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
 import logging
+import os
 from typing import Any, Callable, Dict, List, Optional
 
 import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
+from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils.cluster import parse_sbatch_kwargs
@@ -534,12 +537,23 @@ def generate(
     if generation_module is None:
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
-    # Server command is determined by server_type, not generation_module
-    # Just use the standard server command builder
-    from nemo_skills.pipeline.utils import get_server_command
+    # Import generation module to get GENERATION_TASK_CLASS (for custom server commands, etc.)
+    # For file paths, use relative to workspace (not mounted paths)
+    if generation_module.endswith(".py") or os.sep in generation_module:
+        # File path - import directly (should be relative to workspace)
+        path_suffix = ".py" if not generation_module.endswith(".py") else ""
+        generation_task = import_from_path(generation_module + path_suffix)
+    else:
+        # Module name - import as module
+        generation_task = importlib.import_module(generation_module)
 
-    get_server_command_fn = get_server_command
-
+    if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
+        raise ValueError(
+            f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
+            "Please provide a valid generation module."
+        )
+    generation_task = generation_task.GENERATION_TASK_CLASS
+    extra_arguments = f"{generation_task.get_generation_default_args()} {extra_arguments}"
     extra_arguments_original = extra_arguments
 
     # Treat no random seeds as a single None seed to unify the code paths
@@ -643,7 +657,7 @@ def generate(
                     generation_cmd_params=cmd,
                     cluster_config=cluster_config,
                     installation_command=installation_command,
-                    get_server_command_fn=get_server_command_fn,
+                    get_server_command_fn=generation_task.get_server_command_fn(),
                     with_sandbox=with_sandbox,
                     sandbox_port=current_sandbox_port,
                     partition=partition,
