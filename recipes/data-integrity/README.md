@@ -24,7 +24,7 @@ Parameters:
 
 See `download` in `run_integrity_pipeline.py`
 
-### 2. Generate alternative response from a different model 
+### 2. Generate alternative response from a different model
 
 - Invoke NeMo-Skill to generate alternative response from target model
 - Result will be saved in `answers_dir` directory
@@ -53,11 +53,11 @@ See `compare` in `run_integrity_pipeline.py`
 scripts/
 ├── README.md                 # This file
 ├── prepare_data.py           # Download from HuggingFace nvidia/Llama-Nemotron-Post-Training-Dataset
-├── postprocess_data.py       # After generate answers from NeMo-Skill, prepare the result for comparison 
+├── postprocess_data.py       # After generate answers from NeMo-Skill, prepare the result for comparison
 ├── run_integrity_pipeline.py # A pipeline script to run end-to-end from dowloading to comparison
-│ 
+│
 └── model_comparison/         # Analysis module
-    ├── __init__.py          
+    ├── __init__.py
     ├── analyzer.py           # Main OrganizedModelAnalyzer class
     ├── data_loader.py        # Data loading and preprocessing
     ├── main.py               # Command-line entry point
@@ -212,5 +212,3 @@ To add new features:
    - Add visualization functions in `model_comparison/visualization/`
    - Update the analyzer to call your analysis
    - Update the report generator
-
-

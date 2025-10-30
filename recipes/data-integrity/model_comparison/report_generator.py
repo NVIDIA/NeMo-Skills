@@ -77,7 +77,7 @@ This analysis generated the following files in: {results_dir}
 
 ### Traditional Visualizations:
 - Response length analysis
-- Vocabulary diversity analysis  
+- Vocabulary diversity analysis
 - Semantic similarity and ROUGE-L heatmaps
 - Similarity score distributions (dual histogram)
 
@@ -119,7 +119,7 @@ Analysis completed: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 ```
 {results_dir}/
 ├── visualizations/     # All charts and plots (including UMAP)
-├── data_outputs/       # CSV and JSON data files  
+├── data_outputs/       # CSV and JSON data files
 ├── reports/           # Summary reports
 └── README.md          # This file
 ```
