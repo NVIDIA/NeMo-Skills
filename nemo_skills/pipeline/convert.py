@@ -200,7 +200,7 @@ def convert(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     skip_hf_home_check: bool | None = typer.Option(
         None,

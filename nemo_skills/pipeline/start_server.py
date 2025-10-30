@@ -78,7 +78,7 @@ def start_server(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
     sbatch_kwargs: str = typer.Option(

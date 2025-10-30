@@ -174,7 +174,7 @@ def eval(
         help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
