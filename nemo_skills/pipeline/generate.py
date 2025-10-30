@@ -11,15 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import importlib
 import logging
-import os
 from typing import Any, Callable, Dict, List, Optional
 
 import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
-from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils.cluster import parse_sbatch_kwargs
@@ -116,113 +113,6 @@ def _normalize_parameter(
     raise ValueError(
         f"Parameter {param_name} has {len(param_value)} values but {num_models} models specified. "
         f"Must be 1 value (broadcast) or {num_models} values (per-model)."
-    )
-
-
-def _create_commandgroup_from_config(
-    generation_cmd: str,
-    server_config: Optional[Dict],
-    with_sandbox: bool,
-    sandbox_port: Optional[int],
-    cluster_config: Dict,
-    installation_command: Optional[str],
-    get_server_command_fn: Callable,
-    partition: Optional[str],
-    keep_mounts_for_sandbox: bool,
-    task_name: str,
-    log_dir: str,
-    sbatch_kwargs: Optional[Dict] = None,
-) -> CommandGroup:
-    """Create a CommandGroup from server_config.
-
-    Component ordering:
-    1. Server (if server_config provided)
-    2. Client command
-    3. Sandbox (if with_sandbox=True)
-    """
-
-    components = []
-
-    # Track GPU/node requirements for this group (from server config)
-    group_gpus = 0
-    group_nodes = 1
-
-    # 1. Add server if server_config is provided
-    if server_config is not None and int(server_config["num_gpus"]) > 0:
-        server_type = server_config["server_type"]
-
-        # Get container (don't pop, just access)
-        server_container = server_config.get("container") or cluster_config["containers"][server_type]
-
-        # Build server command (filter out container key for get_server_command_fn)
-        server_config_for_cmd = {k: v for k, v in server_config.items() if k != "container"}
-        cmd, num_tasks = get_server_command_fn(**server_config_for_cmd, cluster_config=cluster_config)
-
-        # Set group GPU/node requirements from server config
-        group_gpus = server_config["num_gpus"]
-        group_nodes = server_config["num_nodes"]
-
-        # Create metadata dict
-        metadata = {
-            "num_tasks": num_tasks,
-            "gpus": group_gpus,
-            "nodes": group_nodes,
-            "log_prefix": "server",
-        }
-
-        server_cmd = Command(
-            command=cmd,
-            container=server_container,
-            gpus=group_gpus,
-            nodes=group_nodes,
-            name=task_name,
-            metadata=metadata,
-        )
-        components.append(server_cmd)
-
-    # 2. Add main generation command
-    # Note: General cluster config env vars are automatically added by get_env_variables() in get_executor()
-    client_env = {}
-    if with_sandbox and sandbox_port is not None:
-        client_env["NEMO_SKILLS_SANDBOX_PORT"] = str(sandbox_port)
-
-    client_cmd = Command(
-        command=generation_cmd,
-        container=cluster_config["containers"]["nemo-skills"],
-        name=task_name,
-        installation_command=installation_command,
-        metadata={
-            "log_prefix": "main",
-            "environment": client_env,
-        },
-    )
-    components.append(client_cmd)
-
-    # 3. Add sandbox if requested
-    if with_sandbox:
-        # Call sandbox command builder directly with cluster_config
-        cmd, metadata = sandbox_command(cluster_config=cluster_config, port=sandbox_port)
-        metadata["log_prefix"] = "sandbox"
-
-        sandbox_cmd = Command(
-            command=cmd,
-            container=cluster_config["containers"]["sandbox"],
-            name=task_name,
-            metadata=metadata,
-        )
-
-        components.append(sandbox_cmd)
-
-    return CommandGroup(
-        commands=components,
-        hardware=HardwareConfig(
-            partition=partition,
-            num_gpus=group_gpus,
-            num_nodes=group_nodes,
-            sbatch_kwargs=sbatch_kwargs,
-        ),
-        name=task_name,
-        log_dir=log_dir,
     )
 
 
@@ -592,8 +482,10 @@ def generate(
 
     # Validate multi-model requirements
     if num_models > 1:
-        if generation_type is None:
-            raise ValueError("Multi-model generation requires --generation-type to be specified")
+        if generation_type is None and generation_module is None:
+            raise ValueError(
+                "Multi-model generation requires either --generation-type or --generation-module to be specified"
+            )
 
     if log_samples:
         wandb_parameters = {
@@ -642,18 +534,12 @@ def generate(
     if generation_module is None:
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
-    if generation_module.endswith(".py") or os.sep in generation_module:
-        path_suffix = ".py" if not generation_module.endswith(".py") else ""
-        generation_task = import_from_path(generation_module + path_suffix)
-    else:
-        generation_task = importlib.import_module(generation_module)
-    if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
-        raise ValueError(
-            f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
-            "Please provide a valid generation module."
-        )
-    generation_task = generation_task.GENERATION_TASK_CLASS
-    extra_arguments = f"{generation_task.get_generation_default_args()} {extra_arguments}"
+    # Server command is determined by server_type, not generation_module
+    # Just use the standard server command builder
+    from nemo_skills.pipeline.utils import get_server_command
+
+    get_server_command_fn = get_server_command
+
     extra_arguments_original = extra_arguments
 
     # Treat no random seeds as a single None seed to unify the code paths
@@ -731,6 +617,7 @@ def generate(
                 "script": generation_module,
                 "server_addresses_prehosted": server_addresses_resolved,  # For pre-hosted fallback
             }
+            LOG.info(f"Generation script will be: {generation_module}")
             cmd = cmd_params  # Pass params dict for lambda construction
 
             # Base task name (shared across all dependent jobs in the chain)
@@ -756,7 +643,7 @@ def generate(
                     generation_cmd_params=cmd,
                     cluster_config=cluster_config,
                     installation_command=installation_command,
-                    get_server_command_fn=generation_task.get_server_command_fn(),
+                    get_server_command_fn=get_server_command_fn,
                     with_sandbox=with_sandbox,
                     sandbox_port=current_sandbox_port,
                     partition=partition,

@@ -218,9 +218,11 @@ def get_generation_cmd(
         # It's a file path, run it directly with .py extension
         script_path = script if script.endswith(".py") else f"{script}.py"
         cmd += f"python {script_path} {common_args} "
+        LOG.debug(f"Building command with script path: {script_path}")
     else:
         # It's a module name, use -m flag
         cmd += f"python -m {script} {common_args} "
+        LOG.debug(f"Building command with module: {script}")
 
     # Add server addresses and models if provided (for multi-model generation)
     if server_addresses is not None and model_names is not None and num_models is not None:
