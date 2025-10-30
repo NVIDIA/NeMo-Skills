@@ -15,9 +15,10 @@
 """Main entry point for model comparison analysis"""
 
 import argparse
-import os
 import logging
+import os
 from datetime import datetime
+
 from .analyzer import OrganizedModelAnalyzer
 
 logger = logging.getLogger(__name__)

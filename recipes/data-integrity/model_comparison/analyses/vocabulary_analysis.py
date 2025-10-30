@@ -15,12 +15,14 @@
 """Vocabulary diversity analysis module"""
 
 import logging
-import nltk
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from collections import Counter
-from ..utils.file_utils import save_plot, save_data
+
+import matplotlib.pyplot as plt
+import nltk
+import numpy as np
+import pandas as pd
+
+from ..utils.file_utils import save_data, save_plot
 
 logger = logging.getLogger(__name__)
 

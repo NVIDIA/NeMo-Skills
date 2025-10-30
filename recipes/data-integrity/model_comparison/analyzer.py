@@ -14,30 +14,29 @@
 
 """Main analyzer class for model comparison"""
 
-import os
 import logging
-from datetime import datetime
+import os
 import warnings
-warnings.filterwarnings('ignore')
+from datetime import datetime
 
-# NLP and ML libraries
 import nltk
 import spacy
 from sentence_transformers import SentenceTransformer
 
-# Import internal modules
-from .data_loader import load_and_prepare_data
-from .utils.file_utils import save_data
 from .analyses import (
-    analyze_response_lengths,
-    analyze_vocabulary_diversity,
-    analyze_semantic_similarity,
-    analyze_response_embeddings_umap,
     analyze_input_response_mapping_umap,
-    analyze_multimodal_space_umap
+    analyze_multimodal_space_umap,
+    analyze_response_embeddings_umap,
+    analyze_response_lengths,
+    analyze_semantic_similarity,
+    analyze_vocabulary_diversity,
 )
-from .visualization.interactive_plots import create_interactive_explorer
+from .data_loader import load_and_prepare_data
 from .report_generator import generate_analysis_report, generate_index_file
+from .utils.file_utils import save_data
+from .visualization.interactive_plots import create_interactive_explorer
+
+warnings.filterwarnings('ignore')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

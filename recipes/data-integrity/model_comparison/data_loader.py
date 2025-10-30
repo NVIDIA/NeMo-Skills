@@ -15,9 +15,10 @@
 """Data loading and preprocessing module"""
 
 import json
-import pandas as pd
 import logging
 from datetime import datetime
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 

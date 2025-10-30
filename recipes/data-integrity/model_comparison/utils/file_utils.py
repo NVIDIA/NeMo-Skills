@@ -14,12 +14,13 @@
 
 """File handling utilities for model comparison analysis"""
 
-import os
 import json
-import pandas as pd
-import matplotlib.pyplot as plt
 import logging
+import os
 import re
+
+import matplotlib.pyplot as plt
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 

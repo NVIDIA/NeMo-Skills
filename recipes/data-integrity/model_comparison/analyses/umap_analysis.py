@@ -15,14 +15,16 @@
 """UMAP-based analysis module"""
 
 import logging
-import pandas as pd
-import numpy as np
 import os
+
+import numpy as np
+import pandas as pd
+import textstat
 from sklearn.preprocessing import StandardScaler
 from textblob import TextBlob
-import textstat
-from ..utils.model_utils import shorten_model_name
+
 from ..utils.file_utils import save_data
+from ..utils.model_utils import shorten_model_name
 
 logger = logging.getLogger(__name__)
 

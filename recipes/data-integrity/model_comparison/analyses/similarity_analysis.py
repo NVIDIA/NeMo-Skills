@@ -15,14 +15,16 @@
 """Semantic similarity analysis module"""
 
 import logging
-import pandas as pd
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+from ..utils.file_utils import save_data, save_plot
 from ..utils.text_utils import calculate_rouge_l
-from ..utils.file_utils import save_plot, save_data
 
 logger = logging.getLogger(__name__)
 

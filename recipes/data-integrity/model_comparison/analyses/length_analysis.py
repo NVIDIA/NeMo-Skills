@@ -15,12 +15,14 @@
 """Response length analysis module"""
 
 import logging
-import nltk
-import pandas as pd
+
 import matplotlib.pyplot as plt
-import seaborn as sns
+import nltk
 import numpy as np
-from ..utils.file_utils import save_plot, save_data
+import pandas as pd
+import seaborn as sns
+
+from ..utils.file_utils import save_data, save_plot
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ def analyze_response_lengths(df, subdirs):
     logger.info("📏 RESPONSE LENGTH ANALYSIS")
     line = '='*60
     logger.info(line)
-    
+
     # Calculate various length metrics
     df['char_count'] = df['response'].str.len()
     df['word_count'] = df['response'].apply(lambda x: len(str(x).split()))

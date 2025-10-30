@@ -21,6 +21,7 @@ Installs dependencies and downloads required data
 import subprocess
 import sys
 
+
 def install_requirements():
     """Install required packages from requirements.txt"""
     print("📦 Installing required packages...")
