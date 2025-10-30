@@ -453,7 +453,6 @@ def generate(
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
-    # ===== NORMALIZE MODELS AND PARAMETERS TO LISTS =====
     models_list = _normalize_models_config(model)
     num_models = len(models_list)
 
@@ -461,7 +460,6 @@ def generate(
     for idx, model_name in enumerate(models_list):
         LOG.info(f"  Model {idx}: {model_name}")
 
-    # Convert server_type enum(s) to string(s)
     def convert_server_type_to_string(server_type):
         return server_type.value if hasattr(server_type, "value") else server_type
 
@@ -469,7 +467,6 @@ def generate(
         server_type = [convert_server_type_to_string(st) for st in server_type]
     else:
         server_type = convert_server_type_to_string(server_type)
-    # Normalize all server parameters
     server_types_list = _normalize_parameter(server_type, num_models, "server_type")
     server_gpus_list = _normalize_parameter(server_gpus, num_models, "server_gpus")
     server_nodes_list = _normalize_parameter(server_nodes, num_models, "server_nodes")
@@ -477,7 +474,6 @@ def generate(
     server_entrypoints_list = _normalize_parameter(server_entrypoint, num_models, "server_entrypoint")
     server_containers_list = _normalize_parameter(server_container, num_models, "server_container")
 
-    # Handle server_address (can be None)
     if server_address is not None:
         server_addresses_list = _normalize_parameter(server_address, num_models, "server_address")
     else:
@@ -537,16 +533,11 @@ def generate(
     if generation_module is None:
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
-    # Import generation module to get GENERATION_TASK_CLASS (for custom server commands, etc.)
-    # For file paths, use relative to workspace (not mounted paths)
     if generation_module.endswith(".py") or os.sep in generation_module:
-        # File path - import directly (should be relative to workspace)
         path_suffix = ".py" if not generation_module.endswith(".py") else ""
         generation_task = import_from_path(generation_module + path_suffix)
     else:
-        # Module name - import as module
         generation_task = importlib.import_module(generation_module)
-
     if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
         raise ValueError(
             f"Module {generation_module} does not have a GENERATION_TASK_CLASS attribute. "
@@ -587,8 +578,6 @@ def generate(
                 chunk_id=None,
             )
         for chunk_id in chunk_ids:
-            # ===== UNIFIED PATH: Configure all servers and build unified command =====
-
             server_configs = []
             server_addresses_resolved = []
 
