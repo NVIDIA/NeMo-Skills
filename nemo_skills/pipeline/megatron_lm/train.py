@@ -231,9 +231,7 @@ def train_megatron_lm(
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
-                sbatch_kwargs=parse_sbatch_kwargs(
-                    sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min}
-                ),
+                sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )

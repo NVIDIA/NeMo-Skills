@@ -388,7 +388,7 @@ def sft_nemo_rl(
 
     server_config = None
     env_update = {"RAY_LOG_SYNC_FREQUENCY": 20} if profile_step_range else {}
-    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
+    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
 
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies

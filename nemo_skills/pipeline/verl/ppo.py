@@ -427,9 +427,7 @@ def ppo_verl(
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
-                sbatch_kwargs=parse_sbatch_kwargs(
-                    sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min}
-                ),
+                sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
                 installation_command=installation_command,

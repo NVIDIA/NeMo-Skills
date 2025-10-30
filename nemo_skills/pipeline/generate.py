@@ -378,7 +378,7 @@ def generate(
         _task_dependencies = []
 
     # Parse sbatch kwargs
-    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
+    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
 
     # Build jobs list using declarative interface
     jobs = []

@@ -329,9 +329,7 @@ def convert(
             run_after=run_after,
             reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
-            sbatch_kwargs=parse_sbatch_kwargs(
-                sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min}
-            ),
+            sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
             installation_command=installation_command,
             task_dependencies=_task_dependencies,
             skip_hf_home_check=skip_hf_home_check,

@@ -331,7 +331,7 @@ def eval(
         generation_module=generation_module,
     )
 
-    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
+    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
 
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local

@@ -130,9 +130,7 @@ def start_server(
             with_sandbox=with_sandbox,
             keep_mounts_for_sandbox=keep_mounts_for_sandbox,
             sandbox_port=None if get_random_port else 6000,
-            sbatch_kwargs=parse_sbatch_kwargs(
-                sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min}
-            ),
+            sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
         )
         # we don't want to detach in this case even on slurm, so not using run_exp
         exp.run(detach=False, tail_logs=True)
