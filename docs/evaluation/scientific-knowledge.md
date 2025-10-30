@@ -32,7 +32,7 @@ More details are coming soon!
                     "++inference.endpoint_type=text ++chat_template_kwargs.builtin_tools=[python] "
                     "++chat_template_kwargs.reasoning_effort=high ++code_execution=true "
                     "++parse_reasoning=True "
-                    "++end_reasoning_string='<|start|>assistant<|channel|>final<|message|>'"
+                    '\'++end_reasoning_string="<|start|>assistant<|channel|>final<|message|>"\''
         ),
         cluster=cluster,
         expname="simpleqa-gpt-oss-120b-tool-output-only",
