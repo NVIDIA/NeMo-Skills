@@ -32,45 +32,37 @@ def main():
     )
 
     parser.add_argument(
-        "--json_file",
-        type=str,
-        required=True,
-        help="Input json file containing model outputs to compare"
+        "--json_file", type=str, required=True, help="Input json file containing model outputs to compare"
     )
 
-    parser.add_argument(
-        "--result_dir",
-        type=str,
-        required=True,
-        help="Base directory for saving analysis results"
-    )
+    parser.add_argument("--result_dir", type=str, required=True, help="Base directory for saving analysis results")
 
     args = parser.parse_args()
-    
+
     # Extract dataset split from filename
-    split = os.path.basename(args.json_file).split("_")[0]    
-    result_base_dir = f'{args.result_dir}/{split}'
-    
-    logger.info(f'Result base directory: {result_base_dir}')
-    logger.info(f'Input JSON file: {args.json_file}')
-    
+    split = os.path.basename(args.json_file).split("_")[0]
+    result_base_dir = f"{args.result_dir}/{split}"
+
+    logger.info(f"Result base directory: {result_base_dir}")
+    logger.info(f"Input JSON file: {args.json_file}")
+
     # Track total analysis time
     start = datetime.now()
-    
+
     # Create analyzer instance
     analyzer = OrganizedModelAnalyzer(args.json_file, result_base_dir)
-    
+
     # Load data and initialize models
     analyzer.load_data()
     analyzer.initialize_models()
-    
+
     # Run comprehensive analysis with organized output and UMAP
     analyzer.generate_final_report()
-    
+
     # Calculate and log total elapsed time
     end = datetime.now()
     elapsed = end - start
-    elapsed_in_min = elapsed.total_seconds()/60
+    elapsed_in_min = elapsed.total_seconds() / 60
     logger.info(f"Total elapsed time: {elapsed_in_min:.2f} minutes")
 
 

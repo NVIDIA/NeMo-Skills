@@ -37,11 +37,10 @@ def download(workspace, cluster, num_gpus, expname_prefix, target_model, generat
         log_dir=f"{workspace}/download-assets",
     )
 
+
 def gen_answer(workspace, cluster, num_gpus, expname_prefix, target_model, generator, split, nrows, wandb_params):
     generate(
-        ctx=wrap_arguments(
-            "++prompt_format=openai ++inference.temperature=0.6 ++inference.tokens_to_generate=8192 "
-        ),
+        ctx=wrap_arguments("++prompt_format=openai ++inference.temperature=0.6 ++inference.tokens_to_generate=8192 "),
         cluster=cluster,
         input_file=f"{workspace}/data.jsonl",
         output_dir=f"{workspace}/answers",
@@ -55,6 +54,7 @@ def gen_answer(workspace, cluster, num_gpus, expname_prefix, target_model, gener
         wandb_group=f"{expname_prefix}-sdg",
         wandb_project=wandb_params["wandb_project"],
     )
+
 
 def postprocess(workspace, cluster, num_gpus, expname_prefix, target_model, generator, split, nrows, wandb_params):
     cmd = (
@@ -70,6 +70,7 @@ def postprocess(workspace, cluster, num_gpus, expname_prefix, target_model, gene
         expname=f"{expname_prefix}-postprocess",
         log_dir=f"{workspace}/postprocess",
     )
+
 
 def compare(workspace, cluster, num_gpus, expname_prefix, target_model, generator, split, nrows, wandb_params):
     cmd = (
@@ -127,12 +128,7 @@ if __name__ == "__main__":
         default="science",
         help="The split that will be download from nvidia/Llama-Nemotron-Post-Training-Dataset",
     )
-    parser.add_argument(
-        "--nrows",
-        type=int,
-        default=20,
-        help="number of examples to download"
-    )
+    parser.add_argument("--nrows", type=int, default=20, help="number of examples to download")
     parser.add_argument(
         "--disable_wandb",
         action="store_true",

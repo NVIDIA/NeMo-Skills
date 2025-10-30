@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 def get_model_comparison_name(df):
     """Generate descriptive name including all models being compared"""
     if df is not None:
-        models = sorted(df['generator'].unique())
+        models = sorted(df["generator"].unique())
         # Clean model names for filename
         clean_models = []
         for model in models:
             # Shorten long model names
             if len(model) > 20:
                 # Try to extract key parts
-                parts = model.split('-')
+                parts = model.split("-")
                 if len(parts) > 2:
                     clean_name = f"{parts[0]}-{parts[1]}"
                 else:
@@ -43,9 +43,9 @@ def get_model_comparison_name(df):
             else:
                 clean_name = model
             # Remove problematic characters for filenames
-            clean_name = re.sub(r'[^\w\-_\.]', '_', clean_name)
+            clean_name = re.sub(r"[^\w\-_\.]", "_", clean_name)
             clean_models.append(clean_name)
-        
+
         return "_vs_".join(clean_models)
     return "models"
 
@@ -54,27 +54,27 @@ def save_plot(subdirs, df, filename_suffix, title=""):
     """Save plot with organized naming and location"""
     model_names = get_model_comparison_name(df)
     filename = f"{model_names}_{filename_suffix}.png"
-    filepath = os.path.join(subdirs['visualizations'], filename)
-    
-    plt.savefig(filepath, dpi=300, bbox_inches='tight', facecolor='white')
+    filepath = os.path.join(subdirs["visualizations"], filename)
+
+    plt.savefig(filepath, dpi=300, bbox_inches="tight", facecolor="white")
     logger.info(f"💾 Saved: {filename}")
     return filepath
 
 
-def save_data(subdirs, df, data, filename_suffix, format='csv'):
+def save_data(subdirs, df, data, filename_suffix, format="csv"):
     """Save data outputs with organized naming"""
     model_names = get_model_comparison_name(df)
     filename = f"{model_names}_{filename_suffix}.{format}"
-    filepath = os.path.join(subdirs['data_outputs'], filename)
-    
+    filepath = os.path.join(subdirs["data_outputs"], filename)
+
     if isinstance(data, pd.DataFrame):
-        if format == 'csv':
+        if format == "csv":
             data.to_csv(filepath, index=False)
-        elif format == 'excel':
+        elif format == "excel":
             data.to_excel(filepath, index=False)
     elif isinstance(data, dict):
-        with open(filepath.replace(f'.{format}', '.json'), 'w') as f:
+        with open(filepath.replace(f".{format}", ".json"), "w") as f:
             json.dump(data, f, indent=2, default=str)
-    
+
     logger.info(f"💾 Saved data: {filename}")
     return filepath

@@ -14,24 +14,24 @@
 
 """Report generation module"""
 
-import os
 import logging
+import os
 from datetime import datetime
+
 from .utils.file_utils import get_model_comparison_name
 
 logger = logging.getLogger(__name__)
 
 
-def generate_analysis_report(df, results_dir, subdirs, length_stats, diversity_stats, 
-                           elapsed_times):
+def generate_analysis_report(df, results_dir, subdirs, length_stats, diversity_stats, elapsed_times):
     """Generate comprehensive analysis report"""
-    models = list(df['generator'].unique())
+    models = list(df["generator"].unique())
     model_comparison_name = get_model_comparison_name(df)
-    
+
     report_content = f"""
 # Model Comparison Analysis Report with UMAP Visualizations
-Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-Models Compared: {', '.join(models)}
+Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Models Compared: {", ".join(models)}
 
 ## Summary Statistics
 
@@ -44,12 +44,12 @@ Models Compared: {', '.join(models)}
 ## Key Findings
 
 ### Length Analysis
-- Longest responses: {df.groupby('generator')['word_count'].mean().idxmax()}
-- Shortest responses: {df.groupby('generator')['word_count'].mean().idxmin()}
+- Longest responses: {df.groupby("generator")["word_count"].mean().idxmax()}
+- Shortest responses: {df.groupby("generator")["word_count"].mean().idxmin()}
 
 ### Vocabulary Analysis
-- Most diverse vocabulary: {diversity_stats.loc[diversity_stats['type_token_ratio'].idxmax(), 'generator']}
-- Least diverse vocabulary: {diversity_stats.loc[diversity_stats['type_token_ratio'].idxmin(), 'generator']}
+- Most diverse vocabulary: {diversity_stats.loc[diversity_stats["type_token_ratio"].idxmax(), "generator"]}
+- Least diverse vocabulary: {diversity_stats.loc[diversity_stats["type_token_ratio"].idxmin(), "generator"]}
 
 ### Similarity Analysis
 - Semantic similarity measures content meaning overlap using sentence embeddings
@@ -64,13 +64,13 @@ The UMAP visualizations reveal:
 - **Interactive Explorer**: Allows detailed exploration of individual responses
 
 ## Performance Metrics
-- Response lengths analysis: {elapsed_times['response_lengths']:.2f} minutes
-- Vocabulary diversity analysis: {elapsed_times['vocabulary_diversity']:.2f} minutes
-- Semantic similarity analysis: {elapsed_times['semantic_similarity']:.2f} minutes
-- Response embeddings UMAP: {elapsed_times['response_embeddings_umap']:.2f} minutes
-- Input-response mapping UMAP: {elapsed_times['input_response_mapping_umap']:.2f} minutes
-- Multimodal space UMAP: {elapsed_times['multimodal_space_umap']:.2f} minutes
-- Interactive UMAP explorer: {elapsed_times['interactive_umap_explorer']:.2f} minutes
+- Response lengths analysis: {elapsed_times["response_lengths"]:.2f} minutes
+- Vocabulary diversity analysis: {elapsed_times["vocabulary_diversity"]:.2f} minutes
+- Semantic similarity analysis: {elapsed_times["semantic_similarity"]:.2f} minutes
+- Response embeddings UMAP: {elapsed_times["response_embeddings_umap"]:.2f} minutes
+- Input-response mapping UMAP: {elapsed_times["input_response_mapping_umap"]:.2f} minutes
+- Multimodal space UMAP: {elapsed_times["multimodal_space_umap"]:.2f} minutes
+- Interactive UMAP explorer: {elapsed_times["interactive_umap_explorer"]:.2f} minutes
 
 ## Files Generated
 This analysis generated the following files in: {results_dir}
@@ -93,24 +93,24 @@ This analysis generated the following files in: {results_dir}
 - UMAP coordinates (CSV format)
 - Raw analysis data (JSON format)
 """
-    
+
     # Save report
-    report_path = os.path.join(subdirs['reports'], f"{model_comparison_name}_analysis_report.md")
-    with open(report_path, 'w') as f:
+    report_path = os.path.join(subdirs["reports"], f"{model_comparison_name}_analysis_report.md")
+    with open(report_path, "w") as f:
         f.write(report_content)
-    
+
     logger.info(f"📋 Comprehensive report saved: {report_path}")
     return report_path
 
 
 def generate_index_file(results_dir, subdirs, df):
     """Generate index file for easy navigation"""
-    models = list(df['generator'].unique())
+    models = list(df["generator"].unique())
     model_comparison_name = get_model_comparison_name(df)
-    
+
     index_content = f"""
 # Model Comparison Results Index
-Analysis completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Analysis completed: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 ## Models Compared
 {chr(10).join([f"- {model}" for model in models])}
@@ -155,10 +155,10 @@ Analysis completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 - Similarity analysis provides both semantic (meaning-based) and ROUGE-L (lexical overlap) metrics
 - Compare the dual heatmaps to understand both semantic and surface-level similarities
 """
-    
-    index_path = os.path.join(results_dir, 'README.md')
-    with open(index_path, 'w') as f:
+
+    index_path = os.path.join(results_dir, "README.md")
+    with open(index_path, "w") as f:
         f.write(index_content)
-    
+
     logger.info(f"📑 Index file created: {index_path}")
     return index_path

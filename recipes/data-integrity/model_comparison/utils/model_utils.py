@@ -19,27 +19,27 @@ def shorten_model_name(model_name):
     """Shorten long model names for better legend readability"""
     if len(model_name) <= 20:
         return model_name
-    
+
     # Common shortening patterns
     shortcuts = {
-        'Instruct': 'Inst',
-        'Instruction': 'Inst', 
-        'Chat': 'Chat',
-        'deepseek': 'DS',
-        'Mixtral': 'Mixtral',
-        'llama': 'Llama',
-        'nemotron': 'Nemotron',
-        'ultra': 'Ultra'
+        "Instruct": "Inst",
+        "Instruction": "Inst",
+        "Chat": "Chat",
+        "deepseek": "DS",
+        "Mixtral": "Mixtral",
+        "llama": "Llama",
+        "nemotron": "Nemotron",
+        "ultra": "Ultra",
     }
-    
+
     # Apply shortcuts
     short_name = model_name
     for long_form, short_form in shortcuts.items():
         short_name = short_name.replace(long_form, short_form)
-    
+
     # If still too long, take first part + version
     if len(short_name) > 25:
-        parts = short_name.split('-')
+        parts = short_name.split("-")
         if len(parts) >= 2:
             # Take first part and any version numbers
             version_parts = [p for p in parts if any(c.isdigit() for c in p)]
@@ -48,9 +48,9 @@ def shorten_model_name(model_name):
                 short_name = f"{main_part}-{version_parts[0]}"
             else:
                 short_name = main_part
-    
+
     # Final fallback: truncate and add ellipsis
     if len(short_name) > 25:
         short_name = short_name[:22] + "..."
-        
+
     return short_name

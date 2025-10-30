@@ -13,57 +13,48 @@
 # limitations under the License.
 
 import argparse
-from datasets import load_dataset, IterableDataset
 import functools
 import json
 import multiprocessing as mp
-import numpy as np
-import os
+
+from datasets import IterableDataset, load_dataset
 from tqdm import tqdm
 
+
 def process_data(elem, split):
-    #rename "input" to "messages" and use ++prompt_format=openai and remove ++prompt_config to work with nemo-skills.
-    elem['messages'] = elem.pop('input')
-    system_message = {
-        'role': 'system',
-        'content': elem['system_prompt']
-    }
-    elem['messages'].append(system_message)
-    elem['split'] = split
+    # rename "input" to "messages" and use ++prompt_format=openai and remove ++prompt_config to work with nemo-skills.
+    elem["messages"] = elem.pop("input")
+    system_message = {"role": "system", "content": elem["system_prompt"]}
+    elem["messages"].append(system_message)
+    elem["split"] = split
     return elem
+
 
 def get_from_iterable(dataset: IterableDataset):
     examples = []
     for example in dataset:
         examples.append(example)
     return examples
-    
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="prepare data")
-    parser.add_argument("--split",
-                        type=str,
-                        default="science",
-                        help="one of the following: 'safety','chat','science','code', 'math'")
+    parser.add_argument(
+        "--split", type=str, default="science", help="one of the following: 'safety','chat','science','code', 'math'"
+    )
 
-    parser.add_argument("--nrows",
-                        type=int,
-                        default=100,
-                        help="number of examples to download")
+    parser.add_argument("--nrows", type=int, default=100, help="number of examples to download")
 
-    parser.add_argument("--generator",
-                        type=str,
-                        default='DeepSeek-R1',
-                        help="The model whose respose you want to compare")
+    parser.add_argument(
+        "--generator", type=str, default="DeepSeek-R1", help="The model whose respose you want to compare"
+    )
 
-    parser.add_argument("--output",
-                        type=str,
-                        required=True,
-                        help="The download result")    
+    parser.add_argument("--output", type=str, required=True, help="The download result")
 
     args = parser.parse_args()
-    
-    dataset_name = "nvidia/Llama-Nemotron-Post-Training-Dataset"    
-    
+
+    dataset_name = "nvidia/Llama-Nemotron-Post-Training-Dataset"
+
     dataset = load_dataset(dataset_name, "SFT", split=args.split, streaming=True)
     dataset = dataset.filter(lambda x: x["generator"] == args.generator)
     first_nrows = dataset.take(args.nrows)
@@ -72,7 +63,7 @@ if __name__ == "__main__":
     num_workers = max(1, mp.cpu_count() - 1)
     print(f"Using {num_workers} workers for parallel processing")
 
-    partial_func = functools.partial(process_data, split=args.split)        
+    partial_func = functools.partial(process_data, split=args.split)
     # Create a pool of workers
     with mp.Pool(num_workers) as pool:
         # Process the dataset in parallel with a progress bar
@@ -90,5 +81,4 @@ if __name__ == "__main__":
     print(f"Dump {len(processed_data)} examples to {output_fname}")
     with open(output_fname, "w") as fout:
         for d in processed_data:
-            fout.write(json.dumps(d) + '\n')
-  
+            fout.write(json.dumps(d) + "\n")
