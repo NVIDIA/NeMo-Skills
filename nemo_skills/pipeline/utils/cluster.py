@@ -118,6 +118,7 @@ def parse_sbatch_kwargs(sbatch_kwargs: str | dict | None, **kwargs) -> dict | No
         sbatch_kwargs: Either a JSON string or a dictionary containing sbatch kwargs.
                          Can also be None or empty string.
         **kwargs: any additional keyword arguments to include in the resulting dictionary.
+            Any values of None will be ignored.
 
     Returns:
         A dictionary of slurm kwargs, or None if no arguments are provided.
@@ -125,7 +126,7 @@ def parse_sbatch_kwargs(sbatch_kwargs: str | dict | None, **kwargs) -> dict | No
     Raises:
         ValueError: If sbatch_kwargs is a string but cannot be parsed as JSON.
     """
-    sbatch_kwargs = kwargs.copy()
+    sbatch_kwargs = {key: value for key, value in kwargs.items() if value is not None}
 
     if sbatch_kwargs:
         if isinstance(sbatch_kwargs, dict):
