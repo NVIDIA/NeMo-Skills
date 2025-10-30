@@ -199,7 +199,7 @@ class Command:
 
         # Use our SLURM helper utility to parse the nodelist
         var_name = f"SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index}"
-        # TODO: maybe instead  do something that is fully bash ready
+        # TODO: maybe instead  do something that is fully bash ready so it can be run in any container
         return f"$(python3 -m nemo_skills.pipeline.utils.slurm_helpers ${var_name})"
 
     def meta_ref(self, key: str) -> str:
@@ -612,9 +612,6 @@ class Pipeline:
             )
 
             for comp_idx, command in enumerate(group.commands):
-                # Note: het_group_index already assigned above for heterogeneous jobs
-                # For non-heterogeneous jobs, it remains None (using localhost)
-
                 final_cmd, exec_config = self._prepare_command(command, cluster_config)
                 commands.append(final_cmd)
 
