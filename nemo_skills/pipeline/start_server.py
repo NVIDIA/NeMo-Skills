@@ -130,7 +130,7 @@ def start_server(
             with_sandbox=with_sandbox,
             keep_mounts_for_sandbox=keep_mounts_for_sandbox,
             sandbox_port=None if get_random_port else 6000,
-            slurm_kwargs=parse_sbatch_kwargs(
+            sbatch_kwargs=parse_sbatch_kwargs(
                 sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min}
             ),
         )

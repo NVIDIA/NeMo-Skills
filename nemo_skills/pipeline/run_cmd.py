@@ -208,7 +208,7 @@ def run_cmd(
                 num_gpus=num_gpus,
                 num_nodes=num_nodes,
                 num_tasks=[num_tasks] * len(commands),
-                slurm_kwargs=parse_sbatch_kwargs(
+                sbatch_kwargs=parse_sbatch_kwargs(
                     sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min}
                 ),
                 installation_command=installation_command,

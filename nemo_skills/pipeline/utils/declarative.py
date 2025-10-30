@@ -139,7 +139,12 @@ from nemo_skills.pipeline.utils import (
     temporary_env_update,
 )
 from nemo_skills.pipeline.utils.commands import wrap_command
-from nemo_skills.pipeline.utils.exp import REUSE_CODE_EXP, get_packaging_job_key, install_packages_wrap, tunnel_hash
+from nemo_skills.pipeline.utils.exp import (
+    REUSE_CODE_EXP,
+    get_packaging_job_key,
+    install_packages_wrap,
+    tunnel_hash,
+)
 from nemo_skills.pipeline.utils.mounts import is_mounted_filepath
 from nemo_skills.pipeline.utils.packager import get_registered_external_repo
 from nemo_skills.utils import get_logger_name
@@ -252,7 +257,7 @@ class HardwareConfig:
     partition: Optional[str] = None
     num_gpus: Optional[int] = None
     num_nodes: Optional[int] = None
-    extra_slurm_kwargs: Optional[dict] = None
+    sbatch_kwargs: Optional[dict] = None
 
 
 class CommandGroup:
@@ -533,7 +538,7 @@ class Pipeline:
                 overlap=overlap,
                 mounts=exec_config.get("mounts"),
                 with_ray=self.with_ray,
-                slurm_kwargs=hardware.extra_slurm_kwargs,
+                sbatch_kwargs=hardware.sbatch_kwargs,
                 dependencies=dependencies,
             )
 

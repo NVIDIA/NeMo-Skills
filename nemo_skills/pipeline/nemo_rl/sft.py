@@ -388,7 +388,7 @@ def sft_nemo_rl(
 
     server_config = None
     env_update = {"RAY_LOG_SYNC_FREQUENCY": 20} if profile_step_range else {}
-    slurm_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
+    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
 
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
@@ -409,7 +409,7 @@ def sft_nemo_rl(
                     reuse_code=reuse_code,
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=[prev_task] if prev_task is not None else None,
-                    slurm_kwargs=slurm_kwargs,
+                    sbatch_kwargs=sbatch_kwargs,
                     heterogeneous=True if server_config is not None else False,
                     with_sandbox=False,
                     with_ray=True,
@@ -439,7 +439,7 @@ def sft_nemo_rl(
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
-                slurm_kwargs=slurm_kwargs,
+                sbatch_kwargs=sbatch_kwargs,
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )
@@ -469,7 +469,7 @@ def sft_nemo_rl(
                     reuse_code=reuse_code,
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=[prev_task] if prev_task is not None else None,
-                    slurm_kwargs=slurm_kwargs,
+                    sbatch_kwargs=sbatch_kwargs,
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
                 )
@@ -495,7 +495,7 @@ def sft_nemo_rl(
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=task_dependencies,
-                slurm_kwargs=slurm_kwargs,
+                sbatch_kwargs=sbatch_kwargs,
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )

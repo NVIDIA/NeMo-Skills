@@ -326,11 +326,10 @@ def convert(
             num_tasks=1,
             cluster_config=cluster_config,
             partition=partition,
-            time_min=time_min,
             run_after=run_after,
             reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
-            slurm_kwargs=parse_sbatch_kwargs(
+            sbatch_kwargs=parse_sbatch_kwargs(
                 sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min}
             ),
             installation_command=installation_command,

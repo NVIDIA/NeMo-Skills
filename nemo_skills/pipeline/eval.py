@@ -331,7 +331,7 @@ def eval(
         generation_module=generation_module,
     )
 
-    slurm_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
+    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, {"exclusive": exclusive, "qos": qos, "time_min": time_min})
 
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
@@ -379,7 +379,7 @@ def eval(
                     ),
                     get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
-                    slurm_kwargs=slurm_kwargs,
+                    sbatch_kwargs=sbatch_kwargs,
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
                 )
@@ -442,7 +442,7 @@ def eval(
                 reuse_code=reuse_code,
                 exclusive=exclusive,
                 installation_command=installation_command,
-                sbatch_kwargs=slurm_kwargs,
+                sbatch_kwargs=sbatch_kwargs,
                 _reuse_exp=exp,
                 _task_dependencies=(
                     dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
@@ -506,7 +506,7 @@ def eval(
                     ),
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
-                    slurm_kwargs=slurm_kwargs,
+                    sbatch_kwargs=sbatch_kwargs,
                 )
                 all_tasks.append(summarize_task)
                 if benchmark_args.benchmark_group:
@@ -540,7 +540,7 @@ def eval(
                     ),
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
-                    slurm_kwargs=slurm_kwargs,
+                    sbatch_kwargs=sbatch_kwargs,
                 )
                 all_tasks.append(score_task)
 

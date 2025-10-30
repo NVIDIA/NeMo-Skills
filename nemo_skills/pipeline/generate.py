@@ -142,7 +142,7 @@ def _create_commandgroup_from_config(
             partition=partition,
             num_gpus=max_gpus,
             num_nodes=max_nodes,
-            extra_slurm_kwargs=sbatch_kwargs,
+            sbatch_kwargs=sbatch_kwargs,
         ),
         name=task_name,
         log_dir=log_dir,
