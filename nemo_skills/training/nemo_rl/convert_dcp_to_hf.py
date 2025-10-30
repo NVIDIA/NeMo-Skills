@@ -42,7 +42,6 @@ def parse_args():
     )
     parser.add_argument(
         "--max-position-embeddings",
-        type=int,
         default=None,
         help="Max position embeddings to use for conversion. If not specified, will be inferred from the model config.",
     )
