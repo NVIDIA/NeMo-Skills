@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import asyncio
 import json
 import logging
 import re
@@ -39,6 +39,7 @@ BIGCODEBENCH_REQUIREMENTS_URL = (
 
 @nested_dataclass(kw_only=True)
 class CodeExecEvaluatorConfig:
+    input_file: str
     sandbox: dict
     language: str = "python3"
     timeout: int = 10
@@ -73,7 +74,6 @@ class CodeExecEvaluator(BaseEvaluator):
 
             output_dict["process_status"].append(output["process_status"])
             output_dict["stdouts"].append(output["stdout"])
-
             output_dict["stderrs"].append(output["stderr"])
             output_dict["correct_tests"].append(output["stdout"].strip() == test_case["output"].strip())
 
@@ -83,6 +83,21 @@ class CodeExecEvaluator(BaseEvaluator):
             else (sum(output_dict["correct_tests"]) / len(output_dict["correct_tests"]))
         )
         return {"code_execution": output_dict}
+
+    async def eval_full(self):  # type: ignore[override]
+        jsonl_file = self.eval_config.input_file
+        with open(jsonl_file, "r", encoding="utf-8") as f:
+            all_samples = [json.loads(line) for line in f]
+
+        tasks = [self.eval_single(s) for s in all_samples]
+        outputs = await asyncio.gather(*tasks)
+
+        for s, o in zip(all_samples, outputs):
+            s["code_execution"] = o["code_execution"]
+
+        with open(jsonl_file, "wt", encoding="utf-8") as f:
+            for sample in all_samples:
+                f.write(json.dumps(sample) + "\n")
 
 
 def preprocess_code(generation_dict: dict, language="python", strip_whitespace=True):
