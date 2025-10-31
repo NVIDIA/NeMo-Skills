@@ -188,6 +188,10 @@ def get_generation_cmd(
     wandb_parameters=None,
     with_sandbox: bool = False,
     script: str = "nemo_skills.inference.generate",
+    # Optional: for multi-model generation
+    server_addresses: list[str] | None = None,
+    model_names: list[str] | None = None,
+    num_models: int | None = None,
 ):
     """Construct the generation command for language model inference."""
     if input_file is None and input_dir is None:
@@ -211,12 +215,21 @@ def get_generation_cmd(
     # Handle file paths vs module names
     common_args = f"++skip_filled=True ++input_file={input_file} ++output_file={output_file}"
     if script.endswith(".py") or os.sep in script:
-        # It's a file path, run it directly with .py extension
         script_path = script if script.endswith(".py") else f"{script}.py"
         cmd += f"python {script_path} {common_args} "
     else:
-        # It's a module name, use -m flag
         cmd += f"python -m {script} {common_args} "
+
+    if server_addresses is not None and model_names is not None and num_models is not None:
+        if num_models > 1:
+            # Multi-model: pass as lists
+            server_addresses_arg = ",".join(server_addresses)
+            cmd += f"++server_addresses=[{server_addresses_arg}] "
+
+            model_names_arg = ",".join(model_names)
+            cmd += f"++model_names=[{model_names_arg}] "
+        # For n=1: server_address/model are already in extra_arguments from configure_client
+
     job_end_cmd = ""
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations

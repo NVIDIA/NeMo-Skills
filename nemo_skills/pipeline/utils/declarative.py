@@ -186,11 +186,21 @@ class Command:
             self.command = wrap_command(self.command, self.working_dir, self.env_vars)
 
     def hostname_ref(self) -> str:
-        """Get hostname reference for hetjob cross-component communication."""
+        """Get hostname reference for hetjob cross-component communication.
+
+        Returns a shell variable reference that resolves to the first hostname
+        in the het group's nodelist. Handles these SLURM nodelist formats:
+        - Single node: "batch-block1-0075" → "batch-block1-0075"
+        - Node range: "batch-block1-[0075-0078]" → "batch-block1-0075"
+        - Node list: "batch-block1-0075,batch-block1-0076" → "batch-block1-0075"
+        """
         if self.het_group_index is None:
-            return "127.0.0.1"  # Local fallback
-        # For heterogeneous SLURM jobs, resolve nodelist to actual hostname
-        return f"$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index} | head -n1)"
+            return "127.0.0.1"  # Local fallback for non-heterogeneous jobs
+
+        # Use our SLURM helper utility to parse the nodelist
+        var_name = f"SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index}"
+        # TODO: maybe instead  do something that is fully bash ready so it can be run in any container
+        return f"$(python3 -m nemo_skills.pipeline.utils.slurm_helpers ${var_name})"
 
     def meta_ref(self, key: str) -> str:
         """Get metadata value (like port). Fails if key not found."""
@@ -571,6 +581,13 @@ class Pipeline:
         executors: List = []
         het_group_indices: List[int] = []
 
+        # Assign het_group_indices FIRST (before any prepare_for_execution calls)
+        # This is critical for cross-component references in lambdas
+        if heterogeneous:
+            for het_idx, group in enumerate(groups):
+                for command in group.commands:
+                    command.het_group_index = het_idx
+
         # In heterogeneous jobs, collect environment from all commands for cross-component refs
         shared_env_vars: Dict[str, str] = {}
         if heterogeneous:
@@ -595,13 +612,6 @@ class Pipeline:
             )
 
             for comp_idx, command in enumerate(group.commands):
-                # Assign het_group_index ONLY for heterogeneous jobs (per-job, not global)
-                # Non-heterogeneous jobs use localhost, so het_group_index should remain None
-                if heterogeneous:
-                    command.het_group_index = het_idx
-                else:
-                    command.het_group_index = None
-
                 final_cmd, exec_config = self._prepare_command(command, cluster_config)
                 commands.append(final_cmd)
 
