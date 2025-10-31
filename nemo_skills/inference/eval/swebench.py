@@ -40,7 +40,7 @@ class SupportedAgentFrameworks(str, Enum):
     openhands = "openhands"
 
 
-class SupportedEvalHarnesses(str, Enum):
+class SupportedDatasetTypes(str, Enum):
     swe_bench = "swe_bench"
     swe_gym = "swe_gym"
     r2e_gym = "r2e_gym"
@@ -118,14 +118,14 @@ def get_openhands_install_cmd(repo, commit):
     )
 
 
-def infer_eval_harness(dataset_name):
-    """Attempts to infer the eval harness based on the HuggingFace dataset name."""
+def infer_dataset_type(dataset_name):
+    """Attempts to infer the dataset type based on the HuggingFace dataset name."""
     if "SWE-Gym" in dataset_name:
-        return SupportedEvalHarnesses.swe_gym
+        return SupportedDatasetTypes.swe_gym
     elif "R2E-Gym" in dataset_name:
-        return SupportedEvalHarnesses.r2e_gym
+        return SupportedDatasetTypes.r2e_gym
     else:
-        return SupportedEvalHarnesses.swe_bench
+        return SupportedDatasetTypes.swe_bench
 
 
 # not inheriting since most parameters are not supported because we don't use our model client here
@@ -150,8 +150,8 @@ class SweBenchGenerationConfig:
     # TODO: remove this since it's probably only useful as a one time hack.
     skip_inference: bool = False
 
-    # Which evaluation harness to use. If None, inferred automatically based on the dataset_name field
-    eval_harness: SupportedEvalHarnesses | None = None
+    # Which dataset type we're running on. If None, inferred automatically based on the dataset_name field.
+    dataset_type: SupportedDatasetTypes | None = None
 
     # URL of the evaluation harness repo to pass to git clone
     eval_harness_repo: str | None = None
@@ -245,15 +245,33 @@ class SweBenchGenerationTask(GenerationTask):
         logs_dir = self.output_dir / "apptainer_logs"
         logs_dir.mkdir(exist_ok=True)
 
+        # List of commands to execute in the container in order
+        container_commands = []
+
         # Fix localhost URLs not working sometimes
-        command = f"echo '127.0.0.1 localhost' >/etc/hosts && {command}"
+        container_commands.append("echo '127.0.0.1 localhost' >/etc/hosts")
+
+        if mode == "agent" and self.cfg.dataset_type == SupportedDatasetTypes.r2e_gym:
+            # Remove R2E-Gym test-related files.
+            for root_dir in ["", "/root", "/testbed"]:
+                container_commands.append(
+                    # /r2e_tests contains evaluation tests that the agent should not see.
+                    f"rm -rf {root_dir}/r2e_tests && "
+                    # run_tests.sh launches the tests in /r2e_tests, so the agent should not see this either.
+                    # We check that it contains the substring "r2e_tests"
+                    # to avoid accidentally deleting an unrelated file with that name.
+                    f"if grep -qs r2e_tests {root_dir}/run_tests.sh; then rm -rf {root_dir}/run_tests.sh; fi"
+                )
+
+        container_commands.append(command)
+        combined_command = " && ".join(container_commands)
 
         # Launch Apptainer container and execute the command
         apptainer_cmd = (
             f"apptainer exec --writable-tmpfs --no-mount home,tmp,bind-paths "
             f"--mount type=bind,src=/nemo_run/code,dst=/nemo_run/code "
             f"--mount type=bind,src={self.output_dir},dst=/trajectories_mount "
-            f" {container_name} bash -c {shlex.quote(command)}"
+            f" {container_name} bash -c {shlex.quote(combined_command)}"
         )
 
         # Retry apptainer command up to max_retries times
@@ -652,14 +670,12 @@ class SweBenchGenerationTask(GenerationTask):
         else:
             api_base = f"http://{self.cfg.server.host}:{self.cfg.server.port}/v1"
 
-        if self.cfg.eval_harness is None:
-            eval_harness = infer_eval_harness(data_point["dataset_name"])
-        elif self.cfg.eval_harness in SupportedEvalHarnesses:
-            eval_harness = self.cfg.eval_harness
-        else:
+        if self.cfg.dataset_type is None:
+            self.cfg.dataset_type = infer_dataset_type(data_point["dataset_name"])
+        elif self.cfg.dataset_type not in SupportedDatasetTypes:
             raise ValueError(
-                f"Unsupported evaluation harness: {self.cfg.eval_harness}. "
-                f"Supported harnesses: {', '.join(SupportedEvalHarnesses)}."
+                f"Unsupported dataset type: {self.cfg.dataset_type}. "
+                f"Supported harnesses: {', '.join(SupportedDatasetTypes)}."
             )
 
         if self.cfg.agent_framework == SupportedAgentFrameworks.swe_agent:
@@ -702,11 +718,11 @@ class SweBenchGenerationTask(GenerationTask):
         else:
             # TODO: should we fail on errors here? Seems that json isn't always generated
             try:
-                if eval_harness == SupportedEvalHarnesses.swe_bench:
+                if self.cfg.dataset_type == SupportedDatasetTypes.swe_bench:
                     report_file = await self._eval_swe_bench(data_point, pred_mounted_path)
-                elif eval_harness == SupportedEvalHarnesses.swe_gym:
+                elif self.cfg.dataset_type == SupportedDatasetTypes.swe_gym:
                     report_file = await self._eval_swe_gym(data_point, pred_mounted_path)
-                elif eval_harness == SupportedEvalHarnesses.r2e_gym:
+                elif self.cfg.dataset_type == SupportedDatasetTypes.r2e_gym:
                     report_file = await self._eval_r2e_gym(data_point, pred_mounted_path)
             except ValueError:
                 LOG.error("Failed to execute SWE-bench evaluation command for %s", data_point["instance_id"])
