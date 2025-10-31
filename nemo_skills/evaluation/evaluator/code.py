@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-import asyncio
 import json
 import logging
 import re
@@ -50,31 +49,10 @@ class CodeExecEvaluator(BaseEvaluator):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
         self.sandbox = get_sandbox(self.eval_config.sandbox)
-        self._sandbox_ready = False
-
-    async def _wait_for_sandbox_ready(self, timeout: int = 100):
-        """Wait for sandbox to be ready."""
-        retries = timeout // self.eval_config.timeout
-        for _ in range(retries):
-            try:
-                output, _ = await self.sandbox.execute_code(
-                    "print('test')", language=self.eval_config.language, timeout=self.eval_config.timeout
-                )
-                if output.get("process_status") == "completed":
-                    self._sandbox_ready = True
-                    return
-                else:
-                    LOG.warning(f"Sandbox returned status: {output.get('process_status')}")
-            except Exception:
-                LOG.warning("Sandbox not ready yet, retrying...")
-            await asyncio.sleep(self.eval_config.timeout)
-        raise RuntimeError("Sandbox not available after multiple retries")
+        self.sandbox.wait_for_sandbox(50)
 
     async def eval_single(self, data: dict):
         """Evaluate single code during generation."""
-        if not self._sandbox_ready:
-            await self._wait_for_sandbox_ready()
-
         output_dict = {
             "process_status": [],
             "correct_tests": [],
