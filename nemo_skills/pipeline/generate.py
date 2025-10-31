@@ -592,8 +592,8 @@ def generate(
                     extra_arguments=extra_arguments_original if idx == 0 else "",
                     get_random_port=get_random_port_for_server,
                 )
-            server_configs.append(srv_config)
-            server_addresses_resolved.append(srv_address)
+                server_configs.append(srv_config)
+                server_addresses_resolved.append(srv_address)
 
                 # For n=1, use the extra_arguments from configure_client (has server config)
                 if idx == 0 and num_models == 1:
