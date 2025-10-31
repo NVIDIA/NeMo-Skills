@@ -40,8 +40,9 @@ BIGCODEBENCH_REQUIREMENTS_URL = (
 @nested_dataclass(kw_only=True)
 class CodeExecEvaluatorConfig:
     sandbox: dict
-    language: str = "python"
+    language: str = "python3"
     timeout: int = 10
+    max_output_characters: int = 1000
 
 
 class CodeExecEvaluator(BaseEvaluator):
@@ -67,6 +68,7 @@ class CodeExecEvaluator(BaseEvaluator):
                 std_input=test_case["input"],
                 language=self.eval_config.language,
                 timeout=self.eval_config.timeout,
+                max_output_characters=self.eval_config.max_output_characters,
             )
 
             output_dict["process_status"].append(output["process_status"])
