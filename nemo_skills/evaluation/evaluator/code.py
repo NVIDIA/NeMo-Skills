@@ -24,7 +24,8 @@ from dataclasses import field
 
 from omegaconf import OmegaConf
 
-from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
+from nemo_skills.code_execution.sandbox import get_sandbox
+from nemo_skills.evaluation.evaluator.base import BaseEvaluator, BaseEvaluatorConfig
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
 LOG = logging.getLogger(get_logger_name(__file__))
@@ -32,6 +33,54 @@ LOG = logging.getLogger(get_logger_name(__file__))
 BIGCODEBENCH_REQUIREMENTS_URL = (
     "https://raw.githubusercontent.com/bigcode-project/bigcodebench/main/Requirements/requirements-eval.txt"
 )
+
+
+@nested_dataclass(kw_only=True)
+class CodeExecEvaluatorConfig:
+    sandbox: dict
+    language: str = "python3"
+    timeout: int = 10
+    max_output_characters: int = 1000
+
+
+class CodeExecEvaluator(BaseEvaluator):
+    def __init__(self, config: dict, num_parallel_requests: int = 12):
+        super().__init__(config, num_parallel_requests)
+        self.eval_config = CodeExecEvaluatorConfig(**self.config)
+        self.sandbox = get_sandbox(self.eval_config.sandbox)
+        self.sandbox.wait_for_sandbox(50)
+
+    async def eval_single(self, data: dict):
+        """Evaluate single code during generation."""
+        output_dict = {
+            "process_status": [],
+            "correct_tests": [],
+            "average_test_score": 0.0,
+            "stdouts": [],
+            "stderrs": [],
+        }
+
+        for test_case in data["test_cases"]:
+            output, _ = await self.sandbox.execute_code(
+                generated_code=data["code"],
+                std_input=test_case["input"],
+                language=self.eval_config.language,
+                timeout=self.eval_config.timeout,
+                max_output_characters=self.eval_config.max_output_characters,
+            )
+
+            output_dict["process_status"].append(output["process_status"])
+            output_dict["stdouts"].append(output["stdout"])
+
+            output_dict["stderrs"].append(output["stderr"])
+            output_dict["correct_tests"].append(output["stdout"].strip() == test_case["output"].strip())
+
+        output_dict["average_test_score"] = (
+            0.0
+            if len(output_dict["correct_tests"]) == 0
+            else (sum(output_dict["correct_tests"]) / len(output_dict["correct_tests"]))
+        )
+        return {"code_execution": output_dict}
 
 
 def preprocess_code(generation_dict: dict, language="python", strip_whitespace=True):

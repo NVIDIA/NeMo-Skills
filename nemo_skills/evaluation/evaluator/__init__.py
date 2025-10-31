@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict
 from nemo_skills.evaluation.evaluator.base import BaseEvaluator
 from nemo_skills.evaluation.evaluator.bfcl import eval_bfcl
 from nemo_skills.evaluation.evaluator.code import (
+    CodeExecEvaluator,
     eval_bigcodebench,
     eval_evalplus,
     eval_human_eval_infilling,
@@ -54,11 +55,11 @@ EVALUATOR_MAP = {
     "human_eval_infilling": eval_human_eval_infilling,
 }
 
-# Evaluator class mapping
+# Evaluator class mapping, other evaluators can be added here as they're converted to classes
 EVALUATOR_CLASS_MAP = {
     "math": MathEvaluator,
     "lean4-proof": Lean4ProofEvaluator,
-    # Other evaluators can be added here as they're converted to classes
+    "code_exec": CodeExecEvaluator,
     "ioi": IOIEvaluator,
 }
 
