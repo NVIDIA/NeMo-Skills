@@ -191,6 +191,7 @@ def write_data_to_file(output_file, data, txt_file_folder, max_context_window, t
 
             entry[f"n_tokens_{tokenizer_name}"] = n_tokens
             entry["question"] = question
+            entry["original_question"] = question_text
             entry["expected_answer"] = entry.pop("answer")
             entry["expected_judgement"] = "correct"  # for judgement metric
             # remove unused columns
@@ -255,4 +256,4 @@ if __name__ == "__main__":
 
     LOG.info(f"Preparing AA-LCR dataset with additional arguments: {args}")
     prepare_aalcr_data(args.max_context_window, args.setup, args.tokenizer_name)
-    LOG.info(f"AA-LCR dataset preparation with setup {args.setup} completed. Use --split=${args.setup} to evaluate!")
+    LOG.info(f"AA-LCR dataset preparation with setup {args.setup} completed. Use --split={args.setup} to evaluate!")

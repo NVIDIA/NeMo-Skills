@@ -139,7 +139,12 @@ from nemo_skills.pipeline.utils import (
     temporary_env_update,
 )
 from nemo_skills.pipeline.utils.commands import wrap_command
-from nemo_skills.pipeline.utils.exp import REUSE_CODE_EXP, get_packaging_job_key, install_packages_wrap, tunnel_hash
+from nemo_skills.pipeline.utils.exp import (
+    REUSE_CODE_EXP,
+    get_packaging_job_key,
+    install_packages_wrap,
+    tunnel_hash,
+)
 from nemo_skills.pipeline.utils.mounts import is_mounted_filepath
 from nemo_skills.pipeline.utils.packager import get_registered_external_repo
 from nemo_skills.utils import get_logger_name
@@ -250,11 +255,9 @@ class HardwareConfig:
     """Hardware configuration for a group of tasks."""
 
     partition: Optional[str] = None
-    qos: Optional[str] = None
-    time_min: Optional[str] = None
-    exclusive: bool = False
     num_gpus: Optional[int] = None
     num_nodes: Optional[int] = None
+    sbatch_kwargs: Optional[dict] = None
 
 
 class CommandGroup:
@@ -340,18 +343,14 @@ class Pipeline:
             if not is_mounted_filepath(self.cluster_config, env_vars["HF_HOME"]):
                 raise RuntimeError(f"Invalid cluster_config: HF_HOME={env_vars['HF_HOME']} is not a mounted path.")
 
-    def run(
-        self,
-        dry_run: bool = False,
-        log_dir: Optional[str] = None,
-        _reuse_exp=None,
-    ):
+    def run(self, dry_run: bool = False, log_dir: Optional[str] = None, _reuse_exp=None, sequential: bool = False):
         """Execute the pipeline by calling NeMo-Run directly.
 
         Args:
             dry_run: If True, validate without executing
             log_dir: Default log directory for groups that don't specify one (optional)
             _reuse_exp: Internal - reuse existing experiment object (for eval.py integration)
+            sequential: If True, run tasks sequentially (only makes sense for local/none executors)
         """
         # Track job name -> task handle for dependency resolution
         job_name_to_handle = {}
@@ -467,7 +466,7 @@ class Pipeline:
 
             # Only run if not using existing experiment (matching generate_v0.py line 331)
             if not dry_run and not _reuse_exp:
-                run_exp(exp, self.cluster_config)
+                run_exp(exp, self.cluster_config, sequential=sequential)
 
                 # Cache experiment for code reuse in future runs
                 if self.cluster_config["executor"] != "none":
@@ -533,15 +532,13 @@ class Pipeline:
                 log_dir=log_dir,
                 log_prefix=exec_config["log_prefix"],
                 partition=hardware.partition if hardware else None,
-                qos=hardware.qos if hardware else None,
-                time_min=hardware.time_min if hardware else None,
                 heterogeneous=heterogeneous,
                 het_group=het_group,
                 total_het_groups=total_het_groups,
                 overlap=overlap,
                 mounts=exec_config.get("mounts"),
                 with_ray=self.with_ray,
-                slurm_kwargs={"exclusive": hardware.exclusive} if (hardware and hardware.exclusive) else None,
+                sbatch_kwargs=hardware.sbatch_kwargs,
                 dependencies=dependencies,
             )
 
