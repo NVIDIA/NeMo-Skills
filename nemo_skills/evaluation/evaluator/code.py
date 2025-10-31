@@ -52,9 +52,9 @@ class CodeExecEvaluator(BaseEvaluator):
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
         self.sandbox = get_sandbox(self.eval_config.sandbox)
         # self.sandbox.wait_for_sandbox(50)
-        import time
+        # import time
 
-        time.sleep(10)
+        # time.sleep(10)
 
     async def eval_single(self, data: dict):
         """Evaluate single code during generation."""

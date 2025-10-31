@@ -520,6 +520,6 @@ async def test_code_exec_eval_execution():
     data_path = os.path.join(base, "data", "code_execution", "test.jsonl")
     with open(data_path, "r", encoding="utf-8") as f:
         dp = json.loads(next(f))
-    evaluator = CodeExecEvaluator(config={"test_file": data_path})
+    evaluator = CodeExecEvaluator(config={"input_file": data_path})
     out = await evaluator.eval_single(dp)
     assert out["code_execution"]["average_test_score"] == 1.0
