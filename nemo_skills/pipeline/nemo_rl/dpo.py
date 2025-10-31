@@ -218,7 +218,7 @@ def get_checkpoint_average_cmd(output_dir, average_steps, backend, remove_checkp
 
 @nemo_rl_app.command(name="sft", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @typer_unpacker
-def sft_nemo_rl(
+def dpo_nemo_rl(
     ctx: typer.Context,
     cluster: str = typer.Option(
         None,

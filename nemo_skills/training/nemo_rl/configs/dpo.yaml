@@ -33,7 +33,7 @@ policy:
   tokenizer:
     name: ${policy.model_name}
     chat_template_kwargs: null # can be used to pass kwargs to the chat template, e.g., enable_thinking=true
-
+  tensor_parallel_size: 1
   # number of preference samples per batch
   # each preference sample corresponds to a pair of chosen and rejected responses
   # so the actual batch size processed by the model is train_global_batch_size * 2
@@ -52,7 +52,7 @@ policy:
     cpu_offload: False
     sequence_parallel: false
     activation_checkpointing: false
-    tensor_parallel_size: 1
+    tensor_parallel_size: ${policy.tensor_parallel_size}
     context_parallel_size: 1
     custom_parallel_plan: null
     clear_cache_every_n_steps: null
@@ -61,11 +61,11 @@ policy:
     enabled: false
 
   sequence_packing:
-    enabled: false
+    enabled: False
 
   # makes the training sequence length divisible by the tensor parallel size
   # this is useful for sequence parallel training
-  make_sequence_length_divisible_by: ${policy.dtensor_cfg.tensor_parallel_size}
+  make_sequence_length_divisible_by: ${policy.tensor_parallel_size}
   max_grad_norm: 1.0
 
   optimizer:
@@ -97,7 +97,7 @@ policy:
     enabled: false
     empty_unused_memory_level: 1
     activation_checkpointing: false
-    tensor_model_parallel_size: 2
+    tensor_model_parallel_size: ${policy.tensor_parallel_size}
     expert_tensor_parallel_size: 1
     expert_model_parallel_size: 1
     pipeline_model_parallel_size: 1
@@ -161,6 +161,7 @@ policy:
       use_custom_fsdp: false
 
 data:
+  dataset_name: PreferenceDataset
   max_input_seq_length: ${policy.max_total_sequence_length}
   shuffle: true
   train_data_path: null
