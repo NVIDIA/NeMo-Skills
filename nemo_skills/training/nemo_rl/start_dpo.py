@@ -1,11 +1,3 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,16 +12,15 @@ from typing import Any
 
 from nemo_rl.algorithms.dpo import MasterConfig, dpo_train, setup
 from nemo_rl.algorithms.utils import get_tokenizer
-from nemo_rl.data import DataConfig
-from nemo_rl.data.datasets import AllTaskProcessedDataset, load_preference_dataset
-from nemo_rl.data.datasets.preference_datasets import PreferenceDataset
+from nemo_rl.data import DataConfig, hf_datasets
+from nemo_rl.data.datasets import AllTaskProcessedDataset
 from nemo_rl.data.interfaces import DatumSpec, TaskDataSpec
 from nemo_rl.data.llm_message_utils import get_formatted_message_log
 from nemo_rl.distributed.virtual_cluster import init_ray
+from nemo_rl.models.policy import PolicyConfig
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
 from omegaconf import OmegaConf
-from transformers import AutoTokenizer
 
 
 def parse_args():
@@ -114,7 +105,7 @@ def dpo_preprocessor(
         rejected_completion = datum_dict["completions"][0]
     else:
         raise NotImplementedError(
-            "Ties are not supported yet. You can use the following command to filter out ties: `cat <PathToPreferenceDataset> | jq 'select(.completions[0].rank != .completions[1].rank)'`."
+            "Ties are not supported yet. You can use the following command to filter out ties: `cat <LocalPathToPreferenceDataset> | jq 'select(.completions[0].rank != .completions[1].rank)'`."
         )
 
     messages_chosen = datum_dict["context"] + chosen_completion["completion"]
@@ -150,20 +141,43 @@ def dpo_preprocessor(
     return output
 
 
-def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
+def setup_data(data_config: DataConfig, policy_config: PolicyConfig):
     print("\n▶ Setting up data...")
+    data_cls = data_config["dataset_name"]
 
-    # load dataset
-    data = load_preference_dataset(data_config)
-    train_dataset = data.formatted_ds["train"]
-    val_dataset = data.formatted_ds["validation"]
+    if data_cls == "PreferenceDataset":
+        data_path = data_config["train_data_path"]
+        data = hf_datasets.PreferenceDataset(data_path, split="train")
+        train_dataset = data.formatted_ds["train"]
+        val_dataset = None
+    elif data_cls == "HelpSteer3":
+        data = hf_datasets.HelpSteer3Dataset()
+        train_dataset = data.formatted_ds["train"]
+        val_dataset = data.formatted_ds["validation"]
+    elif data_cls == "Tulu3Preference":
+        data = hf_datasets.Tulu3PreferenceDataset()
+        train_dataset = data.formatted_ds["train"]
+        val_dataset = None
+    elif data_cls == "DPODataset":
+        data = hf_datasets.DPODataset(
+            train_data_path=data_config["train_data_path"],
+            val_data_path=data_config["val_data_path"],
+        )
+        train_dataset = data.formatted_ds["train"]
+        val_dataset = data.formatted_ds["validation"]
+    else:
+        raise ValueError(
+            f"Unknown dataset class: {data_cls}. Supported datasets are: PreferenceDataset, HelpSteer3, Tulu3Preference, and DPODataset (deprecated)."
+        )
 
-    print(f"  ✓ Training dataset loaded with {len(train_dataset)} samples.")
+    if train_dataset:
+        print(f"  ✓ Training dataset loaded with {len(data.formatted_ds['train'])} samples.")
     if val_dataset:
-        print(f"  ✓ Validation dataset loaded with {len(val_dataset)} samples.")
+        print(f"  ✓ Validation dataset loaded with {len(data.formatted_ds['validation'])} samples.")
 
     dpo_task_spec = data.task_spec
 
+    tokenizer = get_tokenizer(policy_config["tokenizer"])
     train_dataset = AllTaskProcessedDataset(
         train_dataset,
         tokenizer,
@@ -172,44 +186,8 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         max_seq_length=data_config["max_input_seq_length"],
     )
 
-    # TODO @yukih: unify the code when support multiple datasets for other algorithms
-    if "val_data_paths" in data_config and data_config["val_data_paths"]:
-        val_dataset = {}
-
-        assert isinstance(data_config["val_data_paths"], dict), (
-            f"Invalid type for val_data_paths: {type(data_config['val_data_paths'])}. val_data_paths must be a dictionary."
-        )
-        val_data_paths = data_config["val_data_paths"]
-
-        for val_dataset_name, val_dataset_path in val_data_paths.items():
-            assert val_dataset_name not in val_dataset
-            val_data = PreferenceDataset(val_dataset_path)
-            print(
-                f"  ✓ Validation dataset '{val_dataset_name}' loaded with {len(val_data.formatted_ds['train'])} samples."
-            )
-            val_dataset[val_dataset_name] = AllTaskProcessedDataset(
-                val_data.formatted_ds["train"],
-                tokenizer,
-                val_data.task_spec,
-                dpo_preprocessor,
-                max_seq_length=data_config["max_input_seq_length"],
-            )
-    else:
-        val_dataset = (
-            {
-                "default": AllTaskProcessedDataset(
-                    val_dataset,
-                    tokenizer,
-                    dpo_task_spec,
-                    dpo_preprocessor,
-                    max_seq_length=data_config["max_input_seq_length"],
-                )
-            }
-            if val_dataset
-            else {}
-        )
-
-    return train_dataset, val_dataset, dpo_task_spec
+    val_dataset = None
+    return train_dataset, val_dataset, tokenizer, dpo_task_spec
 
 
 def main():
@@ -240,16 +218,8 @@ def main():
 
     init_ray()
 
-    # setup tokenizer
-    tokenizer = get_tokenizer(config["policy"]["tokenizer"])
-
     # setup data
-    (
-        train_dataset,
-        val_dataset,
-        dpo_task_spec,
-    ) = setup_data(tokenizer, config["data"])
-
+    train_dataset, val_dataset, tokenizer, dpo_task_spec = setup_data(config["data"], config["policy"])
     (
         policy,
         cluster,
@@ -261,7 +231,7 @@ def main():
         dpo_save_state,
         master_config,
     ) = setup(config, tokenizer, train_dataset, val_dataset)
-
+    val_dataloader = None
     dpo_train(
         policy,
         train_dataloader,
