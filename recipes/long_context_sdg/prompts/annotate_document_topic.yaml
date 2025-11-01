@@ -1,0 +1,20 @@
+system: |
+  You are an expert text analyst.
+  Your goal is to identify the main domain and related subtopics of a given document.
+  Always provide concise, domain-relevant outputs and follow the specified JSON format exactly.
+
+user: |-
+  Given the following document, perform these steps:
+    1. Identify the main domain or topic area of the document (e.g., finance, biology, law, computer science, etc.).
+    2. List the top {num_subtopics} subtopics discussed or implied within the document. Each subtopic should represent a distinct theme, process, or concept related to the main domain.
+    3. Output your response strictly in the following JSON format:
+       {{
+         "domain": "<main domain>",
+         "subtopics": ["<subtopic_1>", "<subtopic_2>", ..., "<subtopic_N>"]
+       }}
+
+  Document:
+  
+  {doc_content}
+
+ 
