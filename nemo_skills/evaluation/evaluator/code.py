@@ -58,7 +58,6 @@ class CodeExecEvaluator(BaseEvaluator):
 
     async def eval_single(self, data: dict):
         """Evaluate single code during generation."""
-        print("Check 3")
         output_dict = {
             "process_status": [],
             "correct_tests": [],
@@ -66,7 +65,7 @@ class CodeExecEvaluator(BaseEvaluator):
             "stdouts": [],
             "stderrs": [],
         }
-        print("Check 4")
+
         for test_case in data["test_cases"]:
             output, _ = await self.sandbox.execute_code(
                 generated_code=data["code"],
@@ -86,24 +85,24 @@ class CodeExecEvaluator(BaseEvaluator):
             if len(output_dict["correct_tests"]) == 0
             else (sum(output_dict["correct_tests"]) / len(output_dict["correct_tests"]))
         )
-        print("Check 5")
         return {"code_execution": output_dict}
 
     async def eval_full(self):  # type: ignore[override]
+        print("Check 2")
         jsonl_file = self.eval_config.input_file
-        print("Check 6")
         with open(jsonl_file, "r", encoding="utf-8") as f:
             all_samples = [json.loads(line) for line in f]
-        print("Check 7")
+        print("Check 3")
         tasks = [self.eval_single(s) for s in all_samples]
         outputs = await asyncio.gather(*tasks)
-        print("Check 8")
+        print("Check 4")
         for s, o in zip(all_samples, outputs):
             s["code_execution"] = o["code_execution"]
-
+        print("Check 5")
         with open(jsonl_file, "wt", encoding="utf-8") as f:
             for sample in all_samples:
                 f.write(json.dumps(sample) + "\n")
+        print("Check 6")
 
 
 def preprocess_code(generation_dict: dict, language="python", strip_whitespace=True):
