@@ -54,7 +54,7 @@ class CodeExecEvaluator(BaseEvaluator):
         # self.sandbox.wait_for_sandbox(50)
         import time
 
-        time.sleep(30)
+        time.sleep(10)
 
     async def eval_single(self, data: dict):
         """Evaluate single code during generation."""
