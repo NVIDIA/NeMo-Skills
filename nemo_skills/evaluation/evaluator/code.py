@@ -51,7 +51,7 @@ class CodeExecEvaluator(BaseEvaluator):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
         self.sandbox = get_sandbox(self.eval_config.sandbox)
-        self.sandbox.wait_for_sandbox(50)
+        # self.sandbox.wait_for_sandbox(50)
         import time
 
         time.sleep(10)
