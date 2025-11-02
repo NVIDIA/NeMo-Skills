@@ -50,7 +50,9 @@ class CodeExecEvaluator(BaseEvaluator):
     def __init__(self, config: dict, num_parallel_requests: int = 12):
         super().__init__(config, num_parallel_requests)
         self.eval_config = CodeExecEvaluatorConfig(**self.config)
+        print(f"Check 1: {self.eval_config}")
         self.sandbox = get_sandbox(self.eval_config.sandbox)
+        print(f"Check 2: {self.sandbox}")
         # self.sandbox.wait_for_sandbox(50)
         # import time
 

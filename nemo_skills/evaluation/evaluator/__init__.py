@@ -113,9 +113,9 @@ def supports_single_eval(eval_type: str, config: Dict[str, Any]) -> bool:
 def evaluate(eval_type, eval_config):
     """Main evaluation function that handles both class-based and function-based evaluators."""
     # Check if it's a class-based evaluator first
-    print(f"eval_type: {eval_type}")
     if eval_type in EVALUATOR_CLASS_MAP:
         evaluator = get_evaluator_class(eval_type, eval_config)
+        print(f"evaluator: {evaluator}")
         return asyncio.run(evaluator.eval_full())
 
     # Fall back to function-based evaluator
