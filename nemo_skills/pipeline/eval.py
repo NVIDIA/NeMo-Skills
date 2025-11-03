@@ -214,6 +214,10 @@ def eval(
         "",
         help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
+    extra_metrics_arguments: str = typer.Option(
+        "",
+        help="Additional arguments to pass to the metrics calculator. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -482,6 +486,8 @@ def eval(
                     command += f" --wandb_project={wandb_project} "
                 if data_dir:
                     command += f" --data_dir={data_dir} "
+                if extra_metrics_arguments:
+                    command += f" --extra_metrics_arguments='{extra_metrics_arguments}' "
 
                 if benchmark in benchmark_to_judge_tasks:
                     dependent_tasks = benchmark_to_judge_tasks[benchmark]
