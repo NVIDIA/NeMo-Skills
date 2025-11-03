@@ -314,10 +314,10 @@ def generate(
         None, help="Number of GPUs to use if hosting the model. Single value (broadcast) or list (per-model)"
     ),
     server_nodes: List[int] = typer.Option(
-        1, help="Number of nodes required for hosting LLM server. Single value (broadcast) or list (per-model)"
+        [1], help="Number of nodes required for hosting LLM server. Single value (broadcast) or list (per-model)"
     ),
     server_args: List[str] = typer.Option(
-        "", help="Any extra arguments to pass to the server. Single value (broadcast) or list (per-model)"
+        [""], help="Any extra arguments to pass to the server. Single value (broadcast) or list (per-model)"
     ),
     server_entrypoint: List[str] = typer.Option(
         None,
