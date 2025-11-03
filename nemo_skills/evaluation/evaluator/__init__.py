@@ -55,13 +55,11 @@ EVALUATOR_MAP = {
     "human_eval_infilling": eval_human_eval_infilling,
 }
 
-# Evaluator class mapping
+# Evaluator class mapping, other evaluators can be added here as they're converted to classes
 EVALUATOR_CLASS_MAP = {
     "math": MathEvaluator,
     "lean4-proof": Lean4ProofEvaluator,
-    "lean4-statement": Lean4StatementEvaluator,
     "code_exec": CodeExecEvaluator,
-    # Other evaluators can be added here as they're converted to classes
     "ioi": IOIEvaluator,
 }
 
