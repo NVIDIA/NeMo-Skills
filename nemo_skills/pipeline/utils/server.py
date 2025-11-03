@@ -142,6 +142,7 @@ def get_server_command(
         # Similar to conversion, we don't hold scripts for megatron on our side
         # and expect it to be in /opt/Megatron-LM in the container
         import os
+
         megatron_path = os.getenv("MEGATRON_PATH", "/opt/Megatron-LM")
         server_start_cmd = (
             f"export PYTHONPATH=$PYTHONPATH:{megatron_path} && "

@@ -159,7 +159,7 @@ def main():
 
     for category_file in category_files.values():
         category_file.parent.mkdir(parents=True, exist_ok=True)
-    
+
     generate_subgroup_init_files(output_dir, _get_mmau_pro_subgroup_configs())
 
     category_file_handles = {

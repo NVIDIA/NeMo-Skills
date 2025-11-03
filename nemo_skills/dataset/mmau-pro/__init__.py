@@ -19,7 +19,7 @@ SCORE_MODULE = "nemo_skills.evaluation.metrics.speechlm_metrics"
 
 # Three separate benchmark subgroups for different evaluation approaches
 BENCHMARKS = {
-    'mmau-pro.closed_form': {},
-    'mmau-pro.open_ended': {},
-    'mmau-pro.instruction_following': {},
+    "mmau-pro.closed_form": {},
+    "mmau-pro.open_ended": {},
+    "mmau-pro.instruction_following": {},
 }

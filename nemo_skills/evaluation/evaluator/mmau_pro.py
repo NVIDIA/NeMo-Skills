@@ -180,7 +180,7 @@ def load_nvembed_model(model_name: str = "nvidia/NV-Embed-v2"):
         return load_nvembed_model._cache[model_name]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+
     # Use explicit cache directory (respects HF_HOME env var)
     cache_dir = os.environ.get("HF_HOME")
     if cache_dir:
@@ -188,10 +188,7 @@ def load_nvembed_model(model_name: str = "nvidia/NV-Embed-v2"):
 
     try:
         model = AutoModel.from_pretrained(
-            model_name, 
-            trust_remote_code=True,
-            cache_dir=cache_dir,
-            local_files_only=False
+            model_name, trust_remote_code=True, cache_dir=cache_dir, local_files_only=False
         )
         model.to(device)
         model.eval()

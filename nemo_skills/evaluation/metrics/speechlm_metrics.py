@@ -115,7 +115,7 @@ class SpeechLMMetrics(BaseMetrics):
 
         if self.compute_no_answer:
             base_metrics["no_answer"] = as_percentage
-        
+
         base_metrics["num_entries"] = as_int  # Add at end for better display order
 
         return base_metrics
@@ -124,28 +124,27 @@ class SpeechLMMetrics(BaseMetrics):
 def compute_score(combined_metrics: dict) -> dict:
     """
     Aggregate metrics from multiple sub-benchmarks into a single group score.
-    
+
     Args:
         combined_metrics: Dictionary with benchmark names as keys.
                          Each benchmark has eval modes (e.g., 'pass@1') as keys,
                          which contain the actual metrics.
                          Format: {benchmark_name: {eval_mode: {metrics...}}}
-    
+
     Returns:
         Aggregated metrics dictionary in the same format.
     """
     # Only include the three MAIN benchmarks, not subcategories
-    main_benchmark_names = ['closed_form', 'open_ended', 'instruction_following']
-    mmau_benchmarks = {k: v for k, v in combined_metrics.items() 
-                       if k.split('.')[-1] in main_benchmark_names}
-    
+    main_benchmark_names = ["closed_form", "open_ended", "instruction_following"]
+    mmau_benchmarks = {k: v for k, v in combined_metrics.items() if k.split(".")[-1] in main_benchmark_names}
+
     if not mmau_benchmarks:
         return {}
-    
+
     # Get all eval modes from first benchmark (they should all have the same modes)
     first_benchmark = next(iter(mmau_benchmarks.values()))
     eval_modes = list(first_benchmark.keys())
-    
+
     # Aggregate metrics for each evaluation mode
     aggregated = {}
     for eval_mode in eval_modes:
@@ -154,29 +153,29 @@ def compute_score(combined_metrics: dict) -> dict:
         total_gen_seconds = 0
         weighted_tokens = 0.0
         weighted_no_answer = 0.0
-        
+
         for benchmark_name, benchmark_data in mmau_benchmarks.items():
             if eval_mode not in benchmark_data:
                 continue
-                
+
             metrics = benchmark_data[eval_mode]
-            num_entries = metrics.get('num_entries', 0)
+            num_entries = metrics.get("num_entries", 0)
             total_entries += num_entries
-            
+
             # Aggregate weighted by number of entries (metrics are already percentages)
             if num_entries > 0:
-                weighted_success += metrics.get('success_rate', 0.0) * num_entries
-                total_gen_seconds += metrics.get('gen_seconds', 0)
-                weighted_tokens += metrics.get('avg_tokens', 0.0) * num_entries
-                weighted_no_answer += metrics.get('no_answer', 0.0) * num_entries
-        
+                weighted_success += metrics.get("success_rate", 0.0) * num_entries
+                total_gen_seconds += metrics.get("gen_seconds", 0)
+                weighted_tokens += metrics.get("avg_tokens", 0.0) * num_entries
+                weighted_no_answer += metrics.get("no_answer", 0.0) * num_entries
+
         # Compute aggregated metrics
         aggregated[eval_mode] = {
-            'avg_tokens': int(weighted_tokens / total_entries) if total_entries > 0 else 0,
-            'gen_seconds': total_gen_seconds,
-            'success_rate': weighted_success / total_entries if total_entries > 0 else 0.0,
-            'no_answer': weighted_no_answer / total_entries if total_entries > 0 else 0.0,
-            'num_entries': total_entries,
+            "avg_tokens": int(weighted_tokens / total_entries) if total_entries > 0 else 0,
+            "gen_seconds": total_gen_seconds,
+            "success_rate": weighted_success / total_entries if total_entries > 0 else 0.0,
+            "no_answer": weighted_no_answer / total_entries if total_entries > 0 else 0.0,
+            "num_entries": total_entries,
         }
-    
+
     return aggregated
