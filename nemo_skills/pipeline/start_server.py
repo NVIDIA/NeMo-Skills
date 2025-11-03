@@ -16,7 +16,9 @@ import signal
 import time
 
 import typer
-from nemo_run import Experiment
+from nemo_run import Experiment, SSHTunnel
+from nemo_run.core.tunnel.client import RunResult
+from nemo_run.run.job import AppState, Job
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
@@ -46,9 +48,6 @@ def get_gradio_chat_cmd(model, server_type, extra_args):
 
 
 def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int = 10):
-    from nemo_run.core.tunnel.client import RunResult, SSHTunnel
-    from nemo_run.run.job import AppState, Job
-
     ## Assumes first job in experiment correspond to the server.
     job: Job = exp.jobs[0]
 
@@ -77,20 +76,22 @@ def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int =
         LOG.exception(f"Failed to get node list. {job_node_list_cmd.stderr}")
         return
 
-    ssh_tunnel_cmd = " ".join(
-        [
-            "ssh",
-            "-N",
-            "-o",
-            "StrictHostKeyChecking=accept-new",
-            "-J",
-            f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
-            job_node_list[0],
-            "-L",
-            f"{server_port}:localhost:{server_port}",
-        ]
-    )
-    LOG.info(f"SSH tunnel command: {ssh_tunnel_cmd}")
+    ssh_tunnel_args = [
+        "ssh",
+        "-N",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-J",
+        f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
+        job_node_list[0],
+        "-L",
+        f"{server_port}:localhost:{server_port}",
+    ]
+    LOG.info(f"SSH tunnel command: {' '.join(ssh_tunnel_args)}")
+
+    import subprocess
+
+    return subprocess.Popen(ssh_tunnel_args)
 
 
 @app.command()
@@ -191,16 +192,20 @@ def start_server(
 
         exp.run(detach=True, tail_logs=True)
 
-        ## Allows ctrl + c to cancel all experiment jobs.
+        ## NOTE: Use ctrl + c twice to cancel all experiment jobs.
         signal.signal(signal.SIGINT, signal.default_int_handler)
         try:
+            tunnel_proc = None
             if create_tunnel:
-                create_server_tunnel(exp, server_config["server_port"])
+                tunnel_proc = create_server_tunnel(exp, server_config["server_port"])
 
             exp._wait_for_jobs(exp.jobs)
         except KeyboardInterrupt:
             pass
         finally:
+            if create_tunnel and tunnel_proc and tunnel_proc.poll() is None:
+                tunnel_proc.terminate()
+
             for j in exp.jobs:
                 exp.cancel(j.id)
 
