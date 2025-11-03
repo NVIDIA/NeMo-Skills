@@ -36,9 +36,7 @@ def sha256_hex(text: str) -> str:
 class ICPCEvaluatorConfig(BaseEvaluatorConfig):
     test_file: str = "test_metadata.json"
     input_file: str = None
-    num_workers: int = 16  # number of test workers
     test_batch_size: int = 16  # number of tests to run concurrently
-    overwrite: bool = False
 
 
 _precompile_loop_tls = threading.local()
