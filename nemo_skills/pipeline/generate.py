@@ -45,24 +45,22 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def _normalize_models_config(
-    model: Optional[str | List[str]],
+    model: Optional[List[str]],
 ) -> List[str]:
     """
     Normalize model specification to list.
 
     Args:
-        model: Single model path or list of model paths
+        model: List of model paths (Typer converts single values to single-element lists)
 
     Returns:
         List of model paths
 
     Raises:
-        ValueError: If model is None
+        ValueError: If model is None or empty
     """
-    if model is None:
+    if model is None or len(model) == 0:
         raise ValueError("Must specify --model")
-    if isinstance(model, str):
-        return [model]
     return list(model)
 
 
@@ -74,16 +72,11 @@ def _normalize_parameter(
     """
     Normalize a parameter to a per-model list.
 
-    Logic:
-    1. If param_value is a list:
-       - If length == num_models: use as-is
-       - If length == 1: broadcast to all models
-       - Otherwise: error
-    2. If param_value is scalar: broadcast to all models
-    3. Return list of length num_models
+    Typer automatically converts single values to single-element lists,
+    so this handles both single-value and multi-value cases uniformly.
 
     Args:
-        param_value: Parameter value (scalar or list)
+        param_value: Parameter value (list from Typer, or scalar for defaults)
         num_models: Number of models
         param_name: Name of parameter (for error messages)
 
@@ -92,25 +85,14 @@ def _normalize_parameter(
 
     Raises:
         ValueError: If list length doesn't match num_models
-
-    Examples:
-        >>> _normalize_parameter(8, 3, "server_gpus")
-        [8, 8, 8]
-        >>> _normalize_parameter([8, 16], 2, "server_gpus")
-        [8, 16]
-        >>> _normalize_parameter([8], 3, "server_gpus")
-        [8, 8, 8]
     """
     if not isinstance(param_value, list):
-        # Scalar: broadcast
         return [param_value] * num_models
 
     if len(param_value) == num_models:
-        # List matches: use as-is
         return list(param_value)
 
     if len(param_value) == 1:
-        # Single-element list: broadcast
         return param_value * num_models
 
     raise ValueError(
@@ -317,32 +299,32 @@ def generate(
         "If not specified, will use the registered generation module for the "
         "generation type (which is required in this case).",
     ),
-    model: str | List[str] = typer.Option(
+    model: List[str] = typer.Option(
         None, help="Path to the model(s) or model name(s) in API. Single value or list for multi-model generation"
     ),
-    server_address: str | List[str] = typer.Option(
+    server_address: List[str] = typer.Option(
         None,
         help="Use ip:port for self-hosted models or the API url if using model providers. "
         "Single value (broadcast) or list (per-model)",
     ),
-    server_type: pipeline_utils.SupportedServers | List[pipeline_utils.SupportedServers] = typer.Option(
+    server_type: List[pipeline_utils.SupportedServers] = typer.Option(
         ..., help="Type of server to use. Single value (broadcast) or list (per-model)"
     ),
-    server_gpus: int | List[int] = typer.Option(
+    server_gpus: List[int] = typer.Option(
         None, help="Number of GPUs to use if hosting the model. Single value (broadcast) or list (per-model)"
     ),
-    server_nodes: int | List[int] = typer.Option(
+    server_nodes: List[int] = typer.Option(
         1, help="Number of nodes required for hosting LLM server. Single value (broadcast) or list (per-model)"
     ),
-    server_args: str | List[str] = typer.Option(
+    server_args: List[str] = typer.Option(
         "", help="Any extra arguments to pass to the server. Single value (broadcast) or list (per-model)"
     ),
-    server_entrypoint: str | List[str] = typer.Option(
+    server_entrypoint: List[str] = typer.Option(
         None,
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type. Single value (broadcast) or list (per-model)",
     ),
-    server_container: str | List[str] = typer.Option(
+    server_container: List[str] = typer.Option(
         None,
         help="Override container image for the hosted server (if server_gpus is set). Single value (broadcast) or list (per-model)",
     ),
