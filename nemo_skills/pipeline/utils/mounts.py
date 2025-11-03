@@ -56,6 +56,18 @@ def check_if_mounted(cluster_config, path_to_check):
         raise ValueError(f"The path '{path_to_check}' is not mounted. Check cluster config.")
 
 
+def _resolve_path_placeholders(path: str) -> str:
+    """Resolve environment variable placeholders in a path."""
+    if path is not None and "${" in path and "}" in path:
+        path = os.path.expandvars(path)
+        if "$" in path or "{" in path or "}" in path:
+            raise ValueError(
+                f"Path `{path}` contains env variable placeholders, but the required env var is "
+                f"not provided in the environment to resolve."
+            )
+    return path
+
+
 def check_mounts(
     cluster_config,
     log_dir: str,
@@ -91,6 +103,9 @@ def check_mounts(
     # Check paths and add to mount list if not mounted
     if check_mounted_paths:
         for path, default_mount in mount_map.items():
+            # Check if path contains ${} env variables placeholders
+            path = _resolve_path_placeholders(path)
+
             if not is_mounted_filepath(cluster_config, path):
                 # check if the path is a file or a directory
                 # so that the directory can be created
@@ -118,6 +133,8 @@ def check_mounts(
         # Just check if the paths are mounted
         for path in mount_map.keys():
             if path is not None:
+                path = _resolve_path_placeholders(path)
+
                 check_if_mounted(cluster_config, path)
 
     # check if the paths are mounted, get them if they arent but have mount sources
@@ -287,14 +304,6 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
         tunnel.cleanup()
 
     elif cluster_config.get("executor") == "slurm":
-        ssh_tunnel_config = cluster_config.get("ssh_tunnel", None)
-        if ssh_tunnel_config is None:
-            raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
-
-        # Check for pre-existing job_dir in the ssh_tunnel_config
-        if "job_dir" not in ssh_tunnel_config:
-            ssh_tunnel_config["job_dir"] = directory[0]
-
         tunnel = get_tunnel(cluster_config)
         for dir_path in directory:
             tunnel.run(f"mkdir -p {dir_path}", hide=False, warn=True)
@@ -351,7 +360,7 @@ def resolve_mount_paths(cluster_config: dict, mount_paths: str | list | dict, cr
 
 
 def check_remote_mount_directories(directories: list, cluster_config: dict, exit_on_failure: bool = True):
-    """Create a remote directory on the cluster."""
+    """Check if a directory exists on the cluster."""
     if cluster_config is None:
         raise ValueError("Cluster config is not provided.")
     if isinstance(directories, str):
@@ -364,29 +373,9 @@ def check_remote_mount_directories(directories: list, cluster_config: dict, exit
     ]
 
     if cluster_config.get("executor") != "slurm":
-        tunnel = run.LocalTunnel(job_dir=None)
-        missing_source_locations = []
-        for directory in directories:
-            result = tunnel.run(f'test -e {directory} && echo "Directory Exists"', hide=True, warn=True)
-            if "Directory Exists" not in result.stdout:
-                missing_source_locations.append(directory)
-        tunnel.cleanup()
-        if len(missing_source_locations) > 0 and exit_on_failure:
-            missing_source_locations = [
-                f"{loc} DOES NOT exist at source destination" for loc in missing_source_locations
-            ]
-            missing_source_locations = "\n".join(missing_source_locations)
-            raise FileNotFoundError(
-                f"Some files or directories do not exist at the source location for mounting !!\n\n"
-                f"{missing_source_locations}"
-            )
+        # there is no error locally if mounts aren't present, so we are skipping the check
+        return
     elif cluster_config.get("executor") == "slurm":
-        ssh_tunnel_config = cluster_config.get("ssh_tunnel", None)
-        if ssh_tunnel_config is None:
-            raise ValueError("`ssh_tunnel` sub-config is not provided in cluster_config.")
-        # Check for pre-existing job_dir in the ssh_tunnel_config
-        if "job_dir" not in ssh_tunnel_config:
-            ssh_tunnel_config["job_dir"] = os.getcwd()
         tunnel = get_tunnel(cluster_config)
         missing_source_locations = []
         for directory in directories:
@@ -429,8 +418,14 @@ def get_mounts_from_config(cluster_config: dict):
         if ":" not in mount:
             raise ValueError(f"Invalid mount format: {mount}. The mount path must be separated by a colon.")
 
+        # First, expand any ${VAR} style environment variables in the entire mount string
+        # This allows partial path substitution like /path/${USER}/subdir
+        if "$" in mount:
+            mount = os.path.expandvars(mount)
+
         mount_source, mount_target = mount.split(":")
 
+        # Then handle {VAR} style for full path replacement (legacy support)
         if mount_source[0] == "{" and mount_source[-1] == "}":
             # Resolve the environment variable for the mount source
             mount_source = mount_source[1:-1]

@@ -331,23 +331,27 @@ class WriteFinalSftManifest(BaseProcessor):
 
         self.prompt = None
         if prompt_config and tokenizer:
-            self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
+            self.prompt = get_prompt(
+                prompt_config, tokenizer=tokenizer, system_message=system_message, code_tags=code_tags
+            )
         else:
             if tokenizer:
                 LOG.warning(
                     "tokenizer is provided, but prompt config is missing! "
                     "Assuming 'user: {input_key}' and no special formatting for output."
                 )
-                self.prompt = get_prompt({"user": "{" + input_key + "}"}, tokenizer=tokenizer, code_tags=code_tags)
+                self.prompt = get_prompt(
+                    {"user": "{" + input_key + "}"},
+                    tokenizer=tokenizer,
+                    system_message=system_message,
+                    code_tags=code_tags,
+                )
             else:
                 LOG.warning("Prompt details are missing! The processed data won't be formatted using any prompt.")
 
         if system_message is not None:
             if prompt_config is None or tokenizer is None:
                 raise ValueError("prompt_config and tokenizer are required when system_message is provided")
-
-        if system_message is not None:
-            self.prompt.config.system = system_message
 
         self.chat_template_kwargs = chat_template_kwargs
         self.assistant_end = assistant_end
@@ -379,7 +383,7 @@ class WriteFinalSftManifest(BaseProcessor):
                 generation = elem.pop(self.output_key)
                 if self.prompt:
                     output_sample["input"] = self.prompt.fill(
-                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs
+                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs, format_as_string=True
                     )
                     # not adding end-of-turn for incomplete generations
                     if output_sample.get("finish_reason", "stop") == "stop":
@@ -436,7 +440,9 @@ class WriteFinalRLManifest(BaseProcessor):
 
         self.prompt = None
         if prompt_config and tokenizer:
-            self.prompt = get_prompt(prompt_config, tokenizer=tokenizer, code_tags=code_tags)
+            self.prompt = get_prompt(
+                prompt_config, tokenizer=tokenizer, system_message=system_message, code_tags=code_tags
+            )
         else:
             if tokenizer:
                 LOG.warning(
@@ -450,9 +456,6 @@ class WriteFinalRLManifest(BaseProcessor):
         if system_message is not None:
             if prompt_config is None or tokenizer is None:
                 raise ValueError("prompt_config and tokenizer are required when system_message is provided")
-
-        if system_message is not None:
-            self.prompt.config.system = system_message
 
         self.chat_template_kwargs = chat_template_kwargs
         self.random_seed = random_seed
@@ -482,7 +485,7 @@ class WriteFinalRLManifest(BaseProcessor):
 
                 if self.prompt:
                     output_sample["input"] = self.prompt.fill(
-                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs
+                        input_dict=elem, chat_template_kwargs=self.chat_template_kwargs, format_as_string=True
                     )
                 else:
                     output_sample["input"] = elem[self.input_key]

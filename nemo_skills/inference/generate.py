@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import random
+import shutil
 import subprocess
 import sys
 import time
@@ -25,26 +26,34 @@ from pathlib import Path
 from typing import Any
 
 import hydra
+import litellm
 from omegaconf import ListConfig
 from tqdm import tqdm
+from transformers import AutoTokenizer
 
 from nemo_skills.code_execution.sandbox import get_sandbox, sandbox_params
+from nemo_skills.evaluation.evaluator import (
+    evaluate,
+    get_evaluator_class,
+    supports_single_eval,
+)
 from nemo_skills.inference.model import (
-    OnlineGenSelectConfig,
+    ParallelThinkingConfig,
     get_code_execution_model,
     get_model,
-    get_online_genselect_model,
+    get_parallel_thinking_model,
     get_tool_calling_model,
     server_params,
 )
-from nemo_skills.prompt.utils import get_prompt
+from nemo_skills.inference.model.base import EndpointType
+from nemo_skills.prompt.utils import get_prompt, get_token_count
 from nemo_skills.utils import (
     chunk_data,
     get_help_message,
     get_logger_name,
     get_server_wait_cmd,
     nested_dataclass,
-    remove_thinking,
+    parse_reasoning,
     setup_logging,
 )
 
@@ -53,6 +62,13 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 @nested_dataclass(kw_only=True)
 class InferenceConfig:
+    # Type of completion to generate when using OpenAI
+    # "chat": used by default
+    # "text": for text completions, in this case we will
+    # take the tokenizer from the model and apply it to the prompt before sending it.
+    # You can override tokenizer with tokenizer parameter.
+    # "responses": for responses api format.
+    endpoint_type: EndpointType = EndpointType.chat
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
     top_k: int = -1
     top_p: float = 0.95
@@ -61,26 +77,27 @@ class InferenceConfig:
     tokens_to_generate: int | None = None
     repetition_penalty: float = 1.0
     top_logprobs: int | None = None
+    timeout: int | None = 14400  # Timeout for each individual LLM call in seconds
 
     extra_body: dict = field(default_factory=dict)  # Any other extra params passed with extra_body argument
 
 
 @nested_dataclass(kw_only=True)
 class GenerateSolutionsConfig:
-    """LLM generation parameters."""
+    """Generation parameters."""
 
     input_file: str  # Path to the input file with data
     output_file: str  # Where to save the generations
     prompt_config: str | None = None  # How to format the data into prompts
-    # by default we use chat completions, set this to True to use completions API. In that case we will take the
-    # tokenizer from the model and apply it to the prompt before sending it. You can override tokenizer with
-    # tokenizer parameter
+
+    # Deprecated, please use endpoint_type in the InferenceConfig instead
     use_completions_api: bool = False
+
     # path or name of the tokenizer to use for completions API. By default uses server.model
     tokenizer: str | None = None
     # extra parameters to pass to the tokenizer's apply_chat_template method
     chat_template_kwargs: dict = field(default_factory=dict)
-    # to specify the format of the prompt, "ns" for NeMo-Skills format or "openai" for OpenAI chat format
+    # to specify the format of the prompt, "ns" for Nemo-Skills format or "openai" for OpenAI chat format
     prompt_format: str = "ns"
     prompt_suffix: str = ""  # suffix to add to the prompt, e.g. " /no_think"
     system_message: str | None = None  # can override the default system message in the config
@@ -91,6 +108,7 @@ class GenerateSolutionsConfig:
     server: dict = field(default_factory=dict)
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
+    wait_for_sandbox: bool = False  # whether we need to wait for sandbox
     # Prompt configuration - path to yaml files
     start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
@@ -101,7 +119,7 @@ class GenerateSolutionsConfig:
 
     # maximum number of concurrent requests to the server for the async loop
     # if sync loop is used, this is the batch size
-    max_concurrent_requests: int = 1024
+    max_concurrent_requests: int = 512
     # chunk the dataset into equal sized parts and index into them
     num_chunks: int | None = None  # if specified, will split the data into chunks and only generate for one chunk
     chunk_id: int | None = None  # if specified, will index the specified chunk only
@@ -109,6 +127,9 @@ class GenerateSolutionsConfig:
     # if False, will not add num_generated_tokens and generation_time values.
     # Useful when running judge jobs to keep the original generation statistics
     add_generation_stats: bool = True
+
+    # Count the number of tokens in the prompt
+    count_prompt_tokens: bool = False
 
     generation_key: str = "generation"
 
@@ -131,23 +152,48 @@ class GenerateSolutionsConfig:
 
     # stop phrase for llms
     stop_phrase: str | None = None  # if None, will not add any extra stop phrase
-    # set to True if online genselect is used
-    online_genselect: bool = False
-    # genselect config
-    online_genselect_config: OnlineGenSelectConfig = field(default_factory=OnlineGenSelectConfig)
 
-    ## FIXME(sanyamk): Rethink the structure of this configuration.
-    tool_config: str | None = None  # Path to tool configuration file.
+    # parallel_thinking config
+    parallel_thinking: ParallelThinkingConfig = field(default_factory=ParallelThinkingConfig)
+
+    # Module-based tool configuration
+    #   List of tool provider locators using double-colon syntax for the tool class.
+    #   Each item should be of the form:
+    #     - Module class:  module.path.to.provider::ClassName
+    #     - File class:    /abs/or/rel/path/to/provider.py::ClassName
+    #
+    #   Examples:
+    #     - ++tool_modules=["nemo_skills.mcp.servers.python_tool::PythonTool"]
+    #     - ++tool_modules=["/nemo_run/code/mcp/example_tool.py::ExampleTool","nemo_skills.mcp.servers.exa_tool::ExaTool"]
+    tool_modules: list[str] | None = None
+    #
+    #   Per-tool overrides keyed by the Tool class name (the same ClassName used above).
+    #   Use dotted keys to set nested values (e.g., client_params.base_url).
+    #
+    #   Common patterns:
+    #     - Set PythonTool timeout knob:
+    #         ++tool_overrides.PythonTool.exec_timeout_s=30
+    #     - Set an ExampleTool server-only arg:
+    #         ++tool_overrides.ExampleTool.foo_argument='[TEST] '
+    tool_overrides: dict | None = field(default_factory=dict)
 
     # if True, will move full generation to _full_generation key and keep cfg.generation_key without thinking tokens
-    remove_thinking: bool = False
-    thinking_begin: str = "<think>"
-    thinking_end: str = "</think>"
+    # IMPORTANT: do not set this for non-reasoning models as it will make the generations empty!
+    parse_reasoning: bool = False
+    end_reasoning_string: str = "</think>"
+
+    # If True, will enable litellm disk cache (useful for keeping intermediate results in case of job timelimit failures)
+    enable_litellm_cache: bool = False
+
+    # Evaluation setup if requested. If eval_type is set to None, evaluation is skipped
+    eval_type: str | None = None  # "lean4-proof", "math", etc.
+    eval_config: dict = field(default_factory=dict)  # Config for the evaluator
 
     def __post_init__(self):
         self._post_init_validate_data()
         self._post_init_validate_server()
         self._post_init_validate_params()
+        self._post_init_deprecated_params()
 
     def _post_init_validate_data(self):
         if isinstance(self.total_code_executions_in_prompt, ListConfig):
@@ -168,7 +214,7 @@ class GenerateSolutionsConfig:
                     "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
                     "Please provide it with an explicit `tokenizer` parameter."
                 )
-            self.cfg.use_completions_api = True
+            self.inference.endpoint_type = EndpointType.text
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -183,6 +229,10 @@ class GenerateSolutionsConfig:
         for param, default_value in self._get_disallowed_params():
             if getattr(self, param) != default_value:
                 raise ValueError(f"{param} must be {default_value}")
+
+    def _post_init_deprecated_params(self):
+        if self.use_completions_api:
+            raise ValueError("use_completions_api is deprecated, please use ++inference.endpoint_type=text instead.")
 
     def _get_disallowed_params(self):
         """Returns a list of parameters with their default values to check that they are not changed from the defaults"""
@@ -227,34 +277,71 @@ class GenerationTask:
             cfg: GenerateSolutionsConfig object with the configuration parameters or subclass.
         """
         self.cfg = cfg
+        self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
 
         # chat template kwargs goes either into extra body of inference or as a prompt parameter
         if self.cfg.chat_template_kwargs:
-            if not self.cfg.use_completions_api:
+            if self.cfg.inference.endpoint_type != EndpointType.text:
                 if "chat_template_kwargs" in self.cfg.inference.extra_body:
                     raise ValueError(
                         "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
                         "You can only use one of them!"
                     )
-                self.cfg.inference.extra_body = dict(self.cfg.inference.extra_body)
+
                 self.cfg.inference.extra_body["chat_template_kwargs"] = dict(self.cfg.chat_template_kwargs)
                 self.cfg.chat_template_kwargs = None
 
+        if self.cfg.inference.extra_body.get("chat_template_kwargs"):
+            if self.cfg.chat_template_kwargs:
+                raise ValueError(
+                    "chat_template_kwargs is provided in both inference.extra_body and as a separate argument. "
+                    "You can only use one of them!"
+                )
+            if self.cfg.inference.endpoint_type == EndpointType.text:
+                self.cfg.chat_template_kwargs = self.cfg.inference.extra_body.pop("chat_template_kwargs")
+
         # Setup tokenizer
-        if self.cfg.use_completions_api or self.cfg.server.get("enable_soft_fail", False):
+        if (
+            self.cfg.inference.endpoint_type == EndpointType.text
+            or self.cfg.server.get("enable_soft_fail", False)
+            or self.cfg.count_prompt_tokens
+        ):
             # These are the only cases where we need a tokenizer
             self.tokenizer = self.cfg.tokenizer or self.cfg.server["model"]
         else:
             self.tokenizer = None
 
+        # Setup litellm cache
+        self.setup_litellm_cache()
+
+        if self.cfg.inference.endpoint_type == EndpointType.text and self.cfg.inference.tokens_to_generate is None:
+            raise ValueError("When using completions API, tokens_to_generate must be specified!")
+
         # Setup prompt formatter and LLM
         self.prompt = self.setup_prompt()
         self.llm = self.setup_llm()
+
+        # Setup hf_tokenizer for counting prompt tokens
+        self.hf_tokenizer = None
+        if self.cfg.count_prompt_tokens:
+            self.hf_tokenizer = AutoTokenizer.from_pretrained(self.tokenizer)
+
+            if self.hf_tokenizer is None:
+                raise ValueError("Tokenizer could not be initialized. Needed for counting prompt tokens.")
 
         if self.cfg.code_execution:
             self.extra_generate_params = self.prompt.get_code_execution_args()
         else:
             self.extra_generate_params = {}
+
+        # Setup evaluator if specified
+        self.should_run_evaluation = self.cfg.eval_type is not None
+        self.evaluator = None
+        if self.should_run_evaluation:
+            self.cfg.eval_config = dict(self.cfg.eval_config)
+            if supports_single_eval(self.cfg.eval_type, self.cfg.eval_config):
+                LOG.info("Evaluator supports per-datapoint evals, will interleave evaluation with generation.")
+                self.evaluator = get_evaluator_class(self.cfg.eval_type, self.cfg.eval_config)
 
         LOG.info(
             "Async loop is maintaining %d generations in parallel. "
@@ -263,11 +350,14 @@ class GenerationTask:
         )
 
         # Initialize semaphore for controlling concurrent requests
-        if self.cfg.online_genselect:
+        if self.cfg.parallel_thinking.mode is not None:
             # Each request will generate multiple solutions, so we need to divide the semaphore by the parallel requests
-            self.semaphore = asyncio.Semaphore(
-                self.cfg.max_concurrent_requests // self.cfg.online_genselect_config.max_concurrent_requests
-            )
+            # Some models (like NIM speech models) don't have cfg attribute
+            if hasattr(self.llm, "cfg"):
+                divisor = self.llm.cfg.max_concurrent_requests
+            else:
+                divisor = 1
+            self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests // divisor)
         else:
             self.semaphore = asyncio.Semaphore(self.cfg.max_concurrent_requests)
 
@@ -283,9 +373,9 @@ class GenerationTask:
             tokenizer=self.tokenizer,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
+            system_message=self.cfg.system_message,
         )
-        if self.cfg.system_message is not None:
-            prompt.config.system = self.cfg.system_message
+
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
@@ -294,26 +384,36 @@ class GenerationTask:
 
         if self.cfg.code_execution:
             llm = get_code_execution_model(**self.cfg.server, tokenizer=self.tokenizer, sandbox=self.sandbox)
-        elif self.cfg.tool_config:
+        elif self.cfg.tool_modules is not None:
             llm = get_tool_calling_model(
                 **self.cfg.server,
-                tool_config=self.cfg.tool_config,
+                tool_modules=self.cfg.tool_modules,
+                tool_overrides=self.cfg.tool_overrides,
                 tokenizer=self.tokenizer,
                 additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
-        if self.cfg.online_genselect:
-            # Use the same prompt parameters for genselect as the one used for generation
-            self.cfg.online_genselect_config.use_completions_api = self.cfg.use_completions_api
-            self.cfg.online_genselect_config.tokenizer = self.cfg.tokenizer
-            self.cfg.online_genselect_config.chat_template_kwargs = self.cfg.chat_template_kwargs
-            self.cfg.online_genselect_config.thinking_begin = self.cfg.thinking_begin
-            self.cfg.online_genselect_config.thinking_end = self.cfg.thinking_end
-            llm = get_online_genselect_model(
-                **{**self.cfg.server, "model": llm, "tokenizer": self.tokenizer},
-                online_genselect_config=self.cfg.online_genselect_config,
+        if self.cfg.parallel_thinking.mode is not None:
+            # We don't want to override these key variables which overlap with self.cfg
+            inference_override_config = {
+                "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
+                # The following are specific to parallel thinking and we want
+                # to defend against any future key overlaps with the main generation config
+                "mode": self.cfg.parallel_thinking.mode,
+                "window_size": self.cfg.parallel_thinking.window_size,
+                "solution_key": self.cfg.parallel_thinking.solution_key,
+                "filter_incomplete_solutions": self.cfg.parallel_thinking.filter_incomplete_solutions,
+            }
+
+            llm = get_parallel_thinking_model(
+                model=llm,
+                orig_prompt_filler=self.fill_prompt,  # Needed for prompt fillling
+                parallel_thinking=self.cfg.parallel_thinking,
+                main_config=self.cfg,
+                tokenizer=self.tokenizer,
+                inference_override_config=inference_override_config,
             )
 
         return llm
@@ -352,6 +452,11 @@ class GenerationTask:
         Data is already saved to self.cfg.output_file, so it can be read and re-saved from there.
         """
         pass
+
+    def run_batch_evaluation(self):
+        """Run final evaluation consuming all data together if configured."""
+        self.cfg.eval_config["input_file"] = self.cfg.output_file
+        evaluate(self.cfg.eval_type, self.cfg.eval_config)
 
     def skip_completed_samples(self, data):
         # if non-async file exists and we are asked to skip filled, then there is no more data to process
@@ -409,6 +514,7 @@ class GenerationTask:
             data_point,
             start_assistant_response_key=self.cfg.start_assistant_response_key,
             chat_template_kwargs=self.cfg.chat_template_kwargs,
+            format_as_string=(self.cfg.inference.endpoint_type == EndpointType.text),
         )
         if self.cfg.prompt_suffix:
             if isinstance(filled_prompt, list):
@@ -418,35 +524,30 @@ class GenerationTask:
         return filled_prompt
 
     def dump_outputs(self, outputs, data_points, fout):
-        for output, original_data_point in zip(outputs, data_points):
-            # to make it easier to follow up with evaluation and limit accidental errors, we are adding
-            # all of the ground-truth data to the output file alongside the generated solutions
-            output[self.cfg.generation_key] = output.pop("generation")
-
-            # calculating total generation time
-            if self.cfg.add_generation_stats:
-                output["generation_end_time"] = time.time()
-                # TODO: start time is saved in data_point, not output, need to fix that
-                output["generation_time"] = (
-                    output["generation_end_time"] - original_data_point["generation_start_time"]
-                )
-            else:
-                # generation_start_time was overriden, so restoring it from end and total
-                # TODO: this is a bit hacky, need a rewrite
-                if "generation_end_time" in original_data_point and "generation_time" in original_data_point:
-                    output["generation_start_time"] = (
-                        original_data_point["generation_end_time"] - original_data_point["generation_time"]
-                    )
-                else:
-                    output.pop("generation_start_time", None)
-                output.pop("num_generated_tokens", None)
-
-            for key in output:
-                original_data_point.pop(key, None)
-            output.update(original_data_point)
-            if self.cfg.remove_thinking:
-                remove_thinking(output, self.cfg.generation_key, self.cfg.thinking_begin, self.cfg.thinking_end)
+        for output in outputs:
             fout.write(json.dumps(output) + "\n")
+
+    async def postprocess_single_output(self, output, original_data_point):
+        # to make it easier to follow up with other generations and limit accidental errors, we are adding
+        # all of the original data to the output file alongside the new generations
+        output[self.cfg.generation_key] = output.pop("generation")
+
+        if not self.cfg.add_generation_stats:
+            output.pop("generation_start_time", None)
+            output.pop("generation_end_time", None)
+            output.pop("generation_time", None)
+            output.pop("num_generated_tokens", None)
+            output.pop("num_input_tokens", None)
+
+        for key in output:
+            original_data_point.pop(key, None)
+        output.update(original_data_point)
+        if self.cfg.parse_reasoning:
+            parse_reasoning(
+                output,
+                self.cfg.generation_key,
+                self.cfg.end_reasoning_string,
+            )
 
     def prefill_generation(self, data_point) -> dict | None:
         """Prefill generation in case LLM is not required."""
@@ -472,21 +573,54 @@ class GenerationTask:
             if self.cfg.override_max_code_executions and self.cfg.total_code_executions_in_prompt is not None:
                 generation_params["max_code_executions"] = data_point["total_code_executions"]
 
-        return await self.llm.generate_async(**generation_params)
+        result = await self.generate_with_semaphore(**generation_params)
 
-    async def _process_single_datapoint_with_semaphore(self, data_point, all_data, fout, pbar):
-        """Process a single data point with semaphore control."""
+        if self.cfg.count_prompt_tokens:
+            num_input_tokens = get_token_count(self.hf_tokenizer, generation_params["prompt"])
+            result["num_input_tokens"] = num_input_tokens
+
+        return result
+
+    async def generate_with_semaphore(self, **generation_params):
+        """Generate with semaphore control.
+
+        Ensures no more than max_concurrent_requests LLM calls can be run at the same time.
+        Should work even if process_single_datapoint is doing multiple requests in parallel
+        as long as those requests also use this function.
+        """
         async with self.semaphore:
-            # registering current time to calculate total generation time
-            data_point["generation_start_time"] = time.time()
+            return await self.llm.generate_async(**generation_params)
 
-            # Generate output for this single data point
-            output = await self.process_single_datapoint(data_point, all_data)
+    async def evaluate_single_datapoint(self, data_point):
+        eval_start_time = time.time()
+        eval_results = await self.evaluator.eval_single(data_point)
+        eval_end_time = time.time()
+        data_point["interleaved_eval_single_time_s"] = eval_end_time - eval_start_time
+        data_point.update(eval_results)
+        return data_point
 
-            # Thread-safe output writing
-            async with self.output_lock:
-                self.dump_outputs([output], [data_point], fout)
-                pbar.update(1)
+    async def _generate_and_save_datapoint(self, data_point, all_data, fout, pbar):
+        """Starts generation, evaluation and saves the output for a single data point."""
+        # Generate output for this single data point
+        start_time = time.time()
+        output = await self.process_single_datapoint(data_point, all_data)
+        end_time = time.time()
+
+        if self.cfg.add_generation_stats:
+            output["generation_start_time"] = start_time
+            output["generation_end_time"] = end_time
+            output["generation_time"] = end_time - start_time
+
+        await self.postprocess_single_output(output, data_point)
+
+        # evaluate single-data point if requested and evaluator supports that
+        if self.should_run_evaluation and self.evaluator:
+            output = await self.evaluate_single_datapoint({**data_point, **output})
+
+        # Thread-safe output writing
+        async with self.output_lock:
+            self.dump_outputs([output], [data_point], fout)
+            pbar.update(1)
 
     async def async_loop(self, data):
         """Async loop to generate generations using asyncio."""
@@ -512,13 +646,19 @@ class GenerationTask:
         with open(self.cfg.output_file + "-async", "at", encoding="utf-8", buffering=1) as fout:
             # Dump prefilled data first
             if len(prefilled_data_points) > 0:
+                for output, data_point in zip(prefilled_outputs, prefilled_data_points):
+                    await self.postprocess_single_output(output, data_point)
+
+                    # evaluate single-data point if requested and evaluator supports that
+                    if self.should_run_evaluation and self.evaluator:
+                        output = await self.evaluate_single_datapoint({**data_point, **output})
                 async with self.output_lock:
                     self.dump_outputs(prefilled_outputs, prefilled_data_points, fout)
 
             # Create tasks for all remaining data points
             tasks = []
             for data_point in remaining_data_points:
-                task = asyncio.create_task(self._process_single_datapoint_with_semaphore(data_point, data, fout, pbar))
+                task = asyncio.create_task(self._generate_and_save_datapoint(data_point, data, fout, pbar))
                 tasks.append(task)
 
             # Wait for all tasks to complete
@@ -544,14 +684,36 @@ class GenerationTask:
                 fout.write(json.dumps(gen_dict) + "\n")
 
         Path(self.cfg.output_file + "-async").unlink()
+        self.cleanup_litellm_cache()
 
     def wait_for_server(self):
+        if not self.cfg.server.get("base_url") and not self.cfg.server.get("host") and not self.cfg.server.get("port"):
+            LOG.info("Skipping server wait as no server address is provided.")
+            return
         server_address = self.cfg.server.get("base_url") or f"{self.cfg.server['host']}:{self.cfg.server['port']}"
-        if not server_address:
+        # Hydra sets None parameters to "None" string
+        if server_address == "None":
             LOG.info("Skipping server wait as no server address is provided.")
             return
         server_start_cmd = get_server_wait_cmd(server_address)
         subprocess.run(server_start_cmd, shell=True, check=True)
+
+    def wait_for_sandbox(self):
+        if self.cfg.wait_for_sandbox:
+            self.sandbox.wait_for_sandbox()
+
+    def setup_litellm_cache(self):
+        if self.cfg.enable_litellm_cache:
+            # One cache per (output_file_name, chunk_id) pair
+            output_file_name = Path(self.cfg.output_file).name
+            self.litellm_cache_dir = (
+                Path(self.cfg.output_file).parent / "litellm_cache" / f"{output_file_name}_{self.cfg.chunk_id or 0}"
+            )
+            litellm.cache = litellm.Cache(type="disk", disk_cache_dir=self.litellm_cache_dir)
+
+    def cleanup_litellm_cache(self):
+        if self.cfg.enable_litellm_cache:
+            shutil.rmtree(self.litellm_cache_dir)
 
     def generate(self):
         Path(self.cfg.output_file).absolute().parent.mkdir(parents=True, exist_ok=True)
@@ -561,25 +723,27 @@ class GenerationTask:
         data = self.skip_completed_samples(data)
 
         if len(data) == 0:
-            LOG.info("No data to process, exiting.")
-            return
+            LOG.info("No data to process, skipping generation")
+        else:
+            data = self.preprocess_data(data)
 
-        data = self.preprocess_data(data)
+            self.log_example_prompt(data)
 
-        self.log_example_prompt(data)
+            if self.cfg.dry_run:
+                LOG.info("Exiting without running generation as dry_run flag is set.")
+                return
 
-        if self.cfg.dry_run:
-            LOG.info("Exiting without running generation as dry_run flag is set.")
-            return
+            if not self.cfg.skip_filled:
+                for output_path in [Path(self.cfg.output_file), Path(self.cfg.output_file + "-async")]:
+                    if output_path.exists():
+                        output_path.unlink()
 
-        if not self.cfg.skip_filled:
-            for output_path in [Path(self.cfg.output_file), Path(self.cfg.output_file + "-async")]:
-                if output_path.exists():
-                    output_path.unlink()
+            self.wait_for_server()
+            self.wait_for_sandbox()
+            asyncio.run(self.async_loop(data))
 
-        self.wait_for_server()
-        asyncio.run(self.async_loop(data))
-
+        if self.should_run_evaluation and self.evaluator is None:
+            self.run_batch_evaluation()
         self.postprocess()
 
 

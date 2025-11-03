@@ -13,105 +13,145 @@
 # limitations under the License.
 
 import json
-import os
 import re
 import shutil
-import urllib.request
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
-import requests
+REPO_URL = "https://github.com/trishullab/PutnamBench.git"
 
-URL_prefix = "https://raw.githubusercontent.com/trishullab/PutnamBench/dc91ed7/lean4/src/"
-URL = "https://github.com/trishullab/PutnamBench/tree/dc91ed7/lean4/src"
+# Freeze to a specific commit - update this when needed
+COMMIT_HASH = "64cedd86ef523f3d5f5dc7a21c10e3f69564c7d4"  # Latest commit as of 2025-10-23
+
+LEAN_COMMENT_BLOCK_REGEX = re.compile(r"/--[\s\S]*?-/", re.MULTILINE)
+LEAN_LINE_COMMENT_REGEX = re.compile(r"^\s*--.*$", re.MULTILINE)
+LEAN_THEOREM_REGEX = re.compile(
+    r"theorem\s+(putnam_[0-9]{4}_[ab][0-6])([\s\S]*?):=\s*(?:sorry|by)\b",
+    re.MULTILINE,
+)
 
 
-lean_regex = r"(^\s*theorem\s+([\S]+).+?sorry)"
-lean_regex_match = re.compile(lean_regex, re.MULTILINE | re.DOTALL)
-informal_prefix_regex = r"/--[\s\S]*?-/"
-informal_prefix_match = re.compile(informal_prefix_regex)
-header_regex = r"^(?:import|open|def|abbrev|noncomputable)\s+.*(?:\n(?:\s*\|.+|[ \t]+.+))*"
-header_regex_match = re.compile(header_regex, re.MULTILINE)
+def parse_lean_file(path: Path) -> dict:
+    text = path.read_text(encoding="utf-8")
 
+    theorem_match = LEAN_THEOREM_REGEX.search(text)
+    if not theorem_match:
+        raise ValueError(f"No theorem found in {path}")
 
-def extract_theorem(filename):
-    with open(filename, "r") as f:
-        text = f.read()
+    theorem_name = theorem_match.group(1)
+    theorem_body = theorem_match.group(2)
+    theorem_text = f"theorem {theorem_name}{theorem_body}:= by\n"
 
-    # retrieve the theorem name, formal statement, informal prefix, informal statement, and header
-    lean_matches = lean_regex_match.findall(text)
-    assert len(lean_matches) == 1, "Multiple theorems found in the file"
-    informal_prefixes = informal_prefix_match.findall(text)
-    assert len(informal_prefixes) == 1, "Multiple informal prefixes found in the file"
-    headers = header_regex_match.findall(text)
-    header = "\n".join(headers) + "\n\n"
-    thm_name = lean_matches[0][1]
-    full_thm = lean_matches[0][0]
-    informal_prefix = informal_prefixes[0]
-    informal_statement = informal_prefix.replace("/--", "").replace("-/", "").strip()
+    pre_theorem = text[: theorem_match.start()]
 
-    theorem = {
-        "name": thm_name,
-        "formal_statement": full_thm,
+    doc_match = LEAN_COMMENT_BLOCK_REGEX.search(pre_theorem)
+    line_match = LEAN_LINE_COMMENT_REGEX.search(pre_theorem)
+
+    first_comment_start = None
+    if doc_match:
+        first_comment_start = doc_match.start()
+    if line_match:
+        first_comment_start = (
+            line_match.start() if first_comment_start is None else min(first_comment_start, line_match.start())
+        )
+
+    if first_comment_start is None:
+        header = pre_theorem.rstrip()
+        informal_prefix = ""
+    else:
+        header = pre_theorem[:first_comment_start].rstrip()
+        informal_prefix = pre_theorem[first_comment_start:].strip("\n")
+
+    if informal_prefix:
+        informal_prefix += "\n"
+
+    header = (header.strip() + "\n") if header else ""
+
+    result = {
+        "name": theorem_name,
+        "split": "test",
+        "formal_statement": theorem_text,
         "informal_prefix": informal_prefix,
-        "problem": informal_statement,
         "header": header,
     }
-
-    return theorem
-
-
-def get_file_names_from_github(url):
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        # Extract file names using a regular expression
-        # This regex pattern matches the hrefs of the files.
-        # TODO: This is a pretty fragile approach, as it depends on GitHub's current HTML structure.
-        # find all names with putnam*.lean
-        pattern = r'putnam[^"]+\.lean'
-        matches = re.findall(pattern, response.text)
-        return matches
-    else:
-        print(f"Failed to access {url}, Status code: {response.status_code}")
-        return []
+    return result
 
 
-def download_dataset(output_path):
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-    # get all file names with putnam*.lean
-    file_names = get_file_names_from_github(URL)
-    for file_name in file_names:
-        # download the file if not exists
-        if not os.path.exists(os.path.join(output_path, file_name)):
-            urllib.request.urlretrieve(URL_prefix + file_name, os.path.join(output_path, file_name))
+def download_dataset_and_process(output_path):
+    output_dir = Path(output_path)
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir) / "putnambench"
+        # Clone the repo
+        subprocess.run(["git", "clone", REPO_URL, str(repo_path)], check=True)
 
-def save_data(data, output_file):
-    with open(output_file, "w", encoding="utf-8") as fout:
-        for entry in data:
-            fout.write(json.dumps(entry) + "\n")
+        # Get the current latest commit hash and freeze it, or use the hardcoded one
+        global COMMIT_HASH
+        if COMMIT_HASH is None:
+            # Get the current latest commit
+            result = subprocess.run(
+                ["git", "-C", str(repo_path), "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            COMMIT_HASH = result.stdout.strip()
+        else:
+            # Use the hardcoded commit hash
+            subprocess.run(["git", "-C", str(repo_path), "checkout", COMMIT_HASH], check=True)
+
+        # Run rewrite_solutions.py to generate solutions_replaced_new
+        rewrite_script = repo_path / "lean4" / "scripts" / "rewrite_solutions.py"
+        if not rewrite_script.exists():
+            raise FileNotFoundError(f"rewrite_solutions.py not found at {rewrite_script}")
+
+        subprocess.run([sys.executable, str(rewrite_script)], check=True, cwd=str(rewrite_script.parent))
+
+        # Copy the processed lean files from solutions_replaced_new
+        solutions_dir = repo_path / "lean4" / "solutions_replaced_new"
+        if not solutions_dir.exists():
+            raise FileNotFoundError(f"solutions_replaced_new directory not found at {solutions_dir}")
+
+        for lean_file in solutions_dir.glob("*.lean"):
+            shutil.copy(lean_file, output_dir / lean_file.name)
 
 
 def delete_file(file_path):
     # delete the folder and all its contents
-    if os.path.exists(file_path):
-        shutil.rmtree(file_path)
+    path = Path(file_path)
+    if path.exists():
+        shutil.rmtree(path)
 
 
 def main():
     data_dir = Path(__file__).absolute().parent
     original_folder = str(data_dir / "lean4")
-    download_dataset(original_folder)
+    download_dataset_and_process(original_folder)
 
-    # extract data
-    theorems = []
-    for filename in os.listdir(original_folder):
-        if filename.endswith(".lean"):
-            theorems.append(extract_theorem(os.path.join(original_folder, filename)))
+    # Extract data from processed lean files
+    lean_files = sorted(Path(original_folder).glob("*.lean"))
+    if len(lean_files) != 660:
+        raise AssertionError(f"Expected 660 Lean files, found {len(lean_files)} in {original_folder}")
 
-    save_data(theorems, str(data_dir / "test.jsonl"))
+    entries = []
+    for lean_file in lean_files:
+        entry = parse_lean_file(lean_file)
+        entries.append(entry)
+
+    output_file = data_dir / "test.jsonl"
+    with output_file.open("w", encoding="utf-8") as fout:
+        for entry in entries:
+            fout.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
     delete_file(original_folder)
+
+    print(f"Processed {len(entries)} problems")
+    print(f"Frozen to commit: {COMMIT_HASH}")
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ DATASETS = [
     ("gsm-plus", ["test", "test_rounded"]),
     ("gsm8k", ["train", "test"]),
     ("hle", ["math", "text"]),
+    ("simpleqa", ["test", "verified"]),
     ("human-eval", ["test"]),
     (
         "livecodebench",
@@ -40,7 +41,7 @@ DATASETS = [
         ],
     ),
     ("ifeval", ["test"]),
-    ("math", ["train", "test"]),
+    ("hendrycks_math", ["train", "test"]),
     ("math-odyssey", ["test"]),
     ("mawps", ["test"]),
     ("mbpp", ["test"]),

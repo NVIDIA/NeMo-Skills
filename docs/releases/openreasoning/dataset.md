@@ -39,39 +39,9 @@ Here we assume that model is hosted on 16 H100 GPUs, but other GPU configuration
 modifications to commands.
 
 To download the model you can run the following from `/workspace` folder on Slurm.
-We will also need [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) to use as the judge
-for answer correctness.
 
 ```bash
-huggingface-cli download deepseek-ai/DeepSeek-R1-0528 --local-dir DeepSeek-R1-0528
-huggingface-cli download Qwen/Qwen2.5-32B-Instruct --local-dir Qwen2.5-32B-Instruct
-```
-
-The next step is optional, but we recommend sharding the checkpoint to avoid very long loading time.
-
-```python
-from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
-
-cmd = (
-    "python3 nemo_skills/conversion/save_sharded_state.py "
-    "    --model-path=/workspace/DeepSeek-R1-0528 "
-    "    --output=/workspace/DeepSeek-R1-0528-tp16 "
-    "    --tensor-parallel-size=16 "
-    "    --context-len=8192 "
-    "    --trust-remote-code "
-    "    --nnodes 2 "
-    "    --dist-init-addr $SLURM_MASTER_NODE:20000 "
-    "    --node-rank $SLURM_PROCID "
-)
-
-run_cmd(
-    ctx=wrap_arguments(cmd),
-    cluster="slurm",
-    num_gpus=8,
-    num_nodes=2,
-    container="sglang",
-    log_dir="/workspace/DeepSeek-R1-0528-tp16",
-)
+hf download deepseek-ai/DeepSeek-R1-0528 --local-dir DeepSeek-R1-0528
 ```
 
 Finally, launch the data generation command. You can adjust `num_chunks` (how many jobs to launch in parallel) and
@@ -96,11 +66,11 @@ generate(
     input_file="/workspace/open-reasoning/sdg/math-problems.jsonl",
     output_dir="/workspace/open-reasoning/sdg/solutions",
     expname="r1-0528-math-solutions",
-    model="/workspace/DeepSeek-R1-0528-tp16",
+    model="/workspace/DeepSeek-R1-0528",
     server_type="sglang",
     server_gpus=8,
     server_nodes=2,
-    server_args=f"--load-format sharded_state --context-length {tokens_to_generate + 2000}",
+    server_args=f"--ep-size 16 --context-length {tokens_to_generate + 2000}",
     num_random_seeds=num_solutions,
     # set these according to your cluster configuration
     # num_chunks=N,
@@ -117,7 +87,7 @@ generate(
     output_dir=f"/workspace/open-reasoning/sdg/solutions-judged",
     expname="r1-0528-math-solutions-judge",
     run_after="r1-0528-math-solutions",
-    model="/workspace/Qwen2.5-32B-Instruct",
+    model="Qwen/Qwen2.5-32B-Instruct",
     server_type="sglang",
     server_gpus=8,
     num_random_seeds=num_solutions,
@@ -150,7 +120,7 @@ generate(
     output_dir=f"/workspace/open-reasoning/sdg/maj-if-no-correct-judged",
     expname="r1-0528-math-solutions-judge-after-majority",
     run_after="change-to-majority-if-no-correct",
-    model="/workspace/Qwen2.5-32B-Instruct",
+    model="Qwen/Qwen2.5-32B-Instruct",
     server_type="sglang",
     server_gpus=8,
     num_random_seeds=num_solutions,
@@ -170,6 +140,7 @@ cmd = (
     "    ++filters.remove_contaminated=false "  # OpenMathReasoning is already decontaminated
     "    ++filters.remove_len_outlier_solutions=false "
     "    ++filters.remove_len_outlier_problems=false "
+    "    ++filters.trim_solutions=true "
     "    ++use_judgement=true "
 )
 run_cmd(
@@ -194,12 +165,12 @@ except the solutions are generated with [DeepSeek-R1-0528](https://huggingface.c
 
 ## Science data
 
-We generate science problems using [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) and [Qwen3-235B-A22B](https://huggingface.co/Qwen/Qwen3-235B-A22B) LLMs with the [prompt for science question generation](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openreasoning/prompts/science_question_generation_prompt.yaml), using few-shot examples to demonstrate the format.
+We generate science problems using [Qwen2.5-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-32B-Instruct) and [Qwen3-235B-A22B](https://huggingface.co/Qwen/Qwen3-235B-A22B) LLMs with the [prompt for science question generation](https://github.com/NVIDIA-NeMo/Skills/tree/main/recipes/openreasoning/prompts/science_question_generation_prompt.yaml), using few-shot examples to demonstrate the format.
 Questions are generated based on difficulty level, topic, and subtopic.
 Full dataset used for this effort is available at [HuggingFace](https://huggingface.co/datasets/nvidia/OpenScience).
 Note: HuggingFace version includes questions generated with [Qwen2.5-72B-Instruct](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct), which are not used for OpenReasoning.
 
-The next step is to augment these problems using the [prompt for science question augmentation](https://github.com/NVIDIA/NeMo-Skills/tree/main/recipes/openreasoning/prompts/science_question_augmentation_prompt.yaml), with few-shot examples to demonstrate the format of the output.
+The next step is to augment these problems using the [prompt for science question augmentation](https://github.com/NVIDIA-NeMo/Skills/tree/main/recipes/openreasoning/prompts/science_question_augmentation_prompt.yaml), with few-shot examples to demonstrate the format of the output.
 
 Next, we generate solutions for these problems.
 We use [DeepSeek-R1-0528](https://huggingface.co/deepseek-ai/DeepSeek-R1-0528) to generate solutions with parameters as described in the math section above.

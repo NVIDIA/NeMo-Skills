@@ -15,14 +15,25 @@
 # Use the base image with Python 3.10 and Flask
 FROM tiangolo/uwsgi-nginx-flask:python3.10
 
-# Install dependencies required for Lean 4 and other tools
+# Install dependencies required for Lean 4, pypy3, and other tools
+ARG TARGETARCH
 RUN apt-get update && \
-    apt-get install -y curl git net-tools bzip2 && \
-    curl -L https://downloads.python.org/pypy/pypy3.10-v7.3.17-linux64.tar.bz2 -o /tmp/pypy.tar.bz2 && \
+    apt-get install -y curl git net-tools bzip2 build-essential libseccomp-dev && \
+    ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" && \
+    case "$ARCH" in \
+        amd64) PYPY_ARCH=linux64 ;; \
+        arm64|aarch64) PYPY_ARCH=aarch64 ;; \
+        x86_64) PYPY_ARCH=linux64 ;; \
+    *) echo "Unsupported TARGETARCH '$ARCH'" >&2; exit 1 ;; \
+    esac && \
+    curl -L https://downloads.python.org/pypy/pypy3.10-v7.3.17-$PYPY_ARCH.tar.bz2 -o /tmp/pypy.tar.bz2 && \
     tar -xjf /tmp/pypy.tar.bz2 -C /opt/ && \
-    ln -s /opt/pypy3.10-v7.3.17-linux64/bin/pypy3 /usr/local/bin/pypy3 && \
-    rm /tmp/pypy.tar.bz2
+    ln -s /opt/pypy3.10-v7.3.17-$PYPY_ARCH/bin/pypy3 /usr/bin/pypy3 && \
+    /usr/bin/pypy3 -m ensurepip && \
+    rm /tmp/pypy.tar.bz2 && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
+# Install Lean 4 toolchain
 RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y && \
     /root/.elan/bin/elan toolchain install leanprover/lean4:v4.12.0 && \
     /root/.elan/bin/elan default leanprover/lean4:v4.12.0 && \

@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import json
 import logging
 import random
 import re
 from dataclasses import asdict, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from transformers import AutoTokenizer
@@ -189,8 +190,8 @@ class Prompt:
             examples = ""
         else:
             examples = f"{self.config.few_shot_examples.prefix}{filled_examples}{self.config.few_shot_examples.suffix}"
-        user = self.config.user.format(examples=examples, **input_dict)
-        return user
+        user_message = self.config.user.format(examples=examples, **input_dict)
+        return user_message
 
     def get_code_execution_args(self):
         """Returns the code execution arguments."""
@@ -228,6 +229,13 @@ class Prompt:
         assert assistant_string.startswith(user_string), f"Something is wrong\n{user_string}\n||\n{assistant_string}"
 
         formatted_response = assistant_string[len(user_string) :]
+        if thinking is not None:
+            # Check that thinking is part of the assistant string
+            # If not, the thinking string should be added to the "content" field during preprocessing
+            # Tokenizers for models like Qwen3-4B don't add thinking to the assistant string by themselves
+            assert thinking in assistant_string, (
+                f"The thinking content is not part of the assistant string. We suggest you add the thinking string to the 'content' field during preprocessing.\n\nThinking string:{thinking}\n\nAssistant string:{formatted_response}"
+            )
 
         return formatted_response
 
@@ -236,6 +244,7 @@ class Prompt:
         input_dict: Dict[str, str],
         start_assistant_response_key: str | None = None,
         chat_template_kwargs: dict | None = None,
+        format_as_string=False,
     ) -> str | List[dict]:
         """
         Fills the prompt with the input_dict.
@@ -247,6 +256,7 @@ class Prompt:
             input_dict: The input dictionary to fill the prompt with.
             start_assistant_response_key: Whether to append the value of this key to the beginning of assistant response.
             chat_template_kwargs: Any extra parameters to pass to the tokenizer's apply_chat_template method.
+            format_as_string: When False (default) we will just return a list of messages, when format_as_string is True, we will return a string using the tokenizer's apply_chat_template method (and fail if the tokenizer is not set).
 
         Returns:
             The filled prompt - either a string or a list of dictionaries.
@@ -260,14 +270,18 @@ class Prompt:
             messages = []
         messages.append({"role": "user", "content": self.build_user_message(input_dict)})
 
-        if start_assistant_response_key and self.tokenizer is None:
-            raise ValueError(
-                f"start_assistant_response_key is '{start_assistant_response_key}', but tokenizer is not set. "
-                "It's not possible to start assistant response with openai messages "
-                "format, so please set tokenizer to a valid value."
-            )
+        if not format_as_string:
+            if start_assistant_response_key:
+                raise ValueError("start_assistant_response_key is not supported for chat template format.")
 
-        if self.tokenizer is not None:
+            if chat_template_kwargs:
+                raise ValueError("chat_template_kwargs can only be used when format_as_string=True")
+
+            return messages
+        else:
+            if self.tokenizer is None:
+                raise ValueError("tokenizer is not set, can't format messages as a string")
+
             chat_template_kwargs = chat_template_kwargs or {}
             try:
                 messages_string = self.tokenizer.apply_chat_template(
@@ -287,16 +301,76 @@ class Prompt:
                         messages_string = self.tokenizer.bos_token + messages[0]["content"]
                     else:
                         messages_string = messages[0]["content"]
+                else:
+                    raise e
             if start_assistant_response_key:
                 messages_string += input_dict[start_assistant_response_key]
             return messages_string
-        elif chat_template_kwargs:
-            raise ValueError("chat_template_kwargs can only be used when tokenizer was provided!")
-
-        return messages
 
     def __str__(self):
         return str(self.config)
+
+
+def get_token_count(
+    tokenizer,
+    messages: Union[str, list[Union[dict, Any]]],
+    tools: Union[list[dict], None] = None,
+) -> int | None:
+    """
+    Count the number of tokens in a string or chat message list.
+
+    Args:
+        messages (str | list[dict]): Input text or chat messages.
+
+    Returns:
+        int | None: Token count, or None if no tokenizer is set.
+    """
+
+    def message_to_dict(orig_message: Any) -> Dict[str, Any]:
+        message = {"role": orig_message.role}
+        # Handle content
+        if orig_message.content is not None:
+            message["content"] = orig_message.content
+        else:
+            message["content"] = ""
+
+        # Handle tool_calls
+        if hasattr(orig_message, "tool_calls") and orig_message.tool_calls:
+            message["tool_calls"] = []
+            for tool_call in orig_message.tool_calls:
+                # Check if tool_call is already a dict
+                if isinstance(tool_call, dict):
+                    # Already in dict format, use as-is
+                    message["tool_calls"].append(tool_call)
+                else:
+                    # Convert object to dict
+                    tool_call_dict = {
+                        "id": tool_call.id,
+                        "type": tool_call.type,
+                        "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments},
+                    }
+                    message["tool_calls"].append(tool_call_dict)
+        return message
+
+    if tokenizer is None:
+        return None
+
+    if messages is None:
+        return None
+
+    if isinstance(messages, str):
+        return len(tokenizer.encode(messages, add_special_tokens=False))
+    elif isinstance(messages, list):
+        # Convert messages to dicts if they are not already in dict format
+        messages = [
+            message if isinstance(message, dict) else message_to_dict(copy.deepcopy(message)) for message in messages
+        ]
+        try:
+            return len(tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True, tools=tools))
+        except Exception as e:
+            raise ValueError(f"Invalid chat message format: {e}")
+    else:
+        raise ValueError("messages must be a string or a list of dictionaries")
 
 
 def get_config_path(config: str, config_dir: str | None = None, config_extension: str = "yaml") -> Path:
@@ -338,6 +412,7 @@ def get_prompt(
     tokenizer: Any | None = None,
     code_tags: str | dict | None = None,
     examples_type: str | None = None,
+    system_message: str | None = None,
     config_dir: str | None = None,
     code_tags_dir: str | None = None,
 ) -> Prompt:
@@ -348,6 +423,9 @@ def get_prompt(
         config = load_config(prompt_config, config_dir)
     else:
         config = prompt_config
+
+    if system_message is not None:
+        config["system"] = system_message
 
     code_tags_obj = None
     if code_tags is not None:

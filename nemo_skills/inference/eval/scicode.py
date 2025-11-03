@@ -17,12 +17,26 @@ import sys
 from dataclasses import field
 
 import hydra
-import litellm
 
-from nemo_skills.inference.eval.scicode_utils import extract_python_script, prefilled_steps_code, process_problem_steps
-from nemo_skills.inference.generate import GenerateSolutionsConfig, GenerationTask, InferenceConfig
+from nemo_skills.inference.eval.scicode_utils import (
+    extract_python_script,
+    prefilled_steps_code,
+    process_problem_steps,
+)
+from nemo_skills.inference.generate import (
+    GenerateSolutionsConfig,
+    GenerationTask,
+    InferenceConfig,
+)
 from nemo_skills.inference.model import server_params
-from nemo_skills.utils import get_help_message, get_logger_name, nested_dataclass, remove_thinking, setup_logging
+from nemo_skills.inference.model.utils import is_context_window_exceeded_error
+from nemo_skills.utils import (
+    get_help_message,
+    get_logger_name,
+    nested_dataclass,
+    parse_reasoning,
+    setup_logging,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -40,8 +54,6 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
 
     prompt_config: str = "eval/scicode/background"
     with_background: bool = True
-
-    remove_thinking: bool = True  # changing default
 
 
 cs = hydra.core.config_store.ConfigStore.instance()
@@ -80,28 +92,31 @@ class SciCodeGenerationTask(GenerationTask):
             previous_code = (
                 f"{dependencies}\n{previous_code_str}\n" if previous_code_str else f"{dependencies}\n"
             )  # Otherwise subtask.step[0] has extra newline
-            prepare_data_point = {
+            prepared_data_point = {
                 "problem_steps_str": problem_steps_str,
                 "next_step_str": next_step_str,
                 "dependencies": dependencies,
             }
             try:
-                llm_output = await super().process_single_datapoint(prepare_data_point, all_data)
+                llm_output = await super().process_single_datapoint(prepared_data_point, all_data)
             # TODO: this is a hack (as not all servers return that),
             # but eventually we should support handling errors like this globally for all generations
-            except litellm.exceptions.ContextWindowExceededError:
-                LOG.warning(
-                    "SciCode generation failed due to running out of context. "
-                    "Failing for subsequent subtasks automatically.",
-                )
-                out_of_context = True
-                task_solutions[f"{problem_id}.{cur_step + 1}"] = "_ran_out_of_context_"
-                continue
+            except Exception as error:
+                if is_context_window_exceeded_error(error):
+                    LOG.warning(
+                        "SciCode generation failed due to running out of context. "
+                        "Failing for subsequent subtasks automatically.",
+                    )
+                    out_of_context = True
+                    task_solutions[f"{problem_id}.{cur_step + 1}"] = "_ran_out_of_context_"
+                    continue
+                else:
+                    raise error
 
             full_outputs[f"{problem_id}.{cur_step + 1}"] = llm_output
             total_generated_tokens += llm_output.get("num_generated_tokens", 0)
-            if self.cfg.remove_thinking:
-                remove_thinking(llm_output, "generation", self.cfg.thinking_begin, self.cfg.thinking_end)
+            if self.cfg.parse_reasoning:
+                parse_reasoning(llm_output, "generation", self.cfg.end_reasoning_string)
             extracted_python = extract_python_script(llm_output["generation"])
             previous_llm_code[cur_step] = extracted_python
             # TODO: save those as separate entries so that we can preserve intermediate progress on reruns

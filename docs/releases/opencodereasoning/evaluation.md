@@ -6,15 +6,6 @@ We assume you have `/workspace` defined in your [cluster config](../../basics/cl
 executing all commands from that folder locally. Change all commands accordingly
 if running on slurm or using different paths.
 
-## Download models
-
-Get the model from HF. E.g.
-
-```bash
-# cd into your /workspace folder
-pip install -U "huggingface_hub[cli]"
-huggingface-cli download nvidia/OpenCodeReasoning-Nemotron-1.1-7B --local-dir OpenCodeReasoning-Nemotron-1.1-7B
-```
 ## Prepare evaluation data
 
 ```bash
@@ -26,12 +17,13 @@ ns prepare_data livecodebench
 ```bash
 ns eval \
     --cluster=local \
-    --model=/workspace/OpenCodeReasoning-Nemotron-1.1-7B \
+    --model=nvidia/OpenCodeReasoning-Nemotron-1.1-7B \
     --server_type=vllm \
     --output_dir=/workspace/OpenCodeReasoning-Nemotron-1.1-7B-eval \
     --benchmarks=livecodebench:8 \
     --split=test_v6_2408_2505 \
     --server_gpus=1 \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=64000
 ```
 

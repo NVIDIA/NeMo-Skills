@@ -27,6 +27,8 @@ from nemo_skills.pipeline.cli import eval, prepare_data, run_cmd, wrap_arguments
 #     --data_dir /workspace/ns-data
 # """
 
+# TODO: we should probably switch to another model as this one is quite heavy to run
+
 
 def setup(workspace, cluster, expname_prefix):
     # download models
@@ -48,7 +50,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning ON
-    common_params = "++inference.temperature=0.6 ++inference.top_p=0.95 "
+    common_params = "++inference.temperature=0.6 ++inference.top_p=0.95  ++parse_reasoning=True"
     tokens_to_generate = "++inference.tokens_to_generate=65536 "
     # Math / Code / Science (Reasoning ON)
     eval(
@@ -57,19 +59,36 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         model=base_model,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_on",
-        benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
+        benchmarks="scicode:4,math-500:4,aime24:4,aime25:4",
         server_gpus=8,
         server_args="--max-num-seqs=1024",
-        num_jobs=2,
+        num_jobs=4,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-on",
         wandb_project=wandb_project,
         wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
     )
 
-    # MMLU (Reasoning ON)
+    # GPQA (Reasoning ON)
     eval(
-        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++prompt_config=eval/aai/mcq-4choices-boxed"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/reasoning_on",
+        benchmarks="gpqa:4",
+        server_gpus=8,
+        server_args="--max-num-seqs=1024",
+        num_chunks=4,
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-math-code-science-on",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-on",
+    )
+
+    # MMLU-Pro (Reasoning ON)
+    eval(
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++prompt_config=eval/aai/mcq-10choices-boxed"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -77,7 +96,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
         benchmarks="mmlu-pro:1",
         server_gpus=8,
         server_args="--max-num-seqs=1024",
-        num_chunks=2,
+        num_chunks=4,
         run_after=f"{expname_prefix}-download-models",
         expname=f"{expname_prefix}-math-code-science-on",
         wandb_project=wandb_project,
@@ -166,7 +185,7 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         model=base_model,
         server_type="vllm",
         output_dir=f"{workspace}/reasoning_off",
-        benchmarks="gpqa:4,scicode:4,math-500:4,aime24:4,aime25:4",
+        benchmarks="scicode:4,math-500:4,aime24:4,aime25:4",
         num_jobs=1,
         server_gpus=8,
         server_args="--max-num-seqs=1024",
@@ -176,9 +195,25 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
         wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
     )
 
-    # MMLU (Reasoning OFF)
+    # GPQA (Reasoning OFF)
     eval(
-        ctx=wrap_arguments(f"{common_params} {tokens_to_generate}"),
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++prompt_config=eval/aai/mcq-4choices-boxed"),
+        cluster=cluster,
+        model=base_model,
+        server_type="vllm",
+        output_dir=f"{workspace}/reasoning_off",
+        benchmarks="gpqa:4",
+        server_gpus=8,
+        server_args="--max-num-seqs=1024",
+        run_after=f"{expname_prefix}-download-models",
+        expname=f"{expname_prefix}-math-code-science-off",
+        wandb_project=wandb_project,
+        wandb_name=f"{expname_prefix}-super_49b-eval-reasoning-off",
+    )
+
+    # MMLU-Pro (Reasoning OFF)
+    eval(
+        ctx=wrap_arguments(f"{common_params} {tokens_to_generate} ++prompt_config=eval/aai/mcq-10choices-boxed"),
         cluster=cluster,
         model=base_model,
         server_type="vllm",
@@ -276,9 +311,9 @@ def eval_reasoning_off(workspace, cluster, expname_prefix, wandb_project):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Nemotron eval pipeline")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", required=True, help="Workspace directory containing all experiment data")
-    parser.add_argument("--cluster", required=True, help="Cluster name, e.g. oci")
+    parser.add_argument("--cluster", required=True, help="Cluster name")
     parser.add_argument("--expname_prefix", required=True, help="Experiment name prefix")
     parser.add_argument("--wandb_project", default="nemo-skills-slurm-ci", help="W&B project name")
 
@@ -303,15 +338,12 @@ def main():
     )
 
     # schedule a dependent check job on the cluster and check if the results are as expected
-
-    checker = (
-        f"cd /nemo_run/code/tests/slurm-tests/super_49b_evals && python check_results.py --workspace {args.workspace} "
-    )
+    checker_cmd = f"python tests/slurm-tests/super_49b_evals/check_results.py --workspace {args.workspace}"
 
     run_cmd(
-        ctx=wrap_arguments(checker),
+        ctx=wrap_arguments(checker_cmd),
         cluster=args.cluster,
-        expname="check-eval-results-for-llama-49b",
+        expname=args.expname_prefix + "-check-results",
         log_dir=f"{args.workspace}/check-results-logs",
         run_after=reasoning_on_expnames + reasoning_off_expnames,
     )

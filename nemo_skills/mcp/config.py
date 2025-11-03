@@ -1,3 +1,17 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Unified MCP configuration: schema (nested dataclasses) and loader utilities.
 
 This merges the prior config_schema and config_loader modules into one place.
@@ -5,14 +19,12 @@ This merges the prior config_schema and config_loader modules into one place.
 
 from __future__ import annotations
 
-import copy
 from collections.abc import Mapping
 from dataclasses import field
 from typing import Any
 
 from omegaconf import DictConfig
 
-from nemo_skills.mcp.clients import MCPClientManager
 from nemo_skills.mcp.utils import locate
 from nemo_skills.utils import nested_dataclass
 
@@ -112,22 +124,3 @@ def resolve_adapters(cfg: DictConfig):
         response_formatter_obj() if isinstance(response_formatter_obj, type) else response_formatter_obj
     )
     return schema_adapter, call_interpreter, response_formatter
-
-
-def build_client_manager(cfg: DictConfig) -> MCPClientManager:
-    manager = MCPClientManager()
-    for t in cfg.tools:
-        client_cls = locate(t.client)
-        params = {} if t.get("params") is None else copy.deepcopy(dict(t.params))
-        resolved_params = {}
-        for key, val in params.items():
-            if _is_locate_mapping(val):
-                resolved_params[key] = _resolve_locate_mapping(val, cfg)
-            elif key in RESOLVABLE_PARAM_KEYS and isinstance(val, str):
-                resolved_params[key] = locate(val)
-            else:
-                resolved_params[key] = resolve_value(val, cfg)
-
-        client = client_cls(**resolved_params)
-        manager.register(t.id, client)
-    return manager

@@ -7,8 +7,8 @@ hide:
 
 # Reproducing Llama-Nemotron-Super-49B-V1.5 Evals
 
-In this tutorial, we will reproduce the evals for the [Llama-3.3-Nemotron-Super-49B-v1.5](https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5){target="_blank"} model using NeMo-Skills.
-For an introduction to the NeMo-Skills framework, we recommend going over [our introductory tutorial](../../basics/index.md).
+In this tutorial, we will reproduce the evals for the [Llama-3.3-Nemotron-Super-49B-v1.5](https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5){target="_blank"} model using Nemo-Skills.
+For an introduction to the Nemo-Skills framework, we recommend going over [our introductory tutorial](../../basics/index.md).
 
 
 We assume you have `/workspace` defined in your [cluster config](../../basics/cluster-configs.md) and are
@@ -21,7 +21,7 @@ executing all commands from that folder locally. Change all commands accordingly
 Get the model from HF.
 ```bash
 pip install -U "huggingface_hub[cli]"
-huggingface-cli download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
+hf download nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 --local-dir /workspace/Llama-3_3-Nemotron-Super-49B-v1_5
 ```
 
 !!!note
@@ -51,7 +51,7 @@ We will evaluate the model on the following:
 - Long-context:
     - RULER
 
-Here are the commands to prepare these datasets using NeMo-Skills:
+Here are the commands to prepare these datasets using Nemo-Skills:
 
 ```bash
 ns prepare_data gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25
@@ -101,12 +101,41 @@ ns eval \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5/ \
-    --benchmarks=gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
+    --benchmarks=scicode:16,math-500:16,aime24:16,aime25:16 \
     --server_gpus=2 \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
-    ++inference.top_p=0.95 \
-    ++system_message=''
+    ++inference.top_p=0.95
+```
+
+For GPQA and MMLU-Pro, we additionally specify the exact prompt on which we evaluate the benchmark:
+```bash hl_lines="7"
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5/ \
+    --benchmarks=mmlu-pro:16 \
+    --server_gpus=2 \
+    ++parse_reasoning=True \
+    ++prompt_config=eval/aai/mcq-10choices-boxed \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95
+
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5/ \
+    --benchmarks=gpqa:16 \
+    --server_gpus=2 \
+    ++parse_reasoning=True \
+    ++prompt_config=eval/aai/mcq-4choices-boxed \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.6 \
+    ++inference.top_p=0.95
 ```
 
 For LiveCodeBench, we additionally specify the exact split on which we evaluate the benchmark. In the following command, we evaluate the model on the 166 problems from the 1 October 2024 to 1 March 2025 subset from release_v5. To evaluate on the Artificial Analysis Index (AAI) split, set split to `test_v5_2407_2412`:
@@ -120,16 +149,16 @@ ns eval \
     --benchmarks=livecodebench:16 \
     --split=test_v5_2410_2502 \
     --server_gpus=2 \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
-    ++inference.top_p=0.95 \
-    ++system_message=''
+    ++inference.top_p=0.95
 ```
 
 #### Command for HLE Eval (Reasoning on)
 
 
-For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in NeMo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}.
+For HLE, because symbolic comparison is not sufficient to determine the correctness of the output, we use the recommended `o3-mini-20250131` model as the judge. Note that this model is the default in Nemo-Skills, and we have just added this argument for illustration purposes. To evaluate for the [Artificial Analysis Index (AAI) setting, please use the gpt-4o-20240806 model as the judge](https://artificialanalysis.ai/methodology/intelligence-benchmarking#intelligence-index-evaluation-suite-overview){target="_blank"}.
 
 Note that using any of the OpenAI hosted models requires `OPENAI_API_KEY`. Alternatively, a self-hosted judge model can also be used for judgement. For example, `--judge_model="/workspace/Llama-3_3-Nemotron-Super-49B-v1_5"`  in tandem with `--judge_server_type="vllm" --judge_server_gpus 2` will use the `Llama-3_3-Nemotron-Super-49B-v1_5` itself as a judge.
 
@@ -144,10 +173,10 @@ ns eval \
     --server_gpus=2 \
     --judge_model="o3-mini-20250131" \
     --extra_judge_args="++inference.tokens_to_generate=4096 ++max_concurrent_requests=8" \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
-    ++inference.top_p=0.95 \
-    ++system_message=''
+    ++inference.top_p=0.95
 ```
 
 !!! note
@@ -159,19 +188,19 @@ ns eval \
 
 #### Command for BFCL Eval (Reasoning on)
 
-Tool-calling benchmarks require tool-call parsing and execution. NeMo-Skills supports both client-side parsing (default) and server-side parsing. For server-side parsing, the vLLM server requires the parsing details as highlighted in the below command:
+Tool-calling benchmarks require tool-call parsing and execution. Nemo-Skills supports both client-side parsing (default) and server-side parsing. For server-side parsing, the vLLM server requires the parsing details as highlighted in the below command:
 ```bash hl_lines="12-16"
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_gpus=2 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_tool_calling/ \
+    ++parse_reasoning=True \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.6 \
     ++inference.top_p=0.95 \
-    ++system_message='' \
     ++use_client_parsing=False \
     --server_args="--tool-parser-plugin \"/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/llama_nemotron_toolcall_parser_no_streaming.py\" \
                     --tool-call-parser \"llama_nemotron_json\" \
@@ -182,7 +211,8 @@ ns eval \
 
 For RULER we need to use the same `data_dir` in the evaluation command as we used in the data preparation. We also
 need to use the data preparation `setup` as part of the benchmark name. Finally it's important not to specify
-`++inference.tokens_to_generate` as RULER has a fixed value of this parameter for each task.
+`++inference.tokens_to_generate` as well as not specify `++parse_reasoning=True` as
+RULER has predefined setup for those parameters.
 
 ```bash hl_lines="6-7"
 ns eval \
@@ -194,8 +224,7 @@ ns eval \
     --data_dir=/workspace/ns-data \
     --server_gpus=2 \
     ++inference.temperature=0.6 \
-    ++inference.top_p=0.95 \
-    ++system_message=''
+    ++inference.top_p=0.95
 ```
 
 ### Reasoning-on Results
@@ -276,17 +305,17 @@ pass@16           | 30          | 23366      | 832         | 93.33%           | 
 
 ```
 ----------------------- bfcl_v3 ------------------------
-| Category                    | num_entries | accuracy |
-|-----------------------------|-------------|----------|
-| overall_accuracy            | 4441        | 72.64%   |
-| overall_non_live            | 1390        | 88.20%   |
-| non_live_ast                | 1150        | 88.58%   |
-| irrelevance                 | 240         | 86.67%   |
-| overall_live                | 2251        | 83.34%   |
-| live_ast                    | 1351        | 82.68%   |
-| live_irrelevance            | 882         | 84.47%   |
-| live_relevance              | 18          | 77.78%   |
-| overall_multi_turn          | 800         | 46.38%   |
+| Category           | num_entries | accuracy |
+| ------------------ | ----------- | -------- |
+| overall_accuracy   | 4441        | 72.64%   |
+| overall_non_live   | 1390        | 88.20%   |
+| non_live_ast       | 1150        | 88.58%   |
+| irrelevance        | 240         | 86.67%   |
+| overall_live       | 2251        | 83.34%   |
+| live_ast           | 1351        | 82.68%   |
+| live_irrelevance   | 882         | 84.47%   |
+| live_relevance     | 18          | 77.78%   |
+| overall_multi_turn | 800         | 46.38%   |
 
 ```
 
@@ -297,7 +326,7 @@ pass@16           | 30          | 23366      | 832         | 93.33%           | 
 
 ```
 | Task                                | Accuracy |
-|-------------------------------------|----------|
+| ----------------------------------- | -------- |
 | ruler.nemotron_128k                 | 66.7     |
 | ruler.nemotron_128k.niah_single_1   | 100.0    |
 | ruler.nemotron_128k.niah_single_2   | 96.4     |
@@ -335,8 +364,42 @@ ns eval \
     --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
-    --benchmarks=gpqa:16,mmlu-pro:16,scicode:16,math-500:16,aime24:16,aime25:16 \
+    --benchmarks=scicode:16,math-500:16,aime24:16,aime25:16 \
     --server_gpus=2 \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
+
+For GPQA, the command is:
+
+```bash
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
+    --benchmarks=gpqa:16 \
+    --server_gpus=2 \
+    ++prompt_config=eval/aai/mcq-4choices-boxed \
+    ++inference.tokens_to_generate=65536 \
+    ++inference.temperature=0.0 \
+    ++inference.top_p=1.0 \
+    ++system_message='/no_think'
+```
+
+For MMLU-Pro, the command is:
+
+```bash
+ns eval \
+    --cluster=local \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
+    --server_type=vllm \
+    --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off/ \
+    --benchmarks=mmlu-pro:16 \
+    --server_gpus=2 \
+    ++prompt_config=eval/aai/mcq-10choices-boxed \
     ++inference.tokens_to_generate=65536 \
     ++inference.temperature=0.0 \
     ++inference.top_p=1.0 \
@@ -385,7 +448,7 @@ ns eval \
 ns eval \
     --cluster=local \
     --benchmarks=bfcl_v3 \
-    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5/ \
+    --model=/workspace/Llama-3_3-Nemotron-Super-49B-v1_5 \
     --server_gpus=2 \
     --server_type=vllm \
     --output_dir=/workspace/llama_nemotron_49b_1_5_reasoning_off_tool_calling/ \
@@ -489,24 +552,24 @@ pass@16           | 30          | 1720       | 1149        | 10.00%           | 
 
 ```
 ----------------------- bfcl_v3 ------------------------
-| Category                    | num_entries | accuracy |
-|-----------------------------|-------------|----------|
-| overall_accuracy            | 4441        | 68.52%   |
-| overall_non_live            | 1390        | 87.55%   |
-| non_live_ast                | 1150        | 87.35%   |
-| irrelevance                 | 240         | 88.33%   |
-| overall_live                | 2251        | 81.87%   |
-| live_ast                    | 1351        | 79.79%   |
-| live_irrelevance            | 882         | 85.60%   |
-| live_relevance              | 18          | 55.56%   |
-| overall_multi_turn          | 800         | 36.13%   |
+| Category           | num_entries | accuracy |
+| ------------------ | ----------- | -------- |
+| overall_accuracy   | 4441        | 68.52%   |
+| overall_non_live   | 1390        | 87.55%   |
+| non_live_ast       | 1150        | 87.35%   |
+| irrelevance        | 240         | 88.33%   |
+| overall_live       | 2251        | 81.87%   |
+| live_ast           | 1351        | 79.79%   |
+| live_irrelevance   | 882         | 85.60%   |
+| live_relevance     | 18          | 55.56%   |
+| overall_multi_turn | 800         | 36.13%   |
 ```
 
 #### Results for RULER (Reasoning off)
 
 ```
 | Task                                | Accuracy |
-|-------------------------------------|----------|
+| ----------------------------------- | -------- |
 | ruler.nemotron_128k                 | 66.1     |
 | ruler.nemotron_128k.niah_single_1   | 100.0    |
 | ruler.nemotron_128k.niah_single_2   | 94.0     |

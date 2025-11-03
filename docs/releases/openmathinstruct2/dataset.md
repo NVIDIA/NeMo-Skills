@@ -29,11 +29,11 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=512 \
     --output_dir=/workspace/solution-augmentation/math \
-    --eval_args="++eval_type=math" \
-    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/hendrycks_math/train.jsonl \
+    ++eval_type=math \
     ++prompt_config=generic/math-base \
     ++examples_type=math_text_detailed \
-    ++use_completions_api=True \
+    ++inference.endpoint_type=text \
     ++tokenizer=meta-llama/Llama-3.1-405B \
     ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
@@ -49,11 +49,11 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=64 \
     --output_dir=/workspace/solution-augmentation/gsm8k \
-    --eval_args="++eval_type=math" \
     --input_file=/nemo_run/code/nemo_skills/dataset/gsm8k/train.jsonl \
+    ++eval_type=math \
     ++prompt_config=generic/math-base \
     ++examples_type=gsm8k_text_detailed \
-    ++use_completions_api=True \
+    ++inference.endpoint_type=text \
     ++tokenizer=meta-llama/Llama-3.1-405B \
     ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
@@ -72,11 +72,11 @@ ns generate \
     --server_nodes=2 \
     --num_random_seeds=80 \
     --output_dir=/workspace/problem-augmentation/math \
-    --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+    --input_file=/nemo_run/code/nemo_skills/dataset/hendrycks_math/train.jsonl \
     ++prompt_config=generic/problem-augmentation \
     ++examples_type=math_problem_augmentation \
     ++generation_key=problem \
-    ++use_completions_api=True \
+    ++inference.endpoint_type=text \
     ++tokenizer=meta-llama/Llama-3.1-405B \
     ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
@@ -96,7 +96,7 @@ ns generate \
     ++prompt_config=generic/problem-augmentation-similar \
     ++examples_type=gsm8k_problem_augmentation \
     ++generation_key=problem \
-    ++use_completions_api=True \
+    ++inference.endpoint_type=text \
     ++tokenizer=meta-llama/Llama-3.1-405B \
     ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
@@ -128,7 +128,7 @@ for i in range(80):
         ctx=wrap_arguments(
             f"++prompt_config=generic/math-base "
             f"++examples_type=math_text_detailed "
-            f"++use_completions_api=True "
+            f"++inference.endpoint_type=text "
             f"++tokenizer=meta-llama/Llama-3.1-405B "
             f"++stop_phrase='\n\n\n\n\n\n' "
         ),
@@ -155,7 +155,7 @@ for i in range(10):
         ctx=wrap_arguments(
             f"++prompt_config=generic/math-base "
             f"++examples_type=gsm8k_text_detailed "
-            f"++use_completions_api=True "
+            f"++inference.endpoint_type=text "
             f"++tokenizer=meta-llama/Llama-3.1-405B "
             f"++stop_phrase='\n\n\n\n\n\n' "
         ),
@@ -221,7 +221,7 @@ Retrieve top-5 similar items from the test sets
 from nemo_skills.pipeline.cli import wrap_arguments, run_cmd
 
 
-test_sets = ['gsm8k', 'math', 'amc23', 'aime24']
+test_sets = ['gsm8k', 'hendrycks_math', 'amc23', 'aime24']
 retrieve_from = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
 cmd = (
@@ -271,6 +271,7 @@ python -m nemo_skills.training.prepare_data \
     ++input_files=\'/workspace/solution-augmentation/**/output-rs*.jsonl,/workspace/new-problems-solution-augmentation/**/output-rs*.jsonl\' \
     ++output_path=/workspace/sft_data.jsonl \
     ++filters.remove_len_outlier_problems=true \
+    ++filters.trim_solutions=true \
     ++max_problem_length=1024 \
     ++filters.remove_len_outlier_solutions=true \
     ++use_chars_for_min_length=true \
@@ -283,4 +284,4 @@ python -m nemo_skills.training.prepare_data \
 
 ## Dataset contamination explorer
 
-To reproduce our dataset contamination explorer demo refer to [dataset_explorer_demo/README.md](https://github.com/NVIDIA/NeMo-Skills/blob/main/dataset_explorer_demo/README.md)
+To reproduce our dataset contamination explorer demo refer to [dataset_explorer_demo/README.md](https://github.com/NVIDIA-NeMo/Skills/blob/main/dataset_explorer_demo/README.md)

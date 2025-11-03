@@ -190,9 +190,10 @@ def save_data_from_qwen(dataset, split="test"):
     )
 
     data_dir = Path(__file__).absolute().parent
-    original_file = str(data_dir / dataset / f"original_{split}.json")
+    ns_dataset = dataset if dataset != "math" else "hendrycks_math"
+    original_file = str(data_dir / ns_dataset / f"original_{split}.json")
     data_dir.mkdir(exist_ok=True)
-    output_file = str(data_dir / dataset / f"{split}.jsonl")
+    output_file = str(data_dir / ns_dataset / f"{split}.jsonl")
     data = []
     if not os.path.exists(original_file):
         formatted_url = url.format(split=split, dataset=dataset)
@@ -228,9 +229,10 @@ def save_data_from_qwen(dataset, split="test"):
 
 def get_mcq_fields(question, choices):
     options_dict = {chr(ord("A") + i): option for i, option in enumerate(choices)}
-    options_text = "\n".join(f"{letter}. {option}" for letter, option in options_dict.items())
+    options_text = "\n".join(f"{letter}) {option}" for letter, option in options_dict.items())
+    question = question.strip("\n")
     return {
-        "problem": f"{question}\n{options_text}",
+        "problem": f"{question}\n\n{options_text}",
         "options": options_text,
         **options_dict,
     }

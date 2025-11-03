@@ -22,9 +22,14 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import parse_sbatch_kwargs
 from nemo_skills.pipeline.utils.server import get_free_port
 from nemo_skills.pipeline.verl import verl_app
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import (
+    get_logger_name,
+    setup_logging,
+    validate_wandb_project_name,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -124,6 +129,10 @@ class PPOVerlTask:
             cmd = f"{cmd} trainer.logger=['console'] "
         else:
             cmd = f"{cmd} trainer.logger=['console','wandb'] "
+            validate_wandb_project_name(
+                wandb_project=wandb_project,
+                wandb_name=expname,
+            )
 
         return cmd
 
@@ -185,7 +194,7 @@ def get_training_cmd(
     verl_config_name=None,
 ):
     # TODO: use those
-    timeout = pipeline_utils.get_timeout(cluster_config, partition)
+    timeout = pipeline_utils.get_timeout_str(cluster_config, partition)
 
     if task is None:
         task = PPOVerlTask(
@@ -216,7 +225,6 @@ def get_training_cmd(
 class SupportedServers(str, Enum):
     trtllm = "trtllm"
     vllm = "vllm"
-    nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
 
@@ -236,7 +244,7 @@ def ppo_verl(
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
     eval_data: str = typer.Option(None, help="Path to the eval data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
-    num_gpus: int = typer.Option(..., help="Number of GPUs"),
+    num_gpus: int = typer.Option(..., help="Number of GPUs per node"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
     server_model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
@@ -256,6 +264,7 @@ def ppo_verl(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
@@ -290,8 +299,8 @@ def ppo_verl(
     script_module: str = typer.Option("verl.trainer.main_ppo", help="The script module to run. "),
     verl_config_dir: str = typer.Option(None, help="The directory containing the Verl config files. "),
     verl_config_name: str = typer.Option(None, help="The name of the Verl config file to use. "),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
@@ -301,6 +310,10 @@ def ppo_verl(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -358,7 +371,7 @@ def ppo_verl(
 
     server_config = None
     if server_type is not None:
-        get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+        get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
         if server_address is None:  # we need to host the model
             assert server_gpus is not None, "Need to specify server_gpus if hosting the model"
             server_port = get_free_port(strategy="random") if get_random_port else 5000
@@ -410,12 +423,11 @@ def ppo_verl(
                 cluster_config=cluster_config,
                 server_config=server_config,
                 partition=partition,
-                time_min=time_min,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
-                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
                 installation_command=installation_command,

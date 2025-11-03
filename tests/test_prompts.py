@@ -102,7 +102,7 @@ Start directly with the problem statement and DO NOT include any phrases such as
 After the problem is completed finish your response right away.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    assert prompt.fill({"problem": "What's the meaning of life?"}) == expected_prompt
+    assert prompt.fill({"problem": "What's the meaning of life?"}, format_as_string=True) == expected_prompt
 
 
 def test_generic_codegen_prompt():
@@ -139,6 +139,18 @@ def test_generic_default_prompt():
     assert prompt.fill({"question": "How are you?"}) == expected_prompt
 
 
+def test_thinking_assistant_response():
+    """Test that the thinking part is added to the assistant response."""
+    prompt = get_prompt("generic/math", tokenizer="openai/gpt-oss-120b")
+
+    expected_prompt = """<|channel|>analysis<|message|>Let me think step by step.... The answer is 4<|end|><|start|>assistant<|channel|>final<|message|>The answer is 4<|return|>"""
+    output_prompt = prompt.format_assistant_response(
+        content="The answer is 4", thinking="Let me think step by step.... The answer is 4"
+    )
+
+    assert output_prompt == expected_prompt, "Formatted assistant response is not as expected"
+
+
 def test_generic_math_prompt():
     prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B-Instruct")
 
@@ -154,11 +166,13 @@ Solve the following math problem. Make sure to put the answer (and only answer) 
 2 + 2 = ?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}, format_as_string=True) == expected_prompt
 
 
 def test_generic_math_prompt_code_examples():
-    prompt = get_prompt("generic/math", "meta-llama/Llama-3.1-8B", "nemotron", examples_type="math_text_with_code")
+    prompt = get_prompt(
+        "generic/math", tokenizer="meta-llama/Llama-3.1-8B", code_tags="nemotron", examples_type="math_text_with_code"
+    )
 
     expected_prompt = """<|begin_of_text|>Solve the following math problem. Make sure to put the answer (and only answer) inside \\boxed{}.
 
@@ -329,7 +343,7 @@ So the bee is $\\boxed{1008\\sqrt{2} + 1008\\sqrt{6}}$ far from the starting poi
 
 Here is the problem you need to solve:
 2 + 2 = ?"""
-    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}, format_as_string=True) == expected_prompt
 
 
 def test_llama_code_output_format_examples():
@@ -525,12 +539,13 @@ Here is the problem you need to solve:
 2 + 2 = ?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
-    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}, format_as_string=True) == expected_prompt
 
 
 def test_qwen_code_output_format_examples():
-    prompt = get_prompt("generic/math", "Qwen/Qwen2.5-32B-Instruct", "qwen", examples_type="math_text_with_code")
-    prompt.config.system = ""
+    prompt = get_prompt(
+        "generic/math", "Qwen/Qwen2.5-32B-Instruct", "qwen", examples_type="math_text_with_code", system_message=""
+    )
 
     expected_prompt = """<|im_start|>system
 <|im_end|>
@@ -706,7 +721,7 @@ Here is the problem you need to solve:
 2 + 2 = ?<|im_end|>
 <|im_start|>assistant
 """
-    assert prompt.fill({"problem": "2 + 2 = ?"}) == expected_prompt
+    assert prompt.fill({"problem": "2 + 2 = ?"}, format_as_string=True) == expected_prompt
 
 
 def test_judge_arena():
@@ -920,7 +935,8 @@ J. 9<|eot_id|><|start_header_id|>assistant<|end_header_id|>
         prompt.fill(
             {
                 "problem": "What is the square root of 81 squared?\nA. 9^2\nB. 27\nC. 81^2\nD. 729\nE. 6561\nF. 12\nG. 162\nH. 243\nI. 81\nJ. 9"
-            }
+            },
+            format_as_string=True,
         )
         == expected_prompt
     )
@@ -952,7 +968,7 @@ Reasoning: Explain why the extracted_final_answer is correct or incorrect based 
 
 Judgement: Answer 'yes' if extracted_final_answer matches the [correct_answer] given above, or is within a small margin of error for numerical problems. Answer 'no' otherwise, i.e. if there if there is any inconsistency, ambiguity, non-equivalency, or if the extracted answer is incorrect.
 
-Confidence: The extracted confidence score between 0|\%| and 100|\%| from [response]. Put 100 if there is no confidence score available.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+Confidence: The extracted confidence score between 0|\\%| and 100|\\%| from [response]. Put 100 if there is no confidence score available.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 """
     assert (
@@ -961,7 +977,8 @@ Confidence: The extracted confidence score between 0|\%| and 100|\%| from [respo
                 "problem": "If $\\sqrt{5+n}=7$, then what is the value of $n$?",
                 "generation": "Let's solve the problem step by step. 5+n=49, so n=44.",
                 "expected_answer": "44",
-            }
+            },
+            format_as_string=True,
         )
         == expected_prompt
     )

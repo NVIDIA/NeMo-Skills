@@ -22,14 +22,17 @@ from nemo_skills.pipeline.utils.cluster import (
     cluster_upload,
     get_cluster_config,
     get_env_variables,
-    get_timeout,
+    get_slurm_timeout_str,
+    get_timeout_str,
     get_tunnel,
+    parse_sbatch_kwargs,
     progress_callback,
     read_config,
     temporary_env_update,
     tunnel_hash,
     update_ssh_tunnel_config,
 )
+from nemo_skills.pipeline.utils.docker_images import resolve_container_image
 from nemo_skills.pipeline.utils.exp import (
     CustomJobDetails,
     add_task,

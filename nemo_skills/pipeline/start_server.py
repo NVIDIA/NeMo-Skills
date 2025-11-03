@@ -21,6 +21,7 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_exp,
     get_free_port,
+    parse_sbatch_kwargs,
     resolve_mount_paths,
     set_python_path_and_wait_for_server,
 )
@@ -55,11 +56,17 @@ def start_server(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    server_container: str = typer.Option(None, help="Override container image for the hosted server"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     with_sandbox: bool = typer.Option(
         False, help="Starts a sandbox (set this flag if model supports calling Python interpreter)"
+    ),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
     ),
     launch_chat_interface: bool = typer.Option(
         False, help="If True, will launch a gradio app that provides chat with the model"
@@ -71,9 +78,13 @@ def start_server(
         help="Can specify a custom location for slurm logs. "
         "If not specified, will be inside `ssh_tunnel.job_dir` part of your cluster config.",
     ),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     get_random_port: bool = typer.Option(False, help="If True, will get a random port for the server"),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
 ):
     """Self-host a model server."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -97,6 +108,8 @@ def start_server(
         "server_entrypoint": server_entrypoint,
         "server_port": get_free_port(strategy="random") if get_random_port else 5000,
     }
+    if server_container:
+        server_config["container"] = server_container
 
     with get_exp("server", cluster_config) as exp:
         cmd = ""
@@ -113,11 +126,11 @@ def start_server(
             container=cluster_config["containers"]["nemo-skills"],
             cluster_config=cluster_config,
             partition=partition,
-            time_min=time_min,
             server_config=server_config,
             with_sandbox=with_sandbox,
+            keep_mounts_for_sandbox=keep_mounts_for_sandbox,
             sandbox_port=None if get_random_port else 6000,
-            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+            sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
         )
         # we don't want to detach in this case even on slurm, so not using run_exp
         exp.run(detach=False, tail_logs=True)

@@ -52,13 +52,15 @@ class OpenAIModel(BaseModel):
                 api_key = os.getenv("NVIDIA_API_KEY")
                 if not api_key:
                     raise ValueError("NVIDIA_API_KEY is required for NVIDIA models and could not be found.")
-            elif "api.openai.com" in base_url:
+            else:
                 api_key = os.getenv("OPENAI_API_KEY")
-                if not api_key:
+                if not api_key and "api.openai.com" in base_url:
                     raise ValueError("OPENAI_API_KEY is required for OpenAI models and could not be found.")
         return api_key
 
     def _is_reasoning_model(self, model_name: str) -> bool:
+        if "gpt-5" in model_name:
+            return True
         return re.match(r"^o\d", model_name)
 
     def _build_completion_request_params(self, **kwargs) -> dict:
@@ -139,6 +141,7 @@ class OpenAIModel(BaseModel):
             ]
             if reasoning_effort:
                 params["reasoning_effort"] = reasoning_effort
+                params["allowed_openai_params"] = ["reasoning_effort"]
         else:
             # Standard model parameters
             if reasoning_effort is not None:
@@ -146,8 +149,15 @@ class OpenAIModel(BaseModel):
             params["presence_penalty"] = repetition_penalty
             params["logprobs"] = top_logprobs is not None
             params["top_logprobs"] = top_logprobs
-            params["max_tokens"] = tokens_to_generate
+            params["max_completion_tokens"] = tokens_to_generate
             params["temperature"] = temperature
             params["top_p"] = top_p
 
         return params
+
+    def _build_responses_request_params(self, input, **kwargs) -> dict:
+        # Remapping variables to match responses API
+        responses_params = self._build_chat_request_params(messages=input, **kwargs)
+        responses_params["input"] = responses_params.pop("messages")
+        responses_params["max_output_tokens"] = responses_params.pop("max_completion_tokens")
+        return responses_params

@@ -18,23 +18,27 @@ from nemo_skills.pipeline.cli import run_cmd, wrap_arguments
 
 
 def main():
-    ap = argparse.ArgumentParser(
-        description="Run OpenMathReasoning and then schedule an on-cluster SFT results check."
-    )
+    ap = argparse.ArgumentParser()
     ap.add_argument("--cluster", required=True)
-    ap.add_argument("--backend", required=True, choices=["nemo-aligner", "nemo-rl"], help="Training backend")
     ap.add_argument("--workspace", required=True, help="Workspace path")
     ap.add_argument("--wandb_project", default="nemo-skills-slurm-ci", help="W&B project name")
     ap.add_argument("--expname_prefix", required=True, help="Experiment name prefix used inside the recipe")
     ap.add_argument("--disable_wandb", action="store_true", help="Disable W&B logging in the recipe")
+    ap.add_argument(
+        "--backend",
+        type=str,
+        nargs="+",
+        choices=["megatron", "fsdp"],
+        default=["megatron"],
+    )
     args = ap.parse_args()
 
     cmd = (
         f"python -m recipes.openmathreasoning.scripts.simplified_recipe "
-        f"    --cluster {args.cluster} "
-        f"    --workspace {args.workspace} "
-        f"    --training_backend {args.backend} "
-        f"    --expname_prefix {args.expname_prefix} "
+        f" --cluster {args.cluster} "
+        f" --workspace {args.workspace} "
+        f" --expname_prefix {args.expname_prefix} "
+        f" --backend {' '.join(args.backend)} "
     )
 
     if args.disable_wandb:
@@ -44,20 +48,17 @@ def main():
 
     subprocess.run(cmd, shell=True, check=True)
 
-    checker_cmd = (
-        f"cd /nemo_run/code/tests/slurm-tests/omr_simple_recipe && "
-        f"python check_results.py --workspace {args.workspace} "
-    )
+    checker_cmd = f"python tests/slurm-tests/omr_simple_recipe/check_results.py --workspace {args.workspace} --backend {' '.join(args.backend)}"
+
+    final_eval_name = [f"{args.expname_prefix}-final-eval-{training_backend}" for training_backend in args.backend]
 
     run_cmd(
         ctx=wrap_arguments(checker_cmd),
         cluster=args.cluster,
-        expname=f"check-sft-results-for-{args.backend}",
+        expname=args.expname_prefix + "-check-results",
         log_dir=f"{args.workspace}/check-results-logs",
-        run_after=[  # this are launched in simplified recipe
-            f"{args.expname_prefix}-final-eval",
-            f"{args.expname_prefix}-baseline-eval",
-        ],
+        # these are launched in simplified recipe
+        run_after=final_eval_name + [f"{args.expname_prefix}-baseline-eval"],
     )
 
 

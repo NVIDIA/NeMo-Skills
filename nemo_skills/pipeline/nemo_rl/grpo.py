@@ -15,7 +15,7 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 import typer
 
@@ -23,18 +23,24 @@ from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.nemo_rl import nemo_rl_app
 from nemo_skills.pipeline.utils import (
     add_task,
+    check_if_mounted,
     check_mounts,
     get_cluster_config,
     get_env_variables,
     get_exp,
     get_mounted_path,
     get_nsight_cmd,
-    get_timeout,
+    get_timeout_str,
+    parse_sbatch_kwargs,
     resolve_mount_paths,
     run_exp,
     temporary_env_update,
 )
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import (
+    get_logger_name,
+    setup_logging,
+    validate_wandb_project_name,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -82,7 +88,9 @@ class NemoRLTask:
         return cmd
 
     def format_data_args(self):
-        cmd = f"+data.train_data_path={self.prompt_data} +data.val_data_path={self.eval_data} "
+        cmd = f"+data.train_data_path={self.prompt_data} "
+        if self.eval_data is not None:
+            cmd += f"+data.val_data_path={self.eval_data} "
         return cmd
 
     def format_wandb_args(self):
@@ -95,6 +103,15 @@ class NemoRLTask:
         )
         if self.wandb_group:
             cmd += f"++logger.wandb.group={self.wandb_group} "
+
+        if not self.disable_wandb:
+            validate_wandb_project_name(
+                wandb_project=self.wandb_project,
+                wandb_name=self.expname,
+                wandb_group=self.wandb_group,
+                wandb_id=wandb_id,
+            )
+
         return cmd
 
     def get_cmd(self):
@@ -133,7 +150,7 @@ def get_training_cmd(
     backend,
     profile_step_range,
 ):
-    timeout = get_timeout(cluster_config, partition)
+    timeout = get_timeout_str(cluster_config, partition)
 
     task = NemoRLTask(
         model=hf_model,
@@ -157,7 +174,7 @@ def get_training_cmd(
     return task.get_cmd()
 
 
-def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
+def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend, max_position_embeddings=None):
     cmd = "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && export UV_PROJECT=/opt/NeMo-RL && cd /nemo_run/code && "
     if backend == "fsdp":
         cmd += "uv run --active python -m nemo_skills.training.nemo_rl.convert_dcp_to_hf "
@@ -166,11 +183,38 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend):
     else:
         raise ValueError("Invalid backend: must be 'fsdp' or 'megatron'")
 
-    cmd += f"   --training-folder={output_dir} "
-    cmd += f"   --hf-ckpt-path={final_hf_path} "
+    cmd += f" --training-folder={output_dir} "
+    cmd += f" --hf-ckpt-path={final_hf_path} "
+    if max_position_embeddings is not None:
+        cmd += f" --max-position-embeddings={max_position_embeddings} "
+    if step != "last":
+        try:
+            step = int(step)
+        except ValueError:
+            raise ValueError(
+                f"Invalid step value: {step}. Expected a string representing an integer (e.g. '100') or 'last'."
+            )
+        cmd += f" --step {step} "
 
-    if step is not None:
-        cmd += f"  --step {step} "
+    return cmd
+
+
+def get_checkpoint_average_cmd(output_dir, average_steps, backend, remove_checkpoints_after_average):
+    cmd = "export PYTHONPATH=$PYTHONPATH:/nemo_run/code && export UV_PROJECT=/opt/NeMo-RL && cd /nemo_run/code && "
+
+    if backend in ["fsdp", "megatron"]:
+        cmd += "uv run python -m nemo_skills.pipeline.nemo_rl.average_checkpoints "
+    else:
+        raise ValueError("Invalid backend: must be 'fsdp' or 'megatron'")
+
+    steps = [int(x.strip()) for x in average_steps.split(",") if x.strip()]
+    steps_str = " ".join(map(str, steps))
+
+    cmd += f" --checkpoint_dir {output_dir} "
+    cmd += f" --steps {steps_str} "
+    cmd += f" --backend={backend} "
+    if remove_checkpoints_after_average:
+        cmd += " --remove_checkpoints_after_average "
 
     return cmd
 
@@ -193,11 +237,24 @@ def grpo_nemo_rl(
     expname: str = typer.Option("openrlhf-ppo", help="Nemo run experiment name"),
     hf_model: str = typer.Option(..., help="Path to the HF model"),
     training_data: str = typer.Option(None, help="Path to the training data"),
-    validation_data: str = typer.Option(None, help="Path to the validation data"),
+    validation_data: Optional[str] = typer.Option(None, help="Path to the validation data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
-    num_gpus: int = typer.Option(..., help="Number of GPUs"),
+    num_gpus: int = typer.Option(..., help="Number of GPUs per node"),
     num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
-    conversion_step: int = typer.Option(None, help="The step of checkpoint that needs to be converted"),
+    conversion_step: str = typer.Option(
+        default="last",
+        help=(
+            "The checkpoint step to convert. Use 'last' (default) to convert the latest checkpoint, "
+            "or specify a step number explicitly, e.g. --conversion-step '100'."
+        ),
+    ),
+    average_steps: str = typer.Option(
+        None,
+        help="List of commas separated checkpoint steps to average. E.g '1000,2000,3000,4000,5000'. If None, skip average step and only convert last checkpoint",
+    ),
+    remove_checkpoints_after_average: bool = typer.Option(
+        False, help="Whether to delete original step directories after averaging (default: False)."
+    ),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -210,6 +267,7 @@ def grpo_nemo_rl(
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     backend: SupportedBackends = typer.Option(
         ...,
@@ -245,8 +303,8 @@ def grpo_nemo_rl(
     ),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
@@ -256,9 +314,17 @@ def grpo_nemo_rl(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
+    ),
+    max_position_embeddings: int = typer.Option(
+        None,
+        help="Max position embeddings to use for conversion. If not specified, will be inferred from the model config.",
     ),
 ):
     """Runs NeMo-RL GRPO training.
@@ -276,12 +342,14 @@ def grpo_nemo_rl(
     if log_dir is None:
         log_dir = output_dir
 
-    hf_model, output_dir, log_dir = check_mounts(
+    output_dir, log_dir = check_mounts(
         cluster_config,
         log_dir=log_dir,
-        mount_map={hf_model: None, output_dir: None},
+        mount_map={output_dir: None},
         check_mounted_paths=check_mounted_paths,
     )
+    if hf_model.startswith("/"):  # could ask to download from HF
+        check_if_mounted(cluster_config, hf_model)
 
     env_variables = get_env_variables(cluster_config)
     if backend == "megatron":
@@ -296,9 +364,7 @@ def grpo_nemo_rl(
             raise ValueError("training_data is required when num_training_jobs > 0")
         if training_data.startswith("/"):  # could ask to download from HF
             training_data = get_mounted_path(cluster_config, training_data)
-        if validation_data is None:
-            validation_data = training_data
-        else:
+        if validation_data is not None:
             validation_data = get_mounted_path(cluster_config, validation_data)
 
     train_cmd = get_training_cmd(
@@ -323,6 +389,8 @@ def grpo_nemo_rl(
 
     server_config = None
     env_update = {"RAY_LOG_SYNC_FREQUENCY": 20} if profile_step_range else {}
+    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
+
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
         with temporary_env_update(cluster_config, env_update):
@@ -338,45 +406,98 @@ def grpo_nemo_rl(
                     cluster_config=cluster_config,
                     server_config=server_config,
                     partition=partition,
-                    time_min=time_min,
                     run_after=run_after,
                     reuse_code=reuse_code,
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=[prev_task] if prev_task is not None else None,
-                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    sbatch_kwargs=sbatch_kwargs,
                     heterogeneous=True if server_config is not None else False,
                     with_sandbox=with_sandbox,
                     with_ray=True,
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
                 )
+        if average_steps is None:
+            prev_task = add_task(
+                exp,
+                cmd=get_checkpoint_convert_cmd(
+                    output_dir=output_dir,
+                    final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
+                    step=conversion_step,
+                    backend=backend,
+                    max_position_embeddings=max_position_embeddings,
+                ),
+                task_name=f"{expname}-convert-final-ckpt",
+                log_dir=f"{log_dir}/convert-final-ckpt",
+                container=cluster_config["containers"]["nemo-rl"],
+                cluster_config=cluster_config,
+                partition=partition,
+                num_nodes=1,
+                num_tasks=1,
+                num_gpus=num_gpus,
+                run_after=run_after,
+                reuse_code=reuse_code,
+                reuse_code_exp=reuse_code_exp,
+                task_dependencies=[prev_task] if prev_task is not None else None,
+                sbatch_kwargs=sbatch_kwargs,
+                installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
+            )
+        else:
+            steps = [int(x.strip()) for x in average_steps.split(",") if x.strip()]
+            task_dependencies = []
+            for step in steps:
+                task = add_task(
+                    exp,
+                    cmd=get_checkpoint_convert_cmd(
+                        output_dir=output_dir,
+                        final_hf_path=f"{output_dir}/hf_model_step_{step}",
+                        step=step,
+                        backend=backend,
+                        max_position_embeddings=max_position_embeddings,
+                    ),
+                    task_name=f"{expname}-convert-ckpt-step_{step}",
+                    log_dir=f"{log_dir}/convert-ckpt-step",
+                    container=cluster_config["containers"]["nemo-rl"],
+                    cluster_config=cluster_config,
+                    partition=partition,
+                    num_nodes=1,
+                    num_tasks=1,
+                    num_gpus=num_gpus,
+                    run_after=run_after,
+                    reuse_code=reuse_code,
+                    reuse_code_exp=reuse_code_exp,
+                    task_dependencies=[prev_task] if prev_task is not None else None,
+                    sbatch_kwargs=sbatch_kwargs,
+                    installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
+                )
+                task_dependencies.append(task)
 
-        prev_task = add_task(
-            exp,
-            cmd=get_checkpoint_convert_cmd(
-                output_dir=output_dir,
-                final_hf_path=final_hf_path or f"{output_dir}/final_hf_model",
-                step=conversion_step,
-                backend=backend,
-            ),
-            task_name=f"{expname}-convert-final-ckpt",
-            log_dir=f"{log_dir}/convert-final-ckpt",
-            container=cluster_config["containers"]["nemo-rl"],
-            cluster_config=cluster_config,
-            partition=partition,
-            time_min=time_min,
-            num_nodes=1,
-            num_tasks=1,
-            num_gpus=num_gpus,
-            run_after=run_after,
-            reuse_code=reuse_code,
-            reuse_code_exp=reuse_code_exp,
-            task_dependencies=[prev_task] if prev_task is not None else None,
-            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
-            installation_command=installation_command,
-            skip_hf_home_check=skip_hf_home_check,
-        )
-
+            prev_task = add_task(
+                exp,
+                cmd=get_checkpoint_average_cmd(
+                    output_dir=output_dir,
+                    average_steps=average_steps,
+                    backend=backend,
+                    remove_checkpoints_after_average=remove_checkpoints_after_average,
+                ),
+                task_name=f"{expname}-average-ckpt",
+                log_dir=f"{log_dir}/average-ckpt",
+                container=cluster_config["containers"]["nemo-rl"],
+                cluster_config=cluster_config,
+                partition=partition,
+                num_nodes=1,
+                num_tasks=1,
+                num_gpus=num_gpus,
+                run_after=run_after,
+                reuse_code=reuse_code,
+                reuse_code_exp=reuse_code_exp,
+                task_dependencies=task_dependencies,
+                sbatch_kwargs=sbatch_kwargs,
+                installation_command=installation_command,
+                skip_hf_home_check=skip_hf_home_check,
+            )
         # explicitly setting sequential to False since we set dependencies directly
         run_exp(exp, cluster_config, sequential=False, dry_run=dry_run)
 

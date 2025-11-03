@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 import os
 import sys
 import tarfile
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -39,19 +40,112 @@ _logged_required_env_vars = set()
 _logged_optional_env_vars = set()
 
 
-def get_timeout(cluster_config, partition):
-    if "timeouts" not in cluster_config:
-        timeout = "10000:00:00:00"
+def _parse_slurm_timeout(value: str) -> timedelta:
+    """
+    Parse a slurm timeout string into a timedelta object.
+    Time format for SLURM: "minutes", "minutes:seconds", "hours:minutes:seconds",
+    "days-hours", "days-hours:minutes" and "days-hours:minutes:seconds"
+    https://slurm.schedmd.com/sbatch.html#OPT_time
+    """
+    days, hours, minutes, seconds = 0, 0, 0, 0
+    days_in_value = "-" in value
+    if days_in_value:
+        day_part, value = value.split("-", 1)
+        days = int(day_part)
+    parts: list[int] = list(map(int, value.split(":")))
+    if len(parts) == 4 and days == 0:
+        # this is not SLURM format, but we support it for compatibility reason
+        # since NeMo-RL uses "DD:HH:MM:SS" format
+        days, hours, minutes, seconds = parts
+    elif len(parts) == 3:
+        hours, minutes, seconds = parts
+    elif len(parts) == 2:
+        if days_in_value:
+            hours, minutes = parts
+        else:
+            minutes, seconds = parts
+    elif len(parts) == 1:
+        if days_in_value:
+            hours = parts[0]
+        else:
+            minutes = parts[0]
     else:
-        timeout = cluster_config["timeouts"][partition or cluster_config["partition"]]
+        raise ValueError(f"Unsupported Slurm time format: {value!r}")
+    return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
-        # subtracting 15 minutes to account for the time it takes to save the model
-        # the format expected by nemo is days:hours:minutes:seconds
-        time_diff = datetime.strptime(timeout, "%H:%M:%S") - datetime.strptime("00:15:00", "%H:%M:%S")
-        timeout = (
-            f"00:{time_diff.seconds // 3600:02d}:{(time_diff.seconds % 3600) // 60:02d}:{time_diff.seconds % 60:02d}"
-        )
+
+def _get_timeout(cluster_config, partition, with_save_delay: bool = True) -> timedelta:
+    default_timeout = cluster_config.get("default_timeout", "100-00:00:00")
+    try:
+        timeout_str = cluster_config["timeouts"][partition or cluster_config["partition"]]
+    except KeyError:
+        timeout_str = default_timeout
+    timeout = _parse_slurm_timeout(timeout_str)
+    # subtracting 15 minutes to account for the time it takes to save the model
+    # the format expected by nemo is days-hours:minutes:seconds
+    if with_save_delay:
+        save_delay = timedelta(minutes=15)
+        if timeout > save_delay:
+            timeout -= save_delay
     return timeout
+
+
+def get_slurm_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> str:
+    """Slurm format: D-HH:MM:SS"""
+    timeout = _get_timeout(cluster_config, partition, with_save_delay=with_save_delay)
+    timeout_str = (
+        f"{timeout.days}-{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
+    )
+    return timeout_str
+
+
+def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> str:
+    """NeMo-RL format: DD:HH:MM:SS"""
+    timeout = _get_timeout(cluster_config, partition, with_save_delay=with_save_delay)
+    timeout_str = f"{timeout.days:02d}:{timeout.seconds // 3600:02d}:{(timeout.seconds % 3600) // 60:02d}:{timeout.seconds % 60:02d}"
+    return timeout_str
+
+
+def parse_sbatch_kwargs(sbatch_kwargs: str | dict | None, **kwargs) -> dict | None:
+    """
+    Parse sbatch kwargs from either a JSON string or a dictionary.
+
+    This utility function handles sbatch kwargs that can be provided in two ways:
+    1. As a JSON string (typically from CLI)
+    2. As a dictionary (when invoked from Python code)
+
+    Args:
+        sbatch_kwargs: Either a JSON string or a dictionary containing sbatch kwargs.
+                         Can also be None or empty string.
+        **kwargs: any additional keyword arguments to include in the resulting dictionary.
+            Any values of None will be ignored.
+
+    Returns:
+        A dictionary of slurm kwargs, or None if no arguments are provided.
+
+    Raises:
+        ValueError: If sbatch_kwargs is a string but cannot be parsed as JSON.
+    """
+    full_sbatch_kwargs = {key: value for key, value in kwargs.items() if value is not None}
+
+    if sbatch_kwargs:
+        if isinstance(sbatch_kwargs, dict):
+            # Already a dictionary, just update
+            full_sbatch_kwargs.update(sbatch_kwargs)
+        elif isinstance(sbatch_kwargs, str):
+            # Parse JSON string
+            try:
+                sbatch_kwargs = json.loads(sbatch_kwargs)
+                full_sbatch_kwargs.update(sbatch_kwargs)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Failed to parse sbatch_kwargs with JSON: {e}")
+        else:
+            raise ValueError(f"sbatch_kwargs must be a string or dict, got {type(sbatch_kwargs).__name__}")
+
+    if not len(full_sbatch_kwargs):
+        return None
+
+    return full_sbatch_kwargs
 
 
 def get_env_variables(cluster_config):
@@ -100,47 +194,73 @@ def get_env_variables(cluster_config):
     # It is fine to have these as always optional even if they are required for some configs
     # Assume it is required, then this will override the value set above with the same
     # value, assuming it has not been updated externally between these two calls
-    always_optional_env_vars = [
+    optional_env_vars_to_add = {
         "WANDB_API_KEY",
         "NVIDIA_API_KEY",
         "AZURE_OPENAI_API_KEY",
         "OPENAI_API_KEY",
         "HF_TOKEN",
-    ]
-    default_factories = {
-        "HF_TOKEN": lambda: str(get_token()),
+        "NGC_API_KEY",
     }
-    # Add optional env variables
-    optional_env_vars = cluster_config.get("env_vars", [])
-    for env_var in optional_env_vars + always_optional_env_vars:
-        env_var_name = env_var.split("=")[0].strip() if "=" in env_var else env_var
-
+    default_factories = {
+        "HF_TOKEN": lambda: str(token) if (token := get_token()) else "",
+    }
+    # Add optional env variables defined in cluster config
+    cfg_optional_env_vars = cluster_config.get("env_vars", [])
+    for env_var in cfg_optional_env_vars:
         if "=" in env_var:
             if env_var.count("=") == 1:
                 env_var_name, value = env_var.split("=")
-                env_var_name = env_var_name.strip()
-                value = value.strip()
+                env_var_name, value = env_var_name.strip(), value.strip()
             else:
                 raise ValueError(f"Invalid optional environment variable format: {env_var}")
             env_vars[env_var_name] = value
             if env_var_name not in _logged_optional_env_vars:
-                LOG.info(f"Adding optional environment variable {env_var_name} from config")
+                LOG.info(f"Adding optional environment variable {env_var_name} from cluster config")
                 _logged_optional_env_vars.add(env_var_name)
-        elif env_var in os.environ:
-            env_vars[env_var] = os.environ[env_var]
-            if env_var not in _logged_optional_env_vars:
-                LOG.info(f"Adding optional environment variable {env_var} from environment")
-                _logged_optional_env_vars.add(env_var)
-        elif env_var in default_factories:
-            env_vars[env_var] = default_factories[env_var]()
-            if env_var not in _logged_optional_env_vars:
-                LOG.info(f"Adding optional environment variable {env_var} from environment")
-                _logged_optional_env_vars.add(env_var)
+            # no need to request this variable later
+            if env_var_name in optional_env_vars_to_add:
+                optional_env_vars_to_add.remove(env_var_name)
         else:
-            if env_var not in _logged_optional_env_vars:
-                LOG.info(f"Optional environment variable {env_var} not found in user environment; skipping.")
-                _logged_optional_env_vars.add(env_var)
+            # request variable from environment later
+            optional_env_vars_to_add.add(env_var.strip())
+    # iterate over rest optional env vars to add, add from environment or default factory
+    for env_var_name in optional_env_vars_to_add:
+        if env_var_name in os.environ:
+            env_vars[env_var_name] = os.environ[env_var_name]
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var_name} from environment")
+                _logged_optional_env_vars.add(env_var_name)
+        elif env_var_name in default_factories and (value := default_factories[env_var_name]()):
+            # assign only non-empty value from default factory
+            env_vars[env_var_name] = value
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Adding optional environment variable {env_var_name} from default factory")
+                _logged_optional_env_vars.add(env_var_name)
+        else:
+            if env_var_name not in _logged_optional_env_vars:
+                LOG.info(f"Optional environment variable {env_var_name} not found in user environment; skipping.")
+                _logged_optional_env_vars.add(env_var_name)
 
+    # replace placeholders with actual env var values from the environment where
+    # the job is being launched, not where its being run.
+    for key, value in env_vars.items():
+        if isinstance(value, str) and "$" in value:
+            if key in os.environ:
+                env_vars[key] = os.path.expandvars(value)
+                LOG.info(
+                    f"Resolved environment variable {key} inside the placeholder value: {value} with {env_vars[key]}"
+                )
+            else:
+                raise ValueError(f"Cannot resolve environment variable {key} inside the placeholder value: {value}")
+
+    # Unless NGC_API_KEY is explicitly set we will populate it to be equal to NVIDIA_API_KEY
+    if "NGC_API_KEY" not in env_vars:
+        if "NVIDIA_API_KEY" in env_vars:
+            env_vars["NGC_API_KEY"] = env_vars["NVIDIA_API_KEY"]
+            if "NGC_API_KEY" not in _logged_optional_env_vars:
+                LOG.info("Populating NGC_API_KEY to be equal to NVIDIA_API_KEY")
+                _logged_optional_env_vars.add("NGC_API_KEY")
     return env_vars
 
 
@@ -164,10 +284,16 @@ def read_config(config_file):
     # resolve ssh tunnel config
     if "ssh_tunnel" in cluster_config:
         cluster_config = update_ssh_tunnel_config(cluster_config)
+        if "job_dir" not in cluster_config["ssh_tunnel"]:
+            raise ValueError("job_dir must be provided in the ssh_tunnel config.")
+        if not Path(cluster_config["ssh_tunnel"]["job_dir"]).is_absolute():
+            raise ValueError("job_dir in ssh_tunnel must be an absolute path.")
 
     if cluster_config["executor"] == "slurm" and "ssh_tunnel" not in cluster_config:
         if "job_dir" not in cluster_config:
             raise ValueError("job_dir must be provided in the cluster config if ssh_tunnel is not provided.")
+        if not Path(cluster_config["job_dir"]).is_absolute():
+            raise ValueError("job_dir must be an absolute path.")
         set_nemorun_home(cluster_config["job_dir"])
 
     return cluster_config
@@ -264,7 +390,7 @@ def update_ssh_tunnel_config(cluster_config: dict):
                 cluster_config["ssh_tunnel"][key] = os.path.expandvars(cluster_config["ssh_tunnel"][key])
                 LOG.info(f"Resolved `{key}` to `{cluster_config['ssh_tunnel'][key]}`")
 
-    if "$" in cluster_config["ssh_tunnel"]["identity"]:
+    if "$" in (cluster_config["ssh_tunnel"].get("identity") or ""):
         raise ValueError(
             "SSH identity cannot be resolved from environment variables. "
             "Please provide a valid path to the identity file."
@@ -278,11 +404,12 @@ def _get_tunnel_cached(
     job_dir: str,
     host: str,
     user: str,
+    port: int | None = None,
     identity: str | None = None,
     shell: str | None = None,
     pre_command: str | None = None,
 ):
-    return run.SSHTunnel(
+    kwargs = dict(
         host=host,
         user=user,
         identity=identity,
@@ -290,6 +417,17 @@ def _get_tunnel_cached(
         pre_command=pre_command,
         job_dir=job_dir,
     )
+    if port is not None:
+        kwargs["port"] = port
+    try:
+        return run.SSHTunnel(**kwargs)
+    except TypeError as exc:
+        if port is not None and "port" in str(exc):
+            raise RuntimeError(
+                "The configured SSH tunnel requires the `port` parameter, but your nemo_run version "
+                "does not support it. Please upgrade nemo_run."
+            ) from exc
+        raise
 
 
 def tunnel_hash(tunnel):

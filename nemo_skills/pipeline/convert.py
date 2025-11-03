@@ -25,29 +25,13 @@ from nemo_skills.pipeline.utils import (
     check_mounts,
     get_cluster_config,
     get_exp,
+    parse_sbatch_kwargs,
     resolve_mount_paths,
     run_exp,
 )
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-def get_nemo_to_hf_cmd(
-    input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
-):
-    cmd = (
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"cd /nemo_run/code && "
-        f"python -m nemo_skills.conversion.nemo_to_hf_{model_type} "
-        f"    --in-path {input_model} "
-        f"    --out-path {output_model} "
-        f"    --hf-model-name {hf_model_name} "
-        f"    --precision {dtype} "
-        f"    --max-shard-size 10GB "
-        f"    {extra_arguments} "
-    )
-    return cmd
 
 
 def get_hf_to_trtllm_cmd(
@@ -112,23 +96,6 @@ def get_hf_to_trtllm_cmd(
     return cmd
 
 
-def get_hf_to_nemo_cmd(
-    input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
-):
-    cmd = (
-        f"export PYTHONPATH=$PYTHONPATH:/nemo_run/code && "
-        f"cd /nemo_run/code && "
-        f"python -m nemo_skills.conversion.hf_to_nemo_{model_type} "
-        f"    --in-path {input_model} "
-        f"    --out-path {output_model} "
-        f"    --hf-model-name {hf_model_name} "
-        f"    --precision {dtype} "
-        f"    {extra_arguments} "
-    )
-
-    return cmd
-
-
 def get_hf_to_megatron_cmd(
     input_model, output_model, model_type, hf_model_name, dtype, num_gpus, num_nodes, extra_arguments
 ):
@@ -163,14 +130,12 @@ class SupportedTypes(str, Enum):
 
 
 class SupportedFormatsTo(str, Enum):
-    nemo = "nemo"
     hf = "hf"
     trtllm = "trtllm"
     megatron = "megatron"
 
 
 class SupportedFormatsFrom(str, Enum):
-    nemo = "nemo"
     hf = "hf"
 
 
@@ -210,11 +175,12 @@ def convert(
         help="Optional number of samples to use from the calibration dataset (if dtype=fp8)",
     ),
     expname: str = typer.Option("conversion", help="NeMo-Run experiment name"),
-    num_nodes: int = typer.Option(1),
-    num_gpus: int = typer.Option(...),
+    num_nodes: int = typer.Option(1, help="Number of nodes to use"),
+    num_gpus: int = typer.Option(..., help="Number of GPUs per node"),
     partition: str = typer.Option(
         None, help="Can specify if need interactive jobs or a specific non-default partition"
     ),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     run_after: List[str] = typer.Option(
@@ -234,10 +200,10 @@ def convert(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
@@ -247,6 +213,10 @@ def convert(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -282,8 +252,8 @@ def convert(
     if convert_to != "trtllm" and hf_model_name is None:
         raise ValueError("--hf_model_name is required")
 
-    if convert_to in ["hf", "nemo"] and model_type == "deepseek_v3":
-        raise ValueError("Conversion to HF/Nemo is not yet supported for DeepSeek v3 models")
+    if convert_to in ["hf"] and model_type == "deepseek_v3":
+        raise ValueError("Conversion to HF is not yet supported for DeepSeek v3 models")
 
     if convert_to == "megatron":
         if convert_from != "hf":
@@ -298,20 +268,28 @@ def convert(
     cluster_config = get_cluster_config(cluster, config_dir)
     cluster_config = resolve_mount_paths(cluster_config, mount_paths)
 
-    input_model, output_model, log_dir = check_mounts(
-        cluster_config,
-        log_dir=log_dir,
-        mount_map={input_model: "/input_model", output_model: "/output_model"},
-        check_mounted_paths=check_mounted_paths,
-    )
+    if convert_from == "hf" and not input_model.startswith("/"):
+        # For HF, we don't need to check the input_model path if the huggingface model name is used
+        output_model, log_dir = check_mounts(
+            cluster_config,
+            log_dir=log_dir,
+            mount_map={output_model: "/output_model"},
+            check_mounted_paths=check_mounted_paths,
+        )
+
+    else:
+        input_model, output_model, log_dir = check_mounts(
+            cluster_config,
+            log_dir=log_dir,
+            mount_map={input_model: "/input_model", output_model: "/output_model"},
+            check_mounted_paths=check_mounted_paths,
+        )
 
     if log_dir is None:
         log_dir = str(Path(output_model) / "conversion-logs")
 
     conversion_cmd_map = {
-        ("nemo", "hf"): get_nemo_to_hf_cmd,
         ("hf", "megatron"): get_hf_to_megatron_cmd,
-        ("hf", "nemo"): get_hf_to_nemo_cmd,
         ("hf", "trtllm"): partial(
             get_hf_to_trtllm_cmd,
             calib_dataset=calib_dataset,
@@ -321,9 +299,7 @@ def convert(
         ),
     }
     container_map = {
-        ("nemo", "hf"): cluster_config["containers"]["nemo"],
         ("hf", "megatron"): cluster_config["containers"]["megatron"],
-        ("hf", "nemo"): cluster_config["containers"]["nemo"],
         ("hf", "trtllm"): cluster_config["containers"]["trtllm"],
     }
     conversion_cmd = conversion_cmd_map[(convert_from, convert_to)](
@@ -336,6 +312,7 @@ def convert(
         num_nodes=num_nodes,
         extra_arguments=extra_arguments,
     )
+
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         LOG.info("Launching task with command %s", conversion_cmd)
         prev_task = add_task(
@@ -349,11 +326,10 @@ def convert(
             num_tasks=1,
             cluster_config=cluster_config,
             partition=partition,
-            time_min=time_min,
             run_after=run_after,
             reuse_code=reuse_code,
             reuse_code_exp=reuse_code_exp,
-            slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+            sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
             installation_command=installation_command,
             task_dependencies=_task_dependencies,
             skip_hf_home_check=skip_hf_home_check,

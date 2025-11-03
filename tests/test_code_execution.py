@@ -14,6 +14,7 @@
 
 import os
 import re
+from copy import deepcopy
 
 import pytest
 
@@ -109,7 +110,7 @@ async def test_timeout_error(language):
     code = """import time\ntime.sleep(1)\nprint("done")"""
 
     output, session_id = await sandbox.execute_code(code, timeout=1, language=language)
-    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Timed out\n"}
+    assert output == {"process_status": "timeout", "stdout": "", "stderr": "Execution timed out after 1 seconds\n"}
 
     output, session_id = await sandbox.execute_code(code, timeout=2, session_id=session_id, language=language)
     assert output == {"process_status": "completed", "stderr": "", "stdout": "done\n"}
@@ -314,7 +315,7 @@ async def test_lean4_mathlib_code_execution():
     """
     expected_output = "7\n"
 
-    output, session_id = await sandbox.execute_code(correct_code_mathlib, language="lean4")
+    output, session_id = await sandbox.execute_code(correct_code_mathlib, language="lean4", timeout=60)
 
     # Assertions for the mathlib code
     assert session_id is None
@@ -377,6 +378,41 @@ async def test_lean4_code_execution_failure():
 
 
 @pytest.mark.asyncio
+async def test_state_restoration():
+    sandbox = _get_sandbox()
+
+    # Build history with visible outputs
+    out1, sid = await sandbox.execute_code('print("H1"); a = 41', language="ipython")
+    assert out1["process_status"] == "completed"
+
+    out2, sid = await sandbox.execute_code('print("H2"); a += 1', session_id=sid, language="ipython")
+    assert out2["process_status"] == "completed"
+
+    # Run a cell that errors after mutating state; it should not be replayed during restoration
+    err_out, sid = await sandbox.execute_code(
+        'print("ERR"); a = 0; raise ValueError()', session_id=sid, language="ipython"
+    )
+    assert err_out["process_status"] == "error"
+    assert "ValueError" in err_out["stdout"]
+
+    # Force a new backend shell for the same session to trigger client-side restoration by deleting the session
+    assert str(sid) in sandbox.session_histories
+    # Make a copy of the history
+    history = deepcopy(sandbox.session_histories[str(sid)])
+    await sandbox.delete_session(str(sid))
+    # Restore the history
+    sandbox.session_histories[str(sid)] = history
+
+    # Execute code that relies on restored state; stdout should be ONLY from this new execution
+    out3, sid = await sandbox.execute_code("print(a)", session_id=sid, language="ipython")
+    assert out3["process_status"] == "completed"
+    assert out3["stdout"] == "42\n"
+    assert "H1" not in out3["stdout"]
+    assert "H2" not in out3["stdout"]
+    assert "ERR" not in out3["stdout"]
+
+
+@pytest.mark.asyncio
 async def test_minif2f_deepseek_fewshots():
     sandbox = _get_sandbox()
 
@@ -415,6 +451,22 @@ async def test_minif2f_deepseek_fewshots():
     assert not stderr_list, (
         f"Expected no errors in stderr for all test cases, but errors were found at indices {stderr_list}."
     )
+
+
+@pytest.mark.asyncio
+async def test_ioi_eval_execution():
+    import json
+
+    from nemo_skills.evaluation.evaluator.ioi import IOIEvaluator
+
+    base = os.path.dirname(__file__)
+    data_path = os.path.join(base, "data", "ioi", "test.jsonl")
+    meta_path = os.path.join(base, "data", "ioi", "test_metadata.json")
+    with open(data_path, "r", encoding="utf-8") as f:
+        dp = json.loads(next(f))
+    evaluator = IOIEvaluator(config={"test_file": meta_path})
+    out = await evaluator.eval_single(dp)
+    assert all(r.get("score") == 1.0 for s in out["test_case_results"].values() for r in s["outputs"])
 
 
 @pytest.mark.asyncio

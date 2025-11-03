@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from nemo_skills.utils import get_logger_name, nested_dataclass
+from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -186,8 +186,8 @@ def get_aggregate_score(scores, weight=3):
 
     candidate_stats = stats[stats["model"] == "candidate"]
     interval = (
-        round((candidate_stats["lower"] - candidate_stats["score"]).iloc[0], 2),
-        round((candidate_stats["upper"] - candidate_stats["score"]).iloc[0], 2),
+        float(round((candidate_stats["lower"] - candidate_stats["score"]).iloc[0], 2)),
+        float(round((candidate_stats["upper"] - candidate_stats["score"]).iloc[0], 2)),
     )
     metrics = {
         "score": candidate_stats["score"].iloc[0],
@@ -195,14 +195,3 @@ def get_aggregate_score(scores, weight=3):
         "invalid_scores": num_invalid,
     }
     return metrics
-
-
-@nested_dataclass(kw_only=True)
-class LlmEvaluatorConfig:
-    batch_size: int = 100  # lower if running into rate limits
-    tokens_to_generate: int = 4096  # will auto-lower to max possible for NGC models
-    use_batch_api: bool = True  # only supported for OpenAI models!
-    base_url: str = "https://api.openai.com/v1"
-    judge_model: str = JUDGE_MODEL
-    # defaults to True to avoid regenerating judgements unless necessary
-    skip_filled: bool = True

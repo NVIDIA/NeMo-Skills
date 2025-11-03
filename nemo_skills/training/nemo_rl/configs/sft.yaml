@@ -6,7 +6,7 @@ sft:
   max_num_epochs: 100000000
   max_num_steps: 100000000
 
-  val_period: ${checkpointing.save_period}
+  val_period: 0
   val_batches: 1
   val_global_batch_size: 32
   val_micro_batch_size: 1
@@ -27,7 +27,8 @@ policy:
   model_name: ???
   tokenizer:
     name: ${policy.model_name} ## specify if you'd like to use a tokenizer different from the model's default
-    chat_template: null
+    chat_template: "infer_from_data"  ## Can be: null (passthrough), "default" (tokenizer's default), "infer_from_data" (auto-detect from data), or custom jinja2 template
+    chat_template_kwargs: null # can be used to pass kwargs to the chat template, e.g., enable_thinking=true
   train_global_batch_size: 32
   train_micro_batch_size: 1
   max_total_sequence_length: 4096
@@ -37,12 +38,16 @@ policy:
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   context_parallel_size: 1
+  sequence_parallel: false
+  lr: 1e-6
+  weight_decay: 0.01
+  min_lr: 1e-6
 
 
   dtensor_cfg:
     enabled: true
     cpu_offload: False
-    sequence_parallel: false
+    sequence_parallel: ${policy.sequence_parallel}
     activation_checkpointing: false
     tensor_parallel_size: ${policy.tensor_model_parallel_size}
     context_parallel_size: ${policy.context_parallel_size}
@@ -51,7 +56,6 @@ policy:
 
   megatron_cfg:
     enabled: false
-    empty_unused_memory_level: 1
     activation_checkpointing: false
     tensor_model_parallel_size: ${policy.tensor_model_parallel_size}
     expert_tensor_parallel_size: 1
@@ -61,20 +65,23 @@ policy:
     pipeline_dtype: ${policy.precision}
     num_layers_in_first_pipeline_stage: null
     num_layers_in_last_pipeline_stage: null
-    sequence_parallel: false
+    sequence_parallel: ${policy.sequence_parallel}
     freeze_moe_router: false
     moe_router_dtype: null
     moe_router_load_balancing_type: "aux_loss"
     moe_router_bias_update_rate: 1e-3
+    moe_permute_fusion: false
     #gives ~20% training perf speedup with sequence packing
-    apply_rope_fusion: False  # Only used if position_embedding_type=rope
+    bias_activation_fusion: True
+    apply_rope_fusion: True  # Only used if position_embedding_type=rope
     layernorm_epsilon: 1e-6
+    empty_unused_memory_level: 0 # setting it to 0 will maximize performance, but it might lead to OOMs, while setting it to 2 to minimize the peak memory usage to avoid OOMs
 
     optimizer:
       optimizer: "adam"
-      lr: 5.0e-6
-      min_lr: ${policy.megatron_cfg.optimizer.lr}
-      weight_decay: 0.01
+      lr: ${policy.lr}
+      min_lr: ${policy.min_lr}
+      weight_decay: ${policy.weight_decay}
       bf16: true  # must be true to avoid checkpoint load error
       fp16: false
       params_dtype: "float32"
@@ -93,14 +100,18 @@ policy:
 
       # clip_grad: ${policy.max_grad_norm}
 
+      # optimizer cpu offload
+      optimizer_cpu_offload: false
+      optimizer_offload_fraction: 0.0
+
     scheduler:
       start_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       end_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       weight_decay_incr_style: "constant"
       lr_decay_style: "cosine"
-      lr_decay_iters: null
+      lr_decay_iters: ${sft.max_num_steps}
       lr_warmup_iters: 0
-      lr_warmup_init: 1e-7
+      lr_warmup_init: 1.0e-6
 
     distributed_data_parallel_config:
       grad_reduce_in_fp32: false
@@ -119,22 +130,34 @@ policy:
     algorithm: "modified_first_fit_decreasing"
     sequence_length_round: 64
     logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
-  # makes the training sequence length divisible by the tensor parallel size
-  # this is useful for sequence parallel training
-  make_sequence_length_divisible_by: ${policy.dtensor_cfg.tensor_parallel_size}
+  #If this value is set to null, it will be automatically assigned in the code.
+  make_sequence_length_divisible_by: null
   max_grad_norm: null
 
   optimizer:
     name: "torch.optim.AdamW"
     kwargs:
-      lr: 5.0e-6
-      weight_decay: 0.01
+      lr: ${policy.lr}
+      weight_decay: ${policy.weight_decay}
       betas: [0.9, 0.98]
       eps: 1e-8
       # when using Dtensor, we need to set foreach
       # and fused to False
       foreach: False
       fused: False
+
+  scheduler:
+  - name: "torch.optim.lr_scheduler.LinearLR"
+    kwargs:
+      start_factor: 1.0
+      end_factor: 1.0
+      total_iters: 1   # must be >=1, here it keeps LR constant
+  - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
+    kwargs:
+      T_max: ${sft.max_num_steps}      # total training steps
+      eta_min: ${policy.lr}   # set min_lr = initial_lr -> constant schedule
+  - milestones: [0]  # required to avoid config errors
+
 
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
@@ -146,12 +169,14 @@ data:
   output_key: output
   force_reprocess: false
   shuffle: true
+  num_workers: 10
 
 logger:
   log_dir: "logs"  # Base directory for all logs
   wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
   tensorboard_enabled: true
   mlflow_enabled: false
+  swanlab_enabled: false # Disable SwanLab logging
   monitor_gpus: true  # If true, will monitor GPU usage and log to wandb and/or tensorboard
   num_val_samples_to_print: 0  # Number of validation samples to pretty print on terminal
   wandb:

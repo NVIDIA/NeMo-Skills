@@ -20,17 +20,24 @@ import shutil
 import subprocess
 import sys
 from argparse import Namespace
+from dataclasses import field
 
 from omegaconf import OmegaConf
 
-from nemo_skills.utils import get_logger_name, nested_dataclass, unroll_files
+from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
+from nemo_skills.utils import get_logger_name, nested_dataclass
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+BIGCODEBENCH_REQUIREMENTS_URL = (
+    "https://raw.githubusercontent.com/bigcode-project/bigcodebench/main/Requirements/requirements-eval.txt"
+)
 
-def preprocess_code(generation_dict: dict, language="python"):
+
+def preprocess_code(generation_dict: dict, language="python", strip_whitespace=True):
     completion = generation_dict["generation"]
-    completion = completion.strip()
+    if strip_whitespace:
+        completion = completion.strip()
     completion = completion.replace("\r", "")
 
     ##### To handle code generation by reasoning models
@@ -53,25 +60,33 @@ def preprocess_code(generation_dict: dict, language="python"):
 
     if start_with_lang_tag in completion:
         def_line = completion.index(start_with_lang_tag) + len(start_with_lang_tag)
-        completion = completion[def_line:].strip()
+        completion = completion[def_line:]
+        if strip_whitespace:
+            completion = completion.strip()
         try:
             next_line = completion.index(generic_start_end_tag)
-            completion = completion[:next_line].strip()
+            completion = completion[:next_line]
+            if strip_whitespace:
+                completion = completion.strip()
         except Exception:
             print(completion)
             print("================\n")
 
     elif generic_start_end_tag in completion:
         def_line = completion.index(generic_start_end_tag) + len(generic_start_end_tag)
-        completion = completion[def_line:].strip()
+        completion = completion[def_line:]
+        if strip_whitespace:
+            completion = completion.strip()
         try:
             next_line = completion.index(generic_start_end_tag)
-            completion = completion[:next_line].strip()
+            completion = completion[:next_line]
+            if strip_whitespace:
+                completion = completion.strip()
         except Exception:
             print(completion)
             print("================\n")
 
-    if completion.startswith(" "):
+    if completion.startswith(" ") and strip_whitespace:
         completion = completion.strip()
 
     generation_dict["completion"] = completion
@@ -86,122 +101,258 @@ def install_from_git(git_url):
         print(f"Error during installation: {e}")
 
 
-# TODO: use sandbox
 @nested_dataclass(kw_only=True)
-class LiveCodeBenchEvaluatorConfig:
-    language: str = "python"  # "cpp" is another option now
-    test_file: str = None
+class EvalPlusEvaluatorConfig(BaseEvaluatorConfig):
+    # evalplus specific configurations
+    evalplus: dict = field(default_factory=dict)
 
 
-def eval_livecodebench(cfg):
+def eval_evalplus(cfg):
+    cfg = EvalPlusEvaluatorConfig(**cfg)
+    # TODO: need to move it to a separate docker (either our sandbox or separate srun)
+    from evalplus.evaluate import evaluate
+
+    jsonl_file = cfg.input_file
+    with open(jsonl_file) as f:
+        samples = [preprocess_code(json.loads(line)) for line in f]
+    # all changes will be done with a new key "completion", so it's ok to write to the same file
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
+    eval_config = {
+        "samples": jsonl_file,
+        "base_only": False,
+        "parallel": None,
+        "i_just_wanna_run": False,
+        "test_details": False,
+        "min_time_limit": 1,
+        "gt_time_limit_factor": 4.0,
+        "mini": False,
+        "noextreme": False,
+        "version": "default",
+    }
+    eval_config.update(OmegaConf.to_container(cfg.evalplus))
+    evaluate(Namespace(**eval_config))
+    with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+        evalplus_grades = json.load(fin)
+    # adding is_correct key to allow compute_metrics to work
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            sample["is_correct"] = evalplus_grades["eval"][sample["task_id"]][0]["base_status"] == "pass"
+            sample["is_correct-plus"] = (
+                sample["is_correct"] and evalplus_grades["eval"][sample["task_id"]][0]["plus_status"] == "pass"
+            )
+            f.write(json.dumps(sample) + "\n")
+
+    # moving eval file as otherwise evalplus does not want to recompute metrics if it's present..
+    shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+
+
+def install_requirements(url):
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", url])
+        print("Requirements installed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during installation: {e}")
+
+
+def eval_livecodebench_pro(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
+    jsonl_file = cfg.input_file
+    with open(jsonl_file) as f:
+        samples = [preprocess_code(json.loads(line), "python") for line in f]
+        for sample in samples:
+            sample["problem_id"] = sample.pop("task_id")
+            sample["text_response"] = sample.pop("completion")
+            sample["response_meta"] = None
+
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
+
+
+def eval_livebench_coding(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
     try:
         from livecodebench.evaluate import evaluate
     except ImportError:
         LOG.info("Package 'livecodebench' not found. Attempting to install...")
-        # install_from_git("git+https://github.com/wasiahmad/livecodebench.git")
-        install_from_git("git+https://github.com/wasiahmad/livecodebench.git@f285640c20aaf18df1ee5917621a596af4630b5e")
+        install_from_git("git+https://github.com/wasiahmad/livecodebench.git@livebench")
         try:
             from livecodebench.evaluate import evaluate
         except ImportError:
             LOG.info("Failed to install 'livecodebench'. Please install it manually.")
             raise
 
-    eval_config = LiveCodeBenchEvaluatorConfig(_init_nested=True, **cfg.eval_config)
-    assert eval_config.language in ["python", "cpp"]
-    if eval_config.language == "cpp":
-        assert eval_config.test_file is not None
-
-    release_version = None
-    for jsonl_file in unroll_files(cfg.input_files):
-        with open(jsonl_file) as f:
-            samples = [preprocess_code(json.loads(line), eval_config.language) for line in f]
-            for sample in samples:
-                sample["question_id"] = sample["task_id"]
+    jsonl_file = cfg.input_file
+    samples = []
+    with open(jsonl_file) as f:
+        for line in f:
+            sample = json.loads(line)
+            if sample["task"] == "coding_completion":
+                assert len(sample["partial_solution"]) > 0
+                sample = preprocess_code(sample, strip_whitespace=False)
+                sample["completion"] = sample["completion"].replace("\t", "    ")
+                full_solution = sample["partial_solution"] + "\n" + sample["completion"]
+                sample["code_list"] = [full_solution]
+            else:
+                sample = preprocess_code(sample, strip_whitespace=True)
                 sample["code_list"] = [sample["completion"]]
-                if release_version is None:
-                    release_version = sample["release_version"]
-                if release_version != sample["release_version"]:
-                    raise ValueError(
-                        f"All samples should have the same release version, "
-                        f"but got {release_version} and {sample['release_version']}"
-                    )
 
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
+            samples.append(sample)
 
-        # https://github.com/wasiahmad/livecodebench/blob/main/livecodebench/evaluate.py#L10
-        evaluate(
-            custom_output_file=jsonl_file,
-            release_version=f"release_{release_version}",
-            k_list=[1],
-            language=eval_config.language,
-            test_file=None if eval_config.language == "python" else eval_config.test_file,
-            num_process_evaluate=12,
-            timeout=6 if eval_config.language == "python" else 30,
-        )
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
 
-        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
-            eval_grades = json.load(fin)
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                sample["graded_list"] = eval_grades["eval"][sample["task_id"]]["graded_list"]
-                f.write(json.dumps(sample) + "\n")
+    evaluate(
+        custom_output_file=jsonl_file,
+        k_list=[1],
+        num_process_evaluate=12,
+        timeout=6,
+    )
 
-        # moving eval file to ensure metrics are recomputed
-        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+    with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+        eval_grades = json.load(fin)
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            sample["graded_list"] = eval_grades["eval"][sample["question_id"]]["graded_list"]
+            f.write(json.dumps(sample) + "\n")
+
+    # moving eval file to ensure metrics are recomputed
+    shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
 
 
-def eval_livecodebench_pro(cfg):
-    for jsonl_file in unroll_files(cfg.input_files):
-        with open(jsonl_file) as f:
-            samples = [preprocess_code(json.loads(line), "python") for line in f]
-            for sample in samples:
-                sample["problem_id"] = sample.pop("task_id")
-                sample["text_response"] = sample.pop("completion")
-                sample["response_meta"] = None
-
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
+def install_or_upgrade_package(package_name):
+    try:
+        # Run the pip command to install or upgrade the package
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", package_name])
+        print(f"{package_name} has been successfully installed or upgraded.")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while installing/upgrading {package_name}: {e}")
 
 
-def eval_evalplus(cfg):
-    # TODO: need to move it to a separate docker (either our sandbox or separate srun)
-    from evalplus.evaluate import evaluate
+def eval_bigcodebench(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
+    try:
+        from bigcodebench.evaluate import evaluate
+    except ImportError:
+        LOG.info("Package 'bigcodebench' not found. Attempting to install...")
+        install_requirements(BIGCODEBENCH_REQUIREMENTS_URL)
+        install_or_upgrade_package("bigcodebench")
+        install_or_upgrade_package("numpy==1.26.4")  # <= needed to work with scikit-learn version 1.3.1
+        try:
+            from bigcodebench.evaluate import evaluate
+        except ImportError:
+            LOG.error("Failed to install 'bigcodebench'. Please install it manually.")
+            raise
 
-    # processing each generation separately (TODO: evalplus can do it together, but need to figure out the format)
-    for jsonl_file in unroll_files(cfg.input_files):
-        with open(jsonl_file) as f:
-            samples = [preprocess_code(json.loads(line)) for line in f]
-        # all changes will be done with a new key "completion", so it's ok to write to the same file
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                f.write(json.dumps(sample) + "\n")
-        eval_config = {
-            "samples": jsonl_file,
-            "base_only": False,
-            "parallel": None,
-            "i_just_wanna_run": False,
-            "test_details": False,
-            "min_time_limit": 1,
-            "gt_time_limit_factor": 4.0,
-            "mini": False,
-            "noextreme": False,
-            "version": "default",
-        }
-        eval_config.update(OmegaConf.to_container(cfg.eval_config))
-        evaluate(Namespace(**eval_config))
-        with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
-            evalplus_grades = json.load(fin)
-        # adding is_correct key to allow compute_metrics to work
-        with open(jsonl_file, "wt", encoding="utf-8") as f:
-            for sample in samples:
-                sample["is_correct"] = evalplus_grades["eval"][sample["task_id"]][0]["base_status"] == "pass"
-                sample["is_correct-plus"] = (
-                    sample["is_correct"] and evalplus_grades["eval"][sample["task_id"]][0]["plus_status"] == "pass"
-                )
-                f.write(json.dumps(sample) + "\n")
+    data_split = None
+    jsonl_file = cfg.input_file
+    samples = []
+    with open(jsonl_file) as f:
+        for line in f:
+            generation_dict = preprocess_code(json.loads(line))
+            generation_dict["solution"] = generation_dict.pop("completion")
+            samples.append(generation_dict)
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
+            if data_split is None:
+                data_split = sample["split"]
+            elif data_split != sample["split"]:
+                raise ValueError(f"All samples should have the same split, but got {data_split} and {sample['split']}")
 
-        # moving eval file as otherwise evalplus does not want to recompute metrics if it's present..
-        shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+    # https://github.com/bigcode-project/bigcodebench/blob/main/bigcodebench/evaluate.py#L117
+    # if the input filename is "output.jsonl"
+    # then there will be two output files (generated) after evaluation:
+    # "output_eval_results-saved.json"
+    # "output_pass_at_k.json"
+    evaluate(
+        "instruct",
+        data_split,  # full, hard
+        samples=jsonl_file,
+        execution="local",
+        pass_k="1",
+        calibrated=True,
+        save_pass_rate=True,  # saves pass_at_k results in file: "output_pass_at_k.json"
+    )
+
+    with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+        eval_grades = json.load(fin)
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            sample["status"] = eval_grades["eval"][sample["task_id"]][0]["status"]
+            f.write(json.dumps(sample) + "\n")
+
+    # moving eval file to ensure metrics are recomputed
+    shutil.move(jsonl_file[:-6] + "_eval_results.json", jsonl_file[:-6] + "_eval_results-saved.json")
+
+
+def eval_human_eval_infilling(cfg):
+    cfg = BaseEvaluatorConfig(**cfg)
+    try:
+        from human_eval_infilling.evaluate import evaluate
+    except ImportError:
+        LOG.info("Package 'human_eval_infilling' not found. Attempting to install...")
+        install_from_git("git+https://github.com/wasiahmad/human-eval-infilling.git")
+        try:
+            from human_eval_infilling.evaluate import evaluate
+        except ImportError:
+            LOG.error("Failed to install 'human_eval_infilling'. Please install it manually.")
+            raise
+
+    def remove_overlap(preceding_text, following_text, truncate_from="following"):
+        assert truncate_from in ["preceding", "following"]
+        preceding_len = len(preceding_text)
+        following_len = len(following_text)
+        for i in range(min(preceding_len, following_len), 0, -1):
+            if truncate_from == "following":
+                overlap = preceding_text[-i:]
+                if overlap.strip() == "" and "\n" not in overlap:
+                    continue
+                if following_text.startswith(overlap):
+                    return following_text[i:]
+            elif truncate_from == "preceding":
+                overlap = following_text[:i]
+                if overlap.strip() == "" and "\n" not in overlap:
+                    continue
+                if preceding_text.endswith(overlap):
+                    return preceding_text[:-i]
+        return following_text if truncate_from == "following" else preceding_text
+
+    def postprocess_code(sample):
+        sample["completion"] = remove_overlap(sample["prefix"], sample["completion"], truncate_from="following")
+        sample["completion"] = remove_overlap(sample["completion"], sample["suffix"], truncate_from="preceding")
+        return sample
+
+    data_split = None
+    jsonl_file = cfg.input_file
+    samples = []
+    with open(jsonl_file) as f:
+        for line in f:
+            sample = json.loads(line)
+            if data_split is None:
+                data_split = sample["split"]
+            elif data_split != sample["split"]:
+                raise ValueError(f"All samples should have the same split, but got {data_split} and {sample['split']}")
+
+            sample = preprocess_code(sample, strip_whitespace=False)
+            sample["original_completion"] = sample["completion"]
+            sample = postprocess_code(sample)
+            samples.append(sample)
+
+    # all changes will be done with a new key "completion", so it's ok to write to the same file
+    with open(jsonl_file, "wt", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample) + "\n")
+
+    evaluate(data_split, jsonl_file, k=[1], n_workers=4, timeout=3.0)
+
+    with open(jsonl_file[:-6] + "_eval_results.json", "rt", encoding="utf-8") as fin:
+        eval_grades = json.load(fin)
+
+    with open(jsonl_file, "wt", encoding="utf-8") as f_out:
+        for s in samples:
+            s["passed"] = eval_grades["eval"][s["task_id"]][0]["passed"]
+            f_out.write(json.dumps(s) + "\n")

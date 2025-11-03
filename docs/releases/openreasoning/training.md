@@ -24,14 +24,13 @@ from nemo_skills.prompt.utils import get_prompt
 
 def apply_format(elem, prompt):
     assert len(elem['messages']) == 2
-    elem['input'] = prompt.fill({'problem': elem['messages'][0]['content']})
+    elem['input'] = prompt.fill({'problem': elem['messages'][0]['content']}, format_as_string=True)
     elem['output'] = prompt.format_assistant_response(elem['messages'][1]['content'])
     return elem
 
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="math")
 
-prompt = get_prompt('generic/math', 'Qwen/Qwen2.5-32B-Instruct')
-prompt.config.system = ""  # disabling default identity system message
+prompt = get_prompt('generic/math', tokenizer='Qwen/Qwen2.5-32B-Instruct', system_message="")
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -100,14 +99,13 @@ def apply_format(elem, prompt):
     metadata = json.loads(elem['metadata'])
     question = get_question(metadata['dataset'], metadata['split'], int(metadata['index']))
 
-    elem['input'] = prompt.fill({'question': question})
+    elem['input'] = prompt.fill({'question': question}, format_as_string=True)
     elem['output'] = prompt.format_assistant_response(elem['messages'][1]['content'])
     return elem
 
 dataset = load_dataset("nvidia/Nemotron-Post-Training-Dataset-v1", split="code")
 
-prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', 'Qwen/Qwen2.5-32B-Instruct')
-prompt.config.system = ""  # disabling default identity system message
+prompt = get_prompt('eval/livecodebench/python_codegen_reasoning', tokenizer='Qwen/Qwen2.5-32B-Instruct', system_message="")
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 dataset = dataset.remove_columns(['messages'])
@@ -125,14 +123,13 @@ from datasets import load_dataset
 from nemo_skills.prompt.utils import get_prompt
 
 def apply_format(elem, prompt):
-    elem['input'] = prompt.fill({'question': elem['input']})
+    elem['input'] = prompt.fill({'question': elem['input']}, format_as_string=True)
     elem['output'] = prompt.format_assistant_response(elem['output'])
     return elem
 
 dataset = load_dataset("nvidia/OpenScienceReasoning-2", split="train")
 
-prompt = get_prompt('generic/default', 'Qwen/Qwen2.5-32B-Instruct')  # data already includes instruction
-prompt.config.system = ""  # disabling default identity system message
+prompt = get_prompt('generic/default', tokenizer='Qwen/Qwen2.5-32B-Instruct', system_message="")  # data already includes instruction
 func = partial(apply_format, prompt=prompt)
 dataset = dataset.map(func, num_proc=20)
 

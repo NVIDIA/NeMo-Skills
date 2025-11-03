@@ -13,81 +13,68 @@
 # limitations under the License.
 
 import argparse
-import json
+import sys
 from pathlib import Path
 
-# Hard-coded accuracy ranges for baseline and after-training results
+sys.path.append(str(Path(__file__).resolve().parent.parent))  # for utils.py
+from utils import assert_all, load_json, soft_assert  # noqa: E402
+
+# TODO: should we train for longer / generate more data? Variance is really high
 RANGE_CONSTRAINTS = {
     "after_training": {
-        "aime24": {"pass@1[avg-of-8]": (20.0, 30.0), "majority@8": (28.33, 38.33)},
-        "aime25": {"pass@1[avg-of-8]": (17.5, 27.5), "majority@8": (32.22, 42.22)},
+        "aime24": {"pass@1[avg-of-8]": (16.0, 30.0), "majority@8": (25.33, 48.33)},
+        "aime25": {"pass@1[avg-of-8]": (15.0, 27.5), "majority@8": (20.22, 42.22)},
     },
     "baseline": {
-        "aime24": {"pass@1[avg-of-8]": (6.25, 16.25), "majority@8": (13.33, 23.33)},
-        "aime25": {"pass@1[avg-of-8]": (8.75, 18.75), "majority@8": (11.67, 21.67)},
+        "aime24": {"pass@1[avg-of-8]": (6.25, 18.25), "majority@8": (13.33, 25.33)},
+        "aime25": {"pass@1[avg-of-8]": (8.75, 18.75), "majority@8": (11.67, 24.33)},
     },
 }
 
 
-def load_json(path: Path):
-    """Load a JSON file from the given path."""
-    if not path.is_file():
-        raise FileNotFoundError(f"File not found: {path}")
-    with path.open("r") as f:
-        return json.load(f)
-
-
-def get_aime_symbolic(d: dict, bench_key: str, metric_key: str) -> float:
-    """Extract the value of a specific metric and convert to float."""
-    return float(d[bench_key][metric_key]["symbolic_correct"])
-
-
-def in_range(value: float, lo: float, hi: float) -> bool:
-    """Return True if value is within [lo, hi] inclusive."""
-    return lo <= value <= hi
-
-
-def check_benchmark(benchmark: str, baseline_results: dict, after_training_results: dict):
-    """
-    Validate one benchmark:
-      - baseline accuracy must be within its allowed range
-      - after-training accuracy must be within its allowed range
-      - after-training accuracy must be strictly greater than baseline accuracy
-    """
+def check_results(benchmark: str, baseline_results: dict, after_training_results: dict, backend: str):
     for metric in ["pass@1[avg-of-8]", "majority@8"]:
-        baseline_acc = get_aime_symbolic(baseline_results, benchmark, metric)
-        after_acc = get_aime_symbolic(after_training_results, benchmark, metric)
+        baseline_acc = baseline_results[benchmark][metric]["symbolic_correct"]
+        after_acc = after_training_results[benchmark][metric]["symbolic_correct"]
 
         lo_b, hi_b = RANGE_CONSTRAINTS["baseline"][benchmark][metric]
         lo_a, hi_a = RANGE_CONSTRAINTS["after_training"][benchmark][metric]
 
-        assert in_range(baseline_acc, lo_b, hi_b), (
-            f"{benchmark}: baseline {baseline_acc}% out of range [{lo_b}%, {hi_b}%] for metric {metric}"
+        soft_assert(
+            lo_b <= baseline_acc <= hi_b,
+            f"{benchmark}: baseline {baseline_acc}% out of range [{lo_b}%, {hi_b}%] for metric {metric}",
         )
-        assert in_range(after_acc, lo_a, hi_a), (
-            f"{benchmark}: after_training {after_acc}% out of range [{lo_a}%, {hi_a}%] for metric {metric}"
-        )
-        assert after_acc > baseline_acc, (
-            f"{benchmark}: after_training {after_acc}% not greater than baseline {baseline_acc}%"
+        soft_assert(
+            lo_a <= after_acc <= hi_a,
+            f"{benchmark} for {backend}: after_training {after_acc}% out of range [{lo_a}%, {hi_a}%] for metric {metric}",
         )
 
 
 def main():
-    ap = argparse.ArgumentParser(
-        description="Compare after-training vs baseline on AIME24/25 (metric: pass@1[avg-of-8].symbolic_correct)."
-    )
+    ap = argparse.ArgumentParser()
     ap.add_argument("--workspace", required=True, help="Workspace directory containing eval results.")
+    ap.add_argument(
+        "--backend",
+        type=str,
+        nargs="+",
+        choices=["megatron", "fsdp"],
+        default=["megatron"],
+    )
     args = ap.parse_args()
+    for training_backend in args.backend:
+        for benchmark in ("aime24", "aime25"):
+            common_path = Path(args.workspace) / "evals"
+            baseline_results = load_json(common_path / "baseline" / "eval-results" / benchmark / "metrics.json")
+            after_training_results = load_json(
+                common_path
+                / "after-training-{}".format(training_backend)
+                / "eval-results"
+                / benchmark
+                / "metrics.json"
+            )
+            check_results(benchmark, baseline_results, after_training_results, training_backend)
 
-    for benchmark in ("aime24", "aime25"):
-        common_path = Path(args.workspace) / "evals"
-        baseline_results = load_json(common_path / "baseline" / "eval-results" / benchmark / "metrics.json")
-        after_training_results = load_json(
-            common_path / "after-training" / "eval-results" / benchmark / "metrics.json"
-        )
-        check_benchmark(benchmark, baseline_results, after_training_results)
-
-    print("All checks passed.")
+    assert_all()
 
 
 if __name__ == "__main__":

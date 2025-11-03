@@ -26,8 +26,13 @@ from nemo_skills.dataset.utils import ExtraDatasetType
 from nemo_skills.inference import GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import generate as _generate
+from nemo_skills.pipeline.utils import parse_sbatch_kwargs
 from nemo_skills.pipeline.utils.eval import combine_cmds, prepare_eval_commands
-from nemo_skills.utils import get_logger_name, setup_logging
+from nemo_skills.utils import (
+    get_logger_name,
+    setup_logging,
+    validate_wandb_project_name,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -92,6 +97,18 @@ def eval(
         help="Path to the entrypoint of the judge server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    judge_generation_type: GenerationType | None = typer.Option(
+        None, help="Type of generation to perform for the judge (if applicable)"
+    ),
+    judge_generation_module: str = typer.Option(
+        None,
+        help="Path to the generation module to use for the judge (if applicable). "
+        "If not specified, will use the registered generation module for the "
+        "generation type.",
+    ),
+    server_container: str = typer.Option(
+        None, help="Override container image for the hosted server (if server_gpus is set)"
+    ),
     extra_judge_args: str = typer.Option(
         "", help="Additional arguments for judge (passed to generate script, so should start with ++)"
     ),
@@ -117,9 +134,12 @@ def eval(
         "Can provide a list directly when using through Python",
     ),
     partition: str = typer.Option(None, help="Cluster partition to use"),
+    qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
-    extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
+    auto_summarize_results: bool = typer.Option(
+        True, help="If True, will automatically launch summarize results tasks"
+    ),
     single_node_mode: SingleNodeMode = typer.Option(
         SingleNodeMode.parallel,
         help="Whether to run benchmarks in parallel or sequentially on a single node. "
@@ -154,11 +174,15 @@ def eval(
         help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
     with_sandbox: bool = typer.Option(False, help="If True, will start a sandbox container alongside this job"),
+    keep_mounts_for_sandbox: bool = typer.Option(
+        False,
+        help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
+    ),
     check_mounted_paths: bool = typer.Option(False, help="Check if mounted paths are available on the remote machine"),
     log_samples: bool = typer.Option(
         False,
@@ -175,8 +199,8 @@ def eval(
         "nemo-skills",
         help="Name of the wandb project to sync samples to.",
     ),
-    skip_hf_home_check: bool = typer.Option(
-        False,
+    skip_hf_home_check: bool | None = typer.Option(
+        None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     installation_command: str | None = typer.Option(
@@ -186,6 +210,10 @@ def eval(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -220,6 +248,11 @@ def eval(
             "project": wandb_project,
             "group": wandb_group,
         }
+        validate_wandb_project_name(
+            wandb_project=wandb_project,
+            wandb_name=wandb_name or expname,
+            wandb_group=wandb_group,
+        )
     else:
         wandb_parameters = None
 
@@ -231,8 +264,9 @@ def eval(
         "server_nodes": server_nodes,
         "server_args": server_args,
         "server_entrypoint": server_entrypoint,
+        "server_container": server_container,
     }
-    judge_server_parameters = {
+    cli_judge_pipeline_args = {
         "model": judge_model,
         "server_type": judge_server_type,
         "server_address": judge_server_address,
@@ -240,8 +274,10 @@ def eval(
         "server_nodes": judge_server_nodes,
         "server_args": judge_server_args,
         "server_entrypoint": judge_server_entrypoint,
+        "generation_type": judge_generation_type,
+        "generation_module": judge_generation_module,
     }
-    eval_requires_judge = any(param_value for param_value in judge_server_parameters.values())
+    eval_requires_judge = any(param_value for param_value in cli_judge_pipeline_args.values())
 
     # Prepare cluster config and mount paths
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
@@ -288,13 +324,16 @@ def eval(
         extra_datasets_type,
         exclusive,
         with_sandbox,
+        keep_mounts_for_sandbox,
         wandb_parameters,
-        extra_eval_args,
         eval_requires_judge=eval_requires_judge,
         generation_type=generation_type,
         generation_module=generation_module,
     )
-    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive, server_type)
+
+    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
+
+    get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     has_tasks = False
     job_id_to_tasks = {}
@@ -305,9 +344,16 @@ def eval(
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         # scheduling main eval jobs
         for idx, job_args in enumerate(job_batches):
-            cmds, job_benchmarks, job_needs_sandbox, job_server_config, job_server_address, job_server_command = (
-                job_args
-            )
+            (
+                cmds,
+                job_benchmarks,
+                job_needs_sandbox,
+                job_needs_sandbox_to_keep_mounts,
+                job_server_config,
+                job_server_address,
+                job_server_command,
+                job_sandbox_env_overrides,
+            ) = job_args
             prev_tasks = _task_dependencies
 
             for _ in range(dependent_jobs + 1):
@@ -320,10 +366,11 @@ def eval(
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,
                     partition=partition,
-                    time_min=time_min,
                     server_config=job_server_config,
                     with_sandbox=job_needs_sandbox or with_sandbox,
+                    keep_mounts_for_sandbox=job_needs_sandbox_to_keep_mounts or keep_mounts_for_sandbox,
                     sandbox_port=None if get_random_port else 6000,
+                    sandbox_env_overrides=job_sandbox_env_overrides,
                     run_after=run_after,
                     reuse_code_exp=reuse_code_exp,
                     reuse_code=reuse_code,
@@ -332,7 +379,7 @@ def eval(
                     ),
                     get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
-                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    sbatch_kwargs=sbatch_kwargs,
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
                 )
@@ -374,7 +421,7 @@ def eval(
             if judge_server_gpus is not None:
                 judge_pipeline_args["server_address"] = None
 
-            for judge_server_param, judge_server_value in judge_server_parameters.items():
+            for judge_server_param, judge_server_value in cli_judge_pipeline_args.items():
                 if judge_server_value is not None:
                     judge_pipeline_args[judge_server_param] = judge_server_value
             # TODO: should we support parsing a string?
@@ -386,108 +433,116 @@ def eval(
                 expname=f"{expname}-{benchmark}-judge",
                 log_dir=log_dir + "/judge",
                 cluster=cluster,
+                config_dir=config_dir,
                 partition=partition,
-                time_min=time_min,
                 with_sandbox=with_sandbox,
+                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                 run_after=run_after,
                 reuse_code_exp=reuse_code_exp,
                 reuse_code=reuse_code,
                 exclusive=exclusive,
                 installation_command=installation_command,
+                sbatch_kwargs=sbatch_kwargs,
                 _reuse_exp=exp,
                 _task_dependencies=(
                     dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
                 ),
                 **judge_pipeline_args,
             )
-            benchmark_to_judge_tasks[benchmark] = judge_tasks
-            all_tasks.extend(judge_tasks)
+            # _generate can return None when there are no jobs to run (e.g., outputs already exist)
+            # Only record and extend when tasks are present to avoid NoneType errors
+            if judge_tasks:
+                benchmark_to_judge_tasks[benchmark] = judge_tasks
+                all_tasks.extend(judge_tasks)
 
         group_metric_files = defaultdict(list)
         group_tasks = defaultdict(list)
         group_module = {}
 
         # setting summarize results tasks
-        for benchmark, benchmark_args in benchmarks_dict.items():
-            # TODO: add logic if metrics.json exists, we don't run this!
-            has_tasks = True
-            metric_file = f"{output_dir}/{benchmark_args.eval_subfolder}/metrics.json"
-            # TODO: with this new usage summarize_results probably needs some refactoring
-            #       also maybe we should remove it from pipeline as it's not
-            #       really ever needed to be run directly anymore?
-            results_folder = f"{output_dir}/{Path(benchmark_args.eval_subfolder).parent}"
-            command = (
-                f"python -m nemo_skills.pipeline.summarize_results {results_folder} "
-                f"    --benchmarks {benchmark} "
-                f"    --save_metrics_path {metric_file} "
-            )
-            if wandb_name:
-                command += f" --wandb_name={wandb_name} "
-            if wandb_group:
-                command += f" --wandb_group={wandb_group} "
-            if wandb_project:
-                command += f" --wandb_project={wandb_project} "
-            if data_dir:
-                command += f" --data_dir={data_dir} "
+        if auto_summarize_results:
+            for benchmark, benchmark_args in benchmarks_dict.items():
+                # TODO: add logic if metrics.json exists, we don't run this!
+                has_tasks = True
+                metric_file = f"{output_dir}/{benchmark_args.eval_subfolder}/metrics.json"
+                # TODO: with this new usage summarize_results probably needs some refactoring
+                #       also maybe we should remove it from pipeline as it's not
+                #       really ever needed to be run directly anymore?
+                results_folder = f"{output_dir}/{Path(benchmark_args.eval_subfolder).parent}"
+                command = (
+                    f"python -m nemo_skills.pipeline.summarize_results {results_folder} "
+                    f"    --benchmarks {benchmark} "
+                    f"    --save_metrics_path {metric_file} "
+                )
+                if wandb_name:
+                    command += f" --wandb_name={wandb_name} "
+                if wandb_group:
+                    command += f" --wandb_group={wandb_group} "
+                if wandb_project:
+                    command += f" --wandb_project={wandb_project} "
+                if data_dir:
+                    command += f" --data_dir={data_dir} "
 
-            if benchmark in benchmark_to_judge_tasks:
-                dependent_tasks = benchmark_to_judge_tasks[benchmark]
-            else:
-                dependent_job_ids = benchmark_args.job_ids
-                dependent_tasks = []
-                for job_id in dependent_job_ids:
-                    dependent_tasks.extend(job_id_to_tasks[job_id])
+                if benchmark in benchmark_to_judge_tasks:
+                    dependent_tasks = benchmark_to_judge_tasks[benchmark]
+                else:
+                    dependent_job_ids = benchmark_args.job_ids
+                    dependent_tasks = []
+                    for job_id in dependent_job_ids:
+                        dependent_tasks.extend(job_id_to_tasks[job_id])
 
-            summarize_task = pipeline_utils.add_task(
-                exp,
-                cmd=command,
-                task_name=f"{expname}-{benchmark}-summarize-results",
-                log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized-results",
-                container=cluster_config["containers"]["nemo-skills"],
-                cluster_config=cluster_config,
-                run_after=run_after,
-                reuse_code_exp=reuse_code_exp,
-                reuse_code=reuse_code,
-                task_dependencies=(
-                    dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
-                ),
-                installation_command=installation_command,
-                skip_hf_home_check=skip_hf_home_check,
-            )
-            all_tasks.append(summarize_task)
-            if benchmark_args.benchmark_group:
-                group_metric_files[benchmark_args.benchmark_group].append(metric_file)
-                group_tasks[benchmark_args.benchmark_group].append(summarize_task)
-                # it's always the same for all benchmarks in a group
-                group_module[benchmark_args.benchmark_group] = benchmark_args.score_module
+                summarize_task = pipeline_utils.add_task(
+                    exp,
+                    cmd=command,
+                    task_name=f"{expname}-{benchmark}-summarize-results",
+                    log_dir=f"{output_dir}/{benchmark_args.eval_subfolder}/summarized-results",
+                    container=cluster_config["containers"]["nemo-skills"],
+                    cluster_config=cluster_config,
+                    run_after=run_after,
+                    reuse_code_exp=reuse_code_exp,
+                    reuse_code=reuse_code,
+                    task_dependencies=(
+                        dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
+                    ),
+                    installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
+                    sbatch_kwargs=sbatch_kwargs,
+                )
+                all_tasks.append(summarize_task)
+                if benchmark_args.benchmark_group:
+                    group_metric_files[benchmark_args.benchmark_group].append(metric_file)
+                    group_tasks[benchmark_args.benchmark_group].append(summarize_task)
+                    # it's always the same for all benchmarks in a group
+                    group_module[benchmark_args.benchmark_group] = benchmark_args.score_module
 
-        # if we have any benchmark groups, submitting final aggregation for those
-        # TODO: this should be done by summarize_results directly and we just call it on a group
-        #       otherwise behavior is inconsistent when running summarize_results standalone, which isn't great
-        for group, metric_files in group_metric_files.items():
-            has_tasks = True
-            command = (
-                f"python -m nemo_skills.evaluation.compute_group_score {' '.join(metric_files)} "
-                f"    --score_module {group_module[group]} "
-                f"    --save_metrics_file {output_dir}/eval-results/{group}/metrics.json "
-            )
-            score_task = pipeline_utils.add_task(
-                exp,
-                cmd=command,
-                task_name=f"{expname}-{group}-compute-score",
-                log_dir=f"{output_dir}/eval-results/{group}/compute-score-logs",
-                container=cluster_config["containers"]["nemo-skills"],
-                cluster_config=cluster_config,
-                run_after=run_after,
-                reuse_code_exp=reuse_code_exp,
-                reuse_code=reuse_code,
-                task_dependencies=(
-                    group_tasks[group] if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
-                ),
-                installation_command=installation_command,
-                skip_hf_home_check=skip_hf_home_check,
-            )
-            all_tasks.append(score_task)
+            # if we have any benchmark groups, submitting final aggregation for those
+            # TODO: this should be done by summarize_results directly and we just call it on a group
+            #       otherwise behavior is inconsistent when running summarize_results standalone, which isn't great
+            for group, metric_files in group_metric_files.items():
+                has_tasks = True
+                command = (
+                    f"python -m nemo_skills.evaluation.compute_group_score {' '.join(metric_files)} "
+                    f"    --score_module {group_module[group]} "
+                    f"    --save_metrics_file {output_dir}/eval-results/{group}/metrics.json "
+                )
+                score_task = pipeline_utils.add_task(
+                    exp,
+                    cmd=command,
+                    task_name=f"{expname}-{group}-compute-score",
+                    log_dir=f"{output_dir}/eval-results/{group}/compute-score-logs",
+                    container=cluster_config["containers"]["nemo-skills"],
+                    cluster_config=cluster_config,
+                    run_after=run_after,
+                    reuse_code_exp=reuse_code_exp,
+                    reuse_code=reuse_code,
+                    task_dependencies=(
+                        group_tasks[group] if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
+                    ),
+                    installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
+                    sbatch_kwargs=sbatch_kwargs,
+                )
+                all_tasks.append(score_task)
 
         if has_tasks:
             pipeline_utils.run_exp(exp, cluster_config, dry_run=dry_run)

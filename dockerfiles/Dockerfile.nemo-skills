@@ -1,33 +1,58 @@
-FROM python:3.10-bookworm
+# using ubuntu instead of debian for easier apptainer installation on arm64
+FROM ubuntu:22.04
 
-RUN apt-get update && apt-get -y install curl git git-lfs
+# Install Python and other dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    python3.10 \
+    python3-pip \
+    curl \
+    wget \
+    git \
+    git-lfs && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
-# installing apptainer
-RUN apt install -y wget && \
-    cd /tmp && \
-    wget https://github.com/apptainer/apptainer/releases/download/v1.4.1/apptainer_1.4.1_amd64.deb && \
-    apt install -y ./apptainer_1.4.1_amd64.deb
+RUN pip install --upgrade pip setuptools
+
+# Update package lists and install apptainer for arm64
+# https://apptainer.org/docs/admin/1.1/installation.html
+RUN apt update && \
+    apt install -y software-properties-common && \
+    add-apt-repository -y ppa:apptainer/ppa && \
+    apt update && apt -y install apptainer && \
+    add-apt-repository -y ppa:apptainer/ppa && \
+    apt update && apt install -y apptainer-suid && \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # for ifeval benchmark
 # TODO: can we get just a single dir?
 RUN mkdir /opt/benchmarks
 RUN git clone https://github.com/google-research/google-research.git /opt/benchmarks/google-research --depth=1
 
-# ifbench
-RUN git clone https://github.com/allenai/IFBench.git /opt/benchmarks/IFBench --depth=1
-RUN cd /opt/benchmarks/IFBench && sed -i '/^unicodedata[=<>]*.*$/d' requirements.txt && pip install -r requirements.txt
-RUN cd /opt/benchmarks
-
-RUN pip install langdetect absl-py immutabledict nltk ipython && \
-    python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
-
 RUN git clone https://github.com/ShishirPatil/gorilla.git /opt/gorilla
 RUN cd /opt/gorilla && git checkout d2177992bbba9aa228b53c0645bf8f5613a5a7c6
 RUN cd /opt/gorilla/berkeley-function-call-leaderboard && pip install -e .
 
+RUN apt remove -y python3-blinker
 
+# ifbench
+RUN git clone https://github.com/allenai/IFBench.git /opt/benchmarks/IFBench --depth=1
+RUN cd /opt/benchmarks/IFBench && pip install -r requirements.txt
+
+# removing on-the-fly installation in ifbench to avoid conflicts from parallel jobs
+COPY dockerfiles/ifbench.patch /opt/benchmarks/IFBench/ifbench.patch
+RUN cd /opt/benchmarks/IFBench && git apply ifbench.patch
+
+RUN pip install langdetect absl-py immutabledict nltk ipython && \
+    python -c "import nltk; from spacy.cli import download; nltk.download('punkt'); nltk.download('punkt_tab'); \
+    nltk.download('stopwords'); nltk.download('averaged_perceptron_tagger_eng'); download('en_core_web_sm')"
+
+# we aren't copying main nemo_skills folder as it will always be mounted from host
+# but we do want to install all requirements in the container directly
 RUN mkdir -p /opt/NeMo-Skills/requirements
 COPY pyproject.toml README.md /opt/NeMo-Skills/
-COPY nemo_skills /opt/NeMo-Skills/nemo_skills/
 COPY requirements /opt/NeMo-Skills/requirements/
-RUN cd /opt/NeMo-Skills && pip install -e .
+# installing sdp in container only
+RUN pip install git+https://github.com/NVIDIA/NeMo-speech-data-processor@29b9b1ec0ceaf3ffa441c1d01297371b3f8e11d2
+RUN pip install -r /opt/NeMo-Skills/requirements/main.txt

@@ -181,12 +181,12 @@ def get_generation_cmd(
     input_dir=None,
     extra_arguments="",
     random_seed=None,
-    eval_args=None,
     chunk_id=None,
     num_chunks=None,
     preprocess_cmd=None,
     postprocess_cmd=None,
     wandb_parameters=None,
+    with_sandbox: bool = False,
     script: str = "nemo_skills.inference.generate",
 ):
     """Construct the generation command for language model inference."""
@@ -209,13 +209,14 @@ def get_generation_cmd(
     )
     cmd = "export HYDRA_FULL_ERROR=1 && "
     # Handle file paths vs module names
-    if os.sep in script:
+    common_args = f"++skip_filled=True ++input_file={input_file} ++output_file={output_file}"
+    if script.endswith(".py") or os.sep in script:
         # It's a file path, run it directly with .py extension
         script_path = script if script.endswith(".py") else f"{script}.py"
-        cmd += f"python {script_path} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
+        cmd += f"python {script_path} {common_args} "
     else:
         # It's a module name, use -m flag
-        cmd += f"python -m {script} ++skip_filled=True ++input_file={input_file} ++output_file={output_file} "
+        cmd += f"python -m {script} {common_args} "
     job_end_cmd = ""
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations
@@ -225,6 +226,9 @@ def get_generation_cmd(
             f"    ++inference.top_k=-1 "
             f"    ++inference.top_p=0.95 "
         )
+
+    if with_sandbox:
+        cmd += "++wait_for_sandbox=true "
 
     if chunk_id is not None:
         cmd += f" ++num_chunks={num_chunks} ++chunk_id={chunk_id} "
@@ -264,12 +268,8 @@ def get_generation_cmd(
         else:
             postprocess_cmd = job_end_cmd
 
-    cmd += f" {extra_arguments} "
-
-    if eval_args:
-        cmd += (
-            f" && python -m nemo_skills.evaluation.evaluate_results     ++input_files={output_file}     {eval_args} "
-        )
+    if extra_arguments:
+        cmd += f" {extra_arguments} "
 
     return wrap_cmd(
         cmd=cmd,
@@ -313,6 +313,7 @@ def configure_client(
     server_entrypoint: str | None,
     get_random_port: bool,
     extra_arguments: str,
+    server_container: str | None = None,
 ):
     """
     Utility function to configure a client for the model inference server.
@@ -327,6 +328,7 @@ def configure_client(
         server_entrypoint: Entry point for the server command (will use default if None).
         get_random_port: Whether to get a random port for the server.
         extra_arguments: Extra arguments to pass to the command.
+        server_container: Container to use for the server.
 
     Returns:
         A tuple containing:
@@ -348,6 +350,8 @@ def configure_client(
             "server_entrypoint": server_entrypoint,
             "server_port": server_port,
         }
+        if server_container:
+            server_config["container"] = server_container
         extra_arguments = (
             f"{extra_arguments} ++server.server_type={server_type} ++server.host=127.0.0.1 "
             f"++server.port={server_port} ++server.model={model} "

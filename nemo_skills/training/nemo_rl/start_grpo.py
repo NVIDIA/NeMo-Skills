@@ -40,8 +40,7 @@ from omegaconf import OmegaConf
 from transformers import PreTrainedTokenizerBase
 
 from nemo_skills.prompt.utils import get_prompt
-
-OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
+from nemo_skills.utils import setup_make_sequence_length_divisible_by
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
@@ -88,6 +87,8 @@ def load_jsonl_as_dataset(
 
 
 def extract_dataset(split, dataset_path):
+    if dataset_path is None:
+        return None
     if not dataset_path.startswith("/"):
         original_ds = load_dataset(dataset_path, split=split)
     else:
@@ -106,7 +107,8 @@ def format_passthrough(data):
 def prepare_math_dataset(split_ds):
     # Format the examples, removing original columns
     train_formatted = split_ds["train"].map(format_passthrough)
-    val_formatted = split_ds["validation"].map(format_passthrough)
+    val_raw = split_ds.get("validation", None)
+    val_formatted = None if val_raw is None else val_raw.map(format_passthrough)
 
     return {
         "train": train_formatted,
@@ -162,7 +164,7 @@ def ns_data_processor(
     # we need to include system message here as roles are only used for masking
     # so prompt.fill can return a combined system + user message
     # if we use separate, it will have double BOS in the tokens!
-    user_message = prompt.fill(datum_dict)
+    user_message = prompt.fill(datum_dict, format_as_string=True)
     message_log = [
         {
             "role": "user",
@@ -280,6 +282,11 @@ def main() -> None:
         print(f"Overrides: {overrides}")
         config = parse_hydra_overrides(config, overrides)
 
+    OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
+    if config["policy"]["make_sequence_length_divisible_by"] is None:
+        tp = config["policy"]["tensor_model_parallel_size"]
+        cp = config["policy"]["context_parallel_size"]
+        config["policy"]["make_sequence_length_divisible_by"] = setup_make_sequence_length_divisible_by(tp, cp)
     config: MasterConfig = OmegaConf.to_container(config, resolve=True)
     print("Applied CLI overrides")
 

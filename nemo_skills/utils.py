@@ -21,6 +21,7 @@ import sys
 import tokenize
 import typing
 from dataclasses import MISSING, dataclass, fields, is_dataclass
+from math import lcm
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Union
 
@@ -31,19 +32,38 @@ from rich.logging import RichHandler
 # isort: off
 import nemo_skills
 from nemo_skills.file_utils import calculate_chunk_indices, unroll_files, jdump, jload, jload_chunk, count_newlines
+
 # isort: on
 
 
-def remove_thinking(
-    sample: dict, generation_key: str = "generation", thinking_begin: str = "<think>", thinking_end: str = "</think>"
-):
-    sample["_has_think_tags"] = thinking_begin in sample[generation_key]
-    if thinking_end in sample[generation_key]:
-        sample["_full_generation"] = sample[generation_key]
-        sample[generation_key] = sample[generation_key].split(thinking_end)[-1].strip()
-    elif thinking_begin in sample[generation_key]:
-        sample["_full_generation"] = sample[generation_key]
+def get_logger_name(file):
+    if "/nemo_skills/" in file:
+        return "nemo_skills" + file.split("nemo_skills")[1].replace("/", ".").replace(".py", "")
+    else:
+        return f"[external] {Path(file).stem}"
+
+
+LOG = logging.getLogger(get_logger_name(__file__))
+
+
+def parse_reasoning(sample: dict, generation_key: str = "generation", end_reasoning_string: str = "</think>"):
+    # not doing anything if generation isn't a string
+    # TODO: should we be more explicit about this?
+    if not isinstance(sample[generation_key], str):
+        return
+    sample[f"_{generation_key}_finished_thinking"] = end_reasoning_string in sample[generation_key]
+    if end_reasoning_string in sample[generation_key]:
+        sample[f"_full_{generation_key}"] = sample[generation_key]
+        sample[generation_key] = sample[generation_key].split(end_reasoning_string)[-1].strip()
+    else:
+        sample[f"_full_{generation_key}"] = sample[generation_key]
         sample[generation_key] = ""  # no end tag, so setting the generation to empty
+        LOG.warning(
+            "Thinking end tag `%s` not found in generation; setting generation to empty. "
+            "If this happens for every generation, you might have accidentally set ++parse_reasoning=True for a "
+            "non-reasoning model or have incorrect end tag.",
+            end_reasoning_string,
+        )
 
 
 def nested_dataclass(*args, **kwargs):
@@ -86,6 +106,10 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
     logger = logging.getLogger("nemo_skills")
     logger.setLevel(log_level)
 
+    # Remove all existing handlers
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
     if use_rich:
         handler = RichHandler(
             rich_tracebacks=True,
@@ -99,12 +123,11 @@ def setup_logging(disable_hydra_logs: bool = True, log_level: int = logging.INFO
                 datefmt="[%X]",
             )
         )
-        for hdlr in logger.handlers[:]:
-            logger.removeHandler(hdlr)
     else:
         handler = logging.StreamHandler()
         formatter = logging.Formatter("%(asctime)s %(levelname)s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
         handler.setFormatter(formatter)
+
     logger.addHandler(handler)
     logging.getLogger("sshtunnel_requests.cache").setLevel(logging.ERROR)
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -122,10 +145,6 @@ def remove_handlers():
     logger = logging.getLogger("nemo_skills")
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-
-
-def get_logger_name(file):
-    return "nemo_skills" + file.split("nemo_skills")[1].replace("/", ".").replace(".py", "")
 
 
 def get_skills_root_dir():
@@ -182,6 +201,34 @@ def init_wandb(project, name, exp_dir=None, verbose=False):
             print("Wandb initialization failed with the following error.")
             print(e)
         return False
+
+
+def validate_wandb_project_name(wandb_project=None, wandb_name=None, wandb_group=None, wandb_id=None):
+    """
+    Validate Weights & Biases (W&B) identifiers.
+
+    Rules (based on W&B conventions):
+      - Only validate non-None fields.
+      - Must be <= 128 characters (W&B safe upper limit).
+    """
+
+    # Helper function for length validation
+    def _validate_length(value, field_name):
+        if len(value) > 128:
+            raise ValueError(f"{field_name} exceeds the 128-character limit.")
+
+    # Only check if not None
+    if wandb_project is not None:
+        _validate_length(wandb_project, "wandb_project")
+
+    if wandb_name is not None:
+        _validate_length(wandb_name, "wandb_name")
+
+    if wandb_group is not None:
+        _validate_length(wandb_group, "wandb_group")
+
+    if wandb_id is not None:
+        _validate_length(wandb_id, "wandb_id")
 
 
 def extract_comments(code: str):
@@ -575,3 +622,16 @@ def get_server_wait_cmd(server_address):
         f"echo 'Waiting for the server to start at {server_address}' && "
         f"while [ $(curl -X PUT {server_address} >/dev/null 2>&1; echo $?) -ne 0 ]; do sleep 3; done "
     )
+
+
+def setup_make_sequence_length_divisible_by(tensor_model_parallel_size: int, context_parallel_size: int) -> int:
+    if tensor_model_parallel_size > 1 and context_parallel_size > 1:
+        make_sequence_length_divisible_by = lcm(2 * context_parallel_size, tensor_model_parallel_size)
+    elif tensor_model_parallel_size > 1:
+        make_sequence_length_divisible_by = tensor_model_parallel_size
+    elif context_parallel_size > 1:
+        make_sequence_length_divisible_by = context_parallel_size * 2
+    else:
+        make_sequence_length_divisible_by = 1
+
+    return make_sequence_length_divisible_by
