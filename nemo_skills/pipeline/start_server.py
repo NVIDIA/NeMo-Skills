@@ -11,7 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+import signal
+import time
+
 import typer
+from nemo_run import Experiment
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
@@ -25,7 +30,9 @@ from nemo_skills.pipeline.utils import (
     resolve_mount_paths,
     set_python_path_and_wait_for_server,
 )
-from nemo_skills.utils import setup_logging
+from nemo_skills.utils import get_logger_name, setup_logging
+
+LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def get_gradio_chat_cmd(model, server_type, extra_args):
@@ -36,6 +43,54 @@ def get_gradio_chat_cmd(model, server_type, extra_args):
         f" {extra_args} "
     )
     return cmd
+
+
+def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int = 10):
+    from nemo_run.core.tunnel.client import RunResult, SSHTunnel
+    from nemo_run.run.job import AppState, Job
+
+    ## Assumes first job in experiment correspond to the server.
+    job: Job = exp.jobs[0]
+
+    if not isinstance(job.executor.tunnel, SSHTunnel):
+        LOG.warning("Not using an SSH tunnel, skipping server tunnel.")
+        return
+
+    LOG.info("Waiting for server job to start...")
+    while job.status(exp._runner) is not AppState.RUNNING:
+        time.sleep(wait_interval)
+
+    try:
+        _, _, path_str = job.handle.partition("://")
+        path = path_str.split("/")
+        app_id = path[1]
+    except Exception as e:
+        LOG.exception("Unable to get job ID for server tunnel.")
+        LOG.exception(e)
+        return
+
+    job_node_list_cmd: RunResult = job.executor.tunnel.run(f"scontrol show job {app_id} | grep -E '\s+NodeList'")
+    if job_node_list_cmd.return_code == 0:
+        _, job_node_list = job_node_list_cmd.stdout.strip().split("=", 1)
+        job_node_list = job_node_list.split(",")
+    else:
+        LOG.exception(f"Failed to get node list. {job_node_list_cmd.stderr}")
+        return
+
+    ssh_tunnel_cmd = " ".join(
+        [
+            "ssh",
+            "-N",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-J",
+            f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
+            job_node_list[0],
+            "-L",
+            f"{server_port}:localhost:{server_port}",
+        ]
+    )
+    LOG.info(f"SSH tunnel command: {ssh_tunnel_cmd}")
 
 
 @app.command()
@@ -85,6 +140,7 @@ def start_server(
         "",
         help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
+    create_tunnel: bool = typer.Option(False, help="If True, will create an SSH tunnel to the model server."),
 ):
     """Self-host a model server."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -132,9 +188,21 @@ def start_server(
             sandbox_port=None if get_random_port else 6000,
             sbatch_kwargs=parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
         )
-        # we don't want to detach in this case even on slurm, so not using run_exp
-        exp.run(detach=False, tail_logs=True)
-        # TODO: seems like not being killed? If nemorun doesn't do this, we can catch the signal and kill the server ourselves
+
+        exp.run(detach=True, tail_logs=True)
+
+        ## Allows ctrl + c to cancel all experiment jobs.
+        signal.signal(signal.SIGINT, signal.default_int_handler)
+        try:
+            if create_tunnel:
+                create_server_tunnel(exp, server_config["server_port"])
+
+            exp._wait_for_jobs(exp.jobs)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            for j in exp.jobs:
+                exp.cancel(j.id)
 
 
 if __name__ == "__main__":
