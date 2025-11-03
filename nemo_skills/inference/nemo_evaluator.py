@@ -35,6 +35,9 @@ class NemoEvaluatorConfig:
     stream_subprocess_output: bool = True
     # Tasks
     tasks: Optional[List[str]] = None
+    # Full Hydra cfg dict (from ++ overrides). Used to propagate critical fields into RunConfig
+    # WIPP(refine) if needed
+    raw_cfg: Optional[dict] = None
 
 
 class NemoEvaluatorGeneration(GenerationTask):
@@ -44,10 +47,11 @@ class NemoEvaluatorGeneration(GenerationTask):
 
     @staticmethod
     def _load_mapping() -> Dict[tuple[str, str], Dict[str, Any]]:
-        """Load mapping via nemo_evaluator_launcher (required)."""
+        """Load mapping via nemo_evaluator_launcher."""
         try:
+            # TODO(WIPP) add to dependencies
             from nemo_evaluator_launcher.common.mapping import load_tasks_mapping as _ltm  # type: ignore
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             raise RuntimeError(
                 "nemo_evaluator_launcher is required for evaluator task mapping. "
                 "Install with: pip install nemo-evaluator-launcher"
@@ -179,6 +183,20 @@ class NemoEvaluatorGeneration(GenerationTask):
             overrides=[],
         )
 
+        # Propagate critical overrides from Hydra cfg into RunConfig (notably target.api_endpoint)
+        try:
+            if self.cfg.raw_cfg:
+                target = self.cfg.raw_cfg.get("target") or {}
+                api_ep = target.get("api_endpoint") or {}
+                if api_ep:
+                    if "url" in api_ep and getattr(getattr(run_cfg, "target", None), "api_endpoint", None):
+                        run_cfg.target.api_endpoint.url = api_ep["url"]
+                    if "model_id" in api_ep and getattr(getattr(run_cfg, "target", None), "api_endpoint", None):
+                        run_cfg.target.api_endpoint.model_id = api_ep["model_id"]
+        except Exception:
+            # Best-effort propagation; do not fail hard if structure differs
+            pass
+
         # Determine tasks to run
         requested_tasks = self.cfg.tasks
         tasks_to_run: List[str]
@@ -234,6 +252,7 @@ def main(cfg):  # cfg is an OmegaConf DictConfig built from ++ overrides
         nemo_eval_config_name=str(cfg_dict.get("nemo_eval_config_name", "config")),
         stream_subprocess_output=bool(cfg_dict.get("stream_subprocess_output", True)),
         tasks=tasks_val,
+        raw_cfg=cfg_dict,
     )
     task = NemoEvaluatorGeneration(evaluator_cfg)
     task.generate()

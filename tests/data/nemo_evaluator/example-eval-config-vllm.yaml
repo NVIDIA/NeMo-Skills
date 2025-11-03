@@ -34,8 +34,8 @@ execution:
 
 target:
   api_endpoint:
-    model_id: meta/llama-3.1-8b-instruct
-    url: https://integrate.api.nvidia.com/v1/chat/completions
+    model_id: Qwen/Qwen3-4B-Thinking-2507
+    url: http://127.0.0.1:8000/v1/chat/completions # WIPP(fix) propagate via hydra
     api_key_name: API_KEY # API Key with access to build.nvidia.com
 
 # specify the benchmarks to evaluate
@@ -48,7 +48,7 @@ evaluation:
       params:
         request_timeout: 3600 # timeout for API requests in seconds
         parallelism: 1 # number of parallel requests
-        limit_samples: 5 # TEST ONLY: Limits all benchmarks to 10 samples total for quick testing
+        limit_samples: 3 # TEST ONLY: Limits all benchmarks to 10 samples total for quick testing
     target:
       api_endpoint:
         adapter_config:

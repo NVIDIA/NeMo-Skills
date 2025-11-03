@@ -15,6 +15,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils.commands import sandbox_command, vllm_server_command
 from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
 from nemo_skills.utils import get_logger_name, setup_logging
 
@@ -56,6 +57,27 @@ def nemo_evaluator(
             "could potentially lead to data loss."
         ),
     ),
+    # Optional self-hosted server (declarative) ? if server_type is set, a server will be co-scheduled
+    server_type: Optional[str] = typer.Option(
+        None,
+        help=("If set, self-host a server and co-schedule with evaluator. Supported values: vllm (preferred)."),
+    ),
+    server_model: Optional[str] = typer.Option(
+        None, help="Model path/name to serve when self-hosting (e.g., Qwen/Qwen3-4B-Thinking-2507)"
+    ),
+    server_gpus: int = typer.Option(0, help="GPUs to allocate for the self-hosted server (0 = no server)"),
+    server_nodes: int = typer.Option(1, help="Nodes to allocate for the self-hosted server"),
+    server_port: Optional[int] = typer.Option(None, help="Port for the server; if unset uses free/random"),
+    server_args: Optional[str] = typer.Option(None, help="Extra args for server (passed through)"),
+    server_entrypoint: Optional[str] = typer.Option(None, help="Custom entrypoint for server (advanced)"),
+    server_container: Optional[str] = typer.Option(
+        None, help="Container key/image for server (defaults to cluster 'nemo-skills' if None)"
+    ),
+    server_base_url: Optional[str] = typer.Option(
+        None, help="Use an externally hosted server instead of self-hosting (e.g., http://host:port)"
+    ),
+    server_api_path: str = typer.Option("/v1/chat/completions", help="API path used for evaluator target url"),
+    server_health_path: str = typer.Option("/health", help="Health path used to wait for server readiness"),
     # Experiment lifecycle and dependencies
     reuse_code: bool = typer.Option(True, help="If True, will reuse code from the provided experiment"),
     reuse_code_exp: str = typer.Option(None, help="If specified, reuse code from this experiment"),
@@ -198,39 +220,142 @@ def nemo_evaluator(
     jobs = []
     for idx, ((container_id, sig), group_tasks) in enumerate(groups.items()):
         tasks_arg = ",".join(group_tasks)
-        eval_cmd = (
+
+        # Prepare evaluator command base (without server URL overrides yet)
+        base_eval_cmd = (
             "export HYDRA_FULL_ERROR=1 && "
             "python -m nemo_skills.inference.nemo_evaluator "
             f"++tasks={tasks_arg} "
             f"{extra_overrides}"
         )
 
-        # Ensure CPU-only runs don't request GPUs from DockerExecutor:
-        # When job_gpus == 0, explicitly set metadata.gpus = None so
-        # exec_config["num_gpus"] becomes None (not 0), preventing GPU runtime selection.
-        client_cmd = Command(
-            command=eval_cmd,
-            container=container_id,  # key or full image
-            gpus=job_gpus or None,
-            nodes=job_nodes or 1,
-            name=f"{expname}-{idx}" if len(groups) > 1 else expname,
-            installation_command=install_cmd,
-            metadata={
-                "log_prefix": "main",
-                "environment": group_envs.get((container_id, sig), {}),
-                "gpus": job_gpus or None,
-            },
-        )
+        shared_env = group_envs.get((container_id, sig), {})
+
+        commands: List[Command] = []
+
+        # Optional self-hosted server
+        hosting_server = bool(server_type) and (server_gpus or 0) > 0 and bool(server_model)
+        with_external_server = (not hosting_server) and bool(server_base_url)
+
+        server_command_obj: Optional[Command] = None
+        server_effective_port: Optional[int] = None
+
+        if hosting_server:
+            stype = (server_type or "vllm").lower()
+            sargs = server_args or ""
+
+            if stype != "vllm":
+                LOG.warning("Only vllm server_type is explicitly supported in this path right now; got %s", stype)
+
+            # Build server command + metadata (port, num_tasks)
+            srv_cmd_str, srv_meta = vllm_server_command(
+                cluster_config=cluster_config,
+                model=server_model,  # type: ignore[arg-type]
+                port=server_port,
+                server_type=stype,
+                gpus=server_gpus,
+                nodes=server_nodes,
+                args=sargs,
+                entrypoint=server_entrypoint,
+            )
+
+            server_effective_port = int(srv_meta.get("port")) if srv_meta and srv_meta.get("port") else None
+            server_container_resolved = server_container or "nemo-skills"
+            server_command_obj = Command(
+                command=srv_cmd_str,
+                container=server_container_resolved,
+                gpus=server_gpus,
+                nodes=server_nodes or 1,
+                name=f"{expname}-server-{idx}" if len(groups) > 1 else f"{expname}-server",
+                metadata={
+                    **srv_meta,
+                    "gpus": server_gpus,
+                    "log_prefix": "server",
+                },
+            )
+            commands.append(server_command_obj)
+
+        # Build client command; if hosting server, wait for health and point evaluator to server URL
+        if hosting_server and server_command_obj is not None:
+
+            def _client_cmd_factory():
+                # Cross-component references resolved at runtime
+                server_host = server_command_obj.hostname_ref()
+                server_port_val = server_command_obj.meta_ref("port")
+                base_url = f"http://{server_host}:{server_port_val}"
+                health_url = f"{base_url}{server_health_path}"
+                target_url = f"{base_url}{server_api_path}"
+                wait_cmd = pipeline_utils.get_server_wait_cmd(health_url)
+                final = f"{wait_cmd} && {base_eval_cmd} ++target.api_endpoint.url={target_url}"
+                return final
+
+            client_cmd = Command(
+                command=_client_cmd_factory,
+                container=container_id,
+                gpus=job_gpus or None,
+                nodes=job_nodes or 1,
+                name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+                installation_command=install_cmd,
+                metadata={
+                    "log_prefix": "main",
+                    "environment": shared_env,
+                    "gpus": job_gpus or None,
+                },
+            )
+        else:
+            # Either external server provided, or client-only (no overrides)
+            eval_cmd = base_eval_cmd
+            if with_external_server:
+                # Ensure trailing slash handling is consistent
+                url = server_base_url.rstrip("/") + server_api_path
+                eval_cmd = f"{eval_cmd} ++target.api_endpoint.url={url}"
+
+            client_cmd = Command(
+                command=eval_cmd,
+                container=container_id,
+                gpus=job_gpus or None,
+                nodes=job_nodes or 1,
+                name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+                installation_command=install_cmd,
+                metadata={
+                    "log_prefix": "main",
+                    "environment": shared_env,
+                    "gpus": job_gpus or None,
+                },
+            )
+
+        commands.append(client_cmd)
+
+        # Optional sandbox container in the same job
+        if with_sandbox:
+            # Use a random port per group; sandbox communicates via env var on client side (set by evaluator harness)
+            from nemo_skills.pipeline.utils.server import get_free_port
+
+            sandbox_port = get_free_port(strategy="random")
+            sb_cmd_str, sb_meta = sandbox_command(cluster_config, port=sandbox_port)
+            sandbox_cmd = Command(
+                command=sb_cmd_str,
+                container=cluster_config["containers"].get("nemo-skills", "nemo-skills"),
+                gpus=None,
+                nodes=1,
+                name=f"{expname}-sandbox-{idx}" if len(groups) > 1 else f"{expname}-sandbox",
+                metadata=sb_meta,
+            )
+            commands.append(sandbox_cmd)
+
+        # Group hardware: if hosting a server, allocate server_gpus at group level so first component gets them
+        group_num_gpus = (server_gpus or None) if hosting_server else (job_gpus or None)
+        group_num_nodes = max(server_nodes if hosting_server else 1, job_nodes or 1)
 
         group = CommandGroup(
-            commands=[client_cmd],
+            commands=commands,
             hardware=HardwareConfig(
                 partition=partition,
                 qos=qos,
                 time_min=time_min,
                 exclusive=exclusive,
-                num_gpus=job_gpus or None,
-                num_nodes=job_nodes or 1,
+                num_gpus=group_num_gpus,
+                num_nodes=group_num_nodes,
             ),
             name=f"{expname}-{idx}" if len(groups) > 1 else expname,
             log_dir=log_dir,
@@ -245,6 +370,7 @@ def nemo_evaluator(
         reuse_code=reuse_code,
         reuse_code_exp=reuse_code_exp,
         skip_hf_home_check=True,  # avoid HF_HOME requirement for this orchestration path
+        with_ray=bool(server_type) and (server_nodes or 1) > 1,
         run_after=run_after,
     )
 
