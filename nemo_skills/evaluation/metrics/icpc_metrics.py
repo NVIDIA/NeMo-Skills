@@ -31,34 +31,48 @@ class ICPCMetrics(BaseMetrics):
         return {"correct": all(r["score"] > 0 for r in p["test_case_results"].values())}
 
     def get_problem_score(self, submissions) -> bool:
-        submission = submissions[0]
         scores = []
         for submission in submissions:
             scores.append(submission["test_case_results"]["score"])
+        return scores
+
+    def get_problem_sample_score(self, submissions) -> bool:
+        scores = []
+        for submission in submissions:
+            scores.append(submission["test_case_results"]["sample_score"])
         return scores
 
     def get_metrics(self):
         self.problem_scores = {}
         self.correct_submissions = {}
         self.total_submissions = {}
+        self.correct_sample_submissions = {}
         for name, submission in self.predictions_by_problem.items():
             if self.correct_submissions.get(name) is None:
                 self.correct_submissions[name] = 0
             if self.total_submissions.get(name) is None:
                 self.total_submissions[name] = 0
+            if self.correct_sample_submissions.get(name) is None:
+                self.correct_sample_submissions[name] = 0
             if self.problem_scores.get(name) is None:
                 self.problem_scores[name] = False
             scores = self.get_problem_score(submission)
+            sample_scores = self.get_problem_sample_score(submission)
             self.correct_submissions[name] += sum(1 for value in scores if value)
-            self.problem_scores[name] = sum(1 for value in scores if value) > 0
+            self.correct_sample_submissions[name] += sum(1 for value in sample_scores if value)
+
             self.total_submissions[name] += len(submission)
-        self.print_problem_scores()
         metrics_dict = {}
-        for name, scores in self.problem_scores.items():
-            metrics_dict[name] = {"correct": self.correct_submissions[name], "total": self.total_submissions[name]}
+        for name in self.total_submissions.keys():
+            metrics_dict[name] = {
+                "sample_correct": self.correct_sample_submissions[name],
+                "test_correct": self.correct_submissions[name],
+                "total": self.total_submissions[name],
+            }
+
         metrics_dict["total"] = {
             "solved": sum(1 for value in self.correct_submissions.values() if value > 0),
-            "average_run_time": sum(self.total_submissions.values()) / len(self.total_submissions.values()),
+            "average_number_of_runs": sum(self.total_submissions.values()) / len(self.total_submissions.values()),
         }
         return metrics_dict
 
@@ -67,7 +81,13 @@ class ICPCMetrics(BaseMetrics):
         return ["total"] + list(self.problem_scores.keys())
 
     def metrics_to_print(self):
-        metrics_to_print = {"correct": as_int, "total": as_int, "solved": as_int, "average_number_of_runs": as_float}
+        metrics_to_print = {
+            "sample_correct": as_int,
+            "test_correct": as_int,
+            "total": as_int,
+            "solved": as_int,
+            "average_number_of_runs": as_float,
+        }
         return metrics_to_print
 
     def reset(self):
