@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import signal
+import subprocess
 import time
 
 import typer
@@ -88,8 +89,6 @@ def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int =
         f"{server_port}:localhost:{server_port}",
     ]
     LOG.info(f"SSH tunnel command: {' '.join(ssh_tunnel_args)}")
-
-    import subprocess
 
     return subprocess.Popen(ssh_tunnel_args)
 
