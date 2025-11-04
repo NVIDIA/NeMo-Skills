@@ -260,10 +260,13 @@ def nemo_evaluator(
             )
 
             server_effective_port = int(srv_meta.get("port")) if srv_meta and srv_meta.get("port") else None
-            server_container_resolved = server_container or "nemo-skills"
+            server_type = server_type or "vllm"
+            # get container from server_config if provided, otherwise fall back to cluster config
+            if not server_container:
+                server_container = cluster_config["containers"][server_type]
             server_command_obj = Command(
                 command=srv_cmd_str,
-                container=server_container_resolved,
+                container=server_container,
                 gpus=server_gpus,
                 nodes=server_nodes or 1,
                 name=f"{expname}-server-{idx}" if len(groups) > 1 else f"{expname}-server",
