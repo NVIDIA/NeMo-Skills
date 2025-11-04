@@ -26,7 +26,7 @@ from nemo_skills.dataset.utils import ExtraDatasetType
 from nemo_skills.inference import GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import generate as _generate
-from nemo_skills.pipeline.utils import parse_sbatch_kwargs
+from nemo_skills.pipeline.utils import kwargs_to_string, parse_kwargs
 from nemo_skills.pipeline.utils.eval import combine_cmds, prepare_eval_commands
 from nemo_skills.utils import (
     get_logger_name,
@@ -214,9 +214,9 @@ def eval(
         "",
         help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
-    extra_metrics_arguments: str = typer.Option(
+    metrics_kwargs: str = typer.Option(
         "",
-        help="Additional arguments to pass to the metrics calculator. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+        help="Additional kwargs to pass to the metrics calculator. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
@@ -335,7 +335,7 @@ def eval(
         generation_module=generation_module,
     )
 
-    sbatch_kwargs = parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
+    sbatch_kwargs = parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
 
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
@@ -486,8 +486,8 @@ def eval(
                     command += f" --wandb_project={wandb_project} "
                 if data_dir:
                     command += f" --data_dir={data_dir} "
-                if extra_metrics_arguments:
-                    command += f" --extra_metrics_arguments='{extra_metrics_arguments}' "
+                if metrics_kwargs:
+                    command += f" --metrics_kwargs='{kwargs_to_string(metrics_kwargs)}' "
 
                 if benchmark in benchmark_to_judge_tasks:
                     dependent_tasks = benchmark_to_judge_tasks[benchmark]
