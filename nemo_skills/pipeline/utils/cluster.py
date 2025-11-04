@@ -132,7 +132,7 @@ def parse_kwargs(kwargs: str | dict | None, **extra_kwargs) -> dict | None:
             Any values of None will be ignored.
 
     Returns:
-        A dictionary of slurm kwargs, or None if no arguments are provided.
+        A dictionary containing kwargs, or None if no arguments are provided.
 
     Raises:
         ValueError: If kwargs is a string but cannot be parsed as JSON.
