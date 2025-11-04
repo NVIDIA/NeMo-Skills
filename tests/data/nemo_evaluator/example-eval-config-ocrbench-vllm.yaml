@@ -34,7 +34,7 @@ execution:
 
 target:
   api_endpoint:
-    model_id: Qwen/Qwen3-4B-Thinking-2507
+    model_id: Qwen/Qwen2-VL-2B-Instruct
     url: http://127.0.0.1:8000/v1/chat/completions # WIPP(fix) propagate via hydra
     api_key_name: API_KEY # API Key with access to build.nvidia.com
 
@@ -58,20 +58,5 @@ evaluation:
           max_logged_responses: null
           use_request_logging: true
           max_logged_requests: null
-          # custom_system_prompt: >-
-          #     "Think step by step."
-
   tasks:
-    - name: bbq_small
-      nemo_evaluator_config:
-        config:
-          params:
-            extra:
-              judge:
-                url: https://integrate.api.nvidia.com/v1/chat/completions
-                model_id: meta/llama-3.1-8b-instruct
-                parallelism: 2
-                max_new_tokens: 5
-                api_key: API_KEY
-              bbq:
-                dataset: small_ambig_clean.json
+    - name: ocrbench
