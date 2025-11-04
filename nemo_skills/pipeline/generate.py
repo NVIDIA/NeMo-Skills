@@ -45,13 +45,17 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 def _normalize_models_config(
-    model: Optional[List[str]],
+    model: Optional[str | List[str]],
 ) -> List[str]:
     """
     Normalize model specification to list.
 
+    Handles both scalar and list inputs:
+    - CLI (Typer): Converts single values to single-element lists automatically
+    - Python API: Accepts both strings and lists
+
     Args:
-        model: List of model paths (Typer converts single values to single-element lists)
+        model: Model path(s) - string or list from Python API, list from CLI
 
     Returns:
         List of model paths
@@ -59,7 +63,15 @@ def _normalize_models_config(
     Raises:
         ValueError: If model is None or empty
     """
-    if model is None or len(model) == 0:
+    if model is None:
+        raise ValueError("Must specify --model")
+
+    # Handle string (Python API with single model)
+    if isinstance(model, str):
+        return [model]
+
+    # Handle list
+    if len(model) == 0:
         raise ValueError("Must specify --model")
     return list(model)
 
@@ -72,11 +84,17 @@ def _normalize_parameter(
     """
     Normalize a parameter to a per-model list.
 
-    Typer automatically converts single values to single-element lists,
-    so this handles both single-value and multi-value cases uniformly.
+    Handles both scalar and list inputs for flexible usage:
+    - CLI (Typer): Converts single values to single-element lists automatically
+    - Python API: Accepts both scalars and lists directly
+
+    Broadcast logic:
+    - Scalar value: Broadcast to all models [value] * num_models
+    - Single-element list: Broadcast to all models
+    - Multi-element list: Must match num_models exactly
 
     Args:
-        param_value: Parameter value (list from Typer, or scalar for defaults)
+        param_value: Parameter value (scalar or list)
         num_models: Number of models
         param_name: Name of parameter (for error messages)
 
@@ -300,33 +318,44 @@ def generate(
         "generation type (which is required in this case).",
     ),
     model: List[str] = typer.Option(
-        None, help="Path to the model(s) or model name(s) in API. Single value or list for multi-model generation"
+        None,
+        help="Path to the model(s). CLI: space-separated. Python API: string or list. "
+        "Single value broadcasts to all models for multi-model generation.",
     ),
     server_address: List[str] = typer.Option(
         None,
-        help="Use ip:port for self-hosted models or the API url if using model providers. "
-        "Single value (broadcast) or list (per-model)",
+        help="Server address(es). CLI: space-separated. Python API: string or list. "
+        "Single value broadcasts to all models.",
     ),
     server_type: List[pipeline_utils.SupportedServers] = typer.Option(
-        ..., help="Type of server to use. Single value (broadcast) or list (per-model)"
+        ...,
+        help="Server type(s). CLI: space-separated. Python API: string or list. "
+        "Single value broadcasts to all models.",
     ),
     server_gpus: List[int] = typer.Option(
-        None, help="Number of GPUs to use if hosting the model. Single value (broadcast) or list (per-model)"
+        None,
+        help="Number of GPUs per model. CLI: space-separated ints. Python API: int or list. "
+        "Single value broadcasts to all models.",
     ),
     server_nodes: List[int] = typer.Option(
-        [1], help="Number of nodes required for hosting LLM server. Single value (broadcast) or list (per-model)"
+        [1],
+        help="Number of nodes per model. CLI: space-separated ints. Python API: int or list. "
+        "Single value broadcasts to all models.",
     ),
     server_args: List[str] = typer.Option(
-        [""], help="Any extra arguments to pass to the server. Single value (broadcast) or list (per-model)"
+        [""],
+        help="Server arguments per model. CLI: space-separated. Python API: string or list. "
+        "Single value broadcasts to all models.",
     ),
     server_entrypoint: List[str] = typer.Option(
         None,
-        help="Path to the entrypoint of the server. "
-        "If not specified, will use the default entrypoint for the server type. Single value (broadcast) or list (per-model)",
+        help="Server entrypoint(s). CLI: space-separated. Python API: string or list. "
+        "Single value broadcasts to all models.",
     ),
     server_container: List[str] = typer.Option(
         None,
-        help="Override container image for the hosted server (if server_gpus is set). Single value (broadcast) or list (per-model)",
+        help="Container image(s). CLI: space-separated. Python API: string or list. "
+        "Single value broadcasts to all models.",
     ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
@@ -417,7 +446,18 @@ def generate(
         None, help="Internal option to specify task dependencies.", hidden=True
     ),
 ):
-    """Generate LLM completions for a given input file.
+    """Generate LLM completions for single or multiple models.
+
+    Supports both single-model and multi-model generation through a unified interface.
+
+    Parameter Types:
+        Multi-model parameters (model, server_*, etc.) use List[T] type hints for Typer CLI
+        compatibility, but accept both scalars and lists when called from Python:
+        - CLI: --model m1 m2 (space-separated) → Typer converts to ["m1", "m2"]
+        - Python API: model="m1" or model=["m1", "m2"] → Both work (normalized internally)
+        - Single values broadcast to all models: server_gpus=8 → [8, 8, 8] for 3 models
+
+    Multi-model usage requires either --generation-type or --generation-module.
 
     Run `python -m nemo_skills.inference.generate --help` for other supported arguments
     (need to be prefixed with ++, since we use Hydra for that script).
