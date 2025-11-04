@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from nemo_skills.evaluation.metrics import ComputeMetrics
-from nemo_skills.pipeline.generate import _create_commandgroup_from_config
+from nemo_skills.pipeline.generate import _create_job_unified
 
 
 def test_eval_gsm8k_api(tmp_path):
@@ -157,7 +157,11 @@ def test_server_metadata_from_num_tasks():
     """Test that metadata dict is properly created from server command returning (cmd, num_tasks)."""
     mock_server_fn = MagicMock(return_value=("python server.py", 4))
     cluster_config = {
-        "containers": {"vllm": "nvcr.io/nvidia/nemo:vllm", "nemo-skills": "nvcr.io/nvidia/nemo:skills"},
+        "containers": {
+            "vllm": "nvcr.io/nvidia/nemo:vllm",
+            "nemo-skills": "nvcr.io/nvidia/nemo:skills",
+            "sandbox": "nvcr.io/nvidia/nemo:sandbox",
+        },
         "executor": "slurm",
     }
     server_config = {
@@ -168,20 +172,32 @@ def test_server_metadata_from_num_tasks():
         "server_port": 5000,
     }
 
-    cmd_group = _create_commandgroup_from_config(
-        generation_cmd="python generate.py",
-        server_config=server_config,
-        with_sandbox=False,
-        sandbox_port=None,
+    generation_cmd_params = {
+        "input_file": "test.jsonl",
+        "output_dir": "/tmp/output",
+        "model_names": ["test_model"],
+        "num_models": 1,
+        "server_addresses_prehosted": ["localhost:5000"],
+    }
+
+    job = _create_job_unified(
+        models=["test_model"],
+        server_configs=[server_config],
+        generation_cmd_params=generation_cmd_params,
         cluster_config=cluster_config,
         installation_command=None,
         get_server_command_fn=mock_server_fn,
+        with_sandbox=False,
+        sandbox_port=None,
         partition=None,
         keep_mounts_for_sandbox=False,
         task_name="test-task",
         log_dir="/tmp/logs",
+        sbatch_kwargs=None,
     )
 
+    # For single model, job has "groups" key with single group
+    cmd_group = job["groups"][0]
     server_cmd = cmd_group.commands[0]
     assert isinstance(server_cmd.metadata, dict)
     assert server_cmd.metadata["num_tasks"] == 4
