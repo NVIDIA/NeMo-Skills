@@ -217,6 +217,9 @@ def start_server(
         try:
             tunnel_procs = []
             if create_tunnel:
+                if cluster_config.get("executor") != "slurm":
+                    raise NotImplementedError("Tunnels can only be used with slurm executor.")
+
                 ## NOTE(sanyamk): Assumes first job in experiment corresponds to the server.
                 tunnel_procs.append(
                     create_job_tunnel(
@@ -231,7 +234,7 @@ def start_server(
                     )
 
             exp._wait_for_jobs(exp.jobs)
-        except KeyboardInterrupt:
+        except (NotImplementedError, KeyboardInterrupt):
             pass
         finally:
             for proc in tunnel_procs:
