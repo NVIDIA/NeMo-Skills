@@ -91,8 +91,5 @@ def get_metrics(metric_type: str, **kwargs):
         raise ValueError(
             f"Metric {metric_type} not found.\nSupported types: {str(METRICS_MAP.keys())} or use explicit class path format."
         )
-    # If no kwargs are provided, return the metrics class without any arguments
-    if not kwargs:
-        return metrics_cls()
-    else:
-        return metrics_cls(**kwargs)
+
+    return metrics_cls(**kwargs)
