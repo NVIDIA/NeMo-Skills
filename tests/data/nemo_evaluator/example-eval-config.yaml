@@ -47,7 +47,7 @@ evaluation:
       output_dir: /workspace/evals
       params:
         request_timeout: 3600 # timeout for API requests in seconds
-        parallelism: 1 # number of parallel requests
+        parallelism: 2 # number of parallel requests
         limit_samples: 5 # TEST ONLY: Limits all benchmarks to 10 samples total for quick testing
     target:
       api_endpoint:
@@ -59,4 +59,15 @@ evaluation:
           use_request_logging: true
           max_logged_requests: null
   tasks:
-    - name: ifeval
+    - name: bbq_small
+      nemo_evaluator_config:
+        config:
+          params:
+            extra:
+              judge:
+                url: https://integrate.api.nvidia.com/v1/chat/completions
+                parallelism: 2
+                max_new_tokens: 5
+                api_key: API_KEY
+              bbq:
+                dataset: small_ambig_clean.json
