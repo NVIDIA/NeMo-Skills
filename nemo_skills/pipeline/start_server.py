@@ -48,7 +48,14 @@ def get_gradio_chat_cmd(model, server_type, extra_args):
     return cmd
 
 
-def create_job_tunnel(job: Job, runner: Runner, port: int, local_port: int | None = None, wait_interval: int = 10):
+def create_job_tunnel(
+    job: Job,
+    runner: Runner,
+    port: int,
+    service_node: str | None = None,
+    local_port: int | None = None,
+    wait_interval: int = 10,
+):
     if not isinstance(job.executor.tunnel, SSHTunnel):
         LOG.warning("Not using an SSH tunnel, skipping.")
         return
@@ -66,15 +73,16 @@ def create_job_tunnel(job: Job, runner: Runner, port: int, local_port: int | Non
         LOG.exception(e)
         return
 
-    ## NOTE(sanyamk): Assumes first node corresponds to the service head.
-    server_head_node_cmd: RunResult = job.executor.tunnel.run(
-        f"scontrol show job {app_id} | grep -m1 -o -E '\s+NodeList\=.*' | xargs | cut -d= -f2 | xargs scontrol show hostnames | tail -n1"
-    )
-    if server_head_node_cmd.return_code != 0:
-        LOG.exception(f"Failed to get node list. {server_head_node_cmd.stderr}")
-        return
+    if service_node is None:
+        ## NOTE(sanyamk): Assumes last one corresponds to the service node.
+        service_node_cmd: RunResult = job.executor.tunnel.run(
+            f"scontrol show job {app_id} | grep -m1 -o -E '\s+NodeList\=.*' | xargs | cut -d= -f2 | xargs scontrol show hostnames | tail -n1"
+        )
+        if service_node_cmd.return_code != 0:
+            LOG.exception(f"Failed to get node list. {service_node_cmd.stderr}")
+            return
 
-    server_head_node = server_head_node_cmd.stdout.strip()
+        service_node = service_node_cmd.stdout.strip()
 
     ssh_tunnel_args = (
         [
@@ -84,12 +92,12 @@ def create_job_tunnel(job: Job, runner: Runner, port: int, local_port: int | Non
             "-o",
             "StrictHostKeyChecking=accept-new",
         ]
-        + (["-p", job.executor.tunnel.port] if job.executor.tunnel.port else [])
+        + (["-p", str(job.executor.tunnel.port)] if job.executor.tunnel.port else [])
         + (["-i", job.executor.tunnel.identity] if job.executor.tunnel.identity else [])
         + [
             "-J",
             f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
-            server_head_node,
+            service_node,
             "-L",
             f"{local_port or port}:localhost:{port}",
         ]
