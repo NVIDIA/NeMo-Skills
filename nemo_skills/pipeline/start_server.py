@@ -48,7 +48,7 @@ def get_gradio_chat_cmd(model, server_type, extra_args):
     return cmd
 
 
-def create_job_tunnel(job: Job, runner: Runner, port: int, wait_interval: int = 10):
+def create_job_tunnel(job: Job, runner: Runner, port: int, local_port: int | None = None, wait_interval: int = 10):
     if not isinstance(job.executor.tunnel, SSHTunnel):
         LOG.warning("Not using an SSH tunnel, skipping.")
         return
@@ -68,7 +68,7 @@ def create_job_tunnel(job: Job, runner: Runner, port: int, wait_interval: int = 
 
     ## NOTE(sanyamk): Assumes first node corresponds to the service head.
     server_head_node_cmd: RunResult = job.executor.tunnel.run(
-        f"scontrol show job {app_id} | grep -m1 -o -E '\s+NodeList\=.*' | xargs | cut -d= -f2 | xargs scontrol show hostnames | head -n1"
+        f"scontrol show job {app_id} | grep -m1 -o -E '\s+NodeList\=.*' | xargs | cut -d= -f2 | xargs scontrol show hostnames | tail -n1"
     )
     if server_head_node_cmd.return_code != 0:
         LOG.exception(f"Failed to get node list. {server_head_node_cmd.stderr}")
@@ -84,13 +84,14 @@ def create_job_tunnel(job: Job, runner: Runner, port: int, wait_interval: int = 
             "-o",
             "StrictHostKeyChecking=accept-new",
         ]
+        + (["-p", job.executor.tunnel.port] if job.executor.tunnel.port else [])
         + (["-i", job.executor.tunnel.identity] if job.executor.tunnel.identity else [])
         + [
             "-J",
             f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
             server_head_node,
             "-L",
-            f"{port}:localhost:{port}",
+            f"{local_port or port}:localhost:{port}",
         ]
     )
     LOG.info(f"SSH tunnel command: {' '.join(ssh_tunnel_args)}")
@@ -146,7 +147,11 @@ def start_server(
         "",
         help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
-    create_tunnel: bool = typer.Option(False, help="If True, will create an SSH tunnel to the model server."),
+    create_tunnel: bool = typer.Option(
+        False, help="If True, will create an SSH tunnel to the model server (and sandbox when available)."
+    ),
+    server_tunnel_port: int = typer.Option(5000, help="Local tunnel port for the model server."),
+    sandbox_tunnel_port: int = typer.Option(6000, help="Local tunnel port for the sandbox server."),
 ):
     """Self-host a model server."""
     setup_logging(disable_hydra_logs=False, use_rich=True)
@@ -180,6 +185,8 @@ def start_server(
             cmd = set_python_path_and_wait_for_server(
                 server_address, get_gradio_chat_cmd(model, server_type, extra_chat_args)
             )
+
+        sandbox_port = get_free_port(strategy="random") if get_random_port else 6000
         add_task(
             exp,
             cmd=cmd,
@@ -191,8 +198,8 @@ def start_server(
             server_config=server_config,
             with_sandbox=with_sandbox,
             keep_mounts_for_sandbox=keep_mounts_for_sandbox,
-            sandbox_port=None if get_random_port else 6000,
-            sbatch_kwargs=parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
+            sandbox_port=sandbox_port,
+            sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
         )
 
         exp.run(detach=True, tail_logs=True)
@@ -200,17 +207,28 @@ def start_server(
         ## NOTE: Use ctrl + c twice to cancel all experiment jobs.
         signal.signal(signal.SIGINT, signal.default_int_handler)
         try:
-            tunnel_proc = None
+            tunnel_procs = []
             if create_tunnel:
                 ## NOTE(sanyamk): Assumes first job in experiment corresponds to the server.
-                tunnel_proc = create_job_tunnel(exp.jobs[0], exp._runner, server_config["server_port"])
+                tunnel_procs.append(
+                    create_job_tunnel(
+                        exp.jobs[0], exp._runner, server_config["server_port"], local_port=server_tunnel_port
+                    )
+                )
+
+                if with_sandbox:
+                    ## NOTE(sanyamk): Assumes last job in experiment corresponds to the sandbox.
+                    tunnel_procs.append(
+                        create_job_tunnel(exp.jobs[-1], exp._runner, sandbox_port, local_port=sandbox_tunnel_port)
+                    )
 
             exp._wait_for_jobs(exp.jobs)
         except KeyboardInterrupt:
             pass
         finally:
-            if tunnel_proc and tunnel_proc.poll() is None:
-                tunnel_proc.terminate()
+            for proc in tunnel_procs:
+                if proc and proc.poll() is None:
+                    proc.terminate()
 
             for j in exp.jobs:
                 exp.cancel(j.id)
