@@ -19,11 +19,11 @@ METRICS_TYPE = "aalcr"
 # using judgement directly in metrics, no need for special evaluation
 GENERATION_ARGS = "++prompt_config=generic/default"
 
-# JUDGE_PIPELINE_ARGS = {
-#     "model": "gpt-4.1",
-#     "server_type": "openai",
-#     "server_address": "https://api.openai.com/v1",
-# }
+JUDGE_PIPELINE_ARGS = {
+    #     "model": "gpt-4.1",
+    "server_type": "openai",
+    #     "server_address": "https://api.openai.com/v1",
+}
 
 JUDGE_ARGS = "++prompt_config=judge/aalcr ++generation_key=judgement ++add_generation_stats=False"
 
