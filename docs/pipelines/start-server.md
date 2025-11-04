@@ -20,7 +20,8 @@ ns start_server \
     --create_tunnel
 ```
 
-Now, the model server is available at `localhost:5000` by default.
+Now, the model server is available at `localhost:5000` by default. Note that it may take a while before the
+model server starts up depending on the size of the loaded model.
 
 !!! tip
 
