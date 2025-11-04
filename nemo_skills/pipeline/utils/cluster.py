@@ -114,7 +114,8 @@ def kwargs_to_string(kwargs: str | dict | None) -> dict | None:
         return json.dumps(kwargs)
     elif isinstance(kwargs, str):
         return kwargs
-    return None
+    else:
+        raise ValueError(f"kwargs must be a dict or a string, got {type(kwargs).__name__}")
 
 
 def parse_kwargs(kwargs: str | dict | None, **extra_kwargs) -> dict | None:
