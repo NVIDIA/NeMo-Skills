@@ -103,7 +103,7 @@ def eval_scicode(cfg):
     eval_config = ScicodeEvaluatorConfig(**cfg)
 
     # Install required packages for scicode evaluation
-    LOG.info("Installing required packages for scicode evaluation...")
+    LOG.info("Installing required packages and data for scicode evaluation...")
 
     async def install_packages():
         sandbox = get_sandbox(**eval_config.sandbox)
@@ -124,6 +124,35 @@ def eval_scicode(cfg):
             LOG.warning(f"Failed to upgrade matplotlib: {result.get('stderr', 'Unknown error')}")
         else:
             LOG.info("Successfully upgraded matplotlib")
+
+        # Check if test data exists at /data/test_data.h5, download if not
+        check_cmd = "test -f /data/test_data.h5 && echo 'exists' || echo 'missing'"
+        result, _ = await sandbox.execute_code(check_cmd, language="shell", timeout=10.0)
+
+        if result.get("stdout", "").strip() == "missing":
+            LOG.info("Test data not found at /data/test_data.h5, downloading...")
+
+            # Download the test data (gdown already installed in Dockerfile)
+            download_cmd = (
+                'python -c "import gdown; '
+                "url = 'https://drive.google.com/uc?id=17G_k65N_6yFFZ2O-jQH00Lh6iaw3z-AW'; "
+                "gdown.download(url, '/data/test_data.h5', quiet=False)\""
+            )
+            result, _ = await sandbox.execute_code(download_cmd, language="shell", timeout=300.0)
+
+            if result["process_status"] != "completed":
+                error_msg = result.get("stderr", result.get("stdout", "Unknown error"))
+                LOG.error(f"Failed to download scicode test data: {error_msg}")
+                LOG.error(
+                    "You can manually download the file from "
+                    "https://drive.google.com/file/d/17G_k65N_6yFFZ2O-jQH00Lh6iaw3z-AW/view "
+                    "and mount it to the sandbox at /data/test_data.h5"
+                )
+                raise RuntimeError("Failed to download scicode test data. See logs for details.")
+            else:
+                LOG.info("Successfully downloaded test data to /data/test_data.h5")
+        else:
+            LOG.info("Test data found at /data/test_data.h5")
 
         await sandbox.close()
 
