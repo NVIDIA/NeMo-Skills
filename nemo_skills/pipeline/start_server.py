@@ -17,9 +17,9 @@ import subprocess
 import time
 
 import typer
-from nemo_run import Experiment, SSHTunnel
+from nemo_run import SSHTunnel
 from nemo_run.core.tunnel.client import RunResult
-from nemo_run.run.job import AppState, Job
+from nemo_run.run.job import AppState, Job, Runner
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.utils import (
@@ -48,16 +48,13 @@ def get_gradio_chat_cmd(model, server_type, extra_args):
     return cmd
 
 
-def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int = 10):
-    ## NOTE(sanyamk): Assumes first job in experiment corresponds to the server.
-    job: Job = exp.jobs[0]
-
+def create_job_tunnel(job: Job, runner: Runner, port: int, wait_interval: int = 10):
     if not isinstance(job.executor.tunnel, SSHTunnel):
-        LOG.warning("Not using an SSH tunnel, skipping server tunnel.")
+        LOG.warning("Not using an SSH tunnel, skipping.")
         return
 
-    LOG.info("Waiting for server job to start...")
-    while job.status(exp._runner) is not AppState.RUNNING:
+    LOG.info("Waiting for job to start...")
+    while job.status(runner) is not AppState.RUNNING:
         time.sleep(wait_interval)
 
     try:
@@ -65,11 +62,11 @@ def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int =
         path = path_str.split("/")
         app_id = path[1]
     except Exception as e:
-        LOG.exception("Unable to get job ID for server tunnel.")
+        LOG.exception("Unable to get job ID for tunnel.")
         LOG.exception(e)
         return
 
-    ## NOTE(sanyamk): Assumes first node corresponds to the server head.
+    ## NOTE(sanyamk): Assumes first node corresponds to the service head.
     server_head_node_cmd: RunResult = job.executor.tunnel.run(
         f"scontrol show job {app_id} | grep -m1 -o -E '\s+NodeList\=.*' | xargs | cut -d= -f2 | xargs scontrol show hostnames | head -n1"
     )
@@ -93,10 +90,11 @@ def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int =
             f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
             server_head_node,
             "-L",
-            f"{server_port}:localhost:{server_port}",
+            f"{port}:localhost:{port}",
         ]
     )
     LOG.info(f"SSH tunnel command: {' '.join(ssh_tunnel_args)}")
+    LOG.info(f"Tunnel can be accessed at localhost:{port}")
 
     return subprocess.Popen(ssh_tunnel_args)
 
@@ -204,7 +202,8 @@ def start_server(
         try:
             tunnel_proc = None
             if create_tunnel:
-                tunnel_proc = create_server_tunnel(exp, server_config["server_port"])
+                ## NOTE(sanyamk): Assumes first job in experiment corresponds to the server.
+                tunnel_proc = create_job_tunnel(exp.jobs[0], exp._runner, server_config["server_port"])
 
             exp._wait_for_jobs(exp.jobs)
         except KeyboardInterrupt:
