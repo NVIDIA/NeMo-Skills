@@ -106,7 +106,7 @@ def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> 
     return timeout_str
 
 
-def kwargs_to_string(kwargs: str | dict | None) -> dict | None:
+def kwargs_to_string(kwargs: str | dict) -> dict:
     """
     Convert kwargs to a string.
     """
