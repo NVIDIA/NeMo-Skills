@@ -146,7 +146,8 @@ def eval_scicode(cfg):
                 LOG.error(
                     "You can manually download the file from "
                     "https://drive.google.com/file/d/17G_k65N_6yFFZ2O-jQH00Lh6iaw3z-AW/view "
-                    "and mount it to the sandbox at /data/test_data.h5"
+                    "and mount it to the sandbox at /data/test_data.h5. "
+                    "If you do this, rerun with `--keep_mounts_for_sandbox`"
                 )
                 raise RuntimeError("Failed to download scicode test data. See logs for details.")
             else:
