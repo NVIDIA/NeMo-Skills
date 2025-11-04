@@ -71,7 +71,7 @@ class InferenceConfig:
     endpoint_type: EndpointType = EndpointType.chat
     temperature: float = 0.0  # Temperature of 0 means greedy decoding
     top_k: int = -1
-    top_p: float = 0.95
+    top_p: float | None = 0.95  # Set to None to exclude from vllm requests (e.g., for ifbench)
     min_p: float = 0.0
     random_seed: int = 0
     tokens_to_generate: int | None = None

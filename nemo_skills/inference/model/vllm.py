@@ -80,11 +80,11 @@ class VLLMModel(BaseModel):
     ) -> dict:
         assert reasoning_effort is None, "reasoning_effort is not supported for text completion requests"
         assert tools is None, "tools are not supported for text completion requests"
-        return {
+        
+        request = {
             "prompt": prompt,
             "max_tokens": tokens_to_generate,
             "temperature": temperature,
-            "top_p": top_p,
             "seed": random_seed,
             "stop": stop_phrases or None,
             "logprobs": top_logprobs,
@@ -98,6 +98,12 @@ class VLLMModel(BaseModel):
             "timeout": timeout,
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
         }
+        
+        # Only include top_p if it's not None (allows conditional exclusion for specific benchmarks)
+        if top_p is not None:
+            request["top_p"] = top_p
+        
+        return request
 
     def _build_chat_request_params(
         self,
@@ -121,7 +127,6 @@ class VLLMModel(BaseModel):
             "messages": messages,
             "max_tokens": tokens_to_generate,
             "temperature": temperature,
-            "top_p": top_p,
             "seed": random_seed,
             "stop": stop_phrases or None,
             "logprobs": top_logprobs is not None,
@@ -134,6 +139,11 @@ class VLLMModel(BaseModel):
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
             "tools": tools,
         }
+        
+        # Only include top_p if it's not None (allows conditional exclusion for specific benchmarks)
+        if top_p is not None:
+            request["top_p"] = top_p
+        
         if reasoning_effort:
             request["allowed_openai_params"] = ["reasoning_effort"]
             request["reasoning_effort"] = reasoning_effort
