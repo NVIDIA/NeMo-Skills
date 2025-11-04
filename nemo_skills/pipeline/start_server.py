@@ -49,7 +49,7 @@ def get_gradio_chat_cmd(model, server_type, extra_args):
 
 
 def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int = 10):
-    ## Assumes first job in experiment correspond to the server.
+    ## NOTE(sanyamk): Assumes first job in experiment corresponds to the server.
     job: Job = exp.jobs[0]
 
     if not isinstance(job.executor.tunnel, SSHTunnel):
@@ -69,25 +69,33 @@ def create_server_tunnel(exp: Experiment, server_port: int, wait_interval: int =
         LOG.exception(e)
         return
 
-    job_node_list_cmd: RunResult = job.executor.tunnel.run(f"scontrol show job {app_id} | grep -E '\s+NodeList'")
-    if job_node_list_cmd.return_code == 0:
-        _, job_node_list = job_node_list_cmd.stdout.strip().split("=", 1)
-        job_node_list = job_node_list.split(",")
-    else:
-        LOG.exception(f"Failed to get node list. {job_node_list_cmd.stderr}")
+    ## NOTE(sanyamk): Assumes first node corresponds to the server head.
+    server_head_node_cmd: RunResult = job.executor.tunnel.run(
+        f"scontrol show job {app_id} | grep -m1 -o -E '\s+NodeList\=.*' | xargs | cut -d= -f2 | xargs scontrol show hostnames | head -n1"
+    )
+    if server_head_node_cmd.return_code != 0:
+        LOG.exception(f"Failed to get node list. {server_head_node_cmd.stderr}")
         return
 
-    ssh_tunnel_args = [
-        "ssh",
-        "-N",
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        "-J",
-        f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
-        job_node_list[0],
-        "-L",
-        f"{server_port}:localhost:{server_port}",
-    ]
+    server_head_node = server_head_node_cmd.stdout.strip()
+
+    ssh_tunnel_args = (
+        [
+            "ssh",
+            "-N",
+            "-A",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+        ]
+        + (["-i", job.executor.tunnel.identity] if job.executor.tunnel.identity else [])
+        + [
+            "-J",
+            f"{job.executor.tunnel.user}@{job.executor.tunnel.host}",
+            server_head_node,
+            "-L",
+            f"{server_port}:localhost:{server_port}",
+        ]
+    )
     LOG.info(f"SSH tunnel command: {' '.join(ssh_tunnel_args)}")
 
     return subprocess.Popen(ssh_tunnel_args)
@@ -202,7 +210,7 @@ def start_server(
         except KeyboardInterrupt:
             pass
         finally:
-            if create_tunnel and tunnel_proc and tunnel_proc.poll() is None:
+            if tunnel_proc and tunnel_proc.poll() is None:
                 tunnel_proc.terminate()
 
             for j in exp.jobs:
