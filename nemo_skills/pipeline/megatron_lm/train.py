@@ -26,7 +26,7 @@ from nemo_skills.pipeline.utils import (
     get_cluster_config,
     get_exp,
     get_timeout_str,
-    parse_sbatch_kwargs,
+    parse_kwargs,
     resolve_mount_paths,
     run_exp,
 )
@@ -115,7 +115,7 @@ def train_megatron_lm(
     ),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs per node"),
-    num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
+    dependent_jobs: int = typer.Option(0, help="Number of dependent jobs"),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -215,7 +215,7 @@ def train_megatron_lm(
 
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
-        for job_id in range(num_training_jobs):
+        for job_id in range(dependent_jobs + 1):
             prev_task = add_task(
                 exp,
                 cmd=train_cmd,
@@ -231,7 +231,7 @@ def train_megatron_lm(
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
-                sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
+                sbatch_kwargs=parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )
