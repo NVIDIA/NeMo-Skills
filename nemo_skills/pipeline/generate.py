@@ -14,7 +14,7 @@
 import importlib
 import logging
 import os
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import typer
 
@@ -42,81 +42,6 @@ from nemo_skills.utils import (
 LOG = logging.getLogger(get_logger_name(__file__))
 
 # TODO: add num_jobs here for consistency with eval?
-
-
-def _normalize_models_config(
-    model: Optional[str | List[str]],
-) -> List[str]:
-    """
-    Normalize model specification to list.
-
-    Handles both scalar and list inputs:
-    - CLI (Typer): Converts single values to single-element lists automatically
-    - Python API: Accepts both strings and lists
-
-    Args:
-        model: Model path(s) - string or list from Python API, list from CLI
-
-    Returns:
-        List of model paths
-
-    Raises:
-        ValueError: If model is None or empty
-    """
-    if model is None:
-        raise ValueError("Must specify --model")
-
-    # Handle string (Python API with single model)
-    if isinstance(model, str):
-        return [model]
-
-    # Handle list
-    if len(model) == 0:
-        raise ValueError("Must specify --model")
-    return list(model)
-
-
-def _normalize_parameter(
-    param_value: Any,
-    num_models: int,
-    param_name: str,
-) -> List[Any]:
-    """
-    Normalize a parameter to a per-model list.
-
-    Handles both scalar and list inputs for flexible usage:
-    - CLI (Typer): Converts single values to single-element lists automatically
-    - Python API: Accepts both scalars and lists directly
-
-    Broadcast logic:
-    - Scalar value: Broadcast to all models [value] * num_models
-    - Single-element list: Broadcast to all models
-    - Multi-element list: Must match num_models exactly
-
-    Args:
-        param_value: Parameter value (scalar or list)
-        num_models: Number of models
-        param_name: Name of parameter (for error messages)
-
-    Returns:
-        List of parameter values (one per model)
-
-    Raises:
-        ValueError: If list length doesn't match num_models
-    """
-    if not isinstance(param_value, list):
-        return [param_value] * num_models
-
-    if len(param_value) == num_models:
-        return list(param_value)
-
-    if len(param_value) == 1:
-        return param_value * num_models
-
-    raise ValueError(
-        f"Parameter {param_name} has {len(param_value)} values but {num_models} models specified. "
-        f"Must be 1 value (broadcast) or {num_models} values (per-model)."
-    )
 
 
 def _create_job_unified(
@@ -467,7 +392,7 @@ def generate(
     LOG.info("Starting generation job")
     LOG.info("Extra arguments that will be passed to the underlying script: %s", extra_arguments)
 
-    models_list = _normalize_models_config(model)
+    models_list = pipeline_utils.normalize_models_config(model)
     num_models = len(models_list)
 
     LOG.info(f"Number of models: {num_models}")
@@ -481,15 +406,15 @@ def generate(
         server_type = [convert_server_type_to_string(st) for st in server_type]
     else:
         server_type = convert_server_type_to_string(server_type)
-    server_types_list = _normalize_parameter(server_type, num_models, "server_type")
-    server_gpus_list = _normalize_parameter(server_gpus, num_models, "server_gpus")
-    server_nodes_list = _normalize_parameter(server_nodes, num_models, "server_nodes")
-    server_args_list = _normalize_parameter(server_args, num_models, "server_args")
-    server_entrypoints_list = _normalize_parameter(server_entrypoint, num_models, "server_entrypoint")
-    server_containers_list = _normalize_parameter(server_container, num_models, "server_container")
+    server_types_list = pipeline_utils.normalize_parameter(server_type, num_models, "server_type")
+    server_gpus_list = pipeline_utils.normalize_parameter(server_gpus, num_models, "server_gpus")
+    server_nodes_list = pipeline_utils.normalize_parameter(server_nodes, num_models, "server_nodes")
+    server_args_list = pipeline_utils.normalize_parameter(server_args, num_models, "server_args")
+    server_entrypoints_list = pipeline_utils.normalize_parameter(server_entrypoint, num_models, "server_entrypoint")
+    server_containers_list = pipeline_utils.normalize_parameter(server_container, num_models, "server_container")
 
     if server_address is not None:
-        server_addresses_list = _normalize_parameter(server_address, num_models, "server_address")
+        server_addresses_list = pipeline_utils.normalize_parameter(server_address, num_models, "server_address")
     else:
         server_addresses_list = [None] * num_models
 
@@ -627,7 +552,6 @@ def generate(
                 "random_seed": seed,
                 "output_dir": output_dir,
                 "model_names": models_list,
-                "num_models": num_models,
                 "extra_arguments": extra_args_from_first_server,
                 "chunk_id": chunk_id,
                 "num_chunks": num_chunks,

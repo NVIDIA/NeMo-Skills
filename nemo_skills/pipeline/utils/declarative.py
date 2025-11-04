@@ -188,19 +188,18 @@ class Command:
     def hostname_ref(self) -> str:
         """Get hostname reference for hetjob cross-component communication.
 
-        Returns a shell variable reference that resolves to the first hostname
-        in the het group's nodelist. Handles these SLURM nodelist formats:
-        - Single node: "batch-block1-0075" → "batch-block1-0075"
-        - Node range: "batch-block1-[0075-0078]" → "batch-block1-0075"
-        - Node list: "batch-block1-0075,batch-block1-0076" → "batch-block1-0075"
+        Returns a shell variable reference that resolves to the master node hostname
+        for this het group. Uses environment variables automatically exported by nemo-run:
+            SLURM_MASTER_NODE_HET_GROUP_0, SLURM_MASTER_NODE_HET_GROUP_1, etc.
+
+        These are set via:
+            export SLURM_MASTER_NODE_HET_GROUP_N=$(scontrol show hostnames $SLURM_JOB_NODELIST_HET_GROUP_N | head -n1)
         """
         if self.het_group_index is None:
             return "127.0.0.1"  # Local fallback for non-heterogeneous jobs
 
-        # Use our SLURM helper utility to parse the nodelist
-        var_name = f"SLURM_JOB_NODELIST_HET_GROUP_{self.het_group_index}"
-        # TODO: maybe instead  do something that is fully bash ready so it can be run in any container
-        return f"$(python3 -m nemo_skills.pipeline.utils.slurm_helpers ${var_name})"
+        # Use the environment variable exported by nemo-run
+        return f"${{SLURM_MASTER_NODE_HET_GROUP_{self.het_group_index}:-localhost}}"
 
     def meta_ref(self, key: str) -> str:
         """Get metadata value (like port). Fails if key not found."""
