@@ -52,7 +52,11 @@ class ComputeMetrics:
         self.metrics_kwargs = metrics_kwargs
 
     def get_metrics_calculator(self):
-        metrics_calculator = get_metrics(self.metric_type, extra_arguments=self.metrics_kwargs)
+        metrics_calculator = (
+            get_metrics(self.metric_type, **self.metrics_kwargs)
+            if self.metrics_kwargs
+            else get_metrics(self.metric_type)
+        )
         metrics_calculator.reset()
         return metrics_calculator
 
