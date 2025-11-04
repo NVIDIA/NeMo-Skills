@@ -93,8 +93,7 @@ def _create_job_unified(
     groups = []
     server_commands = []  # Track server Command objects for hostname references
 
-    # Create groups for each model
-    for idx, (model_path, server_config) in enumerate(zip(models, server_configs)):
+    for model_idx, (model_path, server_config) in enumerate(zip(models, server_configs)):
         components = []
 
         # Track GPU/node requirements for this group (from server config)
@@ -118,7 +117,7 @@ def _create_job_unified(
                 "num_tasks": num_tasks,
                 "gpus": group_gpus,
                 "nodes": group_nodes,
-                "log_prefix": f"server_{idx}" if num_models > 1 else "server",
+                "log_prefix": f"server_{model_idx}" if num_models > 1 else "server",
                 "port": server_config["server_port"],
             }
 
@@ -127,7 +126,7 @@ def _create_job_unified(
                 container=server_container,
                 gpus=group_gpus,
                 nodes=group_nodes,
-                name=f"model_{idx}_server" if num_models > 1 else "server",
+                name=f"model_{model_idx}_server" if num_models > 1 else "server",
                 metadata=metadata,
             )
             components.append(server_cmd)
@@ -137,7 +136,7 @@ def _create_job_unified(
             server_commands.append(None)
 
         # 2. Group 0 gets the client
-        if idx == 0:
+        if model_idx == 0:
             client_env = {}
             if with_sandbox and sandbox_port is not None:
                 client_env["NEMO_SKILLS_SANDBOX_PORT"] = str(sandbox_port)
@@ -202,7 +201,7 @@ def _create_job_unified(
                     num_nodes=group_nodes,
                     sbatch_kwargs=sbatch_kwargs,
                 ),
-                name=f"model_{idx}_group" if num_models > 1 else task_name,
+                name=f"model_{model_idx}_group" if num_models > 1 else task_name,
                 log_dir=log_dir,
             )
             groups.append(group)
@@ -396,8 +395,8 @@ def generate(
     num_models = len(models_list)
 
     LOG.info(f"Number of models: {num_models}")
-    for idx, model_name in enumerate(models_list):
-        LOG.info(f"  Model {idx}: {model_name}")
+    for model_idx, model_name in enumerate(models_list):
+        LOG.info(f"  Model {model_idx}: {model_name}")
 
     def convert_server_type_to_string(server_type):
         return server_type.value if hasattr(server_type, "value") else server_type
@@ -524,26 +523,28 @@ def generate(
             # For n>1, we build server addresses ourselves
             extra_args_from_first_server = extra_arguments_original
 
-            for idx in range(num_models):
-                get_random_port_for_server = pipeline_utils.should_get_random_port(server_gpus_list[idx], exclusive)
+            for model_idx in range(num_models):
+                get_random_port_for_server = pipeline_utils.should_get_random_port(
+                    server_gpus_list[model_idx], exclusive
+                )
 
                 srv_config, srv_address, srv_extra_args = pipeline_utils.configure_client(
-                    model=models_list[idx],
-                    server_type=server_types_list[idx],
-                    server_address=server_addresses_list[idx],
-                    server_gpus=server_gpus_list[idx],
-                    server_nodes=server_nodes_list[idx],
-                    server_args=server_args_list[idx],
-                    server_entrypoint=server_entrypoints_list[idx],
-                    server_container=server_containers_list[idx],
-                    extra_arguments=extra_arguments_original if idx == 0 else "",
+                    model=models_list[model_idx],
+                    server_type=server_types_list[model_idx],
+                    server_address=server_addresses_list[model_idx],
+                    server_gpus=server_gpus_list[model_idx],
+                    server_nodes=server_nodes_list[model_idx],
+                    server_args=server_args_list[model_idx],
+                    server_entrypoint=server_entrypoints_list[model_idx],
+                    server_container=server_containers_list[model_idx],
+                    extra_arguments=extra_arguments_original if model_idx == 0 else "",
                     get_random_port=get_random_port_for_server,
                 )
                 server_configs.append(srv_config)
                 server_addresses_resolved.append(srv_address)
 
                 # For n=1, use the extra_arguments from configure_client (has server config)
-                if idx == 0 and num_models == 1:
+                if model_idx == 0 and num_models == 1:
                     extra_args_from_first_server = srv_extra_args
 
             cmd_params = {
