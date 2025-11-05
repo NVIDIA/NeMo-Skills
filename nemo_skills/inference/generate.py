@@ -335,8 +335,7 @@ class GenerationTask:
         # Step 3: Setup prompt with composed system message (now has tool prompts available)
         self.prompt = self.setup_prompt()
 
-        # Step 4: Setup LLM, passing tool_manager (includes parallel thinking wrapper if configured)
-        # Note: Parallel thinking can now be applied inside setup_llm since self.prompt exists
+        # Step 4: Setup LLM, passing tool_manager
         self.llm = self.setup_llm(tool_manager=self.tool_manager)
 
         # Setup hf_tokenizer for counting prompt tokens
