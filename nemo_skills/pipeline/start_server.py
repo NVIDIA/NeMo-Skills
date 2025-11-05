@@ -207,7 +207,7 @@ def start_server(
             with_sandbox=with_sandbox,
             keep_mounts_for_sandbox=keep_mounts_for_sandbox,
             sandbox_port=sandbox_port,
-            sbatch_kwargs=parse_sbatch_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
+            sbatch_kwargs=parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
         )
 
         exp.run(detach=True, tail_logs=True)
