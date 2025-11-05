@@ -27,14 +27,12 @@ At a high level, for each JSONL line in your result manifests we do the followin
 
 Important configuration options and considerations for reliable Lean 4 evaluation:
 
-- Producing only the proof body
-  - Encourage the model to output only the proof body. If a theorem header is generated, it will be stripped and the dataset statement will be used.
-- Providing a preassembled proof
-  - If the line already includes a complete proof artifact, it will be used directly; otherwise the proof is assembled from the model’s generated text and dataset metadata.
-- `restate_formal_statement` (default: True)
-  - Controls whether the dataset’s `formal_statement` is inserted before the proof. Keeping this enabled enforces the canonical theorem; disabling it relies on the model’s emitted statement and is generally not recommended for benchmarking.
-- `timeout` (default: 30.0 seconds)
-  - Per-item execution timeout. A timeout returns `proof_status='timeout'`.
+1. Producing only the proof body
+    - Encourage the model to output only the proof body. If a theorem header is generated, it will be stripped and the dataset statement will be used.
+2. `restate_formal_statement` (default: True)
+    - Controls whether the dataset's `formal_statement` is inserted before the proof. Keeping this enabled enforces the canonical theorem; disabling it relies on the model's emitted statement and is generally not recommended for benchmarking.
+3. `timeout` (default: 30.0 seconds)
+    - Per-item execution timeout. A timeout returns `proof_status='timeout'`.
 
 ## Sample launch command
 
@@ -53,6 +51,17 @@ ns eval \
     ++inference.top_p=0.95 \
     ++inference.tokens_to_generate=38912 \
     ++eval_config.timeout=400
+```
+Collecting the results with
+```
+ns summarize_results --cluster=cluster /workspace/minif2f-pass32
+```
+outputs
+```
+----------------------------------------- minif2f -----------------------------------------
+evaluation_mode   | num_entries | avg_tokens | gen_seconds | lean4_correct  | timeout_error
+pass@1[avg-of-32] | 244         | 6936       | 1171        | 71.18% ± 1.69% | 2.00%
+pass@32           | 244         | 6936       | 1171        | 87.30%         | 0.00%
 ```
 
 Note: This command uses specific inference settings (temperature=1.0, top_p=0.95, tokens_to_generate=38912) to match the Goedel-Prover-V2 repository configuration, and uses the `lean4/formal-proof-deepseek-prover-v2` prompt configuration.
