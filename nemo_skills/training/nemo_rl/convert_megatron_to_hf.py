@@ -126,7 +126,6 @@ def main():
         output_path=args.hf_ckpt_path,
         hf_tokenizer_path=tokenizer_name,
         overwrite=True,
-        hf_overrides=hf_overrides,
     )
 
 
