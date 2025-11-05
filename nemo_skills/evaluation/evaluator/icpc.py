@@ -79,7 +79,7 @@ def _precompile_grader(
         sandbox = LocalSandbox()
         sandbox._owner_tid = threading.get_ident()
 
-    pre_dir = f"/tmp/icpc_pre_{problem_name}_{os.getpid()}"
+    pre_dir = f"/nemo_run/icpc_pre_{problem_name}_{os.getpid()}"
     # Create directories and files locally; sandbox shares the same filesystem
     os.makedirs(os.path.join(pre_dir, "graders"), exist_ok=True)
 
@@ -116,7 +116,7 @@ def _precompile_grader(
 
 def run_test_case(task_args: dict, worker_id: int) -> dict:
     # Use high-resolution timestamp to guarantee uniqueness across parallel calls.
-    unique_dir = f"/tmp/icpc_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
+    unique_dir = f"/nemo_run/icpc_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
 
     try:
         # 1. Create all necessary files locally (sandbox shares filesystem)
@@ -192,7 +192,7 @@ def run_test_case(task_args: dict, worker_id: int) -> dict:
 
 def run_input_case(task_args: dict, worker_id: int) -> dict:
     # Use high-resolution timestamp to guarantee uniqueness across parallel calls.
-    unique_dir = f"/tmp/icpc_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
+    unique_dir = f"/nemo_run/icpc_run_{worker_id}_{os.getpid()}_{time.time_ns()}"
 
     try:
         # 1. Create all necessary files locally (sandbox shares filesystem)
@@ -380,7 +380,6 @@ class ICPCEvaluator(BaseEvaluator):
             tasks = []
             for test_data in batch:
                 test_name, test_case, test_type = test_data
-                print(f"Test Name: {test_name}")
                 tasks.append(
                     {
                         "generated_code": completion,
@@ -408,14 +407,6 @@ class ICPCEvaluator(BaseEvaluator):
                     if float(result.get("score", 0)) == 0.0:
                         problem_state["test_passed"] = False
 
-                # Debug prints similar to original implementation
-                if not result.get("compile_success", True):
-                    print(
-                        f"Compile failed for problem '{entry['name']}', test '{test_name}':\n"
-                        f"--- STDOUT ---\n{result.get('compile_stdout', '').strip()}\n"
-                        f"--- STDERR ---\n{result.get('compile_stderr', '').strip()}\n"
-                    )
-
         test_case_results = {
             "sample_score": problem_state["sample_passed"],
             "score": problem_state["test_passed"],
@@ -428,7 +419,6 @@ class ICPCEvaluator(BaseEvaluator):
                 batch = problem_inputs[i : i + batch_size]
                 tasks = []
                 for test_data in batch:
-                    print(f"Test Name: {test_data['file_name']}")
                     tasks.append(
                         {
                             "generated_code": completion,
@@ -442,12 +432,12 @@ class ICPCEvaluator(BaseEvaluator):
                     self.pool.starmap, run_input_case, [(ta, idx) for idx, ta in enumerate(tasks)]
                 )
 
-            for test_data, result in zip(batch, results):
-                test_name = test_data["file_name"]
-                test_type = "input"
-                result["test_name"] = test_name
-                result["test_type"] = test_type
-                problem_state["input_outputs"].append(result)
+                for test_data, result in zip(batch, results):
+                    test_name = test_data["file_name"]
+                    test_type = "input"
+                    result["test_name"] = test_name
+                    result["test_type"] = test_type
+                    problem_state["input_outputs"].append(result)
 
         return {
             "name": entry["name"],
