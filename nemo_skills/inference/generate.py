@@ -424,8 +424,6 @@ class GenerationTask:
         if self.cfg.prompt_format == "openai":
             return None
 
-        # Compose final system message before creating the prompt
-        # This happens after setup_llm() so tool_system_prompt is already loaded
         system_message_arg = self._get_composed_system_message_for_prompt()
 
         prompt = get_prompt(
@@ -443,7 +441,7 @@ class GenerationTask:
         """Compute the final system message to pass to get_prompt().
 
         Behavior depends on whether tools are configured:
-        - WITHOUT tools: Return cfg.system_message (replaces default, backward compatible)
+        - WITHOUT tools: Return cfg.system_message (replaces default)
         - WITH tools: Compose default + tool prompts + user override
 
         Returns:
@@ -452,7 +450,6 @@ class GenerationTask:
         will_use_tools = self.cfg.tool_modules is not None
 
         if not will_use_tools:
-            # Backward compatible: user's system_message replaces default
             return self.cfg.system_message
 
         # With tools: compose all sources
@@ -497,7 +494,7 @@ class GenerationTask:
 
         Args:
             tool_manager: Optional pre-created ToolManager to use. If None and tools are
-                         configured, a new one will be created (for backward compatibility).
+                         configured, a new one will be created.
 
         Returns:
             The configured LLM instance (including parallel thinking if configured)
@@ -518,8 +515,6 @@ class GenerationTask:
         else:
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
-        # Wrap with parallel thinking if configured
-        # This works now because self.prompt was set up before calling setup_llm()
         if self.cfg.parallel_thinking.mode is not None:
             inference_override_config = {
                 "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
