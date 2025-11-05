@@ -11,8 +11,8 @@ Evaluation constructs a complete Lean 4 file from the model output and dataset m
 At a high level, for each JSONL line in your result manifests we do the following:
 
 1. Build the final Lean program to check.
-   All the parameters mentioned here are *evaluation* parameters which are controlled with `--extra_eval_args="++eval_config.<parameter_name>=<parameter_value>`
-      - Normalize the model output to keep only the intended Lean code. By default we extract the last Lean code block when multiple are present (controlled by `extract_code_mode` parameter, which defaults to `"last"`). You can change the split phrase with `final_answer_key` parameter. If the `final_answer_key` phrase isn't present, we use the full generation instead.
+   All the parameters mentioned here are *evaluation* parameters which are controlled with `++eval_config.<parameter_name>=<parameter_value>`
+      - Normalize the model output to keep only the intended Lean code. By default we extract the last Lean code block when multiple are present (controlled by `extract_code_mode` parameter, which defaults to `"last"`). Optionally, you can configure a split phrase with the `final_answer_key` parameter to extract only the portion after that phrase (disabled by default).
       - Insert the dataset-provided header (imports and configuration) to ensure a consistent environment (always included from dataset).
       - Use the dataset’s original theorem (formal statement). If the model output includes a theorem declaration, we strip it and replace it with the canonical statement from the dataset to prevent statement tampering (controlled by `restate_formal_statement`; stripping governed by  `strip_theorem_from_proof`).
       - If you're changing default prompt, it's best to ask the model to emit only the proof body; any generated theorem declaration will be replaced as above.
@@ -35,8 +35,6 @@ Important configuration options and considerations for reliable Lean 4 evaluatio
   - Controls whether the dataset’s `formal_statement` is inserted before the proof. Keeping this enabled enforces the canonical theorem; disabling it relies on the model’s emitted statement and is generally not recommended for benchmarking.
 - `timeout` (default: 30.0 seconds)
   - Per-item execution timeout. A timeout returns `proof_status='timeout'`.
-- Stateless execution for Lean 4
-  - Evaluation is stateless; prior context is not persisted across items.
 
 ## Sample launch command
 
@@ -54,8 +52,7 @@ ns eval \
     ++inference.temperature=1.0 \
     ++inference.top_p=0.95 \
     ++inference.tokens_to_generate=38912 \
-    --extra_eval_args="++eval_config.timeout=400" \
-    ++prompt_config=lean4/formal-proof-deepseek-prover-v2
+    ++eval_config.timeout=400
 ```
 
 Note: This command uses specific inference settings (temperature=1.0, top_p=0.95, tokens_to_generate=38912) to match the Goedel-Prover-V2 repository configuration, and uses the `lean4/formal-proof-deepseek-prover-v2` prompt configuration.
