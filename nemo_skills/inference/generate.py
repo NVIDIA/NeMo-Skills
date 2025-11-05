@@ -46,7 +46,9 @@ from nemo_skills.inference.model import (
     server_params,
 )
 from nemo_skills.inference.model.base import EndpointType
-from nemo_skills.prompt.utils import get_prompt, get_token_count
+from nemo_skills.mcp.tool_manager import ToolManager
+from nemo_skills.pipeline.utils import get_server_command
+from nemo_skills.prompt.utils import get_prompt, get_token_count, load_config
 from nemo_skills.utils import (
     chunk_data,
     get_help_message,
@@ -264,8 +266,6 @@ class GenerationTask:
         Returns:
             callable: Function that returns the server command.
         """
-        from nemo_skills.pipeline.utils import get_server_command
-
         return get_server_command
 
     def __init__(self, cfg: GenerateSolutionsConfig):
@@ -317,9 +317,27 @@ class GenerationTask:
         if self.cfg.inference.endpoint_type == EndpointType.text and self.cfg.inference.tokens_to_generate is None:
             raise ValueError("When using completions API, tokens_to_generate must be specified!")
 
-        # Setup prompt formatter and LLM
+        # INITIALIZATION ORDER:
+        # 1. Create ToolManager first (if tools configured) to get system prompts
+        # 2. Setup prompt with composed system message (using tool prompts)
+        # 3. Setup LLM, passing the ToolManager (includes parallel thinking wrapper)
+
+        # Step 1: Setup ToolManager if tools are configured
+        self.tool_manager = self.setup_tool_manager()
+
+        # Step 2: Extract tool system prompts before setting up prompt
+        self.tool_system_prompt = None
+        if self.tool_manager:
+            self.tool_system_prompt = self.tool_manager.get_tool_system_prompts()
+            if self.tool_system_prompt:
+                LOG.info("Tool-provided system prompt loaded")
+
+        # Step 3: Setup prompt with composed system message (now has tool prompts available)
         self.prompt = self.setup_prompt()
-        self.llm = self.setup_llm()
+
+        # Step 4: Setup LLM, passing tool_manager (includes parallel thinking wrapper if configured)
+        # Note: Parallel thinking can now be applied inside setup_llm since self.prompt exists
+        self.llm = self.setup_llm(tool_manager=self.tool_manager)
 
         # Setup hf_tokenizer for counting prompt tokens
         self.hf_tokenizer = None
@@ -364,22 +382,127 @@ class GenerationTask:
         # output_lock will be initialized when async_loop is called
         self.output_lock = None
 
+    def _compose_system_message(self, default_system: str | None = None) -> str | None:
+        """Compose system message from multiple sources for tool-based generation.
+
+        This method is only called when tool_modules is configured. Backward compatibility
+        for non-tool workflows is handled in setup_prompt() by passing cfg.system_message
+        directly to get_prompt().
+
+        Composition order (all sources combined):
+          1. Default prompt config system message (baseline task instructions)
+          2. Tool system prompts (tool-specific requirements, merged if multiple tools)
+          3. ++system_message argument (user's final customizations)
+
+        Args:
+            default_system: The default system message from the prompt config
+
+        Returns:
+            Composed system message string, or None if all sources are None
+        """
+        system_parts = []
+
+        # 1. Default from prompt config
+        if default_system:
+            system_parts.append(default_system)
+
+        # 2. Tool system prompts
+        if hasattr(self, "tool_system_prompt") and self.tool_system_prompt:
+            system_parts.append(self.tool_system_prompt)
+
+        # 3. User override from ++system_message
+        if self.cfg.system_message:
+            system_parts.append(self.cfg.system_message)
+
+        if system_parts:
+            composed = "\n\n".join(system_parts)
+            LOG.info("Composed system message from %d source(s)", len(system_parts))
+            return composed
+
+        return None
+
     def setup_prompt(self):
         if self.cfg.prompt_format == "openai":
             return None
+
+        # Compose final system message before creating the prompt
+        # This happens after setup_llm() so tool_system_prompt is already loaded
+        system_message_arg = self._get_composed_system_message_for_prompt()
 
         prompt = get_prompt(
             prompt_config=self.cfg.prompt_config,
             tokenizer=self.tokenizer,
             code_tags=self.cfg.code_tags,
             examples_type=self.cfg.examples_type,
-            system_message=self.cfg.system_message,
+            system_message=system_message_arg,
         )
 
         LOG.info("Prompt used: %s", prompt)
         return prompt
 
-    def setup_llm(self):
+    def _get_composed_system_message_for_prompt(self) -> str | None:
+        """Compute the final system message to pass to get_prompt().
+
+        Behavior depends on whether tools are configured:
+        - WITHOUT tools: Return cfg.system_message (replaces default, backward compatible)
+        - WITH tools: Compose default + tool prompts + user override
+
+        Returns:
+            Final system message to pass to get_prompt(), or None to use config default
+        """
+        will_use_tools = self.cfg.tool_modules is not None
+
+        if not will_use_tools:
+            # Backward compatible: user's system_message replaces default
+            return self.cfg.system_message
+
+        # With tools: compose all sources
+        # First get the default system message from prompt config
+        default_system = None
+        if self.cfg.prompt_config:
+            config_data = load_config(self.cfg.prompt_config)
+            if config_data:
+                default_system = config_data.get("system")
+
+        # Now compose with tool prompts and user override
+        composed = self._compose_system_message(default_system)
+        if composed:
+            LOG.info("Composed system message from multiple sources")
+        return composed
+
+    def setup_tool_manager(self):
+        """Setup the ToolManager if tools are configured.
+
+        This creates the tool manager early so we can extract tool system prompts
+        before setting up the prompt template.
+
+        Returns:
+            ToolManager instance if tools are configured, None otherwise
+        """
+        if self.cfg.tool_modules is None:
+            return None
+
+        additional_config = {"sandbox": self.cfg.sandbox}
+        return ToolManager(
+            module_specs=self.cfg.tool_modules,
+            overrides=self.cfg.tool_overrides or {},
+            context=additional_config,
+        )
+
+    def setup_llm(self, tool_manager=None):
+        """Setup the LLM including parallel thinking wrapper if configured.
+
+        This method can be overridden by subclasses to customize LLM creation.
+        Since this is called after setup_prompt(), self.prompt is available for
+        parallel thinking which uses self.fill_prompt.
+
+        Args:
+            tool_manager: Optional pre-created ToolManager to use. If None and tools are
+                         configured, a new one will be created (for backward compatibility).
+
+        Returns:
+            The configured LLM instance (including parallel thinking if configured)
+        """
         self.sandbox = get_sandbox(**self.cfg.sandbox) if self.cfg.sandbox is not None else None
 
         if self.cfg.code_execution:
@@ -391,12 +514,14 @@ class GenerationTask:
                 tool_overrides=self.cfg.tool_overrides,
                 tokenizer=self.tokenizer,
                 additional_config={"sandbox": self.cfg.sandbox},
+                tool_manager=tool_manager,  # Pass pre-created tool_manager
             )
         else:
             llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
 
+        # Wrap with parallel thinking if configured
+        # This works now because self.prompt was set up before calling setup_llm()
         if self.cfg.parallel_thinking.mode is not None:
-            # We don't want to override these key variables which overlap with self.cfg
             inference_override_config = {
                 "endpoint_type": self.cfg.parallel_thinking.endpoint_type,
                 # The following are specific to parallel thinking and we want
@@ -409,7 +534,7 @@ class GenerationTask:
 
             llm = get_parallel_thinking_model(
                 model=llm,
-                orig_prompt_filler=self.fill_prompt,  # Needed for prompt fillling
+                orig_prompt_filler=self.fill_prompt,  # Requires self.prompt to exist
                 parallel_thinking=self.cfg.parallel_thinking,
                 main_config=self.cfg,
                 tokenizer=self.tokenizer,
@@ -492,15 +617,32 @@ class GenerationTask:
 
     # TODO: data will not include any samples skipped after restart
     def fill_prompt(self, data_point, data):
-        """Passing in full data in case it's needed to fill the prompt in subclasses."""
+        """Passing in full data in case it's needed to fill the prompt in subclasses.
+
+        For system message composition, the order is:
+        1. Default system message (if exists in messages)
+        2. Tool system prompts (from tool_overrides configuration)
+        3. ++system_message argument (user's final customizations)
+        """
         if self.cfg.prompt_format == "openai":
             if self.cfg.prompt_suffix:
                 data_point["messages"][-1]["content"] += self.cfg.prompt_suffix
-            if self.cfg.system_message:
-                if data_point["messages"][0]["role"] != "system":
-                    data_point["messages"].insert(0, {"role": "system", "content": self.cfg.system_message})
+
+            # Compose system message from all sources
+            default_system = None
+            if data_point["messages"] and data_point["messages"][0]["role"] == "system":
+                default_system = data_point["messages"][0]["content"]
+
+            composed_system = self._compose_system_message(default_system)
+
+            if composed_system:
+                if data_point["messages"] and data_point["messages"][0]["role"] == "system":
+                    # Replace existing system message
+                    data_point["messages"][0]["content"] = composed_system
                 else:
-                    data_point["messages"][0]["content"] = self.cfg.system_message
+                    # Insert new system message at the beginning
+                    data_point["messages"].insert(0, {"role": "system", "content": composed_system})
+
             return data_point["messages"]
 
         total_code_executions_in_prompt = self.cfg.total_code_executions_in_prompt

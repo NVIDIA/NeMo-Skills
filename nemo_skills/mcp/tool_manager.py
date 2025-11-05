@@ -162,3 +162,24 @@ class ToolManager:
     async def execute_tool(self, raw_name: str, args: Dict[str, Any], extra_args: Dict[str, Any] | None = None):
         tool, bare = self._resolve(self._raw_to_qualified_map[raw_name])
         return await tool.execute(bare, args, extra_args=extra_args)
+
+    def get_tool_system_prompts(self) -> str | None:
+        """Collect and merge system prompts from all configured tools.
+
+        Iterates through all registered tools and collects their system prompts
+        (if they provide a get_system_prompt() method). Multiple prompts are
+        merged with double newlines as separators.
+
+        Returns:
+            Merged system prompt string, or None if no tools provide prompts.
+        """
+        system_prompts = []
+        for tool_name, tool in self._tools.items():
+            if hasattr(tool, "get_system_prompt"):
+                prompt = tool.get_system_prompt()
+                if prompt:
+                    system_prompts.append(prompt)
+
+        if system_prompts:
+            return "\n\n".join(system_prompts)
+        return None

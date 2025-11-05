@@ -46,19 +46,22 @@ class ToolCallingWrapper:
         tool_modules: list[str] | None = None,
         tool_overrides: dict | None = None,
         additional_config: dict | None = None,
+        tool_manager: ToolManager | None = None,
     ):
         self.model = model
         additional_config = additional_config or {}
 
-        self.tool_manager = None
-
-        # Module-based tool loading only
-        assert tool_modules, "tool_modules must be provided for tool calling"
-        self.tool_manager = ToolManager(
-            module_specs=tool_modules,
-            overrides=tool_overrides or {},
-            context=additional_config,
-        )
+        # Use provided tool_manager or create a new one (backward compatibility)
+        if tool_manager is not None:
+            self.tool_manager = tool_manager
+        else:
+            # Module-based tool loading only
+            assert tool_modules, "tool_modules must be provided for tool calling"
+            self.tool_manager = ToolManager(
+                module_specs=tool_modules,
+                overrides=tool_overrides or {},
+                context=additional_config,
+            )
 
     async def _execute_tool_call(self, tool_call, request_id: str, endpoint_type: EndpointType):
         ## TODO(sanyamk): The correct key format needs to be cohesive with other formatters.
@@ -158,3 +161,13 @@ class ToolCallingWrapper:
         result_steps["conversation"] = conversation
 
         return result_steps
+
+    def get_tool_system_prompt(self) -> str | None:
+        """Get the merged system prompt from all configured tools.
+
+        Returns:
+            Merged system prompt string from tools, or None if no tools provide prompts.
+        """
+        if self.tool_manager:
+            return self.tool_manager.get_tool_system_prompts()
+        return None

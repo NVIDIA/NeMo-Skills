@@ -222,3 +222,102 @@ which outputs
 
 
 You can also have a look at the [tests](https://github.com/NVIDIA-NeMo/Skills/tree/main/tests/test_prompts.py) to see more examples of using our prompt API.
+
+
+## Tool System Prompts
+
+When using tool calling with MCP tools (like `PythonTool`, `LeanTool`, etc.), you can configure custom system prompts that are specific to each tool. These prompts provide tool-specific instructions that are automatically merged into the final system message.
+
+### Configuring Tool System Prompts
+
+#### 1. Create a YAML file with system prompt
+
+Create a YAML file (e.g., `custom_python_prompt.yaml`) with the `system:` key:
+
+```yaml
+system: >-
+  You are a helpful assistant that writes Python code.
+  Always include type hints in your function signatures.
+  Prioritize code readability and include descriptive comments.
+  Test your code mentally before executing it.
+```
+
+#### 2. Configure via tool_overrides
+
+**Command line usage:**
+
+```bash
+ns generate \
+  ... \
+  ++tool_modules=[nemo_skills.mcp.servers.python_tool.PythonTool] \
+  ++tool_overrides.PythonTool.system_prompt_file=/path/to/custom_python_prompt.yaml \
+  ...
+```
+
+**Python API usage:**
+
+```python
+from nemo_skills.pipeline.generate import generate
+
+generate(
+    ...,
+    tool_modules=["nemo_skills.mcp.servers.python_tool.PythonTool"],
+    tool_overrides={
+        "PythonTool": {
+            "system_prompt_file": "/path/to/custom_python_prompt.yaml"
+        }
+    },
+    ...
+)
+```
+
+### System Message Composition Order
+
+The behavior of `++system_message` depends on whether tools are configured:
+
+#### WITHOUT Tools (Backward Compatible)
+When `tool_modules` is **not** configured:
+- `++system_message` **replaces** the prompt config's default system message
+- This is the traditional behavior for non-tool workflows
+
+#### WITH Tools (Composition Behavior)
+When `tool_modules` **is** configured, the final system message is composed from **three sources** in this order:
+
+1. **Default prompt config system message** - The baseline task instructions from your prompt config (e.g., `generic/math.yaml`)
+2. **Tool system prompts** - Tool-specific requirements from `tool_overrides.{ToolName}.system_prompt_file`
+3. **`++system_message` argument** - User's final customizations passed via command line or API
+
+These sources are merged with double newlines (`\n\n`) as separators. This composition strategy allows:
+
+- **Prompt configs** to provide baseline task instructions
+- **Tools** to add their specific requirements (e.g., code formatting guidelines)
+- **Users** to add final customizations without losing the default or tool instructions
+
+### Example Composition
+
+Given:
+- Prompt config with: `"Solve math problems and put answers in \\boxed{}"`
+- PythonTool with: `"When writing Python code, always include type hints"`
+- User override: `"Be concise in your explanations"`
+
+The final composed system message will be:
+
+```
+Solve math problems and put answers in \boxed{}
+
+When writing Python code, always include type hints
+
+Be concise in your explanations
+```
+
+### Multiple Tools
+
+If you configure multiple tools with system prompts, they are all merged in the order they are registered. For example:
+
+```bash
+++tool_modules=[nemo_skills.mcp.servers.python_tool.PythonTool,other_tool.OtherTool] \
+++tool_overrides.PythonTool.system_prompt_file=/path/to/python_prompt.yaml \
+++tool_overrides.OtherTool.system_prompt_file=/path/to/other_prompt.yaml
+```
+
+Both tool prompts will be included in the final system message.

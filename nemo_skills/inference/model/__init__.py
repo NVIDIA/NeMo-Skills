@@ -106,6 +106,7 @@ def get_tool_calling_model(
     additional_config=None,
     tool_modules: list[str] | None = None,
     tool_overrides: dict | None = None,
+    tool_manager=None,
     **kwargs,
 ):
     if isinstance(model, str):
@@ -115,6 +116,7 @@ def get_tool_calling_model(
         tool_modules=tool_modules,
         tool_overrides=tool_overrides,
         additional_config=additional_config,
+        tool_manager=tool_manager,
     )
 
 
