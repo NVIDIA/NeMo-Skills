@@ -16,7 +16,7 @@ ns start_server \
     --log_dir=/workspace/logs/start_server \
 ```
 
-Now, the model server is available at `localhost:5000` by default.
+Now, the model server is available at `localhost:5000` by default. Note that you can also use `Qwen/Qwen3-4B-Thinking-2507` directly as the model name if you don't have it pre-downloaded.
 
 To launch a sandbox server in parallel, provide the `--with_sandbox` argument, which will be
 available at `localhost:6000` by default.
