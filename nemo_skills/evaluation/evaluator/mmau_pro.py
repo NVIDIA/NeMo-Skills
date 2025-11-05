@@ -19,56 +19,39 @@ from typing import Any
 
 from tqdm import tqdm
 
+from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
 from nemo_skills.utils import get_logger_name, nested_dataclass
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
 @nested_dataclass(kw_only=True)
-class MMAUProEvaluatorConfig:
-    """Configuration for MMAU-Pro evaluation."""
+class MMAUProEvaluatorConfig(BaseEvaluatorConfig):
+    """Configuration for MMAU-Pro instruction following evaluation."""
 
-    # Prompt configuration
-    prompt_config: str = "eval/speechlm/mmau-pro"
-
-    # NVEmbed settings
-    embedding_model: str = "nvidia/NV-Embed-v2"
-    use_nvembed: bool = True
+    pass
 
 
 def eval_mmau_pro(cfg):
-    """Evaluate MMAU-Pro dataset using nemo-skills framework.
+    """Evaluate MMAU-Pro instruction following questions using AIF (Audio Instruction Following) format.
 
-    This evaluator processes JSONL files with speech/audio language model outputs
-    and evaluates them using two main approaches:
-    - Closed-form questions: NVEmbed similarity matching evaluation
-    - Open-ended questions: LLM as a Judge evaluation
-    - Instruction following questions: Audio Instruction Following (AIF) format evaluation
-
-    All categories maintain separate logging to track sample counts and success rates.
+    This evaluator handles instruction following evaluation for MMAU-Pro benchmark.
+    Other question types are handled by different evaluation methods:
+    - Closed-form questions: Evaluated by nvembed_judge.py using NVEmbed similarity matching
+    - Open-ended questions: Evaluated by LLM judge (Qwen) using judge/speechlm prompt config
     """
-    # Extract only the fields that belong to MMAUProEvaluatorConfig
-    config_fields = {"prompt_config", "embedding_model", "use_nvembed"}
-    config_kwargs = {k: v for k, v in cfg.items() if k in config_fields}
-    eval_config = MMAUProEvaluatorConfig(**config_kwargs)
+    eval_config = MMAUProEvaluatorConfig(**cfg)
 
-    jsonl_file = cfg["input_file"]
-    LOG.info(f"Evaluating {jsonl_file}")
+    jsonl_file = eval_config.input_file
+    LOG.info(f"Evaluating instruction following questions in {jsonl_file}")
 
     with open(jsonl_file, "rt", encoding="utf-8") as fin:
         data = [json.loads(line) for line in fin]
 
-    samples_to_evaluate = sum(
-        1 for sample in data if "nvembed_confidence" not in sample or sample.get("category") == "instruction following"
-    )
-    samples_already_done = len(data) - samples_to_evaluate
-
-    if samples_already_done > 0:
-        LOG.info(f"Resuming evaluation: {samples_already_done}/{len(data)} samples already have nvembed_confidence")
+    LOG.info(f"Processing {len(data)} instruction following samples")
 
     for idx, sample in enumerate(tqdm(data, desc="Evaluating samples")):
-        evaluated_sample = evaluate_sample(sample, eval_config)
-        data[idx] = evaluated_sample
+        data[idx] = evaluate_instruction_following_sample(sample)
 
     # Write all results at once
     with open(jsonl_file, "wt", encoding="utf-8") as fout:
@@ -78,189 +61,21 @@ def eval_mmau_pro(cfg):
     LOG.info(f"Evaluation completed for {jsonl_file}")
 
 
-def evaluate_sample(sample: dict[str, Any], config: MMAUProEvaluatorConfig) -> dict[str, Any]:
+def evaluate_instruction_following_sample(sample: dict[str, Any]) -> dict[str, Any]:
+    """Evaluate a single instruction following sample."""
     sample = sample.copy()
-    category = sample.get("category", "unknown")
-
-    # Add subset_for_metrics only for closed_form subcategories (not for open_ended or instruction_following)
-    # This creates per-category breakdowns only for closed_form (e.g., music, speech, sound)
-    if category not in ["open", "instruction following"]:
-        sample["subset_for_metrics"] = category
-
-    if category == "instruction following":
-        sample = evaluate_instruction_following(sample, config)
-    else:
-        choices = sample.get("choices", [])
-
-        if config.use_nvembed and choices and len(choices) > 1:
-            sample = evaluate_closed_form_with_nvembed(sample, config)
-        else:
-            if "requires_judge" not in sample:
-                sample["requires_judge"] = True
-                sample["predicted_answer"] = sample.get("generation", "")
-            sample["is_correct"] = False
-
-        sample["expected_answer"] = sample.get("expected_answer", "")
-        sample["choices"] = sample.get("choices", [])
-
-    sample["is_correct"] = get_overall_correctness(sample, category)
-    return sample
-
-
-def get_overall_correctness(sample: dict[str, Any], category: str) -> bool:
-    if "judgement" not in sample:
-        return sample.get("is_correct", False)
-
-    return extract_judge_result(sample.get("judgement", ""))
-
-
-def extract_judge_result(judgement_text: str) -> bool:
-    """Extract judge result from judgement text (nemo-skills pattern)."""
-    import re
-
-    if re.search(r"\byes\b", judgement_text, re.IGNORECASE):
-        return True
-    elif re.search(r"\bno\b", judgement_text, re.IGNORECASE):
-        return False
-    else:
-        return False
-
-
-# ===========================================
-# Open-ended questions are handled by separate judge pipeline
-# ===========================================
-
-# ===========================================
-# Closed-ended questions evaluation using NVEmbed similarity matching
-# ===========================================
-
-
-def evaluate_with_nvembed_similarity(
-    model_prediction: str, choices: list, ground_truth: str, config: MMAUProEvaluatorConfig
-) -> tuple[str, float]:
-    """NVEmbed-based evaluation: match predictions to choices using embedding similarity."""
-    import torch
-    import torch.nn.functional as F
-
-    model = load_nvembed_model(config.embedding_model)
-    device = next(model.parameters()).device
-
-    with torch.no_grad():
-        prediction_embedding = model.encode([model_prediction], instruction="", max_length=4096, device=device)
-        choice_embeddings = model.encode(choices, instruction="", max_length=4096, device=device)
-
-    prediction_embedding = F.normalize(prediction_embedding, p=2, dim=1)
-    choice_embeddings = F.normalize(choice_embeddings, p=2, dim=1)
-
-    scores = (prediction_embedding @ choice_embeddings.T) * 100
-    scores = scores.squeeze()
-
-    if scores.dim() == 0:
-        scores = scores.unsqueeze(0)
-
-    best_choice_idx = torch.argmax(scores).item()
-    matched_choice = choices[best_choice_idx]
-    confidence = torch.max(scores).item()
-
-    return matched_choice, confidence
-
-
-def load_nvembed_model(model_name: str = "nvidia/NV-Embed-v2"):
-    """Load NVEmbed model using HuggingFace AutoModel with GPU support."""
-
-    import os
-
-    import torch
-    from transformers import AutoModel
-
-    if not hasattr(load_nvembed_model, "_cache"):
-        load_nvembed_model._cache = {}
-
-    if model_name in load_nvembed_model._cache:
-        return load_nvembed_model._cache[model_name]
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # Use explicit cache directory (respects HF_HOME env var)
-    cache_dir = os.environ.get("HF_HOME")
-    if cache_dir:
-        LOG.info(f"Using HuggingFace cache directory: {cache_dir}")
-
-    try:
-        model = AutoModel.from_pretrained(
-            model_name, trust_remote_code=True, cache_dir=cache_dir, local_files_only=False
-        )
-        model.to(device)
-        model.eval()
-        load_nvembed_model._cache[model_name] = model
-        LOG.info(f"Successfully loaded {model_name} on {device}")
-        return model
-    except Exception as e:
-        LOG.error(f"Failed to load {model_name}: {e}")
-        raise
-
-
-def evaluate_closed_form_with_nvembed(sample: dict[str, Any], config: MMAUProEvaluatorConfig) -> dict[str, Any]:
-    """Evaluate closed-form questions using NVEmbed similarity matching."""
-
-    if "nvembed_confidence" in sample:
-        LOG.info("Skipping sample - nvembed_confidence already exists")
-        return sample
-
     generation = sample.get("generation", "").strip()
-    choices = sample.get("choices", [])
-    expected_answer = sample.get("expected_answer", "")
-
-    LOG.info(f"NVEmbed evaluation for generation='{generation[:50]}'")
-
-    if not generation or not choices:
-        LOG.warning("Missing generation or choices for nvembed evaluation")
-        sample.update({"nvembed_success": False, "is_correct": False, "error": "missing_generation_or_choices"})
-        return sample
-
-    try:
-        matched_choice, confidence = evaluate_with_nvembed_similarity(generation, choices, expected_answer, config)
-
-        is_correct = matched_choice.strip().lower() == expected_answer.strip().lower()
-
-        sample.update(
-            {"nvembed_matched_choice": matched_choice, "nvembed_confidence": confidence, "is_correct": is_correct}
-        )
-
-        return sample
-
-    except Exception as e:
-        LOG.error(f"NVEmbed evaluation failed: {e}")
-        sample.update(
-            {
-                "is_correct": False,
-            }
-        )
-        return sample
-
-
-# ======================================================
-# Audio Instruction Following (AIF) Evaluation Function
-# ======================================================
-
-
-def evaluate_instruction_following(sample: dict[str, Any], config: MMAUProEvaluatorConfig) -> dict[str, Any]:
-    """Evaluate instruction following questions using AIF (Audio Instruction Following) criteria."""
-    generation = sample.get("generation", "").strip()
-
-    LOG.info(f"AIF evaluation for generation='{generation}'")
 
     if not generation:
         LOG.info("Empty generation detected for instruction following question")
-        sample.update({"is_correct": False, "error": "empty_generation"})
+        sample["is_correct"] = False
+        sample["error"] = "empty_generation"
         return sample
 
     success = evaluate_aif_constraints(
         generation, sample.get("task_identifier", ""), sample.get("kwargs", {}) or {}, sample
     )
-
-    sample.update({"is_correct": success})
-
+    sample["is_correct"] = success
     return sample
 
 

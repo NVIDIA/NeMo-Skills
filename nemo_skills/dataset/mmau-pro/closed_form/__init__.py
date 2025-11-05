@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Define MMAU-Pro as a benchmark group with three separate evaluation types
-DATASET_GROUP = "speechlm"
-IS_BENCHMARK_GROUP = True
-SCORE_MODULE = "nemo_skills.dataset.mmau-pro.mmau_pro_score"
 
-# Three separate benchmark subgroups for different evaluation approaches
-BENCHMARKS = {
-    "mmau-pro.closed_form": {},
-    "mmau-pro.open_ended": {},
-    "mmau-pro.instruction_following": {},
+METRICS_TYPE = "mmau_pro_closed_form"
+SCORE_MODULE = "nemo_skills.evaluation.metrics.mmau_pro_metrics"
+GENERATION_ARGS = "++prompt_format=openai"
+
+# NVEmbed judge configuration for closed-form evaluation
+JUDGE_PIPELINE_ARGS = {
+    "judge_type": "nvembed",
 }

@@ -12,14 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Define MMAU-Pro as a benchmark group with three separate evaluation types
-DATASET_GROUP = "speechlm"
-IS_BENCHMARK_GROUP = True
-SCORE_MODULE = "nemo_skills.dataset.mmau-pro.mmau_pro_score"
-
-# Three separate benchmark subgroups for different evaluation approaches
-BENCHMARKS = {
-    "mmau-pro.closed_form": {},
-    "mmau-pro.open_ended": {},
-    "mmau-pro.instruction_following": {},
-}
+# Instruction following questions evaluated with AIF format
+METRICS_TYPE = "mmau_pro_instruction_following"
+SCORE_MODULE = "nemo_skills.evaluation.metrics.mmau_pro_metrics"
+EVAL_ARGS = "++eval_type=mmau-pro"
+GENERATION_ARGS = "++prompt_format=openai"

@@ -236,38 +236,3 @@ def get_mcq_fields(question, choices):
         "options": options_text,
         **options_dict,
     }
-
-
-def generate_subgroup_init_files(output_dir, subgroup_configs):
-    """
-    Generate __init__.py files for benchmark subgroups.
-
-    Args:
-        output_dir (Path): Parent directory where subgroup directories should be created
-        subgroup_configs (dict): Dictionary mapping subgroup names to their config content
-
-    Example:
-        generate_subgroup_init_files(
-            Path("mmau-pro"),
-            {
-                "closed_form": '''METRICS_TYPE = "speechlm"
-                                GENERATION_ARGS = "++prompt_format=openai"
-                                NUM_CHUNKS = 10''',
-                                                "open_ended": '''METRICS_TYPE = "speechlm"
-                                NUM_CHUNKS = 1''',
-            }
-        )
-    """
-    generated_files = []
-    for subgroup_name, config_content in subgroup_configs.items():
-        subgroup_dir = Path(output_dir) / subgroup_name
-        subgroup_dir.mkdir(parents=True, exist_ok=True)
-
-        init_file = subgroup_dir / "__init__.py"
-        with open(init_file, "w", encoding="utf-8") as f:
-            f.write(config_content.strip() + "\n")
-
-        print(f"Generated {init_file}")
-        generated_files.append(init_file)
-
-    return generated_files

@@ -1,5 +1,5 @@
 # Judge prompt configuration for Speech/Audio Language Model evaluation
-# Used for evaluating open-ended responses in MMAU-Pro dataset
+# Used for evaluating open-ended responses in MMAU-Pro benchmark
 # Follows nemo-skills standard Yes/No judgement pattern
 
 user: |-

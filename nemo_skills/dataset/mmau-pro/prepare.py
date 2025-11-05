@@ -22,48 +22,7 @@ from pathlib import Path
 from datasets import load_dataset
 from tqdm import tqdm
 
-from nemo_skills.dataset.utils import generate_subgroup_init_files, get_mcq_fields
-
-
-def _get_mmau_pro_subgroup_configs():
-    """Define the __init__.py configurations for each MMAU-Pro subgroup."""
-    return {
-        "closed_form": """# Closed-form questions evaluated with NV Embed similarity matching
-METRICS_TYPE = "speechlm"
-
-# No EVAL_ARGS - evaluation happens only during judge phase with NVEmbed
-GENERATION_ARGS = "++prompt_format=openai"
-
-# Split into 10 chunks for parallel processing of large dataset
-NUM_CHUNKS = 10
-
-# Use NVEmbed judge for closed-form evaluation
-JUDGE_PIPELINE_ARGS = {
-    "judge_type": "nvembed",
-}""",
-        "open_ended": """# Open-ended questions evaluated with LLM judge (Qwen)
-METRICS_TYPE = "speechlm"
-GENERATION_ARGS = "++prompt_format=openai"
-
-# Single chunk (small dataset)
-NUM_CHUNKS = 1
-
-# Judge configuration for open-ended evaluation using NVIDIA API
-JUDGE_PIPELINE_ARGS = {
-    "model": "qwen/qwen2.5-7b-instruct",
-    "server_type": "openai",
-    "server_address": "https://integrate.api.nvidia.com/v1",
-}
-JUDGE_ARGS = "++prompt_config=judge/speechlm ++generation_key=judgement"
-""",
-        "instruction_following": """# Instruction following questions evaluated with AIF format
-METRICS_TYPE = "speechlm"
-EVAL_ARGS = "++eval_type=mmau-pro"
-GENERATION_ARGS = "++prompt_format=openai"
-
-# Single chunk (small dataset)
-NUM_CHUNKS = 1""",
-    }
+from nemo_skills.dataset.utils import get_mcq_fields
 
 
 def download_mmau_data(download_dir, hf_token):
@@ -109,6 +68,10 @@ def format_entry(entry, with_audio=False):
 
     category = entry.get("category", "")
 
+    # Add subset_for_metrics for closed-form questions to track different domains
+    if category not in ["open", "instruction following"]:
+        formatted_entry["subset_for_metrics"] = category
+
     if category == "open":
         content = entry["question"]
     elif choices and len(choices) > 1:
@@ -135,32 +98,33 @@ def main():
     parser = argparse.ArgumentParser(description="Prepare MMAU-Pro dataset for nemo-skills")
     parser.add_argument("--split", default="test", choices=["validation", "test"])
     parser.add_argument("--with-audio", action="store_true", help="Download audio files (requires HF_TOKEN)")
-    parser.add_argument("--download-dir", help="Directory for audio files (required with --with-audio)")
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        help="Directory for dataset files including audio. If not provided, uses the default dataset directory.",
+    )
     args = parser.parse_args()
 
+    # Determine the data directory
+    data_dir = Path(args.data_dir) if args.data_dir else Path(__file__).parent
+
     if args.with_audio:
-        if not args.download_dir:
-            raise ValueError("--download-dir is required when using --with-audio")
         if not os.environ.get("HF_TOKEN"):
             raise ValueError("HF_TOKEN environment variable required for --with-audio")
-        download_mmau_data(args.download_dir, os.environ["HF_TOKEN"])
+        download_mmau_data(data_dir, os.environ["HF_TOKEN"])
 
     print(f"Loading {args.split} split...")
     dataset = load_dataset("gamma-lab-umd/MMAU-Pro", trust_remote_code=True)[args.split]
 
-    output_dir = Path(__file__).parent
-
     # Separate files for each evaluation category
     category_files = {
-        "closed_form": output_dir / "closed_form" / f"{args.split}.jsonl",
-        "open": output_dir / "open_ended" / f"{args.split}.jsonl",
-        "instruction following": output_dir / "instruction_following" / f"{args.split}.jsonl",
+        "closed_form": data_dir / "closed_form" / f"{args.split}.jsonl",
+        "open": data_dir / "open_ended" / f"{args.split}.jsonl",
+        "instruction following": data_dir / "instruction_following" / f"{args.split}.jsonl",
     }
 
     for category_file in category_files.values():
         category_file.parent.mkdir(parents=True, exist_ok=True)
-
-    generate_subgroup_init_files(output_dir, _get_mmau_pro_subgroup_configs())
 
     category_file_handles = {
         category: open(file_path, "w", encoding="utf-8") for category, file_path in category_files.items()
