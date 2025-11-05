@@ -26,7 +26,7 @@ available at `localhost:6000` by default.
 It is also possible to remotely start the server on a slurm cluster and access it locally.
 This approach is especially useful for quick debugging or when your local workstation does not have all the required compute resources available.
 
-Consider a vLLM model at path `/workspace/models/Qwen3-4B-Thinking-2507` that requires 16 GPUs.
+Consider a vLLM model at path `/workspace/models/Qwen3-235B-A22B-Thinking-2507` that requires 16 GPUs.
 We start the server with `--create_tunnel` as,
 ```bash
 ns start_server \
