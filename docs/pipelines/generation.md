@@ -465,3 +465,81 @@ We support three methods for automatic trimming of generation budget or context:
         ++server.enable_soft_fail=True
         ++server.context_limit_retry_strategy=reduce_prompt_from_end
     ```
+
+### Using Config Files
+
+You can use YAML config files to pass parameters to `ns generate`. This is most applicable when using parameters that require extra escaping, such as strings with special characters.
+
+#### The Problem
+
+Parameters like `end_reasoning_string='</think>'` can cause shell escaping issues:
+
+```bash
+# Problematic - angle brackets can be interpreted as shell redirection or cause Hydra parsing errors
+ns generate \
+    ... \
+    ++parse_reasoning=True \
+    ++end_reasoning_string='</think>'  # May cause errors!
+```
+
+Common error:
+```
+hydra.errors.OverrideParseException: LexerNoViableAltException: ++end_reasoning_string=\</think\>
+```
+
+#### The Solution
+
+**1. Create a config file** (`/workspace/reasoning_config.yaml`):
+
+```yaml
+# Include parameters that are difficult to escape
+end_reasoning_string: '</think>'
+parallel_thinking:
+    end_reasoning_string: '</think>'
+```
+
+**2. Use it with command-line args:**
+
+```bash
+ns generate \
+    --cluster=slurm \
+    --server_type=vllm \
+    --model=Qwen/QwQ-32B-Preview \
+    --server_gpus=4 \
+    --output_dir=/workspace/reasoning-output \
+    --input_file=/workspace/math-problems.jsonl \
+    --config-path=/workspace/configs \
+    --config-name=reasoning_config \
+    ++prompt_config=generic/math-base \
+    ++inference.temperature=0.7 \
+    ++inference.tokens_to_generate=2048
+```
+
+**How it works:**
+- `--config-path=./configs`: Directory containing your config file
+- `--config-name=reasoning_config`: Config filename without `.yaml` extension
+- Command-line args can override config file values if needed
+
+#### Python API
+
+When using the Python API, leverage config files with `wrap_arguments`:
+
+```python
+from pathlib import Path
+from nemo_skills.pipeline.cli import generate, wrap_arguments
+
+# Assume config is mounted to /workspace/configs/reasoning_config.yaml
+generate(
+    wrap_arguments(
+        f"--config-path /workspace/configs ",
+        f"--config-name reasoning_config",
+    ),
+    cluster="local",
+    server_type="openai",
+    model="meta/llama-3.1-8b-instruct",
+    server_address="https://integrate.api.nvidia.com/v1",
+    output_dir="/workspace/test-generate",
+    input_file="/workspace/input.jsonl",
+)
+```
+
