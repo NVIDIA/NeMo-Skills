@@ -161,20 +161,42 @@ parallel_thinking:
 
 **2. Use it with command-line args:**
 
-```bash
-ns generate \
-    --cluster=slurm \
-    --server_type=vllm \
-    --model=Qwen/QwQ-32B-Preview \
-    --server_gpus=4 \
-    --output_dir=/workspace/reasoning-output \
-    --input_file=/workspace/math-problems.jsonl \
-    --config-path=/workspace/configs \
-    --config-name=reasoning_config \
-    ++prompt_config=generic/math-base \
-    ++inference.temperature=0.7 \
-    ++inference.tokens_to_generate=2048
-```
+=== "command-line interface"
+
+    ```bash
+    ns generate \
+        --cluster=slurm \
+        --server_type=vllm \
+        --model=Qwen/QwQ-32B-Preview \
+        --server_gpus=4 \
+        --output_dir=/workspace/reasoning-output \
+        --input_file=/workspace/math-problems.jsonl \
+        --config-path=/workspace/configs \
+        --config-name=reasoning_config \
+        ++prompt_config=generic/math-base \
+        ++inference.temperature=0.7 \
+        ++inference.tokens_to_generate=2048
+    ```
+
+=== "python interface"
+
+    ```python
+    from nemo_skills.pipeline.cli import generate, wrap_arguments
+
+    # Assume config is mounted to /workspace/configs/reasoning_config.yaml
+    generate(
+        wrap_arguments(
+            "--config-path /workspace/configs "
+            "--config-name reasoning_config "
+        ),
+        cluster="local",
+        server_type="openai",
+        model="meta/llama-3.1-8b-instruct",
+        server_address="https://integrate.api.nvidia.com/v1",
+        output_dir="/workspace/test-generate",
+        input_file="/workspace/input.jsonl",
+    )
+    ```
 
 **How it works:**
 
@@ -182,25 +204,3 @@ ns generate \
 - `--config-name=reasoning_config`: Config filename without `.yaml` extension
 - Command-line `++` args can still override config file values if needed
 - This works with any pipeline script with generation (`ns generate`, `ns eval`, etc.)
-
-### Python API
-
-When using the Python API, leverage config files with `wrap_arguments`:
-
-```python
-from nemo_skills.pipeline.cli import generate, wrap_arguments
-
-# Assume config is mounted to /workspace/configs/reasoning_config.yaml
-generate(
-    wrap_arguments(
-        "--config-path /workspace/configs "
-        "--config-name reasoning_config "
-    ),
-    cluster="local",
-    server_type="openai",
-    model="meta/llama-3.1-8b-instruct",
-    server_address="https://integrate.api.nvidia.com/v1",
-    output_dir="/workspace/test-generate",
-    input_file="/workspace/input.jsonl",
-)
-```
