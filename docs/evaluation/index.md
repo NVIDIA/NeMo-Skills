@@ -176,7 +176,7 @@ code execution timeout for scicode benchmark
 !!! tip "Passing Main Arguments with Config Files"
 
     For parameters that are difficult to escape on the command line (like `end_reasoning_string='</think>'`),
-    you can use YAML config files instead. See [Passing Main Arguments with Config Files](index.md###passing-main-arguments-with-config-files) for details.
+    you can use YAML config files instead. See [Passing Main Arguments with Config Files](../pipelines/index.md###passing-main-arguments-with-config-files) for details.
 
 
 ## Using data on cluster
