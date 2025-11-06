@@ -248,11 +248,6 @@ def get_executor(
     if cluster_config["executor"] == "local":
         env_vars["PYTHONUNBUFFERED"] = "1"  # this makes sure logs are streamed right away
         resolved_container = resolve_container_image(container, cluster_config)
-        # If no GPUs requested, force CPU runtime to avoid NVIDIA prestart hooks on hosts
-        # without nvidia-container-toolkit / drivers.
-        additional_kwargs = {"entrypoint": ""}
-        if gpus_per_node is None or gpus_per_node == 0:
-            additional_kwargs["runtime"] = "runc"
         return DockerExecutor(
             container_image=resolved_container,
             packager=packager,
@@ -266,7 +261,7 @@ def get_executor(
             num_gpus=-1 if gpus_per_node else None,
             network="host",
             env_vars=env_vars,
-            additional_kwargs=additional_kwargs,
+            additional_kwargs={"entrypoint": ""},
         )
 
     if not heterogeneous:
