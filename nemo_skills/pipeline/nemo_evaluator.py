@@ -332,6 +332,9 @@ def nemo_evaluator(
 
     # 6) Build jobs per group
     jobs = []
+    # Base container-visible output root for evaluator artifacts
+    base_output_root = (output_dir or '').rstrip('/') if output_dir else None
+
     for idx, ((container_id, sig), group_tasks) in enumerate(groups.items()):
         # Helper to construct final evaluator commands on the client
         from nemo_evaluator_launcher.common.helpers import get_eval_factory_command  # type: ignore
@@ -375,6 +378,11 @@ def nemo_evaluator(
                     override_parts.append(f"config.params.extra.judge.url={judge_url_override}")
                 if judge_model_id:
                     override_parts.append(f"config.params.extra.judge.model_id={judge_model_id}")
+
+            # Always set per-task output_dir: <base>/<expname>/nemo_evaluator/<task_name>
+            if base_output_root:
+                task_out = f"{base_output_root}/{expname}/nemo_evaluator/{task_name}"
+                override_parts.append(f"config.output_dir={task_out}")
 
             if override_parts:
                 joined = ",".join(override_parts)
