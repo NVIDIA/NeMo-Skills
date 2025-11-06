@@ -669,11 +669,13 @@ def nemo_evaluator(
                     commands=[server_command_obj, client_cmd],
                     hardware=HardwareConfig(
                         partition=partition,
-                        qos=qos,
-                        time_min=time_min,
-                        exclusive=exclusive,
                         num_gpus=server_gpus or None,
                         num_nodes=server_nodes or 1,
+                        sbatch_kwargs={
+                            "qos": qos,
+                            "time_min": time_min,
+                            "exclusive": exclusive,
+                        },
                     ),
                     name=f"{expname}-server-{idx}" if len(groups) > 1 else f"{expname}-server",
                     log_dir=log_dir,
@@ -683,11 +685,13 @@ def nemo_evaluator(
                     commands=[judge_server_command_obj],
                     hardware=HardwareConfig(
                         partition=partition,
-                        qos=qos,
-                        time_min=time_min,
-                        exclusive=exclusive,
                         num_gpus=judge_server_gpus or None,
                         num_nodes=judge_server_nodes or 1,
+                        sbatch_kwargs={
+                            "qos": qos,
+                            "time_min": time_min,
+                            "exclusive": exclusive,
+                        },
                     ),
                     name=f"{expname}-judge-server-{idx}" if len(groups) > 1 else f"{expname}-judge-server",
                     log_dir=log_dir,
@@ -713,11 +717,13 @@ def nemo_evaluator(
                         ],
                         hardware=HardwareConfig(
                             partition=partition,
-                            qos=qos,
-                            time_min=time_min,
-                            exclusive=exclusive,
                             num_gpus=None,
                             num_nodes=1,
+                            sbatch_kwargs={
+                                "qos": qos,
+                                "time_min": time_min,
+                                "exclusive": exclusive,
+                            },
                         ),
                         name=f"{expname}-sandbox-{idx}" if len(groups) > 1 else f"{expname}-sandbox",
                         log_dir=log_dir,
@@ -815,12 +821,14 @@ def nemo_evaluator(
         group = CommandGroup(
             commands=commands,
             hardware=HardwareConfig(
-                qos=qos,
-                time_min=time_min,
-                exclusive=exclusive,
                 partition=partition,
                 num_gpus=group_num_gpus,
                 num_nodes=group_num_nodes,
+                sbatch_kwargs={
+                    "qos": qos,
+                    "time_min": time_min,
+                    "exclusive": exclusive,
+                },
             ),
             name=f"{expname}-{idx}" if len(groups) > 1 else expname,
             log_dir=log_dir,
