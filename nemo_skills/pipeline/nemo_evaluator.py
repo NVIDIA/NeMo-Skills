@@ -315,10 +315,28 @@ def nemo_evaluator(
             task_name = task_query.split(".", 1)[-1]
             task_cfg = name_to_task.get(task_name)
             task_def = get_task_from_mapping(task_query, mapping)
-            cmd_struct = get_eval_factory_command(run_cfg, task_cfg, task_def)
+
+            # Prefer setting URL directly on RunConfig prior to command construction
+            url_set = False
             if url_override:
-                # Append hydra override so runtime URL wins
-                return f"{cmd_struct.cmd} ++target.api_endpoint.url={url_override}"
+                # If URL contains shell refs like $(scontrol ...), avoid baking into config; pass via --overrides
+                contains_shell_ref = ("$(" in url_override) or ("$SLURM_" in url_override)
+                if not contains_shell_ref:
+                    try:
+                        api_ep = getattr(getattr(run_cfg, "target", None), "api_endpoint", None)
+                        if api_ep is not None and hasattr(api_ep, "url"):
+                            setattr(api_ep, "url", url_override)
+                            url_set = True
+                    except Exception:
+                        # Best-effort; if structure differs, fall back to CLI override
+                        url_set = False
+
+            cmd_struct = get_eval_factory_command(run_cfg, task_cfg, task_def)
+
+            # Fallback: if we could not set URL on RunConfig, append via launcher-style --overrides
+            if url_override and not url_set:
+                return f'{cmd_struct.cmd} --overrides "target.api_endpoint.url={url_override}"'
+
             return cmd_struct.cmd
 
         shared_env = group_envs.get((container_id, sig), {})
