@@ -246,7 +246,7 @@ def separate_hydra_args(extra_arguments: str) -> tuple[str, str]:
         "--info",
     }
 
-    args_parts = extra_arguments.split()
+    args_parts = shlex.split(extra_arguments)
     i = 0
     while i < len(args_parts):
         arg = args_parts[i]
