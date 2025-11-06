@@ -199,6 +199,8 @@ def nemo_evaluator(
         container = task_def.get("container")
         if not container:
             raise ValueError(f"No container specified for task {task_query!r} in nemo_evaluator_launcher's mapping")
+        # WIPP
+        return "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_dle/users/agronskiy/images/safety-25.10.sqsh"
         return container
 
     # 2) Build launcher RunConfig to collect env_vars and to construct final commands on the client
@@ -531,8 +533,9 @@ def nemo_evaluator(
                 and server_command_obj is not None
                 and judge_server_command_obj is not None
             ):
+                # Group 0: main server + client (client waits on both servers and injects URLs)
                 server_group = CommandGroup(
-                    commands=[server_command_obj],
+                    commands=[server_command_obj, client_cmd],
                     hardware=HardwareConfig(
                         partition=partition,
                         qos=qos,
@@ -544,9 +547,9 @@ def nemo_evaluator(
                     name=f"{expname}-server-{idx}" if len(groups) > 1 else f"{expname}-server",
                     log_dir=log_dir,
                 )
-                # Attach client into judge group to avoid zero-GPU group requirement
+                # Group 1: judge server only
                 judge_group = CommandGroup(
-                    commands=[judge_server_command_obj, client_cmd],
+                    commands=[judge_server_command_obj],
                     hardware=HardwareConfig(
                         partition=partition,
                         qos=qos,
