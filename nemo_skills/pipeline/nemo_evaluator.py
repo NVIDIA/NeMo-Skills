@@ -127,11 +127,18 @@ def nemo_evaluator(
     tasks_mapping_toml: Optional[str] = typer.Option(
         None, help="Path to a local mapping.toml to resolve harness/task containers"
     ),
+    nemo_evaluator_config: Optional[str] = typer.Option(
+        None,
+        help=(
+            "Path to nemo-evaluator-launcher config YAML. We'll split into config_dir and config_name "
+            "(filename without extension) and pass to Hydra. Explicit ++nemo_eval_config_dir/name overrides win."
+        ),
+    ),
 ):
     """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
-    Extra Hydra overrides for the evaluator launcher config can be passed positionally, e.g.
-    ++nemo_eval_config_dir=..., ++nemo_eval_config_name=..., etc.
+    Provide the evaluator config via --nemo_evaluator_config=/path/to/config.yaml.
+    Other evaluator settings are passed to nemo-evaluator via its --overrides string.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
 
@@ -155,13 +162,6 @@ def nemo_evaluator(
     )
 
     # Helpers for container + env resolution
-    def _parse_override_flag(args: List[str], key: str) -> Optional[str]:
-        prefix = f"++{key}="
-        for a in args:
-            if a.startswith(prefix):
-                return a[len(prefix) :]
-        return None
-
     def _normalize_env_map(value) -> Dict[str, str]:
         env: Dict[str, str] = {}
         if value is None:
@@ -281,10 +281,13 @@ def nemo_evaluator(
 
     merged_overrides = _build_hydra_overrides()
 
-    cfg_dir = _parse_override_flag(merged_overrides, "nemo_eval_config_dir")
-    cfg_name = _parse_override_flag(merged_overrides, "nemo_eval_config_name") or "config"
-    if not cfg_dir:
-        raise ValueError("++nemo_eval_config_dir is required to construct evaluator commands on the client")
+    # Derive config_dir/config_name from --nemo_evaluator_config (required)
+    from pathlib import Path as _Path
+    if not nemo_evaluator_config:
+        raise ValueError("--nemo_evaluator_config is required (path to launcher YAML)")
+    _p = _Path(nemo_evaluator_config)
+    cfg_dir = str(_p.parent)
+    cfg_name = _p.stem or "config"
 
     run_cfg = RunConfig.from_hydra(
         config_dir=cfg_dir,
