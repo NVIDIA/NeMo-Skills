@@ -192,8 +192,8 @@ from nemo_skills.pipeline.cli import generate, wrap_arguments
 # Assume config is mounted to /workspace/configs/reasoning_config.yaml
 generate(
     wrap_arguments(
-        "--config-path /workspace/configs",
-        "--config-name reasoning_config",
+        "--config-path /workspace/configs ",
+        "--config-name reasoning_config ",
     ),
     cluster="local",
     server_type="openai",
