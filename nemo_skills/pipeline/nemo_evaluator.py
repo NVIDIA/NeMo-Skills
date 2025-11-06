@@ -165,7 +165,7 @@ def nemo_evaluator(
     # 2) Resolve container per task via launcher mapping
     from nemo_evaluator_launcher.common.mapping import get_task_from_mapping, load_tasks_mapping  # type: ignore
 
-    mapping = load_tasks_mapping(latest=False)
+    mapping = load_tasks_mapping(latest=latest_mapping)
 
     def _task_to_container(task_query: str) -> str:
         # Accept 'task' or 'harness.task'
@@ -175,32 +175,37 @@ def nemo_evaluator(
             raise ValueError(f"No container specified for task {task_query!r} in nemo_evaluator_launcher's mapping")
         return container
 
-    # 3) Build launcher RunConfig to collect env_vars: use same overrides the evaluator will receive
+    # 3) Build launcher RunConfig to collect env_vars and to construct final commands on the client
     from nemo_evaluator_launcher.api import RunConfig  # type: ignore
 
     cfg_dir = _parse_override_flag(ctx.args, "nemo_eval_config_dir")
     cfg_name = _parse_override_flag(ctx.args, "nemo_eval_config_name") or "config"
-    run_cfg = None
-    if cfg_dir:
-        run_cfg = RunConfig.from_hydra(config_dir=cfg_dir, config_name=cfg_name, hydra_overrides=list(ctx.args))
+    if not cfg_dir:
+        raise ValueError("++nemo_eval_config_dir is required to construct evaluator commands on the client")
+
+    run_cfg = RunConfig.from_hydra(
+        config_dir=cfg_dir,
+        config_name=cfg_name,
+        hydra_overrides=list(ctx.args),
+    )
 
     # 4) Build per-task env maps (global overlaid by per-task)
     global_env: Dict[str, str] = {}
     per_task_env: Dict[str, Dict[str, str]] = {}
-    if run_cfg is not None:
-        evaluation = getattr(run_cfg, "evaluation", None)
-        if evaluation is not None:
-            global_env = _normalize_env_map(getattr(evaluation, "env_vars", None))
-            # Build name->task cfg map to fetch per-task envs
-            tasks_cfg = getattr(evaluation, "tasks", []) or []
-            name_to_task = {getattr(t, "name", None): t for t in tasks_cfg if getattr(t, "name", None)}
-            for tq in task_list:
-                tname = tq.split(".", 1)[-1]
-                tcfg = name_to_task.get(tname)
-                env_map = dict(global_env)
-                if tcfg is not None:
-                    env_map.update(_normalize_env_map(getattr(tcfg, "env_vars", None)))
-                per_task_env[tq] = env_map
+    name_to_task = {}
+    evaluation = getattr(run_cfg, "evaluation", None)
+    if evaluation is not None:
+        global_env = _normalize_env_map(getattr(evaluation, "env_vars", None))
+        # Build name->task cfg map to fetch per-task envs
+        tasks_cfg = getattr(evaluation, "tasks", []) or []
+        name_to_task = {getattr(t, "name", None): t for t in tasks_cfg if getattr(t, "name", None)}
+        for tq in task_list:
+            tname = tq.split(".", 1)[-1]
+            tcfg = name_to_task.get(tname)
+            env_map = dict(global_env)
+            if tcfg is not None:
+                env_map.update(_normalize_env_map(getattr(tcfg, "env_vars", None)))
+            per_task_env[tq] = env_map
 
     # 5) Group tasks by (container, env_signature)
     def _env_signature(env: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
@@ -219,15 +224,19 @@ def nemo_evaluator(
     # 6) Build jobs per group
     jobs = []
     for idx, ((container_id, sig), group_tasks) in enumerate(groups.items()):
-        tasks_arg = ",".join(group_tasks)
+        # Helper to construct final evaluator commands on the client
+        from nemo_evaluator_launcher.common.helpers import get_eval_factory_command  # type: ignore
 
-        # Prepare evaluator command base (without server URL overrides yet)
-        base_eval_cmd = (
-            "export HYDRA_FULL_ERROR=1 && "
-            "python -m nemo_skills.inference.nemo_evaluator "
-            f"++tasks={tasks_arg} "
-            f"{extra_overrides}"
-        )
+        def _build_task_cmd(task_query: str, url_override: Optional[str] = None) -> str:
+            # Map 'task' or 'harness.task' to task cfg
+            task_name = task_query.split(".", 1)[-1]
+            task_cfg = name_to_task.get(task_name)
+            task_def = get_task_from_mapping(task_query, mapping)
+            cmd_struct = get_eval_factory_command(run_cfg, task_cfg, task_def)
+            if url_override:
+                # Append hydra override so runtime URL wins
+                return f"{cmd_struct.cmd} ++target.api_endpoint.url={url_override}"
+            return cmd_struct.cmd
 
         shared_env = group_envs.get((container_id, sig), {})
 
@@ -289,8 +298,10 @@ def nemo_evaluator(
                 health_url = f"{base_url}{server_health_path}"
                 target_url = f"{base_url}{server_api_path}"
                 wait_cmd = pipeline_utils.get_server_wait_cmd(health_url)
-                final = f"{wait_cmd} && {base_eval_cmd} ++target.api_endpoint.url={target_url}"
-                return final
+                # Build per-task commands with runtime URL override
+                cmds = [_build_task_cmd(tq, url_override=target_url) for tq in group_tasks]
+                joined = " && ".join(cmds)
+                return f"{wait_cmd} && {joined}"
 
             client_cmd = Command(
                 command=_client_cmd_factory,
@@ -306,12 +317,22 @@ def nemo_evaluator(
                 },
             )
         else:
-            # Either external server provided, or client-only (no overrides)
-            eval_cmd = base_eval_cmd
+            # Either external server provided, or client-only (no URL override)
             if with_external_server:
                 # Ensure trailing slash handling is consistent
                 url = server_base_url.rstrip("/") + server_api_path
-                eval_cmd = f"{eval_cmd} ++target.api_endpoint.url={url}"
+                # Prefer setting the URL on the RunConfig before building commands
+                try:
+                    if getattr(getattr(run_cfg, "target", None), "api_endpoint", None):
+                        run_cfg.target.api_endpoint.url = url
+                except Exception:
+                    # Fallback handled below by appending overrides (not needed in most cases)
+                    pass
+                cmds = [_build_task_cmd(tq) for tq in group_tasks]
+            else:
+                cmds = [_build_task_cmd(tq) for tq in group_tasks]
+
+            eval_cmd = " && ".join(cmds)
 
             client_cmd = Command(
                 command=eval_cmd,
