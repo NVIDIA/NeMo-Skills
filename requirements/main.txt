@@ -24,6 +24,7 @@ gradio
 httpx
 huggingface_hub
 hydra-core
+nemo-evaluator-launcher
 ipython
 iso639-lang
 langcodes
