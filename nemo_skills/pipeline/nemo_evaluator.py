@@ -77,9 +77,7 @@ def nemo_evaluator(
     # Optional judge self-hosted server (similar to main server)
     judge_server_type: Optional[str] = typer.Option(
         None,
-        help=(
-            "If set, self-host a judge server and co-schedule with evaluator. Supported values: vllm (preferred)."
-        ),
+        help=("If set, self-host a judge server and co-schedule with evaluator. Supported values: vllm (preferred)."),
     ),
     judge_server_model: Optional[str] = typer.Option(
         None, help="Model path/name to serve for judge (e.g., Qwen/Qwen3-32B-Instruct)"
@@ -95,9 +93,7 @@ def nemo_evaluator(
     judge_server_base_url: Optional[str] = typer.Option(
         None, help="Use an externally hosted judge server instead of self-hosting (e.g., http://host:port)"
     ),
-    judge_server_api_path: str = typer.Option(
-        "/v1/chat/completions", help="API path used for judge target url"
-    ),
+    judge_server_api_path: str = typer.Option("/v1/chat/completions", help="API path used for judge target url"),
     judge_server_health_path: str = typer.Option(
         "/health", help="Health path used to wait for judge server readiness"
     ),
@@ -374,13 +370,9 @@ def nemo_evaluator(
 
             if judge_url_override or judge_model_id:
                 if judge_url_override:
-                    override_parts.append(
-                        f"config.params.extra.judge.url={judge_url_override}"
-                    )
+                    override_parts.append(f"config.params.extra.judge.url={judge_url_override}")
                 if judge_model_id:
-                    override_parts.append(
-                        f"config.params.extra.judge.model_id={judge_model_id}"
-                    )
+                    override_parts.append(f"config.params.extra.judge.model_id={judge_model_id}")
 
             if override_parts:
                 joined = ",".join(override_parts)
@@ -447,7 +439,9 @@ def nemo_evaluator(
             jstype = (judge_server_type or "vllm").lower()
             jargs = judge_server_args or ""
             if jstype != "vllm":
-                LOG.warning("Only vllm judge_server_type is explicitly supported in this path right now; got %s", jstype)
+                LOG.warning(
+                    "Only vllm judge_server_type is explicitly supported in this path right now; got %s", jstype
+                )
             j_cmd_str, j_meta = vllm_server_command(
                 cluster_config=cluster_config,
                 model=judge_server_model,  # type: ignore[arg-type]
@@ -458,11 +452,9 @@ def nemo_evaluator(
                 args=jargs,
                 entrypoint=judge_server_entrypoint,
             )
-            judge_effective_port = int(j_meta.get("port")) if j_meta and j_meta.get("port") else None
             if not judge_server_container:
-                judge_server_container = (
-                    cluster_config["containers"].get("vllm")
-                    or cluster_config["containers"].get("nemo-skills", "nemo-skills")
+                judge_server_container = cluster_config["containers"].get("vllm") or cluster_config["containers"].get(
+                    "nemo-skills", "nemo-skills"
                 )
             judge_server_command_obj = Command(
                 command=j_cmd_str,
@@ -478,8 +470,10 @@ def nemo_evaluator(
             )
             commands.append(judge_server_command_obj)
 
-        # Build client command; if hosting server, wait for health and point evaluator to server URL
-        if (hosting_server and server_command_obj is not None) or (hosting_judge and judge_server_command_obj is not None):
+        # Build client command factory that can wait on hosted servers and inject runtime URLs
+        if (hosting_server and server_command_obj is not None) or (
+            hosting_judge and judge_server_command_obj is not None
+        ):
 
             def _client_cmd_factory():
                 # Cross-component references resolved at runtime
@@ -529,6 +523,81 @@ def nemo_evaluator(
                     "gpus": job_gpus or None,
                 },
             )
+
+            # If both servers are hosted, prefer a heterogeneous job with separate groups for each server and the client
+            if (
+                hosting_server
+                and hosting_judge
+                and server_command_obj is not None
+                and judge_server_command_obj is not None
+            ):
+                server_group = CommandGroup(
+                    commands=[server_command_obj],
+                    hardware=HardwareConfig(
+                        partition=partition,
+                        qos=qos,
+                        time_min=time_min,
+                        exclusive=exclusive,
+                        num_gpus=server_gpus or None,
+                        num_nodes=server_nodes or 1,
+                    ),
+                    name=f"{expname}-server-{idx}" if len(groups) > 1 else f"{expname}-server",
+                    log_dir=log_dir,
+                )
+                # Attach client into judge group to avoid zero-GPU group requirement
+                judge_group = CommandGroup(
+                    commands=[judge_server_command_obj, client_cmd],
+                    hardware=HardwareConfig(
+                        partition=partition,
+                        qos=qos,
+                        time_min=time_min,
+                        exclusive=exclusive,
+                        num_gpus=judge_server_gpus or None,
+                        num_nodes=judge_server_nodes or 1,
+                    ),
+                    name=f"{expname}-judge-server-{idx}" if len(groups) > 1 else f"{expname}-judge-server",
+                    log_dir=log_dir,
+                )
+                hetero_groups = [server_group, judge_group]
+
+                # Optional sandbox as separate group (0 GPUs)
+                if with_sandbox:
+                    from nemo_skills.pipeline.utils.server import get_free_port
+
+                    sandbox_port = get_free_port(strategy="random")
+                    sb_cmd_str, sb_meta = sandbox_command(cluster_config, port=sandbox_port)
+                    sandbox_group = CommandGroup(
+                        commands=[
+                            Command(
+                                command=sb_cmd_str,
+                                container=cluster_config["containers"].get("nemo-skills", "nemo-skills"),
+                                gpus=None,
+                                nodes=1,
+                                name=f"{expname}-sandbox-{idx}" if len(groups) > 1 else f"{expname}-sandbox",
+                                metadata=sb_meta,
+                            )
+                        ],
+                        hardware=HardwareConfig(
+                            partition=partition,
+                            qos=qos,
+                            time_min=time_min,
+                            exclusive=exclusive,
+                            num_gpus=None,
+                            num_nodes=1,
+                        ),
+                        name=f"{expname}-sandbox-{idx}" if len(groups) > 1 else f"{expname}-sandbox",
+                        log_dir=log_dir,
+                    )
+                    hetero_groups.append(sandbox_group)
+
+                jobs.append(
+                    {
+                        "name": f"{expname}-{idx}" if len(groups) > 1 else expname,
+                        "groups": hetero_groups,
+                    }
+                )
+                # Proceed to next container+env group
+                continue
         else:
             # Either external server provided, or client-only (no URL override)
             if with_external_server:
@@ -606,7 +675,7 @@ def nemo_evaluator(
             group_num_gpus = total_server_gpus or None
             group_num_nodes = max(server_nodes or 1, judge_server_nodes or 1, job_nodes or 1)
         else:
-            group_num_gpus = (job_gpus or None)
+            group_num_gpus = job_gpus or None
             group_num_nodes = job_nodes or 1
 
         group = CommandGroup(
