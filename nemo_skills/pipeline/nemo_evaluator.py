@@ -673,7 +673,6 @@ def nemo_evaluator(
                         num_nodes=server_nodes or 1,
                         sbatch_kwargs={
                             "qos": qos,
-                            "time_min": time_min,
                             "exclusive": exclusive,
                         },
                     ),
@@ -689,7 +688,6 @@ def nemo_evaluator(
                         num_nodes=judge_server_nodes or 1,
                         sbatch_kwargs={
                             "qos": qos,
-                            "time_min": time_min,
                             "exclusive": exclusive,
                         },
                     ),
@@ -721,7 +719,6 @@ def nemo_evaluator(
                             num_nodes=1,
                             sbatch_kwargs={
                                 "qos": qos,
-                                "time_min": time_min,
                                 "exclusive": exclusive,
                             },
                         ),
@@ -826,7 +823,6 @@ def nemo_evaluator(
                 num_nodes=group_num_nodes,
                 sbatch_kwargs={
                     "qos": qos,
-                    "time_min": time_min,
                     "exclusive": exclusive,
                 },
             ),
