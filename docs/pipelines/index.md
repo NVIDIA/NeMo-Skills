@@ -127,7 +127,7 @@ All of the scripts that involve LLM data generation accept a common set of param
   E.g. use `--server_args="--gpu-memory-utilization=0.99"` to change gpu memory utilization of a
   vLLM server.
 
-## Using Config Files
+## Passing Main Arguments with Config Files
 
 You can use YAML config files to pass parameters to any pipeline script. This is most applicable when using parameters that require extra escaping, such as strings with special characters.
 
@@ -177,6 +177,7 @@ ns generate \
 ```
 
 **How it works:**
+
 - `--config-path=/workspace/configs`: Directory containing your config file
 - `--config-name=reasoning_config`: Config filename without `.yaml` extension
 - Command-line `++` args can still override config file values if needed
