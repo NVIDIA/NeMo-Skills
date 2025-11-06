@@ -35,11 +35,6 @@ def nemo_evaluator(
     ),
     output_dir: str = typer.Option(..., help="Where to put logs and .done tracking files for the run"),
     expname: str = typer.Option("nemo-evaluator", help="Nemo run experiment name"),
-    tasks: str = typer.Option(
-        ...,
-        help="Comma-separated list of evaluator task queries (`taskname` "
-        "or, for the sake of name resolution, `harness.taskname`)",
-    ),
     # Orchestration knobs
     job_gpus: int = typer.Option(0, help="GPUs to allocate for the evaluator job (client container)"),
     job_nodes: int = typer.Option(1, help="Nodes to allocate for the evaluator job"),
@@ -93,16 +88,11 @@ def nemo_evaluator(
     tasks_mapping_toml: Optional[str] = typer.Option(
         None, help="Path to a local mapping.toml to resolve harness/task containers"
     ),
-    # Optional per-container installation step before running evaluator
-    install_cmd: Optional[str] = typer.Option(
-        None,
-        help="Shell command to run inside container before evaluator (e.g., pip install -r /workspace/reqs.txt)",
-    ),
 ):
     """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
-    Extra Hydra overrides for the underlying evaluator generator can be passed positionally and will be
-    forwarded to the Python -m invocation, e.g. ++nemo_eval_config_dir=..., ++nemo_eval_config_name=..., etc.
+    Extra Hydra overrides for the evaluator launcher config can be passed positionally, e.g.
+    ++nemo_eval_config_dir=..., ++nemo_eval_config_name=..., etc.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
 
@@ -159,10 +149,7 @@ def nemo_evaluator(
         raise ValueError("env_vars must be a dict")
 
     # Now preparing the config for the launcher
-    # 1)  tasks from CLI
-    task_list = [t.strip() for t in tasks.split(",") if t.strip()]
-
-    # 2) Resolve container per task via launcher mapping
+    # 1) Resolve container mapping utilities
     from nemo_evaluator_launcher.common.mapping import get_task_from_mapping, load_tasks_mapping  # type: ignore
 
     mapping = load_tasks_mapping(latest=latest_mapping)
@@ -175,7 +162,7 @@ def nemo_evaluator(
             raise ValueError(f"No container specified for task {task_query!r} in nemo_evaluator_launcher's mapping")
         return container
 
-    # 3) Build launcher RunConfig to collect env_vars and to construct final commands on the client
+    # 2) Build launcher RunConfig to collect env_vars and to construct final commands on the client
     from nemo_evaluator_launcher.api import RunConfig  # type: ignore
 
     cfg_dir = _parse_override_flag(ctx.args, "nemo_eval_config_dir")
@@ -189,23 +176,28 @@ def nemo_evaluator(
         hydra_overrides=list(ctx.args),
     )
 
+    # 3) Determine tasks to run from the evaluator config
+    evaluation = getattr(run_cfg, "evaluation", None)
+    if evaluation is None:
+        raise ValueError("Evaluator config missing 'evaluation' section with tasks")
+    tasks_cfg = getattr(evaluation, "tasks", []) or []
+    task_list = [getattr(t, "name", None) for t in tasks_cfg]
+    task_list = [t for t in task_list if t]
+    if not task_list:
+        raise ValueError("No tasks found in evaluator config; please define evaluation.tasks")
+
     # 4) Build per-task env maps (global overlaid by per-task)
     global_env: Dict[str, str] = {}
     per_task_env: Dict[str, Dict[str, str]] = {}
-    name_to_task = {}
-    evaluation = getattr(run_cfg, "evaluation", None)
-    if evaluation is not None:
-        global_env = _normalize_env_map(getattr(evaluation, "env_vars", None))
-        # Build name->task cfg map to fetch per-task envs
-        tasks_cfg = getattr(evaluation, "tasks", []) or []
-        name_to_task = {getattr(t, "name", None): t for t in tasks_cfg if getattr(t, "name", None)}
-        for tq in task_list:
-            tname = tq.split(".", 1)[-1]
-            tcfg = name_to_task.get(tname)
-            env_map = dict(global_env)
-            if tcfg is not None:
-                env_map.update(_normalize_env_map(getattr(tcfg, "env_vars", None)))
-            per_task_env[tq] = env_map
+    name_to_task = {getattr(t, "name", None): t for t in tasks_cfg if getattr(t, "name", None)}
+    global_env = _normalize_env_map(getattr(evaluation, "env_vars", None))
+    for tq in task_list:
+        tname = tq.split(".", 1)[-1]
+        tcfg = name_to_task.get(tname)
+        env_map = dict(global_env)
+        if tcfg is not None:
+            env_map.update(_normalize_env_map(getattr(tcfg, "env_vars", None)))
+        per_task_env[tq] = env_map
 
     # 5) Group tasks by (container, env_signature)
     def _env_signature(env: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
@@ -309,7 +301,6 @@ def nemo_evaluator(
                 gpus=job_gpus or None,
                 nodes=job_nodes or 1,
                 name=f"{expname}-{idx}" if len(groups) > 1 else expname,
-                installation_command=install_cmd,
                 metadata={
                     "log_prefix": "main",
                     "environment": shared_env,
@@ -340,7 +331,6 @@ def nemo_evaluator(
                 gpus=job_gpus or None,
                 nodes=job_nodes or 1,
                 name=f"{expname}-{idx}" if len(groups) > 1 else expname,
-                installation_command=install_cmd,
                 metadata={
                     "log_prefix": "main",
                     "environment": shared_env,
