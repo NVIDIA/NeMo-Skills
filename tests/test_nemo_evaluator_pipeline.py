@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0
 
 import importlib
+import textwrap
 
 import pytest
 
@@ -24,10 +25,7 @@ def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
 
     # Simulate Typer call via function directly; ensure no exceptions for dry_run
     class Ctx:
-        args = [
-            "++nemo_eval_config_dir=tests/data/nemo_evaluator",
-            "++nemo_eval_config_name=example-eval-config",
-        ]
+        args = []
 
     # Provide minimal valid args
     kwargs = dict(
@@ -35,8 +33,7 @@ def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
         cluster=None,
         output_dir=str(tmp_path / "out"),
         expname="evaluator-test",
-        tasks="ifeval",
-        job_gpus=0,
+        nemo_evaluator_config=str(tmp_path / "example-eval-config.yaml"),
         job_nodes=1,
         partition=None,
         qos=None,
@@ -55,6 +52,29 @@ def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
 
     # Should not raise; actual Pipeline.run is expected to handle dry_run path
     try:
+        # write a tiny config file for the launcher
+        (tmp_path / "example-eval-config.yaml").write_text(
+            textwrap.dedent(
+                """
+                defaults:
+                  - execution: local
+                  - deployment: none
+                  - _self_
+
+                execution:
+                  output_dir: test
+
+                target:
+                  api_endpoint:
+                    model_id: meta/llama-3.1-8b-instruct
+                    url: http://127.0.0.1:8000/v1/chat/completions
+
+                evaluation:
+                  tasks:
+                    - name: ifeval
+                """
+            ).strip()
+        )
         command_fn(**kwargs)
     except Exception as e:
         pytest.fail(f"CLI dry_run failed unexpectedly: {e}")
