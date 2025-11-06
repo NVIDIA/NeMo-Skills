@@ -249,10 +249,10 @@ def test_separate_hydra_args_mixed_formats():
 
 def test_separate_hydra_args_with_special_chars():
     """Test with override args containing special characters."""
-    extra_args = "--config-path /configs --config-name test ++end_reasoning_string='</think>' ++stop_phrase='\\n\\n'"
+    extra_args = "--config-path /configs --config-name test ++end_reasoning_string='END_TAG' ++stop_phrase='\\n\\n'"
     hydra_args, override_args = separate_hydra_args(extra_args)
     assert hydra_args == " --config-path /configs --config-name test"
-    assert override_args == " ++end_reasoning_string='</think>' ++stop_phrase='\\n\\n'"
+    assert override_args == " ++end_reasoning_string=END_TAG ++stop_phrase=\\n\\n"
 
 
 def test_separate_hydra_args_complex():
@@ -261,14 +261,14 @@ def test_separate_hydra_args_complex():
         "--config-path /nemo_run/code/configs --config-name reasoning_config "
         "++prompt_config=generic/math-base ++inference.temperature=0.7 "
         "++inference.tokens_to_generate=2048 ++parse_reasoning=True "
-        "++end_reasoning_string='</think>'"
+        "++end_reasoning_string='END_TAG'"
     )
     hydra_args, override_args = separate_hydra_args(extra_args)
     assert hydra_args == " --config-path /nemo_run/code/configs --config-name reasoning_config"
     assert override_args == (
         " ++prompt_config=generic/math-base ++inference.temperature=0.7 "
         "++inference.tokens_to_generate=2048 ++parse_reasoning=True "
-        "++end_reasoning_string='</think>'"
+        "++end_reasoning_string=END_TAG"
     )
 
 
@@ -351,7 +351,7 @@ def test_separate_hydra_args_with_spaces_in_values():
 
 def test_separate_hydra_args_with_quoted_special_chars():
     """Test with quoted values containing special characters."""
-    extra_args = """--config-path /configs ++end_reasoning_string="</think>" ++prompt="Question: {question}" """
+    extra_args = """--config-path /configs ++end_reasoning_string="END_TAG" ++prompt="Question: {question}" """
     hydra_args, override_args = separate_hydra_args(extra_args)
     assert hydra_args == " --config-path /configs"
-    assert override_args == " ++end_reasoning_string=</think> ++prompt=Question: {question}"
+    assert override_args == " ++end_reasoning_string=END_TAG ++prompt=Question: {question}"
