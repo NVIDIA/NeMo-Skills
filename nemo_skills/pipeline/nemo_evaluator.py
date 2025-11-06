@@ -37,7 +37,7 @@ def nemo_evaluator(
     output_dir: str = typer.Option(..., help="Where to put logs and .done tracking files for the run"),
     expname: str = typer.Option("nemo-evaluator", help="Nemo run experiment name"),
     # Orchestration knobs
-    job_gpus: int = typer.Option(0, help="GPUs to allocate for the evaluator job (client container)"),
+    job_gpus: int = typer.Option(0, help="GPUs to allocate for the evaluator client when no servers are hosted"),
     job_nodes: int = typer.Option(1, help="Nodes to allocate for the evaluator job"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     qos: str = typer.Option(None, help="Slurm QoS"),
@@ -121,12 +121,6 @@ def nemo_evaluator(
     config_dir: str = typer.Option(None, help="Where to search for cluster configs"),
     dry_run: bool = typer.Option(False, help="If True, validate without submitting the job"),
     # Evaluator mapping/config knobs
-    latest_mapping: bool = typer.Option(
-        False, help="If True, use latest upstream task mapping from nemo_evaluator_launcher"
-    ),
-    tasks_mapping_toml: Optional[str] = typer.Option(
-        None, help="Path to a local mapping.toml to resolve harness/task containers"
-    ),
     nemo_evaluator_config: Optional[str] = typer.Option(
         None,
         help=(
@@ -137,8 +131,57 @@ def nemo_evaluator(
 ):
     """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
-    Provide the evaluator config via --nemo_evaluator_config=/path/to/config.yaml.
-    Other evaluator settings are passed to nemo-evaluator via its --overrides string.
+    This entrypoint builds nemo-evaluator-launcher commands and schedules them via
+    the declarative Pipeline. It can optionally co-host main and judge vLLM servers
+    and inject their runtime URLs into the evaluator via launcher `--overrides`.
+
+    Args:
+      ctx: Typer context carrying passthrough args (ignored by nemo-evaluator).
+      cluster: Cluster config key or path (None runs locally without containers).
+      output_dir: Host path for run artifacts and logs.
+      expname: Experiment name for grouping jobs and logs.
+      job_nodes: Nodes to allocate for the evaluator client (CPU-only).
+      partition: Slurm partition name.
+      qos: Slurm QoS.
+      time_min: Slurm time-min limit.
+      mount_paths: Comma-delimited "SRC:DEST" mounts to augment cluster config.
+      log_dir: Custom logs root (defaults under output_dir).
+      exclusive: Whether to request exclusive nodes.
+      with_sandbox: Whether to launch a sandbox container alongside.
+      keep_mounts_for_sandbox: Preserve mounts inside sandbox (dangerous for writes).
+      server_type: Main hosted server type (e.g., "vllm").
+      server_model: Main hosted server model identifier or path.
+      server_gpus: GPUs for main hosted server (0 disables hosting).
+      server_nodes: Nodes for main hosted server.
+      server_port: Port for main hosted server (auto if None).
+      server_args: Extra CLI args for the main server.
+      server_entrypoint: Custom entrypoint for the main server.
+      server_container: Container key/image for main server.
+      server_base_url: External main server base URL (use instead of hosting).
+      server_api_path: API path appended to base URL for main server.
+      server_health_path: Health path used for readiness checks (main server).
+      judge_server_type: Judge hosted server type (e.g., "vllm").
+      judge_server_model: Judge hosted server model identifier or path.
+      judge_server_gpus: GPUs for judge hosted server (0 disables hosting).
+      judge_server_nodes: Nodes for judge hosted server.
+      judge_server_port: Port for judge hosted server (auto if None).
+      judge_server_args: Extra CLI args for the judge server.
+      judge_server_entrypoint: Custom entrypoint for the judge server.
+      judge_server_container: Container key/image for judge server.
+      judge_server_base_url: External judge server base URL (use instead of hosting).
+      judge_server_api_path: API path appended to base URL for judge server.
+      judge_server_health_path: Health path used for readiness checks (judge server).
+      launcher_overlay: YAML/JSON overlay to flatten into launcher overrides.
+      launcher_override: Repeated key=value pairs to append to launcher overrides.
+      reuse_code: Enable nemo-run code reuse.
+      reuse_code_exp: Experiment name to reuse code from.
+      run_after: Pipeline-level dependency on other experiments.
+      dependent_jobs: Number of dependent duplicates to launch (advanced).
+      config_dir: Directory to search for cluster configs.
+      dry_run: Validate and print scheduling without submission.
+      latest_mapping: Use latest task mapping from nemo-evaluator-launcher.
+      tasks_mapping_toml: Local mapping.toml path for task resolution.
+      nemo_evaluator_config: Path to launcher YAML (split to config_dir/name).
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
 
@@ -163,6 +206,17 @@ def nemo_evaluator(
 
     # Helpers for container + env resolution
     def _normalize_env_map(value) -> Dict[str, str]:
+        """Normalize env mapping from Hydra/DictConfig to a flat {str:str} dict.
+
+        Accepts dict or OmegaConf containers; casts scalars to strings and preserves
+        keys that are strings only.
+
+        Args:
+          value: Environment mapping-like object.
+
+        Returns:
+          Dict[str, str]: Normalized environment mapping.
+        """
         env: Dict[str, str] = {}
         if value is None:
             return env
@@ -191,16 +245,25 @@ def nemo_evaluator(
     # 1) Resolve container mapping utilities
     from nemo_evaluator_launcher.common.mapping import get_task_from_mapping, load_tasks_mapping  # type: ignore
 
-    mapping = load_tasks_mapping(latest=latest_mapping)
+    mapping = load_tasks_mapping()
 
     def _task_to_container(task_query: str) -> str:
+        """Resolve container image from launcher mapping for a task query.
+
+        Supports either "task" or "harness.task" query forms and returns the
+        container string associated with the mapped task.
+
+        Args:
+          task_query: Task identifier (possibly harness-qualified).
+
+        Returns:
+          str: Container image or key from mapping.
+        """
         # Accept 'task' or 'harness.task'
         task_def = get_task_from_mapping(task_query, mapping)
         container = task_def.get("container")
         if not container:
             raise ValueError(f"No container specified for task {task_query!r} in nemo_evaluator_launcher's mapping")
-        # WIPP
-        return "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_dle/users/agronskiy/images/safety-25.10.sqsh"
         return container
 
     # 2) Build launcher RunConfig to collect env_vars and to construct final commands on the client
@@ -208,6 +271,14 @@ def nemo_evaluator(
 
     # Generic override builder: start with ctx.args and extend with overlay/mapping
     def _extract_set_keys(args: List[str]) -> set[str]:
+        """Collect hydra-style override keys already present in a list of flags.
+
+        Args:
+          args: List of CLI-style flags (e.g., ["++k=v", ...]).
+
+        Returns:
+          set[str]: Set of keys found before the equals sign.
+        """
         keys: set[str] = set()
         for a in args:
             if a.startswith("++") and "=" in a:
@@ -216,6 +287,13 @@ def nemo_evaluator(
         return keys
 
     def _flatten(prefix: str, obj, out: Dict[str, str]):
+        """Flatten nested dict/list structures into dot-path assignments.
+
+        Args:
+          prefix: Current dot path prefix.
+          obj: Object to flatten (dict/list/scalar).
+          out: Accumulator for flattened key/value pairs (values cast to str).
+        """
         if isinstance(obj, dict):
             for k, v in obj.items():
                 _flatten(f"{prefix}.{k}" if prefix else str(k), v, out)
@@ -226,6 +304,15 @@ def nemo_evaluator(
             out[prefix] = "" if obj is None else str(obj)
 
     def _build_hydra_overrides() -> List[str]:
+        """Build a merged list of hydra overrides from ctx args and overlays.
+
+        Applies precedence: explicit ctx args and launcher_override > overlay >
+        derived mappings. Only hydra-style keys are added here; nemo-evaluator
+        `--overrides` are appended later on the generated command string.
+
+        Returns:
+          List[str]: Merged list of hydra overrides.
+        """
         overrides: List[str] = list(ctx.args)
         already = _extract_set_keys(overrides)
 
@@ -283,6 +370,7 @@ def nemo_evaluator(
 
     # Derive config_dir/config_name from --nemo_evaluator_config (required)
     from pathlib import Path as _Path
+
     if not nemo_evaluator_config:
         raise ValueError("--nemo_evaluator_config is required (path to launcher YAML)")
     _p = _Path(nemo_evaluator_config)
@@ -321,6 +409,14 @@ def nemo_evaluator(
 
     # 5) Group tasks by (container, env_signature)
     def _env_signature(env: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
+        """Create a stable grouping signature from an env mapping.
+
+        Args:
+          env: Environment mapping.
+
+        Returns:
+          Tuple[Tuple[str, str], ...]: Sorted tuple of key/value pairs.
+        """
         return tuple(sorted(env.items()))
 
     groups: Dict[Tuple[str, Tuple[Tuple[str, str], ...]], List[str]] = {}
@@ -336,7 +432,7 @@ def nemo_evaluator(
     # 6) Build jobs per group
     jobs = []
     # Base container-visible output root for evaluator artifacts
-    base_output_root = (output_dir or '').rstrip('/') if output_dir else None
+    base_output_root = (output_dir or "").rstrip("/") if output_dir else None
 
     for idx, ((container_id, sig), group_tasks) in enumerate(groups.items()):
         # Helper to construct final evaluator commands on the client
@@ -348,6 +444,22 @@ def nemo_evaluator(
             judge_url_override: Optional[str] = None,
             judge_model_id: Optional[str] = None,
         ) -> str:
+            """Construct the per-task evaluator command with launcher overrides.
+
+            Sets runtime main URL on RunConfig when static; otherwise appends
+            `target.api_endpoint.url` via nemo-evaluator `--overrides`. Judge URL
+            and optional model_id are always added via `--overrides`. Also injects
+            a per-task output directory override under the experiment root.
+
+            Args:
+              task_query: Task identifier, possibly harness-qualified.
+              url_override: Full main API URL to set/override at runtime.
+              judge_url_override: Full judge API URL to override at runtime.
+              judge_model_id: Optional judge model identifier.
+
+            Returns:
+              str: Final shell command string to execute.
+            """
             # Map 'task' or 'harness.task' to task cfg
             task_name = task_query.split(".", 1)[-1]
             task_cfg = name_to_task.get(task_name)
@@ -489,6 +601,14 @@ def nemo_evaluator(
         ):
 
             def _client_cmd_factory():
+                """Deferred client command builder that waits on servers.
+
+                Resolves hosted server hostnames/ports at runtime, composes
+                a wait chain for health endpoints, and joins per-task commands.
+
+                Returns:
+                  str: Final shell command with waits and evaluator invocations.
+                """
                 # Cross-component references resolved at runtime
                 waits: List[str] = []
                 target_url: Optional[str] = None
@@ -654,7 +774,7 @@ def nemo_evaluator(
             client_cmd = Command(
                 command=eval_cmd,
                 container=container_id,
-                gpus=job_gpus or None,
+                gpus=None,
                 nodes=job_nodes or 1,
                 name=f"{expname}-{idx}" if len(groups) > 1 else expname,
                 metadata={
@@ -695,10 +815,10 @@ def nemo_evaluator(
         group = CommandGroup(
             commands=commands,
             hardware=HardwareConfig(
-                partition=partition,
                 qos=qos,
                 time_min=time_min,
                 exclusive=exclusive,
+                partition=partition,
                 num_gpus=group_num_gpus,
                 num_nodes=group_num_nodes,
             ),
