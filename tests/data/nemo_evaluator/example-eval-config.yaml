@@ -59,7 +59,7 @@ evaluation:
           use_request_logging: true
           max_logged_requests: null
   tasks:
-    - name: aegis_v2
+    - name: bbq_small
       nemo_evaluator_config:
         config:
           params:
@@ -69,3 +69,5 @@ evaluation:
                 parallelism: 2
                 max_new_tokens: 5
                 api_key: API_KEY
+              bbq:
+                dataset: small_ambig_clean.json
