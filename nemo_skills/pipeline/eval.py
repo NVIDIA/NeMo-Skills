@@ -644,8 +644,6 @@ def eval(
 
         # setting summarize results tasks
         if auto_summarize_results:
-            LOG.info("WIPP summarizing results")
-            LOG.info(f"WIPP benchmark_dict: {benchmarks_dict}")
             for benchmark, benchmark_args in benchmarks_dict.items():
                 # TODO: add logic if metrics.json exists, we don't run this!
                 has_tasks = True
