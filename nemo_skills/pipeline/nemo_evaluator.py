@@ -8,6 +8,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
 import logging
+import os
 from typing import Dict, List, Optional, Tuple
 
 import typer
@@ -73,6 +74,21 @@ def nemo_evaluator(
     ),
     server_api_path: str = typer.Option("/v1/chat/completions", help="API path used for evaluator target url"),
     server_health_path: str = typer.Option("/health", help="Health path used to wait for server readiness"),
+    # Generic launcher override mechanisms
+    launcher_overlay: Optional[str] = typer.Option(
+        None,
+        help=(
+            "Overlay for the evaluator launcher Hydra config; accepts a path to YAML/JSON "
+            "or an inline YAML/JSON string. Flattened into ++key=value overrides unless explicitly set in ctx.args."
+        ),
+    ),
+    launcher_override: List[str] = typer.Option(
+        None,
+        help=(
+            "Extra Hydra overrides for the evaluator launcher as key=value pairs. "
+            "Provide multiple --launcher-override flags to add more entries."
+        ),
+    ),
     # Experiment lifecycle and dependencies
     reuse_code: bool = typer.Option(True, help="If True, will reuse code from the provided experiment"),
     reuse_code_exp: str = typer.Option(None, help="If specified, reuse code from this experiment"),
@@ -165,15 +181,90 @@ def nemo_evaluator(
     # 2) Build launcher RunConfig to collect env_vars and to construct final commands on the client
     from nemo_evaluator_launcher.api import RunConfig  # type: ignore
 
-    cfg_dir = _parse_override_flag(ctx.args, "nemo_eval_config_dir")
-    cfg_name = _parse_override_flag(ctx.args, "nemo_eval_config_name") or "config"
+    # Generic override builder: start with ctx.args and extend with overlay/mapping
+    def _extract_set_keys(args: List[str]) -> set[str]:
+        keys: set[str] = set()
+        for a in args:
+            if a.startswith("++") and "=" in a:
+                k = a[2:].split("=", 1)[0]
+                keys.add(k)
+        return keys
+
+    def _flatten(prefix: str, obj, out: Dict[str, str]):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                _flatten(f"{prefix}.{k}" if prefix else str(k), v, out)
+        elif isinstance(obj, (list, tuple)):
+            for idx, v in enumerate(obj):
+                _flatten(f"{prefix}.{idx}" if prefix else str(idx), v, out)
+        else:
+            out[prefix] = "" if obj is None else str(obj)
+
+    def _build_hydra_overrides() -> List[str]:
+        overrides: List[str] = list(ctx.args)
+        already = _extract_set_keys(overrides)
+
+        # 2a) explicit repeated key=value flags
+        if launcher_override:
+            for pair in launcher_override:
+                if not pair or "=" not in pair:
+                    continue
+                k, v = pair.split("=", 1)
+                if k not in already:
+                    overrides.append(f"++{k}={v}")
+                    already.add(k)
+
+        # 2b) overlay file or inline YAML/JSON
+        if launcher_overlay:
+            try:
+                if os.path.exists(launcher_overlay):
+                    ov_cfg = OmegaConf.load(launcher_overlay)
+                else:
+                    ov_cfg = OmegaConf.create(launcher_overlay)
+                ov_dict = OmegaConf.to_container(ov_cfg, resolve=True) or {}
+                flat: Dict[str, str] = {}
+                _flatten("", ov_dict, flat)
+                for k, v in flat.items():
+                    if k not in already:
+                        overrides.append(f"++{k}={v}")
+                        already.add(k)
+            except Exception as e:
+                LOG.warning("Failed to parse launcher_overlay; ignoring", exc_info=e)
+
+        # 2c) declarative mapping from selected top-level options
+        def _add_if_missing(key: str, value: Optional[str]):
+            if value is None:
+                return
+            if key in already:
+                return
+            overrides.append(f"++{key}={value}")
+            already.add(key)
+
+        # infer external vs hosted server
+        hosting_server = bool(server_type) and (server_gpus or 0) > 0 and bool(server_model)
+        with_external_server = (not hosting_server) and bool(server_base_url)
+
+        # model_id mapping
+        _add_if_missing("target.api_endpoint.model_id", server_model)
+
+        # external URL mapping
+        if with_external_server and server_base_url:
+            url = server_base_url.rstrip("/") + server_api_path
+            _add_if_missing("target.api_endpoint.url", url)
+
+        return overrides
+
+    merged_overrides = _build_hydra_overrides()
+
+    cfg_dir = _parse_override_flag(merged_overrides, "nemo_eval_config_dir")
+    cfg_name = _parse_override_flag(merged_overrides, "nemo_eval_config_name") or "config"
     if not cfg_dir:
         raise ValueError("++nemo_eval_config_dir is required to construct evaluator commands on the client")
 
     run_cfg = RunConfig.from_hydra(
         config_dir=cfg_dir,
         config_name=cfg_name,
-        hydra_overrides=list(ctx.args),
+        hydra_overrides=merged_overrides,
     )
 
     # 3) Determine tasks to run from the evaluator config
