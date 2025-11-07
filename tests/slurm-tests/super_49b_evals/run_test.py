@@ -321,7 +321,6 @@ def main():
 
     prepare_data(
         ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"),
-        skip_data_dir_check=True,
     )
 
     setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)

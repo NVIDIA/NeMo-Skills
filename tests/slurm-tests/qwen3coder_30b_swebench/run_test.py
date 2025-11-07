@@ -56,7 +56,7 @@ def main():
         prepare_data_args = "swe-bench"
     else:
         prepare_data_args = f"swe-bench --container_formatter {args.container_formatter}"
-    prepare_data(ctx=wrap_arguments(prepare_data_args), skip_data_dir_check=True)
+    prepare_data(ctx=wrap_arguments(prepare_data_args))
 
     for agent_framework in ["openhands", "swe_agent"]:
         workspace = f"{args.workspace}/{agent_framework}"

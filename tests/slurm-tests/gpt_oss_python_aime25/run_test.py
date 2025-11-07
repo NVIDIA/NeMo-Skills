@@ -57,7 +57,7 @@ def main():
 
     args = parser.parse_args()
 
-    prepare_data(ctx=wrap_arguments("aime25"), skip_data_dir_check=True)
+    prepare_data(ctx=wrap_arguments("aime25"))
 
     eval_expname = eval_gpt_oss_python(
         workspace=args.workspace,

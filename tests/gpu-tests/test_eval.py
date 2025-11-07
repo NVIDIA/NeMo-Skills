@@ -266,7 +266,6 @@ def test_prepare_and_eval_all_datasets():
         config_dir=str(config_dir),
         data_dir=str(data_dir),
         expname=f"prepare-all-datasets-{model_type}",
-        skip_data_dir_check=True,
     )
 
     eval_kwargs = dict(

@@ -14,7 +14,6 @@
 
 import logging
 import os
-from pathlib import Path
 from typing import List
 
 import typer
@@ -32,7 +31,7 @@ LOG = logging.getLogger(get_logger_name(__file__))
 
 
 # TODO: read this from init.py
-DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24"]
+DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24", "mmau-pro"]
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -74,7 +73,9 @@ def prepare_data(
     ),
     skip_data_dir_check: bool = typer.Option(
         False,
-        help="Skip check that prevents downloading large data files into the git repository.",
+        help="Some datasets require very large input files and we will fail with error if data_dir "
+        "is not specified (to avoid accidentally uploading them to cluster with every job). "
+        "If you're running things locally or have another reason to bypass this check, set this flag.",
     ),
     sbatch_kwargs: str = typer.Option(
         "",
@@ -89,12 +90,13 @@ def prepare_data(
     extra_arguments = f"{' '.join(ctx.args)}"
     command = f"python -m nemo_skills.dataset.prepare {extra_arguments}"
 
-    if not data_dir:
+    if not data_dir and not skip_data_dir_check:
         for dataset in DATASETS_REQUIRE_DATA_DIR:
             if dataset in extra_arguments:
                 raise ValueError(
-                    f"Dataset {dataset} contains very large input data and requires a data_dir to be specified. "
-                    "Please provide --data_dir argument."
+                    f"Dataset {dataset} contains very large input data and it's recommended to have a "
+                    "data_dir to be specified to avoid accidentally uploading large data on cluster with every job. "
+                    "Please provide --data_dir argument or set --skip_data_dir_check to bypass this safety check."
                 )
 
     if data_dir and cluster is None:
@@ -113,22 +115,6 @@ def prepare_data(
         # if we use container, it will mess up permissions, so as a workaround
         # setting executor to none
         cluster_config["executor"] = "none"
-
-    # Check if preparing data inside git repository without specifying data_dir
-    # Skip check if --no-audio is used (will be generalized to other datasets in the future)
-    if not data_dir and not skip_data_dir_check and "--no-audio" not in extra_arguments:
-        current = Path.cwd()
-        while current != current.parent:
-            if (current / ".git").exists():
-                raise ValueError(
-                    f"Error: Preparing data inside git repository at {current}.\n"
-                    f"Large data files will be packaged with the repository and uploaded to the cluster.\n"
-                    f"Please either:\n"
-                    f"  1. Specify --data_dir to prepare data outside the repository\n"
-                    f"  2. Use --skip_data_dir_check to bypass this safety check\n"
-                    f"  3. Use --no-audio if you want to prepare the dataset without audio files"
-                )
-            current = current.parent
 
     if cluster_config["executor"] == "slurm" and not data_dir:
         raise ValueError(

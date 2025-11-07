@@ -21,12 +21,10 @@ MMAU-Pro (Multimodal Audio Understanding - Pro) is a comprehensive benchmark for
 
 MMAU-Pro requires audio files for meaningful evaluation. **Audio files are downloaded by default** to ensure proper evaluation.
 
-!!! warning "Git Repository Safety Check"
-    By default, preparing data inside a git repository will fail to prevent accidentally packaging large data files (in this case, ~50GB audio files). You can either:
-
-    1. Specify `--data_dir` to download data outside the repository (recommended)
-    2. Use `--skip_data_dir_check` to bypass this safety check
-    3. Use `--no-audio` for text-only mode (not recommended for proper evaluation)
+!!! warning "Running without audio files"
+    If you want to evaluation without audio files (not recommended) use
+    `--no-audio` flag. In this case you can also set `--skip_data_dir_check`
+    as data is very lightweight when audio files aren't being used.
 
 ### Data Preparation
 
