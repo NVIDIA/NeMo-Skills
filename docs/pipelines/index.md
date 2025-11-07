@@ -160,8 +160,9 @@ parallel_thinking:
 ```
 
 !!! note
-  Local files can be packaged into the `/nemo_run/code` directory in the execution environment. See
-  [Code Packaging](../basics/code-packaging.md) for details.
+
+    Local files can be packaged into the `/nemo_run/code` directory in the execution environment. See
+    [Code Packaging](../basics/code-packaging.md) for details.
 
 **2. Use it with command-line args:**
 
