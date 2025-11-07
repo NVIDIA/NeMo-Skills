@@ -36,15 +36,10 @@ ds_samples = load_dataset(CALIB_DATASET_NAME, split=CALIB_SPLIT, streaming=True)
 
 prompt_template = get_prompt("generic/math", tokenizer="nvidia/OpenMath-Nemotron-14B-kaggle")
 
-# Process iteratively instead of loading all into memory
 all_texts = []
 for sample in islice(ds_samples, CALIB_SIZE):
-    formatted_text = prompt_template.format_assistant_response(
-        prompt_template.fill(
-            {k: v for k, v in sample.items() if k in ["problem", "generated_solution"]},
-            start_assistant_response_key="generated_solution",
-            format_as_string=True,
-        )
+    formatted_text = prompt_template.fill(
+        {k: v for k, v in sample.items() if k in ["problem", "generated_solution"]},
     )
     all_texts.append(formatted_text)
 
