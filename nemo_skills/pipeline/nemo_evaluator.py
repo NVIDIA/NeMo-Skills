@@ -1,11 +1,16 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import logging
 import os
@@ -131,57 +136,14 @@ def nemo_evaluator(
 ):
     """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
-    This entrypoint builds nemo-evaluator-launcher commands and schedules them via
-    the declarative Pipeline. It can optionally co-host main and judge vLLM servers
-    and inject their runtime URLs into the evaluator via launcher `--overrides`.
+    The ultimate goal is to acccess any harness/task from NeMo Evaluator
+    (https://github.com/NVIDIA-NeMo/Evaluator) via NeMo-Skills.
 
-    Args:
-      ctx: Typer context carrying passthrough args (ignored by nemo-evaluator).
-      cluster: Cluster config key or path (None runs locally without containers).
-      output_dir: Host path for run artifacts and logs.
-      expname: Experiment name for grouping jobs and logs.
-      job_nodes: Nodes to allocate for the evaluator client (CPU-only).
-      partition: Slurm partition name.
-      qos: Slurm QoS.
-      time_min: Slurm time-min limit.
-      mount_paths: Comma-delimited "SRC:DEST" mounts to augment cluster config.
-      log_dir: Custom logs root (defaults under output_dir).
-      exclusive: Whether to request exclusive nodes.
-      with_sandbox: Whether to launch a sandbox container alongside.
-      keep_mounts_for_sandbox: Preserve mounts inside sandbox (dangerous for writes).
-      server_type: Main hosted server type (e.g., "vllm").
-      server_model: Main hosted server model identifier or path.
-      server_gpus: GPUs for main hosted server (0 disables hosting).
-      server_nodes: Nodes for main hosted server.
-      server_port: Port for main hosted server (auto if None).
-      server_args: Extra CLI args for the main server.
-      server_entrypoint: Custom entrypoint for the main server.
-      server_container: Container key/image for main server.
-      server_base_url: External main server base URL (use instead of hosting).
-      server_api_path: API path appended to base URL for main server.
-      server_health_path: Health path used for readiness checks (main server).
-      judge_server_type: Judge hosted server type (e.g., "vllm").
-      judge_server_model: Judge hosted server model identifier or path.
-      judge_server_gpus: GPUs for judge hosted server (0 disables hosting).
-      judge_server_nodes: Nodes for judge hosted server.
-      judge_server_port: Port for judge hosted server (auto if None).
-      judge_server_args: Extra CLI args for the judge server.
-      judge_server_entrypoint: Custom entrypoint for the judge server.
-      judge_server_container: Container key/image for judge server.
-      judge_server_base_url: External judge server base URL (use instead of hosting).
-      judge_server_api_path: API path appended to base URL for judge server.
-      judge_server_health_path: Health path used for readiness checks (judge server).
-      launcher_overlay: YAML/JSON overlay to flatten into launcher overrides.
-      launcher_override: Repeated key=value pairs to append to launcher overrides.
-      reuse_code: Enable nemo-run code reuse.
-      reuse_code_exp: Experiment name to reuse code from.
-      run_after: Pipeline-level dependency on other experiments.
-      dependent_jobs: Number of dependent duplicates to launch (advanced).
-      config_dir: Directory to search for cluster configs.
-      dry_run: Validate and print scheduling without submission.
-      latest_mapping: Use latest task mapping from nemo-evaluator-launcher.
-      tasks_mapping_toml: Local mapping.toml path for task resolution.
-      nemo_evaluator_config: Path to launcher YAML (split to config_dir/name).
+
+
+    This entrypoint builds nemo-evaluator-launcher commands and schedules them via
+    the declarative API (see `declarative.py`). It can optionally co-host main and judge vLLM servers
+    and inject their runtime URLs into the evaluator via launcher `--overrides`.
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
 

@@ -1,28 +1,25 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.
-# Licensed under the Apache License, Version 2.0
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-import importlib
 import textwrap
 
 import pytest
 
-
-def _import_pipeline_cmd():
-    try:
-        mod = importlib.import_module("nemo_skills.pipeline.nemo_evaluator")
-    except Exception:
-        pytest.skip("nemo_skills.pipeline.nemo_evaluator not implemented yet")
-    return mod
+from nemo_skills.pipeline.nemo_evaluator import nemo_evaluator as nemo_evaluator_fn
 
 
 def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
-    pytest.importorskip("nemo_evaluator_launcher")
-    mod = _import_pipeline_cmd()
-    app = getattr(mod, "app", None)
-    command_fn = getattr(mod, "nemo_evaluator", None)
-    if app is None or command_fn is None:
-        pytest.skip("nemo_evaluator Typer command not implemented yet")
-
     # Simulate Typer call via function directly; ensure no exceptions for dry_run
     class Ctx:
         args = []
@@ -75,6 +72,6 @@ def test_cli_parsing_and_dry_run(monkeypatch, tmp_path):
                 """
             ).strip()
         )
-        command_fn(**kwargs)
+        nemo_evaluator_fn(**kwargs)
     except Exception as e:
         pytest.fail(f"CLI dry_run failed unexpectedly: {e}")
