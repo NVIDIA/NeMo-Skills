@@ -267,6 +267,7 @@ def get_generation_cmd(
     # Optional: for multi-model generation
     server_addresses: list[str] | None = None,
     model_names: list[str] | None = None,
+    server_types: list[str] | None = None,
 ):
     """Construct the generation command for language model inference."""
     if input_file is None and input_dir is None:
@@ -298,13 +299,19 @@ def get_generation_cmd(
     if server_addresses is not None and model_names is not None:
         num_models = len(model_names)
         if num_models > 1:
-            # Multi-model: pass as lists
-            server_addresses_arg = ",".join(server_addresses)
-            cmd += f"++server_addresses=[{server_addresses_arg}] "
+            # Multi-model: pass server configuration as lists
+            # Just pass base_url for all models (both self-hosted and pre-hosted)
+            # The inference script will configure the client correctly based on server_gpus
 
             model_names_arg = ",".join(model_names)
-            cmd += f"++model_names=[{model_names_arg}] "
-        # For n=1: server_address/model are already in extra_arguments from configure_client
+            cmd += f"++server.model=[{model_names_arg}] "
+
+            server_types_arg = ",".join(server_types)
+            cmd += f"++server.server_type=[{server_types_arg}] "
+
+            server_addresses_arg = ",".join(server_addresses)
+            cmd += f"++server.base_url=[{server_addresses_arg}] "
+        # For n=1: server config is already in extra_arguments from configure_client
 
     job_end_cmd = ""
 

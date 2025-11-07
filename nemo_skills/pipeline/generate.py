@@ -144,8 +144,10 @@ def _create_job_unified(
             # Build client command as lambda
             def build_client_command():
                 runtime_addresses = []
+
                 for server_idx, server_cmd in enumerate(server_commands):
                     if server_cmd is not None:
+                        # Self-hosted: construct address from hostname and port refs
                         addr = f"{server_cmd.hostname_ref()}:{server_cmd.meta_ref('port')}"
                     else:
                         # Pre-hosted: use the original address from config
@@ -518,10 +520,9 @@ def generate(
         for chunk_id in chunk_ids:
             server_configs = []
             server_addresses_resolved = []
-
-            # For n=1, we need extra_arguments from configure_client
-            # For n>1, we build server addresses ourselves
-            extra_args_from_first_server = extra_arguments_original
+            # For single model: configure_client returns extra_args with server config appended
+            # For multi-model: use original extra_args (server config added as lists in get_generation_cmd)
+            extra_arguments = extra_arguments_original
 
             for model_idx in range(num_models):
                 get_random_port_for_server = pipeline_utils.should_get_random_port(
@@ -543,9 +544,9 @@ def generate(
                 server_configs.append(srv_config)
                 server_addresses_resolved.append(srv_address)
 
-                # For n=1, use the extra_arguments from configure_client (has server config)
+                # For single model, capture the extra_args with server config from configure_client
                 if model_idx == 0 and num_models == 1:
-                    extra_args_from_first_server = srv_extra_args
+                    extra_arguments = srv_extra_args
 
             cmd_params = {
                 "input_file": input_file,
@@ -553,7 +554,8 @@ def generate(
                 "random_seed": seed,
                 "output_dir": output_dir,
                 "model_names": models_list,
-                "extra_arguments": extra_args_from_first_server,
+                "server_types": server_types_list,
+                "extra_arguments": extra_arguments,
                 "chunk_id": chunk_id,
                 "num_chunks": num_chunks,
                 "preprocess_cmd": preprocess_cmd,
