@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import gc
+import os
 from itertools import islice
-from datasets import Dataset, load_dataset, disable_caching
+
+from datasets import Dataset, disable_caching, load_dataset
+
 from nemo_skills.prompt.utils import get_prompt
 
 disable_caching()
@@ -23,24 +25,24 @@ os.environ["HF_DATASETS_DISABLE_PROGRESS_BARS"] = "0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Define paths and parameters
-LOCAL_DATASET_PATH = './calibration_dataset'
+LOCAL_DATASET_PATH = "./calibration_dataset"
 CALIB_DATASET_NAME = "nvidia/OpenMathReasoning"
-CALIB_SPLIT = 'tir'
+CALIB_SPLIT = "tir"
 CALIB_SIZE = 4096
 
 # Load samples, format them, and save as a Parquet file
 print(f"Loading and formatting {CALIB_SIZE} samples for calibration...")
 ds_samples = load_dataset(CALIB_DATASET_NAME, split=CALIB_SPLIT, streaming=True)
 
-prompt_template = get_prompt('generic/math', tokenizer='nvidia/OpenMath-Nemotron-14B-kaggle')
+prompt_template = get_prompt("generic/math", tokenizer="nvidia/OpenMath-Nemotron-14B-kaggle")
 
 # Process iteratively instead of loading all into memory
 all_texts = []
 for sample in islice(ds_samples, CALIB_SIZE):
     formatted_text = prompt_template.format_assistant_response(
         prompt_template.fill(
-            {k: v for k, v in sample.items() if k in ['problem', 'generated_solution']},
-            start_assistant_response_key='generated_solution',
+            {k: v for k, v in sample.items() if k in ["problem", "generated_solution"]},
+            start_assistant_response_key="generated_solution",
             format_as_string=True,
         )
     )
@@ -55,4 +57,3 @@ del all_texts, calibration_dataset, prompt_template, ds_samples
 gc.collect()
 print(f"Calibration dataset saved to {LOCAL_DATASET_PATH}/data.parquet", flush=True)
 os._exit(0)
-
