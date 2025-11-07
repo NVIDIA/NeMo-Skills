@@ -201,5 +201,5 @@ parallel_thinking:
 
 - `--config-path=/nemo_run/code/main_arg_configs`: Directory containing your config file
 - `--config-name=reasoning_config`: Config filename without `.yaml` extension
-- Command-line `++` args can still override config file values if needed
+- Command-line [Hydra override args](https://hydra.cc/docs/advanced/override_grammar/basic/) can still override config file values if needed
 - This works with any pipeline script with generation (`ns generate`, `ns eval`, etc.)
