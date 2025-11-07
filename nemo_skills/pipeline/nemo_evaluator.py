@@ -185,92 +185,56 @@ def nemo_evaluator(
         with_external_judge = (not hosting_judge) and bool(judge_server_base_url)
 
         # Both can be hosted in one job; we will wait on both and inject URLs per task
-
         server_command_obj: Optional[Command] = None
         judge_server_command_obj: Optional[Command] = None
 
         if hosting_server:
-            stype = (server_type or "vllm").lower()
-            sargs = server_args or ""
-
-            if stype != "vllm":
-                LOG.warning("Only vllm server_type is explicitly supported in this path right now; got %s", stype)
-
-            # Build server command + metadata (port, num_tasks)
-            srv_cmd_str, srv_meta = vllm_server_command(
+            server_command_obj = _create_serving_command_obj(
                 cluster_config=cluster_config,
+                is_judge=False,
+                server_type=server_type,
                 model=server_model,
                 port=server_port,
-                server_type=stype,
                 gpus=server_gpus,
                 nodes=server_nodes,
-                args=sargs,
+                args=server_args,
                 entrypoint=server_entrypoint,
-            )
-
-            server_type = server_type or "vllm"
-            # get container from server_config if provided, otherwise fall back to cluster config
-            if not server_container:
-                server_container = cluster_config["containers"][server_type]
-            server_command_obj = Command(
-                command=srv_cmd_str,
                 container=server_container,
-                gpus=server_gpus,
-                nodes=server_nodes or 1,
-                name=f"{expname}-server-{idx}-{task.name}",
-                metadata={
-                    **srv_meta,
-                    "gpus": server_gpus,
-                    "log_prefix": "server",
-                },
+                expname=expname,
+                idx=idx,
+                task_name=task.name,
             )
             commands.append(server_command_obj)
 
         if hosting_judge:
-            jstype = (judge_server_type or "vllm").lower()
-            jargs = judge_server_args or ""
-            if jstype != "vllm":
-                LOG.warning(
-                    "Only vllm judge_server_type is explicitly supported in this path right now; got %s", jstype
-                )
-            j_cmd_str, j_meta = vllm_server_command(
+            judge_server_command_obj = _create_serving_command_obj(
                 cluster_config=cluster_config,
-                model=judge_server_model,  # type: ignore[arg-type]
+                is_judge=True,
+                server_type=judge_server_type,
+                model=judge_server_model,
                 port=judge_server_port,
-                server_type=jstype,
                 gpus=judge_server_gpus,
                 nodes=judge_server_nodes,
-                args=jargs,
+                args=judge_server_args,
                 entrypoint=judge_server_entrypoint,
-            )
-            if not judge_server_container:
-                judge_server_container = cluster_config["containers"].get("vllm") or cluster_config["containers"].get(
-                    "nemo-skills", "nemo-skills"
-                )
-            judge_server_command_obj = Command(
-                command=j_cmd_str,
                 container=judge_server_container,
-                gpus=judge_server_gpus,
-                nodes=judge_server_nodes or 1,
-                name=f"{expname}-judge-server-{idx}-{task.name}",
-                metadata={
-                    **j_meta,
-                    "gpus": judge_server_gpus,
-                    "log_prefix": "judge-server",
-                },
+                expname=expname,
+                idx=idx,
+                task_name=task.name,
             )
             commands.append(judge_server_command_obj)
 
         # Build client command factory that can wait on hosted servers and inject runtime URLs
-        if (hosting_server and server_command_obj is not None) or (
-            hosting_judge and judge_server_command_obj is not None
-        ):
+        if hosting_server or hosting_judge:
 
-            def _client_cmd_factory():
+            def _client_cmd_lambda():
                 """Deferred client command builder that waits on servers.
 
                 Resolves hosted server hostnames/ports at runtime, composes
                 a wait chain for health endpoints, and joins per-task commands.
+
+                According to the Command's documentation, that needs to be lambda.
+                QUESTION(agronskiy): is that really so?
 
                 Returns:
                   str: Final shell command with waits and evaluator invocations.
@@ -278,9 +242,9 @@ def nemo_evaluator(
                 # Cross-component references resolved at runtime
                 waits: List[str] = []
                 target_url: Optional[str] = None
-                judge_url: Optional[str] = None
+                judge_target_url: Optional[str] = None
 
-                if hosting_server and server_command_obj is not None:
+                if hosting_server:
                     server_host = server_command_obj.hostname_ref()
                     server_port_val = server_command_obj.meta_ref("port")
                     base_url = f"http://{server_host}:{server_port_val}"
@@ -288,13 +252,13 @@ def nemo_evaluator(
                     target_url = f"{base_url}{server_api_path}"
                     waits.append(pipeline_utils.get_server_wait_cmd(health_url))
 
-                if hosting_judge and judge_server_command_obj is not None:
-                    jhost = judge_server_command_obj.hostname_ref()
-                    jport = judge_server_command_obj.meta_ref("port")
-                    jbase = f"http://{jhost}:{jport}"
-                    jhealth = f"{jbase}{judge_server_health_path}"
-                    judge_url = f"{jbase}{judge_server_api_path}"
-                    waits.append(pipeline_utils.get_server_wait_cmd(jhealth))
+                if hosting_judge:
+                    judge_server_host = judge_server_command_obj.hostname_ref()
+                    judge_server_host = judge_server_command_obj.meta_ref("port")
+                    judge_base_url = f"http://{judge_server_host}:{judge_server_host}"
+                    judge_health_url = f"{judge_base_url}{judge_server_health_path}"
+                    judge_target_url = f"{judge_base_url}{judge_server_api_path}"
+                    waits.append(pipeline_utils.get_server_wait_cmd(judge_health_url))
 
                 wait_cmd = " && ".join(waits) if waits else "true"
                 # Build per-task commands with runtime URL override(s)
@@ -306,13 +270,13 @@ def nemo_evaluator(
                     expname=expname,
                     base_output_root=base_output_root,
                     url_override=target_url,
-                    judge_url_override=judge_url,
+                    judge_url_override=judge_target_url,
                     judge_model_id=judge_server_model,
                 )
                 return f"{wait_cmd} && {cmd}"
 
             client_cmd = Command(
-                command=_client_cmd_factory,
+                command=_client_cmd_lambda,
                 container=eval_image,
                 gpus=job_gpus or None,
                 nodes=job_nodes or 1,
@@ -365,56 +329,33 @@ def nemo_evaluator(
 
                 jobs.append(
                     {
-                        "name": f"{expname}-{idx}",
+                        "name": f"{expname}-{idx}-group",
                         "groups": hetero_groups,
                     }
                 )
-                # Proceed to next container+env group
+
+                # TODO(agornskiy): make this logic more clear -- we basically continure to the next tas
                 continue
+
         else:
             # Either external server provided, or client-only (no URL override)
-            cmd = ""
+            server_url = None
             if with_external_server:
-                # Ensure trailing slash handling is consistent
-                url = server_base_url.rstrip("/") + server_api_path
-                try:
-                    if getattr(getattr(launcher_run_cfg, "target", None), "api_endpoint", None):
-                        launcher_run_cfg.target.api_endpoint.url = url
-                except Exception:
-                    # Fallback handled below by appending overrides (not needed in most cases)
-                    pass
-                # External judge handling
-                judge_url = None
-                if with_external_judge and judge_server_base_url:
-                    judge_url = judge_server_base_url.rstrip("/") + judge_server_api_path
-                cmd = _build_task_cmd(
-                    task_name=task.name,
-                    launcher_run_cfg=launcher_run_cfg,
-                    task_cfg=task,
-                    task_definition=task_definition,
-                    expname=expname,
-                    base_output_root=base_output_root,
-                    url_override=url,
-                    judge_url_override=judge_url,
-                    judge_model_id=judge_server_model,
-                )
-
-            else:
-                judge_url = None
-                if with_external_judge and judge_server_base_url:
-                    judge_url = judge_server_base_url.rstrip("/") + judge_server_api_path
-                cmd = _build_task_cmd(
-                    task_name=task.name,
-                    launcher_run_cfg=launcher_run_cfg,
-                    task_cfg=task,
-                    task_definition=task_definition,
-                    expname=expname,
-                    base_output_root=base_output_root,
-                    judge_url_override=judge_url,
-                    judge_model_id=judge_server_model,
-                )
-
-            eval_cmd = f" {cmd} "
+                server_url = server_base_url.rstrip("/") + server_api_path
+            judge_url = None
+            if with_external_judge:
+                judge_url = judge_server_base_url.rstrip("/") + judge_server_api_path
+            eval_cmd = _build_task_cmd(
+                task_name=task.name,
+                launcher_run_cfg=launcher_run_cfg,
+                task_cfg=task,
+                task_definition=task_definition,
+                expname=expname,
+                base_output_root=base_output_root,
+                url_override=server_url,
+                judge_url_override=judge_url,
+                judge_model_id=judge_server_model,
+            )
 
             client_cmd = Command(
                 command=eval_cmd,
@@ -479,6 +420,63 @@ if __name__ == "__main__":
     # workaround for https://github.com/fastapi/typer/issues/341
     typer.main.get_command_name = lambda name: name
     app()
+
+
+def _create_serving_command_obj(
+    *,
+    cluster_config: dict,
+    is_judge: bool,
+    server_type: Optional[str],
+    model: Optional[str],
+    port: Optional[int],
+    gpus: int,
+    nodes: int,
+    args: Optional[str],
+    entrypoint: Optional[str],
+    container: Optional[str],
+    expname: str,
+    idx: int,
+    task_name: str,
+) -> Command:
+    """Create a Command for a hosted serving component (main or judge).
+
+    This wraps vllm_server_command and standardizes container/log/name/metadata.
+    """
+    stype = (server_type or "vllm").lower()
+    sargs = args or ""
+    if stype != "vllm":
+        LOG.warning("Only vllm server_type is supported currently; got %s", stype)
+
+    cmd_str, meta = vllm_server_command(
+        cluster_config=cluster_config,
+        model=model,  # type: ignore[arg-type]
+        port=port,
+        server_type=stype,
+        gpus=gpus,
+        nodes=nodes,
+        args=sargs,
+        entrypoint=entrypoint,
+    )
+
+    # Resolve container fallback when not explicitly provided
+    if not container:
+        container = cluster_config["containers"][stype]
+
+    log_prefix = "judge-server" if is_judge else "server"
+    name_role = "judge-server" if is_judge else "server"
+
+    return Command(
+        command=cmd_str,
+        container=container,
+        gpus=gpus,
+        nodes=nodes or 1,
+        name=f"{expname}-{name_role}-{idx}-{task_name}",
+        metadata={
+            **meta,
+            "gpus": gpus,
+            "log_prefix": log_prefix,
+        },
+    )
 
 
 def _build_task_cmd(
