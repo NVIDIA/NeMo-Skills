@@ -60,12 +60,3 @@ evaluation:
           max_logged_requests: null
   tasks:
     - name: aegis_v2
-      nemo_evaluator_config:
-        config:
-          params:
-            extra:
-              judge:
-                url: https://integrate.api.nvidia.com/v1/chat/completions
-                parallelism: 2
-                max_new_tokens: 5
-                api_key: API_KEY

@@ -14,9 +14,13 @@
 
 import logging
 import os
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import typer
+from nemo_evaluator_launcher.api import RunConfig
+from nemo_evaluator_launcher.common.helpers import get_eval_factory_command
+from nemo_evaluator_launcher.common.mapping import get_task_from_mapping, load_tasks_mapping
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 import nemo_skills.pipeline.utils as pipeline_utils
@@ -46,7 +50,6 @@ def nemo_evaluator(
     job_nodes: int = typer.Option(1, help="Nodes to allocate for the evaluator job"),
     partition: str = typer.Option(None, help="Cluster partition to use"),
     qos: str = typer.Option(None, help="Slurm QoS"),
-    time_min: str = typer.Option(None, help="Slurm time-min"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
     log_dir: str = typer.Option(None, help="Custom location for logs"),
     exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
@@ -102,21 +105,6 @@ def nemo_evaluator(
     judge_server_health_path: str = typer.Option(
         "/health", help="Health path used to wait for judge server readiness"
     ),
-    # Generic launcher override mechanisms
-    launcher_overlay: Optional[str] = typer.Option(
-        None,
-        help=(
-            "Overlay for the evaluator launcher Hydra config; accepts a path to YAML/JSON "
-            "or an inline YAML/JSON string. Flattened into ++key=value overrides unless explicitly set in ctx.args."
-        ),
-    ),
-    launcher_override: List[str] = typer.Option(
-        None,
-        help=(
-            "Extra Hydra overrides for the evaluator launcher as key=value pairs. "
-            "Provide multiple --launcher-override flags to add more entries."
-        ),
-    ),
     # Experiment lifecycle and dependencies
     reuse_code: bool = typer.Option(True, help="If True, will reuse code from the provided experiment"),
     reuse_code_exp: str = typer.Option(None, help="If specified, reuse code from this experiment"),
@@ -126,11 +114,10 @@ def nemo_evaluator(
     config_dir: str = typer.Option(None, help="Where to search for cluster configs"),
     dry_run: bool = typer.Option(False, help="If True, validate without submitting the job"),
     # Evaluator mapping/config knobs
-    nemo_evaluator_config: Optional[str] = typer.Option(
-        None,
+    nemo_evaluator_config: str = typer.Option(
         help=(
-            "Path to nemo-evaluator-launcher config YAML. We'll split into config_dir and config_name "
-            "(filename without extension) and pass to Hydra. Explicit ++nemo_eval_config_dir/name overrides win."
+            "Path to nemo-evaluator-launcher config YAML, see "
+            "https://docs.nvidia.com/nemo/evaluator/latest/libraries/nemo-evaluator-launcher/configuration/index.html for documentation."
         ),
     ),
 ):
@@ -138,8 +125,6 @@ def nemo_evaluator(
 
     The ultimate goal is to acccess any harness/task from NeMo Evaluator
     (https://github.com/NVIDIA-NeMo/Evaluator) via NeMo-Skills.
-
-
 
     This entrypoint builds nemo-evaluator-launcher commands and schedules them via
     the declarative API (see `declarative.py`). It can optionally co-host main and judge vLLM servers
@@ -166,187 +151,19 @@ def nemo_evaluator(
         check_mounted_paths=False,
     )
 
-    # Helpers for container + env resolution
-    def _normalize_env_map(value) -> Dict[str, str]:
-        """Normalize env mapping from Hydra/DictConfig to a flat {str:str} dict.
-
-        Accepts dict or OmegaConf containers; casts scalars to strings and preserves
-        keys that are strings only.
-
-        Args:
-          value: Environment mapping-like object.
-
-        Returns:
-          Dict[str, str]: Normalized environment mapping.
-        """
-        env: Dict[str, str] = {}
-        if value is None:
-            return env
-
-        # Gracefully handle OmegaConf containers
-
-        if isinstance(value, (DictConfig, ListConfig)):
-            value = OmegaConf.to_object(value)
-
-        # Mapping form: {KEY: VALUE}
-        if isinstance(value, dict):
-            for k, v in value.items():
-                if not isinstance(k, str):
-                    continue
-                # Accept common scalar types and cast to str
-                if isinstance(v, (str, int, float, bool)) or v is None:
-                    env[k] = "" if v is None else str(v)
-                else:
-                    env[k] = str(v)
-            return env
-
-        # Single string is ambiguous; require explicit forms
-        raise ValueError("env_vars must be a dict")
-
     # Now preparing the config for the launcher
-    # 1) Resolve container mapping utilities
-    from nemo_evaluator_launcher.common.mapping import get_task_from_mapping, load_tasks_mapping  # type: ignore
-
-    mapping = load_tasks_mapping()
-
-    def _task_to_container(task_query: str) -> str:
-        """Resolve container image from launcher mapping for a task query.
-
-        Supports either "task" or "harness.task" query forms and returns the
-        container string associated with the mapped task.
-
-        Args:
-          task_query: Task identifier (possibly harness-qualified).
-
-        Returns:
-          str: Container image or key from mapping.
-        """
-        # Accept 'task' or 'harness.task'
-        task_def = get_task_from_mapping(task_query, mapping)
-        container = task_def.get("container")
-        if not container:
-            raise ValueError(f"No container specified for task {task_query!r} in nemo_evaluator_launcher's mapping")
-        return container
+    # out: dict{ (harness, task_name) -> {task_name, harness_name, harness_container, endpoint_type}}
+    mapping: dict[tuple[str, str], dict] = load_tasks_mapping()
 
     # 2) Build launcher RunConfig to collect env_vars and to construct final commands on the client
-    from nemo_evaluator_launcher.api import RunConfig  # type: ignore
-
-    # Generic override builder: start with ctx.args and extend with overlay/mapping
-    def _extract_set_keys(args: List[str]) -> set[str]:
-        """Collect hydra-style override keys already present in a list of flags.
-
-        Args:
-          args: List of CLI-style flags (e.g., ["++k=v", ...]).
-
-        Returns:
-          set[str]: Set of keys found before the equals sign.
-        """
-        keys: set[str] = set()
-        for a in args:
-            if a.startswith("++") and "=" in a:
-                k = a[2:].split("=", 1)[0]
-                keys.add(k)
-        return keys
-
-    def _flatten(prefix: str, obj, out: Dict[str, str]):
-        """Flatten nested dict/list structures into dot-path assignments.
-
-        Args:
-          prefix: Current dot path prefix.
-          obj: Object to flatten (dict/list/scalar).
-          out: Accumulator for flattened key/value pairs (values cast to str).
-        """
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                _flatten(f"{prefix}.{k}" if prefix else str(k), v, out)
-        elif isinstance(obj, (list, tuple)):
-            for idx, v in enumerate(obj):
-                _flatten(f"{prefix}.{idx}" if prefix else str(idx), v, out)
-        else:
-            out[prefix] = "" if obj is None else str(obj)
-
-    def _build_hydra_overrides() -> List[str]:
-        """Build a merged list of hydra overrides from ctx args and overlays.
-
-        Applies precedence: explicit ctx args and launcher_override > overlay >
-        derived mappings. Only hydra-style keys are added here; nemo-evaluator
-        `--overrides` are appended later on the generated command string.
-
-        Returns:
-          List[str]: Merged list of hydra overrides.
-        """
-        overrides: List[str] = list(ctx.args)
-        already = _extract_set_keys(overrides)
-
-        # 2a) explicit repeated key=value flags
-        if launcher_override:
-            for pair in launcher_override:
-                if not pair or "=" not in pair:
-                    continue
-                k, v = pair.split("=", 1)
-                if k not in already:
-                    overrides.append(f"++{k}={v}")
-                    already.add(k)
-
-        # 2b) overlay file or inline YAML/JSON
-        if launcher_overlay:
-            try:
-                if os.path.exists(launcher_overlay):
-                    ov_cfg = OmegaConf.load(launcher_overlay)
-                else:
-                    ov_cfg = OmegaConf.create(launcher_overlay)
-                ov_dict = OmegaConf.to_container(ov_cfg, resolve=True) or {}
-                flat: Dict[str, str] = {}
-                _flatten("", ov_dict, flat)
-                for k, v in flat.items():
-                    if k not in already:
-                        overrides.append(f"++{k}={v}")
-                        already.add(k)
-            except Exception as e:
-                LOG.warning("Failed to parse launcher_overlay; ignoring", exc_info=e)
-
-        # 2c) declarative mapping from selected top-level options
-        def _add_if_missing(key: str, value: Optional[str]):
-            if value is None:
-                return
-            if key in already:
-                return
-            overrides.append(f"++{key}={value}")
-            already.add(key)
-
-        # infer external vs hosted server
-        hosting_server = bool(server_type) and (server_gpus or 0) > 0 and bool(server_model)
-        with_external_server = (not hosting_server) and bool(server_base_url)
-
-        # model_id mapping
-        _add_if_missing("target.api_endpoint.model_id", server_model)
-
-        # external URL mapping
-        if with_external_server and server_base_url:
-            url = server_base_url.rstrip("/") + server_api_path
-            _add_if_missing("target.api_endpoint.url", url)
-
-        return overrides
-
-    merged_overrides = _build_hydra_overrides()
-
-    # Derive config_dir/config_name from --nemo_evaluator_config (required)
-    from pathlib import Path as _Path
-
-    if not nemo_evaluator_config:
-        raise ValueError("--nemo_evaluator_config is required (path to launcher YAML)")
-    _p = _Path(nemo_evaluator_config)
-    cfg_dir = str(_p.parent)
-    cfg_name = _p.stem or "config"
-
-    run_cfg = RunConfig.from_hydra(
-        config_dir=cfg_dir,
-        config_name=cfg_name,
-        hydra_overrides=merged_overrides,
+    launcher_run_cfg = RunConfig.from_hydra(
+        config_dir=str(Path(nemo_evaluator_config).parent),
+        config_name=str(Path(nemo_evaluator_config).stem),
+        hydra_overrides=list(ctx.args),
     )
 
     # 3) Determine tasks to run from the evaluator config
-    evaluation = getattr(run_cfg, "evaluation", None)
+    evaluation = getattr(launcher_run_cfg, "evaluation", None)
     if evaluation is None:
         raise ValueError("Evaluator config missing 'evaluation' section with tasks")
     tasks_cfg = getattr(evaluation, "tasks", []) or []
@@ -359,14 +176,13 @@ def nemo_evaluator(
     global_env: Dict[str, str] = {}
     per_task_env: Dict[str, Dict[str, str]] = {}
     name_to_task = {getattr(t, "name", None): t for t in tasks_cfg if getattr(t, "name", None)}
-    name_to_index = {getattr(t, "name", None): i for i, t in enumerate(tasks_cfg) if getattr(t, "name", None)}
-    global_env = _normalize_env_map(getattr(evaluation, "env_vars", None))
+    global_env = evaluation.get("env_vars", {})
     for tq in task_list:
         tname = tq.split(".", 1)[-1]
         tcfg = name_to_task.get(tname)
         env_map = dict(global_env)
         if tcfg is not None:
-            env_map.update(_normalize_env_map(getattr(tcfg, "env_vars", None)))
+            env_map.update(tcfg.get("env_vars", {}))
         per_task_env[tq] = env_map
 
     # 5) Group tasks by (container, env_signature)
@@ -384,10 +200,10 @@ def nemo_evaluator(
     groups: Dict[Tuple[str, Tuple[Tuple[str, str], ...]], List[str]] = {}
     group_envs: Dict[Tuple[str, Tuple[Tuple[str, str], ...]], Dict[str, str]] = {}
     for tq in task_list:
-        cont = _task_to_container(tq)
+        evaluation_container = get_task_from_mapping(tq, mapping).get("container")
         env_map = per_task_env.get(tq, global_env)
         sig = _env_signature(env_map)
-        key = (cont, sig)
+        key = (evaluation_container, sig)
         groups.setdefault(key, []).append(tq)
         group_envs[key] = env_map
 
@@ -397,8 +213,6 @@ def nemo_evaluator(
     base_output_root = (output_dir or "").rstrip("/") if output_dir else None
 
     for idx, ((container_id, sig), group_tasks) in enumerate(groups.items()):
-        # Helper to construct final evaluator commands on the client
-        from nemo_evaluator_launcher.common.helpers import get_eval_factory_command  # type: ignore
 
         def _build_task_cmd(
             task_query: str,
@@ -434,7 +248,7 @@ def nemo_evaluator(
                 contains_shell_ref = ("$(" in url_override) or ("$SLURM_" in url_override)
                 if not contains_shell_ref:
                     try:
-                        api_ep = getattr(getattr(run_cfg, "target", None), "api_endpoint", None)
+                        api_ep = getattr(getattr(launcher_run_cfg, "target", None), "api_endpoint", None)
                         if api_ep is not None and hasattr(api_ep, "url"):
                             setattr(api_ep, "url", url_override)
                             url_set = True
@@ -442,7 +256,7 @@ def nemo_evaluator(
                         # Best-effort; if structure differs, fall back to CLI override
                         url_set = False
 
-            cmd_struct = get_eval_factory_command(run_cfg, task_cfg, task_def)
+            cmd_struct = get_eval_factory_command(launcher_run_cfg, task_cfg, task_def)
 
             # Fallback: if we could not set URL on RunConfig, or need task-scoped judge overrides,
             # append via launcher-style --overrides
@@ -704,8 +518,8 @@ def nemo_evaluator(
                 url = server_base_url.rstrip("/") + server_api_path
                 # Prefer setting the URL on the RunConfig before building commands
                 try:
-                    if getattr(getattr(run_cfg, "target", None), "api_endpoint", None):
-                        run_cfg.target.api_endpoint.url = url
+                    if getattr(getattr(launcher_run_cfg, "target", None), "api_endpoint", None):
+                        launcher_run_cfg.target.api_endpoint.url = url
                 except Exception:
                     # Fallback handled below by appending overrides (not needed in most cases)
                     pass
