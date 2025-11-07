@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import logging
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import typer
 from nemo_evaluator_launcher.api import RunConfig
 from nemo_evaluator_launcher.common.helpers import get_eval_factory_command
 from nemo_evaluator_launcher.common.mapping import get_task_from_mapping, load_tasks_mapping
-from omegaconf import DictConfig, ListConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
@@ -123,7 +123,7 @@ def nemo_evaluator(
 ):
     """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
-    The ultimate goal is to acccess any harness/task from NeMo Evaluator
+    The ultimate goal is to access any harness/task from NeMo Evaluator
     (https://github.com/NVIDIA-NeMo/Evaluator) via NeMo-Skills.
 
     This entrypoint builds nemo-evaluator-launcher commands and schedules them via
@@ -153,7 +153,6 @@ def nemo_evaluator(
 
     # Now preparing the config for the launcher
     # out: dict{ (harness, task_name) -> {task_name, harness_name, harness_container, endpoint_type}}
-    mapping: dict[tuple[str, str], dict] = load_tasks_mapping()
 
     # 2) Build launcher RunConfig to collect env_vars and to construct final commands on the client
     launcher_run_cfg = RunConfig.from_hydra(
@@ -163,125 +162,19 @@ def nemo_evaluator(
     )
 
     # 3) Determine tasks to run from the evaluator config
-    evaluation = getattr(launcher_run_cfg, "evaluation", None)
-    if evaluation is None:
-        raise ValueError("Evaluator config missing 'evaluation' section with tasks")
-    tasks_cfg = getattr(evaluation, "tasks", []) or []
-    task_list = [getattr(t, "name", None) for t in tasks_cfg]
-    task_list = [t for t in task_list if t]
-    if not task_list:
-        raise ValueError("No tasks found in evaluator config; please define evaluation.tasks")
-
-    # 4) Build per-task env maps (global overlaid by per-task)
-    global_env: Dict[str, str] = {}
-    per_task_env: Dict[str, Dict[str, str]] = {}
-    name_to_task = {getattr(t, "name", None): t for t in tasks_cfg if getattr(t, "name", None)}
-    global_env = evaluation.get("env_vars", {})
-    for tq in task_list:
-        tname = tq.split(".", 1)[-1]
-        tcfg = name_to_task.get(tname)
-        env_map = dict(global_env)
-        if tcfg is not None:
-            env_map.update(tcfg.get("env_vars", {}))
-        per_task_env[tq] = env_map
-
-    # 5) Group tasks by (container, env_signature)
-    def _env_signature(env: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
-        """Create a stable grouping signature from an env mapping.
-
-        Args:
-          env: Environment mapping.
-
-        Returns:
-          Tuple[Tuple[str, str], ...]: Sorted tuple of key/value pairs.
-        """
-        return tuple(sorted(env.items()))
-
-    groups: Dict[Tuple[str, Tuple[Tuple[str, str], ...]], List[str]] = {}
-    group_envs: Dict[Tuple[str, Tuple[Tuple[str, str], ...]], Dict[str, str]] = {}
-    for tq in task_list:
-        evaluation_container = get_task_from_mapping(tq, mapping).get("container")
-        env_map = per_task_env.get(tq, global_env)
-        sig = _env_signature(env_map)
-        key = (evaluation_container, sig)
-        groups.setdefault(key, []).append(tq)
-        group_envs[key] = env_map
-
-    # 6) Build jobs per group
-    jobs = []
-    # Base container-visible output root for evaluator artifacts
+    tasks_mapping: dict[tuple[str, str], dict] = load_tasks_mapping()
     base_output_root = (output_dir or "").rstrip("/") if output_dir else None
+    jobs = []
+    for idx, task in enumerate(launcher_run_cfg.evaluation.tasks):
+        task_definition = get_task_from_mapping(task.name, tasks_mapping)
 
-    for idx, ((container_id, sig), group_tasks) in enumerate(groups.items()):
+        # collect all env vars
+        env_vars = copy.deepcopy(dict(launcher_run_cfg.evaluation.get("env_vars", {})))
+        env_vars.update(task.get("env_vars", {}))
 
-        def _build_task_cmd(
-            task_query: str,
-            url_override: Optional[str] = None,
-            judge_url_override: Optional[str] = None,
-            judge_model_id: Optional[str] = None,
-        ) -> str:
-            """Construct the per-task evaluator command with launcher overrides.
-
-            Sets runtime main URL on RunConfig when static; otherwise appends
-            `target.api_endpoint.url` via nemo-evaluator `--overrides`. Judge URL
-            and optional model_id are always added via `--overrides`. Also injects
-            a per-task output directory override under the experiment root.
-
-            Args:
-              task_query: Task identifier, possibly harness-qualified.
-              url_override: Full main API URL to set/override at runtime.
-              judge_url_override: Full judge API URL to override at runtime.
-              judge_model_id: Optional judge model identifier.
-
-            Returns:
-              str: Final shell command string to execute.
-            """
-            # Map 'task' or 'harness.task' to task cfg
-            task_name = task_query.split(".", 1)[-1]
-            task_cfg = name_to_task.get(task_name)
-            task_def = get_task_from_mapping(task_query, mapping)
-
-            # Prefer setting URL directly on RunConfig prior to command construction
-            url_set = False
-            if url_override:
-                # If URL contains shell refs like $(scontrol ...), avoid baking into config; pass via --overrides
-                contains_shell_ref = ("$(" in url_override) or ("$SLURM_" in url_override)
-                if not contains_shell_ref:
-                    try:
-                        api_ep = getattr(getattr(launcher_run_cfg, "target", None), "api_endpoint", None)
-                        if api_ep is not None and hasattr(api_ep, "url"):
-                            setattr(api_ep, "url", url_override)
-                            url_set = True
-                    except Exception:
-                        # Best-effort; if structure differs, fall back to CLI override
-                        url_set = False
-
-            cmd_struct = get_eval_factory_command(launcher_run_cfg, task_cfg, task_def)
-
-            # Fallback: if we could not set URL on RunConfig, or need task-scoped judge overrides,
-            # append via launcher-style --overrides
-            override_parts: List[str] = []
-            if url_override and not url_set:
-                override_parts.append(f"target.api_endpoint.url={url_override}")
-
-            if judge_url_override or judge_model_id:
-                if judge_url_override:
-                    override_parts.append(f"config.params.extra.judge.url={judge_url_override}")
-                if judge_model_id:
-                    override_parts.append(f"config.params.extra.judge.model_id={judge_model_id}")
-
-            # Always set per-task output_dir: <base>/<expname>/nemo_evaluator/<task_name>
-            if base_output_root:
-                task_out = f"{base_output_root}/{expname}/nemo_evaluator/{task_name}"
-                override_parts.append(f"config.output_dir={task_out}")
-
-            if override_parts:
-                joined = ",".join(override_parts)
-                return f'{cmd_struct.cmd} --overrides "{joined}"'
-
-            return cmd_struct.cmd
-
-        shared_env = group_envs.get((container_id, sig), {})
+        eval_image = task_definition["container"]
+        if "container" in task:
+            eval_image = task["container"]
 
         commands: List[Command] = []
 
@@ -295,8 +188,6 @@ def nemo_evaluator(
 
         server_command_obj: Optional[Command] = None
         judge_server_command_obj: Optional[Command] = None
-        server_effective_port: Optional[int] = None
-        judge_effective_port: Optional[int] = None
 
         if hosting_server:
             stype = (server_type or "vllm").lower()
@@ -308,7 +199,7 @@ def nemo_evaluator(
             # Build server command + metadata (port, num_tasks)
             srv_cmd_str, srv_meta = vllm_server_command(
                 cluster_config=cluster_config,
-                model=server_model,  # type: ignore[arg-type]
+                model=server_model,
                 port=server_port,
                 server_type=stype,
                 gpus=server_gpus,
@@ -317,7 +208,6 @@ def nemo_evaluator(
                 entrypoint=server_entrypoint,
             )
 
-            server_effective_port = int(srv_meta.get("port")) if srv_meta and srv_meta.get("port") else None
             server_type = server_type or "vllm"
             # get container from server_config if provided, otherwise fall back to cluster config
             if not server_container:
@@ -327,7 +217,7 @@ def nemo_evaluator(
                 container=server_container,
                 gpus=server_gpus,
                 nodes=server_nodes or 1,
-                name=f"{expname}-server-{idx}" if len(groups) > 1 else f"{expname}-server",
+                name=f"{expname}-server-{idx}-{task.name}",
                 metadata={
                     **srv_meta,
                     "gpus": server_gpus,
@@ -362,7 +252,7 @@ def nemo_evaluator(
                 container=judge_server_container,
                 gpus=judge_server_gpus,
                 nodes=judge_server_nodes or 1,
-                name=f"{expname}-judge-server-{idx}" if len(groups) > 1 else f"{expname}-judge-server",
+                name=f"{expname}-judge-server-{idx}-{task.name}",
                 metadata={
                     **j_meta,
                     "gpus": judge_server_gpus,
@@ -408,27 +298,28 @@ def nemo_evaluator(
 
                 wait_cmd = " && ".join(waits) if waits else "true"
                 # Build per-task commands with runtime URL override(s)
-                cmds = [
-                    _build_task_cmd(
-                        tq,
-                        url_override=target_url,
-                        judge_url_override=judge_url,
-                        judge_model_id=judge_server_model,
-                    )
-                    for tq in group_tasks
-                ]
-                joined = " && ".join(cmds)
-                return f"{wait_cmd} && {joined}"
+                cmd = _build_task_cmd(
+                    task_name=task.name,
+                    launcher_run_cfg=launcher_run_cfg,
+                    task_cfg=task,
+                    task_definition=task_definition,
+                    expname=expname,
+                    base_output_root=base_output_root,
+                    url_override=target_url,
+                    judge_url_override=judge_url,
+                    judge_model_id=judge_server_model,
+                )
+                return f"{wait_cmd} && {cmd}"
 
             client_cmd = Command(
                 command=_client_cmd_factory,
-                container=container_id,
+                container=eval_image,
                 gpus=job_gpus or None,
                 nodes=job_nodes or 1,
-                name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+                name=f"{expname}-client-{idx}-{task.name}",
                 metadata={
                     "log_prefix": "main",
-                    "environment": shared_env,
+                    "environment": env_vars,
                     "gpus": job_gpus or None,
                 },
             )
@@ -472,40 +363,9 @@ def nemo_evaluator(
                 )
                 hetero_groups = [server_group, judge_group]
 
-                # Optional sandbox as separate group (0 GPUs)
-                if with_sandbox:
-                    from nemo_skills.pipeline.utils.server import get_free_port
-
-                    sandbox_port = get_free_port(strategy="random")
-                    sb_cmd_str, sb_meta = sandbox_command(cluster_config, port=sandbox_port)
-                    sandbox_group = CommandGroup(
-                        commands=[
-                            Command(
-                                command=sb_cmd_str,
-                                container=cluster_config["containers"].get("nemo-skills", "nemo-skills"),
-                                gpus=None,
-                                nodes=1,
-                                name=f"{expname}-sandbox-{idx}" if len(groups) > 1 else f"{expname}-sandbox",
-                                metadata=sb_meta,
-                            )
-                        ],
-                        hardware=HardwareConfig(
-                            partition=partition,
-                            num_gpus=None,
-                            num_nodes=1,
-                            sbatch_kwargs={
-                                "qos": qos,
-                                "exclusive": exclusive,
-                            },
-                        ),
-                        name=f"{expname}-sandbox-{idx}" if len(groups) > 1 else f"{expname}-sandbox",
-                        log_dir=log_dir,
-                    )
-                    hetero_groups.append(sandbox_group)
-
                 jobs.append(
                     {
-                        "name": f"{expname}-{idx}" if len(groups) > 1 else expname,
+                        "name": f"{expname}-{idx}",
                         "groups": hetero_groups,
                     }
                 )
@@ -513,10 +373,10 @@ def nemo_evaluator(
                 continue
         else:
             # Either external server provided, or client-only (no URL override)
+            cmd = ""
             if with_external_server:
                 # Ensure trailing slash handling is consistent
                 url = server_base_url.rstrip("/") + server_api_path
-                # Prefer setting the URL on the RunConfig before building commands
                 try:
                     if getattr(getattr(launcher_run_cfg, "target", None), "api_endpoint", None):
                         launcher_run_cfg.target.api_endpoint.url = url
@@ -527,60 +387,49 @@ def nemo_evaluator(
                 judge_url = None
                 if with_external_judge and judge_server_base_url:
                     judge_url = judge_server_base_url.rstrip("/") + judge_server_api_path
-                cmds = [
-                    _build_task_cmd(
-                        tq,
-                        judge_url_override=judge_url,
-                        judge_model_id=judge_server_model,
-                    )
-                    for tq in group_tasks
-                ]
+                cmd = _build_task_cmd(
+                    task_name=task.name,
+                    launcher_run_cfg=launcher_run_cfg,
+                    task_cfg=task,
+                    task_definition=task_definition,
+                    expname=expname,
+                    base_output_root=base_output_root,
+                    url_override=url,
+                    judge_url_override=judge_url,
+                    judge_model_id=judge_server_model,
+                )
+
             else:
                 judge_url = None
                 if with_external_judge and judge_server_base_url:
                     judge_url = judge_server_base_url.rstrip("/") + judge_server_api_path
-                cmds = [
-                    _build_task_cmd(
-                        tq,
-                        judge_url_override=judge_url,
-                        judge_model_id=judge_server_model,
-                    )
-                    for tq in group_tasks
-                ]
+                cmd = _build_task_cmd(
+                    task_name=task.name,
+                    launcher_run_cfg=launcher_run_cfg,
+                    task_cfg=task,
+                    task_definition=task_definition,
+                    expname=expname,
+                    base_output_root=base_output_root,
+                    judge_url_override=judge_url,
+                    judge_model_id=judge_server_model,
+                )
 
-            eval_cmd = " && ".join(cmds)
+            eval_cmd = f" {cmd} "
 
             client_cmd = Command(
                 command=eval_cmd,
-                container=container_id,
+                container=eval_image,
                 gpus=None,
                 nodes=job_nodes or 1,
-                name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+                name=f"{expname}-{idx}-{task.name}",
                 metadata={
                     "log_prefix": "main",
-                    "environment": shared_env,
+                    "environment": env_vars,
                     "gpus": job_gpus or None,
                 },
             )
 
         commands.append(client_cmd)
-
-        # Optional sandbox container in the same job
-        if with_sandbox:
-            # Use a random port per group; sandbox communicates via env var on client side (set by evaluator harness)
-            from nemo_skills.pipeline.utils.server import get_free_port
-
-            sandbox_port = get_free_port(strategy="random")
-            sb_cmd_str, sb_meta = sandbox_command(cluster_config, port=sandbox_port)
-            sandbox_cmd = Command(
-                command=sb_cmd_str,
-                container=cluster_config["containers"].get("nemo-skills", "nemo-skills"),
-                gpus=None,
-                nodes=1,
-                name=f"{expname}-sandbox-{idx}" if len(groups) > 1 else f"{expname}-sandbox",
-                metadata=sb_meta,
-            )
-            commands.append(sandbox_cmd)
 
         # Group hardware: allocate enough GPUs/nodes for all hosted servers
         if hosting_server or hosting_judge:
@@ -602,7 +451,7 @@ def nemo_evaluator(
                     "exclusive": exclusive,
                 },
             ),
-            name=f"{expname}-{idx}" if len(groups) > 1 else expname,
+            name=f"{expname}-{idx}",
             log_dir=log_dir,
         )
 
@@ -630,3 +479,54 @@ if __name__ == "__main__":
     # workaround for https://github.com/fastapi/typer/issues/341
     typer.main.get_command_name = lambda name: name
     app()
+
+
+def _build_task_cmd(
+    task_name: str,
+    launcher_run_cfg: DictConfig,
+    task_cfg: DictConfig,
+    task_definition: dict,
+    expname: str,
+    base_output_root: Optional[str],
+    url_override: Optional[str] = None,
+    judge_url_override: Optional[str] = None,
+    judge_model_id: Optional[str] = None,
+) -> str:
+    """Construct the per-task evaluator command with launcher overrides.
+
+    Args:
+      task_query: Task identifier, possibly harness-qualified.
+      url_override: Full main API URL to set/override at runtime.
+      judge_url_override: Full judge API URL to override at runtime.
+      judge_model_id: Optional judge model identifier.
+
+    Returns:
+      str: Final shell command string to execute.
+    """
+    task_cfg_copy = copy.deepcopy(task_cfg)
+    if url_override:
+        OmegaConf.update(task_cfg_copy, "overrides", {"target.api_endpoint.url": url_override}, force_add=True)
+
+    if judge_url_override or judge_model_id:
+        if judge_url_override:
+            OmegaConf.update(
+                task_cfg_copy,
+                "overrides",
+                {"config.params.extra.judge.url": judge_url_override},
+                force_add=True,
+            )
+        if judge_model_id:
+            OmegaConf.update(
+                task_cfg_copy,
+                "overrides",
+                {"config.params.extra.judge.model_id": judge_url_override},
+                force_add=True,
+            )
+
+    if base_output_root:
+        task_out = f"{base_output_root}/{expname}/nemo_evaluator/{task_name}"
+        OmegaConf.update(task_cfg_copy, "overrides", {"config.outpu_dir": task_out}, force_add=True)
+
+    cmd_struct = get_eval_factory_command(launcher_run_cfg, task_cfg_copy, task_definition)
+
+    return cmd_struct.cmd
