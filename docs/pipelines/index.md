@@ -150,7 +150,7 @@ hydra.errors.OverrideParseException: LexerNoViableAltException: ++end_reasoning_
 
 ### The Solution
 
-**1. Create a config file** (`/workspace/reasoning_config.yaml`):
+**1. Create a config file** (`/nemo_run/code/main_arg_configs/reasoning_config.yaml`):
 
 ```yaml
 # Include parameters that are difficult to escape
@@ -171,7 +171,7 @@ parallel_thinking:
         --server_gpus=4 \
         --output_dir=/workspace/reasoning-output \
         --input_file=/workspace/math-problems.jsonl \
-        --config-path=/workspace/configs \
+        --config-path=/nemo_run/code/main_arg_configs \
         --config-name=reasoning_config \
         ++prompt_config=generic/math-base \
         ++inference.temperature=0.7 \
@@ -183,7 +183,6 @@ parallel_thinking:
     ```python
     from nemo_skills.pipeline.cli import generate, wrap_arguments
 
-    # Assume config is mounted to /workspace/configs/reasoning_config.yaml
     generate(
         wrap_arguments(
             "--config-path /workspace/configs "
@@ -200,7 +199,7 @@ parallel_thinking:
 
 **How it works:**
 
-- `--config-path=/workspace/configs`: Directory containing your config file
+- `--config-path=/nemo_run/code/main_arg_configs`: Directory containing your config file
 - `--config-name=reasoning_config`: Config filename without `.yaml` extension
 - Command-line `++` args can still override config file values if needed
 - This works with any pipeline script with generation (`ns generate`, `ns eval`, etc.)
