@@ -1,6 +1,6 @@
-# Speech and Audio Understanding
+# Speech & Audio
 
-This section details how to evaluate speech and audio understanding benchmarks, testing models' ability to understand and reason about audio content including speech, music, and environmental sounds.
+This section details how to evaluate speech and audio benchmarks, including understanding tasks that test models' ability to reason about audio content (speech, music, environmental sounds) and ASR tasks for transcription.
 
 ## Supported benchmarks
 
@@ -19,89 +19,96 @@ MMAU-Pro (Multimodal Audio Understanding - Pro) is a comprehensive benchmark for
 
 ## Preparing MMAU-Pro Data
 
-MMAU-Pro requires audio files for evaluation. The `--with-audio` parameter controls whether audio files are downloaded.
+MMAU-Pro requires audio files for meaningful evaluation. **Audio files are downloaded by default** to ensure proper evaluation.
 
-> **Note:** Meaningful evaluation requires audio files and audio-capable models. Text-only data preparation is possible but not recommended.
+!!! warning "Git Repository Safety Check"
+    By default, preparing data inside a git repository will fail to prevent accidentally packaging large data files (in this case, ~50GB audio files). You can either:
 
-### Data Preparation with Audio Files
+    1. Specify `--data_dir` to download data outside the repository (recommended)
+    2. Use `--skip_data_dir_check` to bypass this safety check
+    3. Use `--no-audio` for text-only mode (not recommended for proper evaluation)
+
+### Data Preparation
 
 To prepare the dataset with audio files:
 
 ```bash
 export HF_TOKEN=your_huggingface_token
-ns prepare_data mmau-pro --with-audio
+ns prepare_data mmau-pro --data_dir=/path/to/data --cluster=<cluster_name>
 ```
 
 **What happens:**
-1. Downloads audio archive (~50GB) from HuggingFace
-2. Requires authentication (HuggingFace token via `HF_TOKEN` environment variable)
-3. Extracts audio files to dataset directory
 
+- Requires authentication (HuggingFace token via `HF_TOKEN` environment variable)
+- Downloads audio archive from HuggingFace and extracts
+- Prepares the dataset files for evaluation
 
-### Custom Data Directory
+### Text-Only Mode (Not Recommended)
 
-To store the dataset in a specific location:
+If you need to prepare without audio files:
 
 ```bash
-ns prepare_data mmau-pro --with-audio --data-dir=/path/to/mmau-pro-data
+ns prepare_data mmau-pro --no-audio
 ```
 
-Useful for cluster storage, sharing data across jobs, or persistent storage across runs.
+Note: The git repository check is automatically skipped with `--no-audio`.
 
 ## Running Evaluation
 
-> **⚠️ Warning:** MMAU-Pro evaluation currently supports only the Megatron server type (`--server_type=megatron`) with audio-capable models. Support for additional server types is planned for future releases.
+!!! note
+    Currently supports only Megatron server type (`--server_type=megatron`).
 
 ### Evaluation Example
 
-Complete example using Megatron-based audio-visual language models:
+```python
+import os
+from nemo_skills.pipeline.cli import wrap_arguments, eval
 
-```bash
-# Set up environment variables - ADJUST THESE PATHS TO YOUR SETUP
-export MEGATRON_PATH="/workspace/path/to/megatron-lm"
-export CKPT_PATH=/workspace/path/to/checkpoint-tp1
-export MODEL_CFG_PATH="${CKPT_PATH}/config.yaml"
-export SERVER_ENTRYPOINT="$MEGATRON_PATH/path/to/server.py"
-export SERVER_CONTAINER="/path/to/server_container.sqsh"
-export OUTPUT_DIR="mmau-pro-eval"
+os.environ["NVIDIA_API_KEY"] = "your_nvidia_api_key"  # For LLM judge
 
-# Set up keys
-export HF_TOKEN='your_huggingface_token'
-export NVIDIA_API_KEY='your_nvidia_api_key'
-export WANDB='your_wandb_key'   # not neccessary
-
-# Run evaluation with audio support
-export HF_TOKEN=${HF_TOKEN} && \
-export NVIDIA_API_KEY=${NVIDIA_API_KEY} && \
-export MEGATRON_PATH="$MEGATRON_PATH" && \
-ns eval \
-    --cluster=oci_iad \
-    --output_dir=/workspace/path/to/$OUTPUT_DIR \
-    --benchmarks=mmau-pro \
-    --server_type=megatron \
-    --server_gpus=1 \
-    --model=$CKPT_PATH \
-    --server_entrypoint=$SERVER_ENTRYPOINT \
-    --server_container=$SERVER_CONTAINER \
-    --data_dir="/dataset" \
-    --installation_command="pip install sacrebleu" \
-    ++prompt_suffix='/no_think' \
-    --server_args="--inference-max-requests 1 \
-                   --model-config ${MODEL_CFG_PATH} \
-                   --num-tokens-to-generate 256 \
-                   --temperature 1.0 \
-                   --top_p 1.0"
+eval(
+    ctx=wrap_arguments("++prompt_suffix='/no_think'"),
+    cluster="oci_iad",
+    output_dir="/workspace/mmau-pro-eval",
+    benchmarks="mmau-pro",
+    server_type="megatron",
+    server_gpus=1,
+    model="/workspace/checkpoint",
+    server_entrypoint="/workspace/megatron-lm/server.py",
+    server_container="/path/to/container.sqsh",
+    data_dir="/dataset",
+    installation_command="pip install sacrebleu",
+    server_args="--inference-max-requests 1 --model-config /workspace/checkpoint/config.yaml",
+)
 ```
 
+??? note "Alternative: Command-line usage"
 
-### Evaluating Individual Categories
+    If you prefer using the command-line interface, you can run:
 
-You can evaluate specific MMAU-Pro categories independently by specifying the sub-benchmark:
+    ```bash
+    export HF_TOKEN=your_huggingface_token
+    export NVIDIA_API_KEY=your_nvidia_api_key
+    export MEGATRON_PATH=/workspace/path/to/megatron-lm
 
-```bash
-# Evaluate only closed-form questions
-ns eval --benchmarks=mmau-pro.closed_form [... other args ...]
-```
+    ns eval \
+        --cluster=oci_iad \
+        --output_dir=/workspace/path/to/mmau-pro-eval \
+        --benchmarks=mmau-pro \
+        --server_type=megatron \
+        --server_gpus=1 \
+        --model=/workspace/path/to/checkpoint-tp1 \
+        --server_entrypoint=$MEGATRON_PATH/path/to/server.py \
+        --server_container=/path/to/server_container.sqsh \
+        --data_dir=/dataset \
+        --installation_command="pip install sacrebleu" \
+        ++prompt_suffix='/no_think' \
+        --server_args="--inference-max-requests 1 \
+                       --model-config /workspace/path/to/checkpoint-tp1/config.yaml \
+                       --num-tokens-to-generate 256 \
+                       --temperature 1.0 \
+                       --top_p 1.0"
+    ```
 
 ## How Evaluation Works
 
@@ -113,7 +120,65 @@ Each category uses a different evaluation strategy:
 | **Open-Ended** | LLM-as-a-judge (Qwen 2.5 7B) | Model generates detailed response; Qwen 2.5 judges quality and correctness |
 | **Instruction Following** | Custom evaluation logic | Model follows instructions; evaluator checks adherence |
 
-**Metrics tracked**: Success rate, average tokens, generation time, no-answer rate
+### Sub-benchmarks
+
+Evaluate individual categories:
+
+- `mmau-pro.closed_form`
+- `mmau-pro.open_ended`
+- `mmau-pro.instruction_following`
+
+```python
+eval(benchmarks="mmau-pro.closed_form", ...)
+```
+
+### Using Custom Judge Models
+
+The open-ended questions subset uses an LLM-as-a-judge (by default, Qwen 2.5 7B via NVIDIA API) to evaluate responses. You can customize the judge model for this subset:
+
+=== "Default (NVIDIA API)"
+
+    ```python
+    from nemo_skills.pipeline.cli import wrap_arguments, eval
+    import os
+
+    os.environ["NVIDIA_API_KEY"] = "your_nvidia_api_key"
+
+    eval(
+        ctx=wrap_arguments("++prompt_suffix='/no_think'"),
+        cluster="oci_iad",
+        output_dir="/workspace/path/to/mmau-pro-eval",
+        benchmarks="mmau-pro.open_ended",  # Only open-ended uses LLM judge
+        server_type="megatron",
+        server_gpus=1,
+        model="/workspace/path/to/checkpoint-tp1",
+        # ... other server args ...
+    )
+    ```
+
+=== "Self-hosted Judge with SGLang"
+
+    !!! warning "Self-hosted Judge Limitation"
+        When using a self-hosted judge, evaluate `mmau-pro.open_ended` separately.
+
+    ```python
+    from nemo_skills.pipeline.cli import wrap_arguments, eval
+
+    eval(
+        ctx=wrap_arguments("++prompt_suffix='/no_think'"),
+        cluster="oci_iad",
+        output_dir="/workspace/path/to/mmau-pro-eval",
+        benchmarks="mmau-pro.open_ended",  # Only open-ended uses LLM judge
+        server_type="megatron",
+        server_gpus=1,
+        model="/workspace/path/to/checkpoint-tp1",
+        # Judge configuration
+        judge_model="Qwen/Qwen2.5-32B-Instruct",
+        judge_server_type="sglang",
+        judge_server_gpus=2,
+        # ... other server args ...
+    )
+    ```
 
 ## Understanding Results
 
@@ -208,8 +273,3 @@ pass@1          | 0          | 6580        | 55.52%       | 0.00%     | 290
 evaluation_mode | avg_tokens | gen_seconds | success_rate | no_answer | num_entries
 pass@1          | 11         | 6879        | 31.44%       | 0.00%     | 5305
 ```
-
-## Tips
-
-1. **Audio files**: Large dataset (~50GB) - download with `--with-audio`
-2. **Evaluation time**: Closed-form evaluation can take longer due to lengthy audio inputs (some music clips are 3+ minutes)

@@ -14,6 +14,7 @@
 
 import logging
 import os
+from pathlib import Path
 from typing import List
 
 import typer
@@ -71,6 +72,10 @@ def prepare_data(
         None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
+    skip_data_dir_check: bool = typer.Option(
+        False,
+        help="Skip check that prevents downloading large data files into the git repository.",
+    ),
     sbatch_kwargs: str = typer.Option(
         "",
         help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
@@ -108,6 +113,22 @@ def prepare_data(
         # if we use container, it will mess up permissions, so as a workaround
         # setting executor to none
         cluster_config["executor"] = "none"
+
+    # Check if preparing data inside git repository without specifying data_dir
+    # Skip check if --no-audio is used (will be generalized to other datasets in the future)
+    if not data_dir and not skip_data_dir_check and "--no-audio" not in extra_arguments:
+        current = Path.cwd()
+        while current != current.parent:
+            if (current / ".git").exists():
+                raise ValueError(
+                    f"Error: Preparing data inside git repository at {current}.\n"
+                    f"Large data files will be packaged with the repository and uploaded to the cluster.\n"
+                    f"Please either:\n"
+                    f"  1. Specify --data_dir to prepare data outside the repository\n"
+                    f"  2. Use --skip_data_dir_check to bypass this safety check\n"
+                    f"  3. Use --no-audio if you want to prepare the dataset without audio files"
+                )
+            current = current.parent
 
     if cluster_config["executor"] == "slurm" and not data_dir:
         raise ValueError(

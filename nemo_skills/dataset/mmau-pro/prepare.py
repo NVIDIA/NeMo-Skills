@@ -97,20 +97,21 @@ def format_entry(entry, with_audio=False):
 def main():
     parser = argparse.ArgumentParser(description="Prepare MMAU-Pro dataset for nemo-skills")
     parser.add_argument("--split", default="test", choices=["validation", "test"])
-    parser.add_argument("--with-audio", action="store_true", help="Download audio files (requires HF_TOKEN)")
     parser.add_argument(
-        "--data-dir",
-        type=str,
-        help="Directory for dataset files including audio. If not provided, uses the default dataset directory.",
+        "--no-audio",
+        action="store_true",
+        help="Skip downloading audio files",
     )
     args = parser.parse_args()
 
-    # Determine the data directory
-    data_dir = Path(args.data_dir) if args.data_dir else Path(__file__).parent
+    data_dir = Path(__file__).parent
 
-    if args.with_audio:
+    # Download audio by default unless --no-audio is specified
+    if not args.no_audio:
         if not os.environ.get("HF_TOKEN"):
-            raise ValueError("HF_TOKEN environment variable required for --with-audio")
+            raise ValueError(
+                "HF_TOKEN environment variable required for audio download. Use --no-audio to skip (not recommended)."
+            )
         download_mmau_data(data_dir, os.environ["HF_TOKEN"])
 
     print(f"Loading {args.split} split...")
@@ -135,7 +136,7 @@ def main():
 
     try:
         for entry in tqdm(dataset):
-            formatted_entry = format_entry(entry, with_audio=args.with_audio)
+            formatted_entry = format_entry(entry, with_audio=not args.no_audio)
             category = entry.get("category", "closed_form")
 
             # Map category to file

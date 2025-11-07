@@ -39,7 +39,7 @@ jobs:
         pip uninstall -y nemo-skills nemo_run
         pip install -e .
         pip install -r requirements/common-tests.txt
-        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval math-500 amc23 aime24
+        ns prepare_data gsm8k human-eval mbpp algebra222 mmlu ifeval math-500 amc23 aime24 --skip_data_dir_check
     - name: Build Docker image
       run: |
         cd ${{ github.run_id }}

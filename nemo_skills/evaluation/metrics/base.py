@@ -27,7 +27,8 @@ class BaseMetrics(abc.ABC):
 
     def update_common_metrics(self, agg_dict):
         agg_dict["num_entries"] = self.total
-        agg_dict["avg_tokens"] = int(self.avg_tokens / self.total) if self.total > 0 else 0
+        if self.avg_tokens > 0:
+            agg_dict["avg_tokens"] = int(self.avg_tokens / self.total)
         if self.max_end_time > float("-inf") and self.min_start_time < float("inf"):
             agg_dict["gen_seconds"] = int(self.max_end_time - self.min_start_time)
 

@@ -41,15 +41,14 @@ def compute_score(combined_metrics: dict) -> dict:
                 continue
 
             metrics = benchmark_data[eval_mode]
-            num_entries = metrics.get("num_entries", 0)
+            num_entries = metrics["num_entries"]
             total_entries += num_entries
 
             # Aggregate weighted by number of entries (metrics are already percentages)
-            if num_entries > 0:
-                weighted_success += metrics.get("success_rate", 0.0) * num_entries
-                total_gen_seconds += metrics.get("gen_seconds", 0)
-                weighted_tokens += metrics.get("avg_tokens", 0.0) * num_entries
-                weighted_no_answer += metrics.get("no_answer", 0.0) * num_entries
+            weighted_success += metrics["success_rate"] * num_entries
+            total_gen_seconds += metrics["gen_seconds"]
+            weighted_tokens += metrics["avg_tokens"] * num_entries
+            weighted_no_answer += metrics["no_answer"] * num_entries
 
         # Compute aggregated metrics
         aggregated[eval_mode] = {

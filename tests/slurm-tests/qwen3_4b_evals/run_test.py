@@ -142,7 +142,7 @@ def main():
 
     args = parser.parse_args()
 
-    prepare_data(ctx=wrap_arguments("bfcl_v3 aime24"))
+    prepare_data(ctx=wrap_arguments("bfcl_v3 aime24"), skip_data_dir_check=True)
 
     bfcl_expname = eval_qwen3_bfcl(
         workspace=args.workspace,

@@ -66,6 +66,9 @@ class MMAUProMetrics(BaseMetrics):
         """Get computed metrics."""
         metrics_dict = super().get_metrics()
         for agg_mode, agg_metrics in metrics_dict.items():
+            # Ensure avg_tokens is always present for MMAU-Pro
+            if "avg_tokens" not in agg_metrics:
+                agg_metrics["avg_tokens"] = 0
             if "no_answer" in agg_metrics:
                 agg_metrics["no_answer"] = agg_metrics["no_answer"] / 2.0
             # Set success_rate from correct or judge_correct

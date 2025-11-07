@@ -20,16 +20,9 @@ from typing import Any
 from tqdm import tqdm
 
 from nemo_skills.evaluation.evaluator.base import BaseEvaluatorConfig
-from nemo_skills.utils import get_logger_name, nested_dataclass
+from nemo_skills.utils import get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
-
-
-@nested_dataclass(kw_only=True)
-class MMAUProEvaluatorConfig(BaseEvaluatorConfig):
-    """Configuration for MMAU-Pro instruction following evaluation."""
-
-    pass
 
 
 def eval_mmau_pro(cfg):
@@ -40,7 +33,7 @@ def eval_mmau_pro(cfg):
     - Closed-form questions: Evaluated by nvembed_judge.py using NVEmbed similarity matching
     - Open-ended questions: Evaluated by LLM judge (Qwen) using judge/speechlm prompt config
     """
-    eval_config = MMAUProEvaluatorConfig(**cfg)
+    eval_config = BaseEvaluatorConfig(**cfg)
 
     jsonl_file = eval_config.input_file
     LOG.info(f"Evaluating instruction following questions in {jsonl_file}")
@@ -72,9 +65,7 @@ def evaluate_instruction_following_sample(sample: dict[str, Any]) -> dict[str, A
         sample["error"] = "empty_generation"
         return sample
 
-    success = evaluate_aif_constraints(
-        generation, sample.get("task_identifier", ""), sample.get("kwargs", {}) or {}, sample
-    )
+    success = evaluate_aif_constraints(generation, sample["task_identifier"], sample["kwargs"], sample)
     sample["is_correct"] = success
     return sample
 
