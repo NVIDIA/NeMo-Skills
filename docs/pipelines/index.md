@@ -192,13 +192,16 @@ parallel_thinking:
         wrap_arguments(
             "--config-path /workspace/configs "
             "--config-name reasoning_config "
+            "++prompt_config=generic/math-base "
+            "++inference.temperature=0.7 "
+            "++inference.tokens_to_generate=2048 "
         ),
-        cluster="local",
-        server_type="openai",
-        model="meta/llama-3.1-8b-instruct",
-        server_address="https://integrate.api.nvidia.com/v1",
-        output_dir="/workspace/test-generate",
-        input_file="/workspace/input.jsonl",
+        cluster="slurm",
+        server_type="vllm",
+        model="Qwen/QwQ-32B-Preview",
+        server_gpus=4,
+        output_dir="/workspace/reasoning-output",
+        input_file="/workspace/math-problems.jsonl",
     )
     ```
 
