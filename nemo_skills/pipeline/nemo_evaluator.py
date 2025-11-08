@@ -12,6 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+NeMo Evaluator (https://github.com/NVIDIA-NeMo/Evaluator) is a powerful
+evaluation framework (external to NeMo-Skills) featuring numerous harnesses
+with advanced configurability and uniform control (independent of harnesses via
+request-response adapters). This module leverages both its advantages and the
+capabilities of NeMo-Skills w.r.t. advanced orchestration, sandboxing etc.
+
+### Architecture Overview:
+
+
+### Component Types:
+
+- Evaluator Client:
+   - Runs ins NeMo Evaluator container using the command prepared here.
+   - Connects to main/judge servers via runtime URLs
+   - Executes evaluation tasks available via NeMo Evaluator
+- Main Server (optional): can be self-hosted or external
+- Judge Server (optional): same
+
+
+### Command Grouping Strategy:
+
+- Both servers hosted: Separate groups (main+client, judge-only)
+
+- Single/no servers: Single group with all components
+  - co-host all containers on one node, shared resources
+
+"""
+
 import copy
 import logging
 from dataclasses import dataclass
@@ -124,12 +153,41 @@ def nemo_evaluator(
 ):
     """Run Nemo Evaluator tasks via nemo-skills orchestration.
 
-    The ultimate goal is to access any harness/task from NeMo Evaluator
-    (https://github.com/NVIDIA-NeMo/Evaluator) via NeMo-Skills.
+    This function orchestrates NeMo Evaluator tasks by:
+    1. Loading the evaluator configuration and task mappings
+    2. For each task, determining server hosting strategy (self-hosted vs external)
+    3. Building Command objects for servers (if needed) and evaluator client
+    4. Grouping commands into CommandGroups based on hosting strategy
+    5. Creating a Pipeline with all jobs and executing it
 
-    This entrypoint builds nemo-evaluator-launcher commands and schedules them via
-    the declarative API (see `declarative.py`). It can optionally co-host main and judge vLLM servers
-    and inject their runtime URLs into the evaluator via launcher `--overrides`.
+    The function supports four server hosting scenarios:
+    - No servers: Client uses external URLs or config defaults
+    - Main server only: Self-host main server, co-schedule with client
+    - Judge server only: Self-host judge server, co-schedule with client
+    - Both servers: Self-host both, create separate groups for resource allocation
+
+    Returns:
+        Pipeline execution result (experiment object or task handles)
+
+    Example:
+        Run evaluation with self-hosted main server:
+        ```bash
+        ns nemo-evaluator \\
+            --nemo-evaluator-config configs/eval.yaml \\
+            --output-dir /workspace/results \\
+            --server-type vllm \\
+            --server-model meta/llama-3.1-8b-instruct \\
+            --server-gpus 8
+        ```
+
+        Use external servers:
+        ```bash
+        ns nemo-evaluator \\
+            --nemo-evaluator-config configs/eval.yaml \\
+            --output-dir /workspace/results \\
+            --server-base-url http://main-server:8000 \\
+            --judge-server-base-url http://judge-server:9000
+        ```
     """
     setup_logging(disable_hydra_logs=False, use_rich=True)
 
@@ -152,28 +210,26 @@ def nemo_evaluator(
         check_mounted_paths=False,
     )
 
-    # Now preparing the config for the launcher
-    # out: dict{ (harness, task_name) -> {task_name, harness_name, harness_container, endpoint_type}}
-
-    # 2) Build launcher RunConfig to collect env_vars and to construct final commands on the client
+    # Load evaluator configuration and task mappings
     launcher_run_cfg = RunConfig.from_hydra(
         config_dir=str(Path(nemo_evaluator_config).parent),
         config_name=str(Path(nemo_evaluator_config).stem),
         hydra_overrides=list(ctx.args),
     )
 
-    # 3) Determine tasks to run from the evaluator config
+    # Build jobs for each task in the evaluator config
     tasks_mapping: dict[tuple[str, str], dict] = load_tasks_mapping()
     base_output_root = (output_dir or "").rstrip("/") if output_dir else None
     jobs = []
     for idx, task in enumerate(launcher_run_cfg.evaluation.tasks):
         task_definition = get_task_from_mapping(task.name, tasks_mapping)
 
-        # 1) Collect context
+        # Collect environment variables (global + task-specific)
         env_vars: Dict[str, str] = copy.deepcopy(dict(launcher_run_cfg.evaluation.get("env_vars", {})))
         env_vars.update(task.get("env_vars", {}))
         eval_image = task.get("container") or task_definition["container"]
 
+        # Determine server hosting strategy
         hosting_server = bool(server_type) and (server_gpus or 0) > 0 and bool(server_model)
         with_external_server = (not hosting_server) and bool(server_base_url)
         hosting_judge = bool(judge_server_type) and (judge_server_gpus or 0) > 0 and bool(judge_server_model)
@@ -223,13 +279,18 @@ def nemo_evaluator(
             exclusive=exclusive,
         )
 
-        # 2) Build components
+        # Build Command objects for each component
         main_server_cmd = _build_main_server_if_needed(task_ctx)
         judge_server_cmd = _build_judge_server_if_needed(task_ctx)
         client_cmd = _build_client_command(task_ctx, main_server_cmd, judge_server_cmd)
 
-        # 3) Assemble groups (always use "groups")
+        # Group commands based on hosting strategy:
+        # - Both servers: Separate groups (main+client, judge-only) for independent scaling
+        # - Single/no servers: Single group with all components
         if main_server_cmd and judge_server_cmd:
+            # Both servers: Create separate groups for independent resource allocation
+            # Group 1: Main server + client (client references judge via cross-component refs)
+            # Group 2: Judge server only (referenced by client in group 1)
             groups_for_job = [
                 CommandGroup(
                     commands=[main_server_cmd, client_cmd],
@@ -257,6 +318,7 @@ def nemo_evaluator(
                 ),
             ]
         else:
+            # Single or no servers: All components in one group
             sg_cmds: List[Command] = []
             if main_server_cmd:
                 sg_cmds.append(main_server_cmd)
@@ -264,13 +326,16 @@ def nemo_evaluator(
                 sg_cmds.append(judge_server_cmd)
             sg_cmds.append(client_cmd)
 
+            # Determine hardware allocation for the group
             if task_ctx.hosting_server or task_ctx.hosting_judge:
+                # Use server GPUs if any servers are hosted
                 total_server_gpus = (task_ctx.server_gpus or 0) + (task_ctx.judge_server_gpus or 0)
                 group_num_gpus = total_server_gpus or None
                 group_num_nodes = max(
                     task_ctx.server_nodes or 1, task_ctx.judge_server_nodes or 1, task_ctx.job_nodes or 1
                 )
             else:
+                # No servers: use job-level GPU allocation
                 group_num_gpus = task_ctx.job_gpus or None
                 group_num_nodes = task_ctx.job_nodes or 1
 
@@ -287,6 +352,7 @@ def nemo_evaluator(
 
         jobs.append({"name": f"{task_ctx.expname}-{task_ctx.idx}", "groups": groups_for_job})
 
+    # Create and execute the pipeline
     pipeline = Pipeline(
         name=expname,
         cluster_config=cluster_config,
@@ -298,7 +364,7 @@ def nemo_evaluator(
         run_after=run_after,
     )
 
-    # Use sequential for local/none executors
+    # Use sequential execution for local/none executors
     sequential = True if cluster_config.get("executor") in ["local", "none"] else False
 
     result = pipeline.run(dry_run=dry_run, sequential=sequential)
@@ -327,9 +393,28 @@ def _create_serving_command_obj(
     idx: int,
     task_name: str,
 ) -> Command:
-    """Create a Command for a hosted serving component (main or judge).
+    """Create a Command object for a hosted serving component (main or judge server).
 
-    This wraps vllm_server_command and standardizes container/log/name/metadata.
+    This function wraps vllm_server_command and standardizes container selection,
+    logging prefixes, and metadata for both main and judge servers.
+
+    Args:
+        cluster_config: Cluster configuration dictionary
+        is_judge: True for judge server, False for main server
+        server_type: Server type (currently only "vllm" supported)
+        model: Model identifier to serve
+        port: Server port (auto-assigned if None)
+        gpus: Number of GPUs to allocate
+        nodes: Number of nodes to allocate
+        args: Extra arguments for server command
+        entrypoint: Custom entrypoint override (advanced)
+        container: Container image (defaults to cluster config)
+        expname: Experiment name for naming
+        idx: Task index for naming
+        task_name: Task name for naming
+
+    Returns:
+        Command object configured for the serving component
     """
     stype = (server_type or "vllm").lower()
     sargs = args or ""
@@ -418,19 +503,36 @@ class _TaskCreationContext:
 def _hardware_for_group(
     partition: Optional[str], num_gpus: Optional[int], num_nodes: int, qos: Optional[str], exclusive: bool
 ) -> HardwareConfig:
+    """Create HardwareConfig for a CommandGroup.
+
+    Args:
+        partition: SLURM partition name
+        num_gpus: Number of GPUs (None means no GPU allocation)
+        num_nodes: Number of nodes
+        qos: SLURM QoS setting
+        exclusive: Whether to request exclusive node access (currently disabled due to SLURM issues)
+
+    Returns:
+        HardwareConfig instance with specified settings
+    """
     return HardwareConfig(
         partition=partition,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         sbatch_kwargs={
             "qos": qos,
-            # WIPP(agronskiy): this results in the "invalid exclusive specification on squeue"
+            # TODO(agronskiy): this results in the "invalid exclusive specification on squeue"
             # "exclusive": exclusive,
         },
     )
 
 
 def _build_main_server_if_needed(ctx: _TaskCreationContext) -> Optional[Command]:
+    """Build Command for main server if self-hosting is enabled.
+
+    Returns:
+        Command object for main server, or None if not hosting
+    """
     if not ctx.hosting_server:
         return None
     return _create_serving_command_obj(
@@ -451,6 +553,11 @@ def _build_main_server_if_needed(ctx: _TaskCreationContext) -> Optional[Command]
 
 
 def _build_judge_server_if_needed(ctx: _TaskCreationContext) -> Optional[Command]:
+    """Build Command for judge server if self-hosting is enabled.
+
+    Returns:
+        Command object for judge server, or None if not hosting
+    """
     if not ctx.hosting_judge:
         return None
     return _create_serving_command_obj(
@@ -473,13 +580,30 @@ def _build_judge_server_if_needed(ctx: _TaskCreationContext) -> Optional[Command
 def _build_client_command(
     ctx: _TaskCreationContext, main_server_cmd: Optional[Command], judge_server_cmd: Optional[Command]
 ) -> Command:
-    if ctx.hosting_server or ctx.hosting_judge:
+    """Build Command for evaluator client.
 
+    The client command behavior depends on server hosting:
+    - If servers are co-hosted: Uses lambda factory to resolve runtime URLs via hostname_ref/meta_ref
+    - If using external servers: Uses static URLs from server_base_url/judge_server_base_url
+    - If no servers: Uses URLs from evaluator config or defaults
+
+    Args:
+        ctx: Task creation context with all configuration
+        main_server_cmd: Main server Command if self-hosted, None otherwise
+        judge_server_cmd: Judge server Command if self-hosted, None otherwise
+
+    Returns:
+        Command object for evaluator client
+    """
+    if ctx.hosting_server or ctx.hosting_judge:
+        # Co-hosted servers: Use lambda factory to resolve runtime URLs
+        # The lambda is evaluated at execution time when het_group_index is assigned
         def _client_cmd_factory():
             waits: List[str] = []
             target_url: Optional[str] = None
             judge_url: Optional[str] = None
 
+            # Build main server URL from runtime references
             if ctx.hosting_server and main_server_cmd is not None:
                 server_host = main_server_cmd.hostname_ref()
                 server_port_val = main_server_cmd.meta_ref("port")
@@ -487,6 +611,7 @@ def _build_client_command(
                 waits.append(pipeline_utils.get_server_wait_cmd(f"{base_url}{ctx.server_health_path}"))
                 target_url = f"{base_url}{ctx.server_api_path}"
 
+            # Build judge server URL from runtime references
             if ctx.hosting_judge and judge_server_cmd is not None:
                 jhost = judge_server_cmd.hostname_ref()
                 jport = judge_server_cmd.meta_ref("port")
@@ -494,6 +619,7 @@ def _build_client_command(
                 waits.append(pipeline_utils.get_server_wait_cmd(f"{jbase}{ctx.judge_server_health_path}"))
                 judge_url = f"{jbase}{ctx.judge_server_api_path}"
 
+            # Wait for servers to be ready, then run evaluator
             wait_cmd = " && ".join(waits) if waits else "true"
             cmd = _build_task_cmd(
                 task_name=ctx.task_name,
@@ -522,7 +648,7 @@ def _build_client_command(
             },
         )
 
-    # No hosted servers: possibly external URLs
+    # No hosted servers: Use external URLs or config defaults
     server_url = None
     if ctx.with_external_server and ctx.server_base_url:
         server_url = ctx.server_base_url.rstrip("/") + ctx.server_api_path
@@ -569,16 +695,31 @@ def _build_task_cmd(
     judge_url_override: Optional[str] = None,
     judge_model_id: Optional[str] = None,
 ) -> str:
-    """Construct the per-task evaluator command with launcher overrides.
+    """Construct the evaluator command string with runtime URL overrides.
+
+    This function builds the nemo-evaluator-launcher command for a specific task,
+    injecting runtime URLs for main and judge servers via Hydra overrides.
 
     Args:
-      task_query: Task identifier, possibly harness-qualified.
-      url_override: Full main API URL to set/override at runtime.
-      judge_url_override: Full judge API URL to override at runtime.
-      judge_model_id: Optional judge model identifier.
+        task_name: Task identifier (e.g., "ifeval", "gpqa_diamond")
+        launcher_run_cfg: Global evaluator configuration from RunConfig
+        task_cfg: Task-specific configuration (may include task-level overrides)
+        task_definition: Task definition from mapping (container, harness info)
+        expname: Experiment name for output directory structure
+        base_output_root: Base directory for task outputs
+        url_override: Main server URL to inject (for co-hosted or external servers)
+        model_id: Main model ID to inject
+        judge_url_override: Judge server URL to inject (for co-hosted or external judge)
+        judge_model_id: Judge model ID to inject
 
     Returns:
-      str: Final shell command string to execute.
+        Complete shell command string ready to execute
+
+    Note:
+        URL overrides are injected via Hydra's override mechanism:
+        - Main: target.api_endpoint.url
+        - Judge: config.params.extra.judge.url
+        Output directory is set to: {base_output_root}/{expname}/nemo_evaluator/{task_name}
     """
     task_cfg_copy = copy.deepcopy(task_cfg)
     if url_override:
