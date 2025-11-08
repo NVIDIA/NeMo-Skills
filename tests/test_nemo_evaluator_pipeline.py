@@ -22,8 +22,9 @@ from nemo_skills.pipeline.utils.declarative import Command, CommandGroup
 
 
 @pytest.fixture
-def real_evaluator_config():
+def real_evaluator_config(monkeypatch):
     """Return path to real evaluator config file."""
+    monkeypatch.setenv("NGC_API_TOKEN", "test_value_ngc_api_token")
     config_path = Path(__file__).parent / "data" / "nemo_evaluator" / "example-eval-config.yaml"
     return str(config_path)
 
