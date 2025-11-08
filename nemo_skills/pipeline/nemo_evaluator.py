@@ -21,6 +21,52 @@ capabilities of NeMo-Skills w.r.t. advanced orchestration, sandboxing etc.
 
 ### Architecture Overview:
 
+NeMo-Skills                                                NeMo Evaluator
+┌─────────────────────────────────┐                       ┌──────────────────────────────┐
+│                                 │                       │                              │
+│  Pipeline                       │                       │  NeMo Evaluator Launcher     │
+│  ┌───────────────────────────┐  │                       │  ┌────────────────────────┐  │
+│  │                           │  │                       │  │                        │  │
+│  │  nemo_evaluator()         │◄─┼───────────────────────┼──────►                    │  │
+│  │                           │  │                       │  │  - Configuration mgmt  │  │
+│  │                           │  │ - Loads eval config   │  │  - Task definitions    │  │
+│  │                           │  │ - Gets task metadata  │  │  - Container images    │  │
+│  │                           │  │ - Constructs commands │  │  - Task mappings       │  │
+│  │                           │  │ - Gets container IDs  │  │                        │  │
+│  └───────────┬───────────────┘  │                       │  └────────────────────────┘  │
+│              │                  │                       │                              │
+│              ▼                  │                       │                              │
+│  ┌───────────────────────────┐  │                       │                              │
+│  │                           │  │                       │                              │
+│  │  Command / CommandGroup   │  │                       │                              │
+│  │                           │  │                       │                              │
+│  │  - Main Server (vLLM)     │  │                       │                              │
+│  │  - Judge Server (vLLM)    │  │                       │                              │
+│  │  - Evaluator Client       │  │                       │                              │
+│  │                           │  │                       │                              │
+│  └───────────┬───────────────┘  │                       │                              │
+│              │                  │                       │                              │
+│              ▼                  │                       │  NeMo Evaluator Container    │
+│  ┌───────────────────────────┐  │                       │  ┌────────────────────────┐  │
+│  │                           │  │                       │  │                        │  │
+│  │  NeMo-Run                 │  │                       │  │  - Runs evaluations    │  │
+│  │                           │  │                       │  │  - Task-specific       │  │
+│  │  - Submits jobs           ┼──┼───────────────────────┼──►  - Container depends   │  │
+│  │  - Orchestrates execution │  │                       │  │    on task type        │  │
+│  │                           │  │                       │  │                        │  │
+│  └───────────────────────────┘  │                       │  └────────────────────────┘  │
+│                                 │                       │                              │
+│                                 │                       │                              │
+│                                 │                       │                              │
+│                                 │                       │                              │
+└─────────────────────────────────┘                       └──────────────────────────────┘
+
+ Flow:
+   1. Pipeline loads evaluation config via NeMo Evaluator Launcher
+   2. Gets task metadata, container images, and task mappings
+   3. Constructs Command objects (servers + client) and groups them
+   4. NeMo-Run executes commands, launching NeMo Evaluator Container
+   5. Container runs task-specific evaluations
 
 ### Component Types:
 
