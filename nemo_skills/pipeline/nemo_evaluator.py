@@ -71,12 +71,12 @@ NeMo-Skills                                                NeMo Evaluator
 ### Component Types:
 
 - Evaluator Client:
-   - Runs ins NeMo Evaluator container using the command prepared here.
-   - Connects to main/judge servers via runtime URLs
+   - Runs in NeMo Evaluator container using the command prepared by the Nemo Evaluator
+   - Connects to main/judge servers via runtime URLs provided via
+     declarative API.
    - Executes evaluation tasks available via NeMo Evaluator
 - Main Server (optional): can be self-hosted or external
 - Judge Server (optional): same
-
 
 ### Command Grouping Strategy:
 
