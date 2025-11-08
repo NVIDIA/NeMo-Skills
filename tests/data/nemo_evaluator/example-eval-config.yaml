@@ -12,16 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# How to use: copy this file locally into a directory, say `examples`, and run
-# Run this config with `nemo-evaluator-launcher run --config-dir examples --config-name local_limit_samples`.
 
-# This is a TEST CONFIGURATION that limits all benchmarks to use only 10 samples total.
-# This allows you to test your setup end-to-end quickly without running full evaluations.
-#
-# ⚠️  WARNING: Results from this test run should NEVER be used to compare models or
-#     report benchmark performance. This is solely for testing configuration and setup.
-#     Always run full evaluations (without limit_samples) for actual benchmark results.
+# This is an example launcher file from NeMo-evaluator used in the tests. For
+# more, see
 
 # specify default configs for execution and deployment
 defaults:
@@ -52,11 +45,18 @@ evaluation:
     target:
       api_endpoint:
         adapter_config:
-          use_reasoning: false # if true, strips reasoning tokens anc collects reasoning stats
-          use_system_prompt: false # enables custom system prompt
-          use_response_logging: true
-          max_logged_responses: null
-          use_request_logging: true
-          max_logged_requests: null
+          use_reasoning: false # if true, strips reasoning tokens and collects reasoning stats
+          use_system_prompt: true # enables custom system prompt
+          custom_system_prompt: >-
+            "Think step by step."
   tasks:
-    - name: aegis_v2
+    - name: ifeval # use the default benchmark configuration
+    - name: gpqa_diamond
+      nemo_evaluator_config: # task-specific configuration for gpqa_diamond
+        config:
+          params:
+            temperature: 0.6 # sampling temperature
+            top_p: 0.95 # nucleus sampling parameter
+            max_new_tokens: 8192 # maximum tokens to generate
+      env_vars:
+        HF_TOKEN: HF_TOKEN_FOR_GPQA_DIAMOND # Click request access for GPQA-Diamond: https://huggingface.co/datasets/Idavidrein/gpqa
