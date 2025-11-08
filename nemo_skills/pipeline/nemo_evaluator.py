@@ -14,8 +14,9 @@
 
 import copy
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import typer
 from nemo_evaluator_launcher.api import RunConfig
@@ -141,7 +142,7 @@ def nemo_evaluator(
     cluster_config = pipeline_utils.resolve_mount_paths(cluster_config, mount_paths, create_remote_dir=False)
 
     if not log_dir:
-        log_dir = f"{output_dir}/nemo-evaluator-logs"
+        log_dir = f"{output_dir}/{expname}/nemo-evaluator-logs"
 
     # Validate mounts for output dir
     output_dir, log_dir = pipeline_utils.check_mounts(
@@ -168,235 +169,123 @@ def nemo_evaluator(
     for idx, task in enumerate(launcher_run_cfg.evaluation.tasks):
         task_definition = get_task_from_mapping(task.name, tasks_mapping)
 
-        # collect all env vars
-        env_vars = copy.deepcopy(dict(launcher_run_cfg.evaluation.get("env_vars", {})))
+        # 1) Collect context
+        env_vars: Dict[str, str] = copy.deepcopy(dict(launcher_run_cfg.evaluation.get("env_vars", {})))
         env_vars.update(task.get("env_vars", {}))
+        eval_image = task.get("container") or task_definition["container"]
 
-        eval_image = task_definition["container"]
-        if "container" in task:
-            eval_image = task["container"]
-
-        commands: List[Command] = []
-
-        # Optional self-hosted servers
         hosting_server = bool(server_type) and (server_gpus or 0) > 0 and bool(server_model)
         with_external_server = (not hosting_server) and bool(server_base_url)
         hosting_judge = bool(judge_server_type) and (judge_server_gpus or 0) > 0 and bool(judge_server_model)
         with_external_judge = (not hosting_judge) and bool(judge_server_base_url)
 
-        # Both can be hosted in one job; we will wait on both and inject URLs per task
-        server_command_obj: Optional[Command] = None
-        judge_server_command_obj: Optional[Command] = None
-
-        if hosting_server:
-            server_command_obj = _create_serving_command_obj(
-                cluster_config=cluster_config,
-                is_judge=False,
-                server_type=server_type,
-                model=server_model,
-                port=server_port,
-                gpus=server_gpus,
-                nodes=server_nodes,
-                args=server_args,
-                entrypoint=server_entrypoint,
-                container=server_container,
-                expname=expname,
-                idx=idx,
-                task_name=task.name,
-            )
-            commands.append(server_command_obj)
-
-        if hosting_judge:
-            judge_server_command_obj = _create_serving_command_obj(
-                cluster_config=cluster_config,
-                is_judge=True,
-                server_type=judge_server_type,
-                model=judge_server_model,
-                port=judge_server_port,
-                gpus=judge_server_gpus,
-                nodes=judge_server_nodes,
-                args=judge_server_args,
-                entrypoint=judge_server_entrypoint,
-                container=judge_server_container,
-                expname=expname,
-                idx=idx,
-                task_name=task.name,
-            )
-            commands.append(judge_server_command_obj)
-
-        # Build client command factory that can wait on hosted servers and inject runtime URLs
-        if hosting_server or hosting_judge:
-
-            def _client_cmd_lambda():
-                """Deferred client command builder that waits on servers.
-
-                Resolves hosted server hostnames/ports at runtime, composes
-                a wait chain for health endpoints, and joins per-task commands.
-
-                According to the Command's documentation, that needs to be lambda.
-                QUESTION(agronskiy): is that really so?
-
-                Returns:
-                  str: Final shell command with waits and evaluator invocations.
-                """
-                # Cross-component references resolved at runtime
-                waits: List[str] = []
-                target_url: Optional[str] = None
-                judge_target_url: Optional[str] = None
-
-                if hosting_server:
-                    server_host = server_command_obj.hostname_ref()
-                    server_port_val = server_command_obj.meta_ref("port")
-                    base_url = f"http://{server_host}:{server_port_val}"
-                    health_url = f"{base_url}{server_health_path}"
-                    target_url = f"{base_url}{server_api_path}"
-                    waits.append(pipeline_utils.get_server_wait_cmd(health_url))
-
-                if hosting_judge:
-                    judge_server_host = judge_server_command_obj.hostname_ref()
-                    judge_server_host = judge_server_command_obj.meta_ref("port")
-                    judge_base_url = f"http://{judge_server_host}:{judge_server_host}"
-                    judge_health_url = f"{judge_base_url}{judge_server_health_path}"
-                    judge_target_url = f"{judge_base_url}{judge_server_api_path}"
-                    waits.append(pipeline_utils.get_server_wait_cmd(judge_health_url))
-
-                wait_cmd = " && ".join(waits) if waits else "true"
-                # Build per-task commands with runtime URL override(s)
-                cmd = _build_task_cmd(
-                    task_name=task.name,
-                    launcher_run_cfg=launcher_run_cfg,
-                    task_cfg=task,
-                    task_definition=task_definition,
-                    expname=expname,
-                    base_output_root=base_output_root,
-                    url_override=target_url,
-                    judge_url_override=judge_target_url,
-                    judge_model_id=judge_server_model,
-                )
-                return f"{wait_cmd} && {cmd}"
-
-            client_cmd = Command(
-                command=_client_cmd_lambda,
-                container=eval_image,
-                gpus=job_gpus or None,
-                nodes=job_nodes or 1,
-                name=f"{expname}-client-{idx}-{task.name}",
-                metadata={
-                    "log_prefix": "main",
-                    "environment": env_vars,
-                    "gpus": job_gpus or None,
-                },
-            )
-
-            # If both servers are hosted, prefer a heterogeneous job with separate groups for each server and the client
-            if (
-                hosting_server
-                and hosting_judge
-                and server_command_obj is not None
-                and judge_server_command_obj is not None
-            ):
-                # Group 0: main server + client (client waits on both servers and injects URLs)
-                server_group = CommandGroup(
-                    commands=[server_command_obj, client_cmd],
-                    hardware=HardwareConfig(
-                        partition=partition,
-                        num_gpus=server_gpus or None,
-                        num_nodes=server_nodes or 1,
-                        sbatch_kwargs={
-                            "qos": qos,
-                            "exclusive": exclusive,
-                        },
-                    ),
-                    name=f"{expname}-server-{idx}" if len(groups) > 1 else f"{expname}-server",
-                    log_dir=log_dir,
-                )
-                # Group 1: judge server only
-                judge_group = CommandGroup(
-                    commands=[judge_server_command_obj],
-                    hardware=HardwareConfig(
-                        partition=partition,
-                        num_gpus=judge_server_gpus or None,
-                        num_nodes=judge_server_nodes or 1,
-                        sbatch_kwargs={
-                            "qos": qos,
-                            "exclusive": exclusive,
-                        },
-                    ),
-                    name=f"{expname}-judge-server-{idx}" if len(groups) > 1 else f"{expname}-judge-server",
-                    log_dir=log_dir,
-                )
-                hetero_groups = [server_group, judge_group]
-
-                jobs.append(
-                    {
-                        "name": f"{expname}-{idx}-group",
-                        "groups": hetero_groups,
-                    }
-                )
-
-                # TODO(agornskiy): make this logic more clear -- we basically continure to the next tas
-                continue
-
-        else:
-            # Either external server provided, or client-only (no URL override)
-            server_url = None
-            if with_external_server:
-                server_url = server_base_url.rstrip("/") + server_api_path
-            judge_url = None
-            if with_external_judge:
-                judge_url = judge_server_base_url.rstrip("/") + judge_server_api_path
-            eval_cmd = _build_task_cmd(
-                task_name=task.name,
-                launcher_run_cfg=launcher_run_cfg,
-                task_cfg=task,
-                task_definition=task_definition,
-                expname=expname,
-                base_output_root=base_output_root,
-                url_override=server_url,
-                judge_url_override=judge_url,
-                judge_model_id=judge_server_model,
-            )
-
-            client_cmd = Command(
-                command=eval_cmd,
-                container=eval_image,
-                gpus=None,
-                nodes=job_nodes or 1,
-                name=f"{expname}-{idx}-{task.name}",
-                metadata={
-                    "log_prefix": "main",
-                    "environment": env_vars,
-                    "gpus": job_gpus or None,
-                },
-            )
-
-        commands.append(client_cmd)
-
-        # Group hardware: allocate enough GPUs/nodes for all hosted servers
-        if hosting_server or hosting_judge:
-            total_server_gpus = (server_gpus or 0) + (judge_server_gpus or 0)
-            group_num_gpus = total_server_gpus or None
-            group_num_nodes = max(server_nodes or 1, judge_server_nodes or 1, job_nodes or 1)
-        else:
-            group_num_gpus = job_gpus or None
-            group_num_nodes = job_nodes or 1
-
-        group = CommandGroup(
-            commands=commands,
-            hardware=HardwareConfig(
-                partition=partition,
-                num_gpus=group_num_gpus,
-                num_nodes=group_num_nodes,
-                sbatch_kwargs={
-                    "qos": qos,
-                    "exclusive": exclusive,
-                },
-            ),
-            name=f"{expname}-{idx}",
-            log_dir=log_dir,
+        task_ctx = _TaskCreationContext(
+            expname=expname,
+            idx=idx,
+            task_name=task.name,
+            launcher_run_cfg=launcher_run_cfg,
+            task_cfg=task,
+            task_definition=task_definition,
+            base_output_root=base_output_root,
+            eval_image=eval_image,
+            env_vars=env_vars,
+            hosting_server=hosting_server,
+            hosting_judge=hosting_judge,
+            with_external_server=with_external_server,
+            with_external_judge=with_external_judge,
+            server_api_path=server_api_path,
+            server_health_path=server_health_path,
+            judge_server_api_path=judge_server_api_path,
+            judge_server_health_path=judge_server_health_path,
+            server_model=server_model,
+            judge_server_model=judge_server_model,
+            server_type=server_type,
+            judge_server_type=judge_server_type,
+            server_port=server_port,
+            judge_server_port=judge_server_port,
+            server_gpus=server_gpus,
+            server_nodes=server_nodes,
+            judge_server_gpus=judge_server_gpus,
+            judge_server_nodes=judge_server_nodes,
+            server_args=server_args,
+            judge_server_args=judge_server_args,
+            server_entrypoint=server_entrypoint,
+            judge_server_entrypoint=judge_server_entrypoint,
+            server_container=server_container,
+            judge_server_container=judge_server_container,
+            server_base_url=server_base_url,
+            judge_server_base_url=judge_server_base_url,
+            job_gpus=job_gpus,
+            job_nodes=job_nodes,
+            cluster_config=cluster_config,
+            partition=partition,
+            qos=qos,
+            exclusive=exclusive,
         )
 
-        jobs.append({"name": group.name, "group": group})
+        # 2) Build components
+        main_server_cmd = _build_main_server_if_needed(task_ctx)
+        judge_server_cmd = _build_judge_server_if_needed(task_ctx)
+        client_cmd = _build_client_command(task_ctx, main_server_cmd, judge_server_cmd)
+
+        # 3) Assemble groups (always use "groups")
+        if main_server_cmd and judge_server_cmd:
+            groups_for_job = [
+                CommandGroup(
+                    commands=[main_server_cmd, client_cmd],
+                    hardware=_hardware_for_group(
+                        task_ctx.partition,
+                        task_ctx.server_gpus or None,
+                        task_ctx.server_nodes or 1,
+                        task_ctx.qos,
+                        task_ctx.exclusive,
+                    ),
+                    name=f"{task_ctx.expname}-server-{task_ctx.idx}",
+                    log_dir=log_dir,
+                ),
+                CommandGroup(
+                    commands=[judge_server_cmd],
+                    hardware=_hardware_for_group(
+                        task_ctx.partition,
+                        task_ctx.judge_server_gpus or None,
+                        task_ctx.judge_server_nodes or 1,
+                        task_ctx.qos,
+                        task_ctx.exclusive,
+                    ),
+                    name=f"{task_ctx.expname}-judge-server-{task_ctx.idx}",
+                    log_dir=log_dir,
+                ),
+            ]
+        else:
+            sg_cmds: List[Command] = []
+            if main_server_cmd:
+                sg_cmds.append(main_server_cmd)
+            if judge_server_cmd:
+                sg_cmds.append(judge_server_cmd)
+            sg_cmds.append(client_cmd)
+
+            if task_ctx.hosting_server or task_ctx.hosting_judge:
+                total_server_gpus = (task_ctx.server_gpus or 0) + (task_ctx.judge_server_gpus or 0)
+                group_num_gpus = total_server_gpus or None
+                group_num_nodes = max(
+                    task_ctx.server_nodes or 1, task_ctx.judge_server_nodes or 1, task_ctx.job_nodes or 1
+                )
+            else:
+                group_num_gpus = task_ctx.job_gpus or None
+                group_num_nodes = task_ctx.job_nodes or 1
+
+            groups_for_job = [
+                CommandGroup(
+                    commands=sg_cmds,
+                    hardware=_hardware_for_group(
+                        task_ctx.partition, group_num_gpus, group_num_nodes, task_ctx.qos, task_ctx.exclusive
+                    ),
+                    name=f"{task_ctx.expname}-{task_ctx.idx}",
+                    log_dir=log_dir,
+                )
+            ]
+
+        jobs.append({"name": f"{task_ctx.expname}-{task_ctx.idx}", "groups": groups_for_job})
 
     pipeline = Pipeline(
         name=expname,
@@ -479,6 +368,193 @@ def _create_serving_command_obj(
     )
 
 
+@dataclass
+class _TaskCreationContext:
+    """Local helper to pass around the information about the task and easier logic sharing."""
+
+    expname: str
+    idx: int
+    task_name: str
+    launcher_run_cfg: RunConfig
+    task_cfg: DictConfig
+    task_definition: dict
+    base_output_root: Optional[str]
+    eval_image: str
+    env_vars: Dict[str, str]
+    hosting_server: bool
+    hosting_judge: bool
+    with_external_server: bool
+    with_external_judge: bool
+    server_api_path: str
+    server_health_path: str
+    judge_server_api_path: str
+    judge_server_health_path: str
+    server_model: Optional[str]
+    judge_server_model: Optional[str]
+    server_type: Optional[str]
+    judge_server_type: Optional[str]
+    server_port: Optional[int]
+    judge_server_port: Optional[int]
+    server_gpus: int
+    server_nodes: int
+    judge_server_gpus: int
+    judge_server_nodes: int
+    server_args: Optional[str]
+    judge_server_args: Optional[str]
+    server_entrypoint: Optional[str]
+    judge_server_entrypoint: Optional[str]
+    server_container: Optional[str]
+    judge_server_container: Optional[str]
+    server_base_url: Optional[str]
+    judge_server_base_url: Optional[str]
+    job_gpus: int
+    job_nodes: int
+    cluster_config: Dict
+    partition: Optional[str]
+    qos: Optional[str]
+    exclusive: bool
+
+
+def _hardware_for_group(
+    partition: Optional[str], num_gpus: Optional[int], num_nodes: int, qos: Optional[str], exclusive: bool
+) -> HardwareConfig:
+    return HardwareConfig(
+        partition=partition,
+        num_gpus=num_gpus,
+        num_nodes=num_nodes,
+        sbatch_kwargs={
+            "qos": qos,
+            # WIPP(agronskiy): this results in the "invalid exclusive specification on squeue"
+            # "exclusive": exclusive,
+        },
+    )
+
+
+def _build_main_server_if_needed(ctx: _TaskCreationContext) -> Optional[Command]:
+    if not ctx.hosting_server:
+        return None
+    return _create_serving_command_obj(
+        cluster_config=ctx.cluster_config,
+        is_judge=False,
+        server_type=ctx.server_type,
+        model=ctx.server_model,
+        port=ctx.server_port,
+        gpus=ctx.server_gpus,
+        nodes=ctx.server_nodes,
+        args=ctx.server_args,
+        entrypoint=ctx.server_entrypoint,
+        container=ctx.server_container,
+        expname=ctx.expname,
+        idx=ctx.idx,
+        task_name=ctx.task_name,
+    )
+
+
+def _build_judge_server_if_needed(ctx: _TaskCreationContext) -> Optional[Command]:
+    if not ctx.hosting_judge:
+        return None
+    return _create_serving_command_obj(
+        cluster_config=ctx.cluster_config,
+        is_judge=True,
+        server_type=ctx.judge_server_type,
+        model=ctx.judge_server_model,
+        port=ctx.judge_server_port,
+        gpus=ctx.judge_server_gpus,
+        nodes=ctx.judge_server_nodes,
+        args=ctx.judge_server_args,
+        entrypoint=ctx.judge_server_entrypoint,
+        container=ctx.judge_server_container,
+        expname=ctx.expname,
+        idx=ctx.idx,
+        task_name=ctx.task_name,
+    )
+
+
+def _build_client_command(
+    ctx: _TaskCreationContext, main_server_cmd: Optional[Command], judge_server_cmd: Optional[Command]
+) -> Command:
+    if ctx.hosting_server or ctx.hosting_judge:
+
+        def _client_cmd_factory():
+            waits: List[str] = []
+            target_url: Optional[str] = None
+            judge_url: Optional[str] = None
+
+            if ctx.hosting_server and main_server_cmd is not None:
+                server_host = main_server_cmd.hostname_ref()
+                server_port_val = main_server_cmd.meta_ref("port")
+                base_url = f"http://{server_host}:{server_port_val}"
+                waits.append(pipeline_utils.get_server_wait_cmd(f"{base_url}{ctx.server_health_path}"))
+                target_url = f"{base_url}{ctx.server_api_path}"
+
+            if ctx.hosting_judge and judge_server_cmd is not None:
+                jhost = judge_server_cmd.hostname_ref()
+                jport = judge_server_cmd.meta_ref("port")
+                jbase = f"http://{jhost}:{jport}"
+                waits.append(pipeline_utils.get_server_wait_cmd(f"{jbase}{ctx.judge_server_health_path}"))
+                judge_url = f"{jbase}{ctx.judge_server_api_path}"
+
+            wait_cmd = " && ".join(waits) if waits else "true"
+            cmd = _build_task_cmd(
+                task_name=ctx.task_name,
+                launcher_run_cfg=ctx.launcher_run_cfg,
+                task_cfg=ctx.task_cfg,
+                task_definition=ctx.task_definition,
+                expname=ctx.expname,
+                base_output_root=ctx.base_output_root,
+                url_override=target_url,
+                judge_url_override=judge_url,
+                judge_model_id=ctx.judge_server_model,
+            )
+            return f"{wait_cmd} && {cmd}"
+
+        return Command(
+            command=_client_cmd_factory,
+            container=ctx.eval_image,
+            gpus=ctx.job_gpus or None,
+            nodes=ctx.job_nodes or 1,
+            name=f"{ctx.expname}-client-{ctx.idx}-{ctx.task_name}",
+            metadata={
+                "log_prefix": "main",
+                "environment": ctx.env_vars,
+                "gpus": ctx.job_gpus or None,
+            },
+        )
+
+    # No hosted servers: possibly external URLs
+    server_url = None
+    if ctx.with_external_server and ctx.server_base_url:
+        server_url = ctx.server_base_url.rstrip("/") + ctx.server_api_path
+    judge_url = None
+    if ctx.with_external_judge and ctx.judge_server_base_url:
+        judge_url = ctx.judge_server_base_url.rstrip("/") + ctx.judge_server_api_path
+
+    eval_cmd = _build_task_cmd(
+        task_name=ctx.task_name,
+        launcher_run_cfg=ctx.launcher_run_cfg,
+        task_cfg=ctx.task_cfg,
+        task_definition=ctx.task_definition,
+        expname=ctx.expname,
+        base_output_root=ctx.base_output_root,
+        url_override=server_url,
+        judge_url_override=judge_url,
+        judge_model_id=ctx.judge_server_model,
+    )
+
+    return Command(
+        command=eval_cmd,
+        container=ctx.eval_image,
+        gpus=None,
+        nodes=ctx.job_nodes or 1,
+        name=f"{ctx.expname}-{ctx.idx}-{ctx.task_name}",
+        metadata={
+            "log_prefix": "main",
+            "environment": ctx.env_vars,
+            "gpus": ctx.job_gpus or None,
+        },
+    )
+
+
 def _build_task_cmd(
     task_name: str,
     launcher_run_cfg: DictConfig,
@@ -523,7 +599,7 @@ def _build_task_cmd(
 
     if base_output_root:
         task_out = f"{base_output_root}/{expname}/nemo_evaluator/{task_name}"
-        OmegaConf.update(task_cfg_copy, "overrides", {"config.outpu_dir": task_out}, force_add=True)
+        OmegaConf.update(task_cfg_copy, "overrides", {"config.output_dir": task_out}, force_add=True)
 
     cmd_struct = get_eval_factory_command(launcher_run_cfg, task_cfg_copy, task_definition)
 
