@@ -503,6 +503,7 @@ def _build_client_command(
                 expname=ctx.expname,
                 base_output_root=ctx.base_output_root,
                 url_override=target_url,
+                model_id=ctx.server_model,
                 judge_url_override=judge_url,
                 judge_model_id=ctx.judge_server_model,
             )
@@ -537,6 +538,7 @@ def _build_client_command(
         expname=ctx.expname,
         base_output_root=ctx.base_output_root,
         url_override=server_url,
+        model_id=ctx.server_model,
         judge_url_override=judge_url,
         judge_model_id=ctx.judge_server_model,
     )
@@ -563,6 +565,7 @@ def _build_task_cmd(
     expname: str,
     base_output_root: Optional[str],
     url_override: Optional[str] = None,
+    model_id: Optional[str] = None,
     judge_url_override: Optional[str] = None,
     judge_model_id: Optional[str] = None,
 ) -> str:
@@ -581,6 +584,14 @@ def _build_task_cmd(
     if url_override:
         OmegaConf.update(task_cfg_copy, "overrides", {"target.api_endpoint.url": url_override}, force_add=True)
 
+    if model_id:
+        OmegaConf.update(
+            task_cfg_copy,
+            "overrides",
+            {"target.api_endpoint.model_id": model_id},
+            force_add=True,
+        )
+
     if judge_url_override or judge_model_id:
         if judge_url_override:
             OmegaConf.update(
@@ -593,7 +604,7 @@ def _build_task_cmd(
             OmegaConf.update(
                 task_cfg_copy,
                 "overrides",
-                {"config.params.extra.judge.model_id": judge_url_override},
+                {"config.params.extra.judge.model_id": judge_model_id},
                 force_add=True,
             )
 
