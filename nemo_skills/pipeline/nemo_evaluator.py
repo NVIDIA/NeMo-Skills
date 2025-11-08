@@ -294,7 +294,7 @@ def nemo_evaluator(
         reuse_code=reuse_code,
         reuse_code_exp=reuse_code_exp,
         skip_hf_home_check=True,  # avoid HF_HOME requirement for this orchestration path
-        with_ray=bool(server_type) and (server_nodes or 1) > 1,
+        with_ray=False,
         run_after=run_after,
     )
 
