@@ -50,7 +50,7 @@ def test_nemo_evaluator_vllm():
     output_dir = f"/tmp/nemo-skills-tests/{model_type}/nemo-evaluator-vllm"
     docker_rm([output_dir])
 
-    config_path = Path(__file__).absolute().parent / "data" / "nemo_evaluator" / "example-gpu-test-config.yaml"
+    config_path = Path(__file__).absolute().parent.parent / "data" / "nemo_evaluator" / "example-gpu-test-config.yaml"
 
     cmd = (
         f"ns nemo_evaluator "
