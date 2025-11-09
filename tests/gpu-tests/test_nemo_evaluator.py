@@ -52,12 +52,14 @@ def test_nemo_evaluator_vllm():
 
     config_path = Path(__file__).absolute().parent.parent / "data" / "nemo_evaluator" / "example-gpu-test-config.yaml"
 
+    expname = "nemo-evaluator-expname"
+    task_name = "ifeval"
     cmd = (
         f"ns nemo_evaluator "
         f"    --cluster test-local "
         f"    --config_dir {Path(__file__).absolute().parent} "
         f"    --output_dir {output_dir} "
-        f"    --expname nemo-evaluator-test "
+        f"    --expname {expname} "
         f"    --server_type vllm "
         f"    --server_model {model_path} "
         f"    --server_gpus 1 "
@@ -70,13 +72,7 @@ def test_nemo_evaluator_vllm():
 
     subprocess.run(cmd, shell=True, check=True)
 
-    # Validate that output directory was created
-    assert Path(output_dir).exists(), f"Output directory {output_dir} was not created"
-
-    # Check for experiment directory structure
-    exp_dir = Path(output_dir) / "nemo-evaluator-test"
-    assert exp_dir.exists(), f"Experiment directory {exp_dir} was not created"
-
-    # The pipeline should create logs directory
-    logs_dir = exp_dir / "nemo-evaluator-logs"
-    assert logs_dir.exists(), f"Logs directory {logs_dir} was not created"
+    # Task dir outputs exist
+    # {output_dir} / {expname} / nemo-evaluator-results/ task_name
+    per_task_eval_dir = Path(output_dir) / expname / "nemo-evaluator-results" / task_name
+    assert (per_task_eval_dir / "results.yml").exists()

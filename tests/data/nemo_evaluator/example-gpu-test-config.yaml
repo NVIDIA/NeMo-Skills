@@ -27,7 +27,7 @@ defaults:
   - _self_
 
 execution:
-  output_dir: test_results
+  output_dir: placeholder
 
 target:
   api_endpoint:
@@ -39,7 +39,6 @@ target:
 evaluation:
   nemo_evaluator_config: # global config settings that apply to all tasks
     config:
-      output_dir: /tmp/nemo-skills-tests/nemo-evaluator-test
       params:
         request_timeout: 3600 # timeout for API requests in seconds
         parallelism: 2 # number of parallel requests

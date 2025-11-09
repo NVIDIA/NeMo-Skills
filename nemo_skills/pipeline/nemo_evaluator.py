@@ -769,7 +769,7 @@ def _build_task_cmd(
         URL overrides are injected via Hydra's override mechanism:
         - Main: target.api_endpoint.url
         - Judge: config.params.extra.judge.url
-        Output directory is set to: {base_output_root}/{expname}/nemo_evaluator/{task_name}
+        Output directory is set to: {base_output_root}/{expname}/nemo-evaluator-results/{task_name}
     """
     task_cfg_copy = copy.deepcopy(task_cfg)
     if url_override:
@@ -800,7 +800,7 @@ def _build_task_cmd(
             )
 
     if base_output_root:
-        task_out = f"{base_output_root}/{expname}/nemo_evaluator/{task_name}"
+        task_out = f"{base_output_root}/{expname}/nemo-evaluator-results/{task_name}"
         OmegaConf.update(task_cfg_copy, "overrides", {"config.output_dir": task_out}, force_add=True)
 
     cmd_struct = get_eval_factory_command(launcher_run_cfg, task_cfg_copy, task_definition)
