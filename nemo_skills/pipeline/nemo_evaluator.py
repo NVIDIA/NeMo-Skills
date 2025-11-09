@@ -247,6 +247,7 @@ def nemo_evaluator(
 
     if not log_dir:
         log_dir = f"{output_dir}/{expname}/nemo-evaluator-logs"
+        Path(log_dir).mkdir(exist_ok=True, parents=True)
 
     # Validate mounts for output dir
     output_dir, log_dir = pipeline_utils.check_mounts(
