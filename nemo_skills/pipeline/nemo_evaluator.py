@@ -253,8 +253,12 @@ def nemo_evaluator(
         cluster_config,
         log_dir=log_dir,
         mount_map={output_dir: None},
-        check_mounted_paths=False,
     )
+
+    # Create log directory for local executors (not created by check_mounts when check_mounted_paths=False)
+    # Use create_remote_directory to create on host side (not inside container) to avoid permission issues
+    if cluster_config.get("executor") in ["local", "none"]:
+        pipeline_utils.create_remote_directory(log_dir, cluster_config)
 
     # Load evaluator configuration and task mappings
     launcher_run_cfg = RunConfig.from_hydra(

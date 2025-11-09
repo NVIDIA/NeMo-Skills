@@ -296,6 +296,7 @@ def create_remote_directory(directory: str | list, cluster_config: dict):
         for dir_path in directory
     ]
 
+    logging.info(f"WIPP {directory}")
     if cluster_config.get("executor") != "slurm":
         tunnel = run.LocalTunnel(job_dir=directory[0])
         for dir_path in directory:
