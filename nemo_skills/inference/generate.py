@@ -108,6 +108,7 @@ class GenerateSolutionsConfig:
     server: dict = field(default_factory=dict)
     # Sandbox configuration {sandbox_params}
     sandbox: dict = field(default_factory=dict)
+    wait_for_sandbox: bool = False  # whether we need to wait for sandbox
     # Prompt configuration - path to yaml files
     start_assistant_response_key: str | None = None  # whether to start assistant response with this key
 
@@ -208,12 +209,6 @@ class GenerateSolutionsConfig:
 
     def _post_init_validate_server(self):
         if self.server["server_type"] == "megatron":
-            if self.tokenizer is None:
-                raise ValueError(
-                    "Megatron server doesn't support chat completions and we can't infer tokenizer from model name. "
-                    "Please provide it with an explicit `tokenizer` parameter."
-                )
-            self.inference.endpoint_type = EndpointType.text
             LOG.warning("Megatron inference is extremely slow. It's highly recommended to use other server types!")
 
     def _post_init_validate_params(self):
@@ -697,6 +692,10 @@ class GenerationTask:
         server_start_cmd = get_server_wait_cmd(server_address)
         subprocess.run(server_start_cmd, shell=True, check=True)
 
+    def wait_for_sandbox(self):
+        if self.cfg.wait_for_sandbox:
+            self.sandbox.wait_for_sandbox()
+
     def setup_litellm_cache(self):
         if self.cfg.enable_litellm_cache:
             # One cache per (output_file_name, chunk_id) pair
@@ -734,6 +733,7 @@ class GenerationTask:
                         output_path.unlink()
 
             self.wait_for_server()
+            self.wait_for_sandbox()
             asyncio.run(self.async_loop(data))
 
         if self.should_run_evaluation and self.evaluator is None:

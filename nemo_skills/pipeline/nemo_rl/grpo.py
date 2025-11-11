@@ -31,12 +31,16 @@ from nemo_skills.pipeline.utils import (
     get_mounted_path,
     get_nsight_cmd,
     get_timeout_str,
-    parse_sbatch_arguments,
+    parse_kwargs,
     resolve_mount_paths,
     run_exp,
     temporary_env_update,
 )
-from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
+from nemo_skills.utils import (
+    get_logger_name,
+    setup_logging,
+    validate_wandb_project_name,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -181,7 +185,8 @@ def get_checkpoint_convert_cmd(output_dir, final_hf_path, step, backend, max_pos
 
     cmd += f" --training-folder={output_dir} "
     cmd += f" --hf-ckpt-path={final_hf_path} "
-    cmd += f" --max-position-embeddings={max_position_embeddings} "
+    if max_position_embeddings is not None:
+        cmd += f" --max-position-embeddings={max_position_embeddings} "
     if step != "last":
         try:
             step = int(step)
@@ -235,7 +240,7 @@ def grpo_nemo_rl(
     validation_data: Optional[str] = typer.Option(None, help="Path to the validation data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
     num_gpus: int = typer.Option(..., help="Number of GPUs per node"),
-    num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
+    dependent_jobs: int = typer.Option(0, help="Number of dependent jobs"),
     conversion_step: str = typer.Option(
         default="last",
         help=(
@@ -250,6 +255,7 @@ def grpo_nemo_rl(
     remove_checkpoints_after_average: bool = typer.Option(
         False, help="Whether to delete original step directories after averaging (default: False)."
     ),
+    run_conversion_only: bool = typer.Option(False, help="Whether to run checkpoint conversion only or not."),
     wandb_project: str = typer.Option("nemo-skills", help="Weights & Biases project name"),
     wandb_group: str = typer.Option(None, help="Weights & Biases group name."),
     disable_wandb: bool = typer.Option(False, help="Disable wandb logging"),
@@ -309,9 +315,9 @@ def grpo_nemo_rl(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
-    sbatch_arguments: str = typer.Option(
+    sbatch_kwargs: str = typer.Option(
         "",
-        help="Additional sbatch arguments to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
@@ -354,9 +360,11 @@ def grpo_nemo_rl(
                 "You can set it in your cluster config like this:\n"
                 '  env_vars: ["HF_HOME=/your/path/to/hf_home"]'
             )
-    if num_training_jobs > 0:
+    if run_conversion_only:
+        dependent_jobs = -1
+    if dependent_jobs > 0:
         if training_data is None:
-            raise ValueError("training_data is required when num_training_jobs > 0")
+            raise ValueError("training_data is required when dependent_jobs >= 0")
         if training_data.startswith("/"):  # could ask to download from HF
             training_data = get_mounted_path(cluster_config, training_data)
         if validation_data is not None:
@@ -384,12 +392,12 @@ def grpo_nemo_rl(
 
     server_config = None
     env_update = {"RAY_LOG_SYNC_FREQUENCY": 20} if profile_step_range else {}
-    slurm_kwargs = parse_sbatch_arguments(sbatch_arguments, exclusive)
+    sbatch_kwargs = parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
 
     with get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
         with temporary_env_update(cluster_config, env_update):
-            for job_id in range(num_training_jobs):
+            for job_id in range(dependent_jobs + 1):
                 prev_task = add_task(
                     exp,
                     cmd=train_cmd,
@@ -401,13 +409,11 @@ def grpo_nemo_rl(
                     cluster_config=cluster_config,
                     server_config=server_config,
                     partition=partition,
-                    qos=qos,
-                    time_min=time_min,
                     run_after=run_after,
                     reuse_code=reuse_code,
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=[prev_task] if prev_task is not None else None,
-                    slurm_kwargs=slurm_kwargs,
+                    sbatch_kwargs=sbatch_kwargs,
                     heterogeneous=True if server_config is not None else False,
                     with_sandbox=with_sandbox,
                     with_ray=True,
@@ -429,8 +435,6 @@ def grpo_nemo_rl(
                 container=cluster_config["containers"]["nemo-rl"],
                 cluster_config=cluster_config,
                 partition=partition,
-                qos=qos,
-                time_min=time_min,
                 num_nodes=1,
                 num_tasks=1,
                 num_gpus=num_gpus,
@@ -438,7 +442,7 @@ def grpo_nemo_rl(
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
-                slurm_kwargs=slurm_kwargs,
+                sbatch_kwargs=sbatch_kwargs,
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )
@@ -460,8 +464,6 @@ def grpo_nemo_rl(
                     container=cluster_config["containers"]["nemo-rl"],
                     cluster_config=cluster_config,
                     partition=partition,
-                    qos=qos,
-                    time_min=time_min,
                     num_nodes=1,
                     num_tasks=1,
                     num_gpus=num_gpus,
@@ -469,7 +471,7 @@ def grpo_nemo_rl(
                     reuse_code=reuse_code,
                     reuse_code_exp=reuse_code_exp,
                     task_dependencies=[prev_task] if prev_task is not None else None,
-                    slurm_kwargs=slurm_kwargs,
+                    sbatch_kwargs=sbatch_kwargs,
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
                 )
@@ -488,8 +490,6 @@ def grpo_nemo_rl(
                 container=cluster_config["containers"]["nemo-rl"],
                 cluster_config=cluster_config,
                 partition=partition,
-                qos=qos,
-                time_min=time_min,
                 num_nodes=1,
                 num_tasks=1,
                 num_gpus=num_gpus,
@@ -497,7 +497,7 @@ def grpo_nemo_rl(
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=task_dependencies,
-                slurm_kwargs=slurm_kwargs,
+                sbatch_kwargs=sbatch_kwargs,
                 installation_command=installation_command,
                 skip_hf_home_check=skip_hf_home_check,
             )

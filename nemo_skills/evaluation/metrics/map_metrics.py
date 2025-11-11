@@ -28,10 +28,12 @@ from nemo_skills.evaluation.metrics.code_metrics import (
     SciCodeMetrics,
     SweBenchMetrics,
 )
+from nemo_skills.evaluation.metrics.icpc_metrics import ICPCMetrics
 from nemo_skills.evaluation.metrics.if_metrics import IFMetrics
 from nemo_skills.evaluation.metrics.ioi_metrics import IOIMetrics
 from nemo_skills.evaluation.metrics.lean4_metrics import Lean4Metrics
 from nemo_skills.evaluation.metrics.math_metrics import MathMetrics
+from nemo_skills.evaluation.metrics.mmau_pro_metrics import MMAUProMetrics
 from nemo_skills.evaluation.metrics.mrcr_metrics import MRCRMetrics
 from nemo_skills.evaluation.metrics.ruler_metrics import RulerMetrics
 from nemo_skills.evaluation.metrics.simpleqa_metrics import SimpleQAMetrics
@@ -49,6 +51,7 @@ METRICS_MAP = {
     "evalplus": EvalPlusMetrics,
     "if": IFMetrics,
     "ioi": IOIMetrics,
+    "icpc": ICPCMetrics,
     "multichoice": MathMetrics,
     "ruler": RulerMetrics,
     "livecodebench": LiveCodeBenchMetrics,
@@ -60,10 +63,13 @@ METRICS_MAP = {
     "livebench_coding": LiveCodeBenchMetrics,
     "translation": TranslationMetrics,
     "human_eval_infilling": HumanEvalInfillingMetrics,
+    "mmau_pro_closed_form": MMAUProMetrics,
+    "mmau_pro_open_ended": MMAUProMetrics,
+    "mmau_pro_instruction_following": MMAUProMetrics,
 }
 
 
-def get_metrics(metric_type: str):
+def get_metrics(metric_type: str, **kwargs):
     """Get metrics class.
 
     Class path formats:
@@ -72,6 +78,7 @@ def get_metrics(metric_type: str):
 
     Arguments:
         metric_type: Either a string from METRICS_MAP, or a path to class (class path format above).
+        **kwargs: Additional kwargs to pass to the metrics class constructor.
     """
     metrics_cls = None
 
@@ -91,4 +98,4 @@ def get_metrics(metric_type: str):
             f"Metric {metric_type} not found.\nSupported types: {str(METRICS_MAP.keys())} or use explicit class path format."
         )
 
-    return metrics_cls()
+    return metrics_cls(**kwargs)

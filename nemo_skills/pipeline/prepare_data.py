@@ -20,14 +20,18 @@ import typer
 
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.run_cmd import run_cmd as _run_cmd
-from nemo_skills.pipeline.utils import get_cluster_config, get_env_variables
+from nemo_skills.pipeline.utils import (
+    get_cluster_config,
+    get_env_variables,
+    parse_kwargs,
+)
 from nemo_skills.utils import get_logger_name, setup_logging
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
 
 # TODO: read this from init.py
-DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24"]
+DATASETS_REQUIRE_DATA_DIR = ["ruler", "ioi24", "mmau-pro"]
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -61,11 +65,21 @@ def prepare_data(
         help="If True, will keep the mounts for the sandbox container. Note that, it is risky given that sandbox executes LLM commands and could potentially lead to data loss. So, we advise not to use this unless absolutely necessary.",
     ),
     log_dir: str = typer.Option(None, help="Custom location for slurm logs"),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     check_mounted_paths: bool = typer.Option(False, help="Check mounted paths availability"),
     skip_hf_home_check: bool | None = typer.Option(
         None,
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
+    ),
+    skip_data_dir_check: bool = typer.Option(
+        False,
+        help="Some datasets require very large input files and we will fail with error if data_dir "
+        "is not specified (to avoid accidentally uploading them to cluster with every job). "
+        "If you're running things locally or have another reason to bypass this check, set this flag.",
+    ),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
 ):
     """Prepare datasets by running python -m nemo_skills.dataset.prepare.
@@ -76,12 +90,13 @@ def prepare_data(
     extra_arguments = f"{' '.join(ctx.args)}"
     command = f"python -m nemo_skills.dataset.prepare {extra_arguments}"
 
-    if not data_dir:
+    if not data_dir and not skip_data_dir_check:
         for dataset in DATASETS_REQUIRE_DATA_DIR:
             if dataset in extra_arguments:
                 raise ValueError(
-                    f"Dataset {dataset} contains very large input data and requires a data_dir to be specified. "
-                    "Please provide --data_dir argument."
+                    f"Dataset {dataset} contains very large input data and it's recommended to have a "
+                    "data_dir to be specified to avoid accidentally uploading large data on cluster with every job. "
+                    "Please provide --data_dir argument or set --skip_data_dir_check to bypass this safety check."
                 )
 
     if data_dir and cluster is None:
@@ -129,14 +144,14 @@ def prepare_data(
             )
         # TODO: automatically add it to cluster config based on user prompt?
 
+    sbatch_kwargs = parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
+
     return _run_cmd(
         ctx=ctx,
         cluster=cluster_config,
         command=command,
         expname=expname,
         partition=partition,
-        qos=qos,
-        time_min=time_min,
         num_gpus=num_gpus,
         num_nodes=num_nodes,
         mount_paths=mount_paths,
@@ -150,6 +165,7 @@ def prepare_data(
         exclusive=exclusive,
         check_mounted_paths=check_mounted_paths,
         skip_hf_home_check=skip_hf_home_check,
+        sbatch_kwargs=sbatch_kwargs,
     )
 
 
