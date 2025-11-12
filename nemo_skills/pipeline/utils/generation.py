@@ -17,6 +17,7 @@ import os
 import shlex
 import subprocess
 from collections import defaultdict
+from typing import Optional
 
 from nemo_skills.pipeline.utils.cluster import get_tunnel
 from nemo_skills.pipeline.utils.mounts import get_unmounted_path
@@ -24,6 +25,81 @@ from nemo_skills.pipeline.utils.server import get_free_port
 from nemo_skills.utils import get_chunked_filename, get_logger_name
 
 LOG = logging.getLogger(get_logger_name(__file__))
+
+
+def normalize_models_config(
+    model: Optional[str | list[str]],
+) -> list[str]:
+    """
+    Normalize model specification to list.
+
+    Handles both scalar and list inputs:
+    - CLI (Typer): Converts single values to single-element lists automatically
+    - Python API: Accepts both strings and lists
+
+    Args:
+        model: Model path(s) - string or list from Python API, list from CLI
+
+    Returns:
+        List of model paths
+
+    Raises:
+        ValueError: If model is None or empty
+    """
+    if model is None:
+        raise ValueError("Must specify --model")
+
+    # Handle string (Python API with single model)
+    if isinstance(model, str):
+        return [model]
+
+    # Handle list
+    if len(model) == 0:
+        raise ValueError("Must specify --model")
+    return list(model)
+
+
+def normalize_parameter(
+    param_value: any,
+    num_models: int,
+    param_name: str,
+) -> list[any]:
+    """
+    Normalize a parameter to a per-model list.
+
+    Handles both scalar and list inputs for flexible usage:
+    - CLI (Typer): Converts single values to single-element lists automatically
+    - Python API: Accepts both scalars and lists directly
+
+    Broadcast logic:
+    - Scalar value: Broadcast to all models [value] * num_models
+    - Single-element list: Broadcast to all models
+    - Multi-element list: Must match num_models exactly
+
+    Args:
+        param_value: Parameter value (scalar or list)
+        num_models: Number of models
+        param_name: Name of parameter (for error messages)
+
+    Returns:
+        List of parameter values (one per model)
+
+    Raises:
+        ValueError: If list length doesn't match num_models
+    """
+    if not isinstance(param_value, list):
+        return [param_value] * num_models
+
+    if len(param_value) == num_models:
+        return list(param_value)
+
+    if len(param_value) == 1:
+        return param_value * num_models
+
+    raise ValueError(
+        f"Parameter {param_name} has {len(param_value)} values but {num_models} models specified. "
+        f"Must be 1 value (broadcast) or {num_models} values (per-model)."
+    )
 
 
 def get_chunked_rs_filename(
@@ -294,6 +370,10 @@ def get_generation_cmd(
     wandb_parameters=None,
     with_sandbox: bool = False,
     script: str = "nemo_skills.inference.generate",
+    # Optional: for multi-model generation
+    server_addresses: list[str] | None = None,
+    model_names: list[str] | None = None,
+    server_types: list[str] | None = None,
 ):
     """Construct the generation command for language model inference."""
     if input_file is None and input_dir is None:
@@ -321,12 +401,29 @@ def get_generation_cmd(
     # Handle file paths vs module names
     common_args = f"++skip_filled=True ++input_file={input_file} ++output_file={output_file}"
     if script.endswith(".py") or os.sep in script:
-        # It's a file path, run it directly with .py extension
         script_path = script if script.endswith(".py") else f"{script}.py"
         cmd += f"python {script_path} {hydra_config_args} {common_args} "
     else:
         # It's a module name, use -m flag
         cmd += f"python -m {script} {hydra_config_args} {common_args} "
+
+    if server_addresses is not None and model_names is not None:
+        num_models = len(model_names)
+        if num_models > 1:
+            # Multi-model: pass server configuration as lists
+            # Just pass base_url for all models (both self-hosted and pre-hosted)
+            # The inference script will configure the client correctly based on server_gpus
+
+            model_names_arg = ",".join(model_names)
+            cmd += f"++server.model=[{model_names_arg}] "
+
+            server_types_arg = ",".join(server_types)
+            cmd += f"++server.server_type=[{server_types_arg}] "
+
+            server_addresses_arg = ",".join(server_addresses)
+            cmd += f"++server.base_url=[{server_addresses_arg}] "
+        # For n=1: server config is already in extra_arguments from configure_client
+
     job_end_cmd = ""
 
     if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations

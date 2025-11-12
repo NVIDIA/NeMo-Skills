@@ -16,6 +16,7 @@
 
 import json
 import os
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -116,13 +117,38 @@ class TestCommand:
         assert cmd.hostname_ref() == "127.0.0.1"
 
     def test_command_hostname_ref_heterogeneous(self):
-        """Test hostname_ref returns SLURM variable when het_group_index is set."""
-        cmd = Command(command="echo test", name="test")
-        cmd.het_group_index = 2
+        """Test hostname_ref returns runtime-resolvable references for heterogeneous jobs."""
 
-        hostname = cmd.hostname_ref()
-        assert "$SLURM_JOB_NODELIST_HET_GROUP_2" in hostname
-        assert "scontrol" in hostname
+        cmd0 = Command(command="echo test", name="server0")
+        cmd0.het_group_index = 0
+
+        cmd1 = Command(command="echo test", name="server1")
+        cmd1.het_group_index = 1
+
+        hostname0 = cmd0.hostname_ref()
+        hostname1 = cmd1.hostname_ref()
+
+        # Each het group should get different references
+        assert hostname0 != hostname1, "Different het groups should have different hostname references"
+
+        # Test with environment variables set (simulating nemo-run's behavior)
+        env = os.environ.copy()
+        env["SLURM_MASTER_NODE_HET_GROUP_0"] = "node-123"
+        env["SLURM_MASTER_NODE_HET_GROUP_1"] = "node-456"
+
+        # Evaluate the shell references
+        resolved0 = subprocess.check_output(f"echo {hostname0}", shell=True, env=env, text=True).strip()
+        resolved1 = subprocess.check_output(f"echo {hostname1}", shell=True, env=env, text=True).strip()
+
+        assert resolved0 == "node-123", f"Expected 'node-123', got '{resolved0}'"
+        assert resolved1 == "node-456", f"Expected 'node-456', got '{resolved1}'"
+
+        # Test fallback to localhost when env vars not set
+        env_no_slurm = {}
+        resolved_fallback = subprocess.check_output(
+            f"echo {hostname0}", shell=True, env=env_no_slurm, text=True
+        ).strip()
+        assert resolved_fallback == "localhost", f"Should fallback to localhost, got '{resolved_fallback}'"
 
     def test_command_with_installation_command(self):
         """Test Command with installation_command."""
@@ -475,8 +501,27 @@ class TestHetGroupIndices:
         # Commands should have het_group_index 0 and 1
         assert cmd1.het_group_index == 0
         assert cmd2.het_group_index == 1
-        assert "$SLURM_JOB_NODELIST_HET_GROUP_0" in cmd1.hostname_ref()
-        assert "$SLURM_JOB_NODELIST_HET_GROUP_1" in cmd2.hostname_ref()
+
+        # Test that hostname references actually resolve correctly
+        import os
+        import subprocess
+
+        env = os.environ.copy()
+        env["SLURM_MASTER_NODE_HET_GROUP_0"] = "test-node-123"
+        env["SLURM_MASTER_NODE_HET_GROUP_1"] = "test-node-456"
+
+        hostname1 = cmd1.hostname_ref()
+        hostname2 = cmd2.hostname_ref()
+
+        # Different groups should have different references
+        assert hostname1 != hostname2
+
+        # Verify they resolve to the correct hostnames
+        resolved1 = subprocess.check_output(f"echo {hostname1}", shell=True, env=env, text=True).strip()
+        resolved2 = subprocess.check_output(f"echo {hostname2}", shell=True, env=env, text=True).strip()
+
+        assert resolved1 == "test-node-123", f"Group 0 should resolve to test-node-123, got {resolved1}"
+        assert resolved2 == "test-node-456", f"Group 1 should resolve to test-node-456, got {resolved2}"
 
     @patch("nemo_skills.pipeline.utils.declarative.get_exp")
     @patch("nemo_skills.pipeline.utils.declarative.get_env_variables")
