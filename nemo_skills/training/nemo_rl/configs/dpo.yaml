@@ -116,7 +116,12 @@ policy:
     # gives ~25% training perf speedup with sequence packing and apply_rope_fusion
     bias_activation_fusion: True
     defer_fp32_logits: False
+    track_moe_metrics: False
+    moe_per_layer_logging: False
+    do_not_average_loss: true
+    cp_normalize: true
     calculate_per_token_loss: true
+    scale_loss_by_dp_cp_size: false
 
     optimizer:
       optimizer: "adam"

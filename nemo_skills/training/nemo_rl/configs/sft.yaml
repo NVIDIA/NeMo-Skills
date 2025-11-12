@@ -76,6 +76,12 @@ policy:
     apply_rope_fusion: True  # Only used if position_embedding_type=rope
     layernorm_epsilon: 1e-6
     empty_unused_memory_level: 0 # setting it to 0 will maximize performance, but it might lead to OOMs, while setting it to 2 to minimize the peak memory usage to avoid OOMs
+    track_moe_metrics: False
+    moe_per_layer_logging: False
+    do_not_average_loss: true
+    cp_normalize: true
+    calculate_per_token_loss: true
+    scale_loss_by_dp_cp_size: false
 
     optimizer:
       optimizer: "adam"
@@ -117,7 +123,7 @@ policy:
       grad_reduce_in_fp32: false
       overlap_grad_reduce: true
       overlap_param_gather: true
-      average_in_collective: true
+      average_in_collective: false
       data_parallel_sharding_strategy: "optim_grads_params"
 
   dynamic_batching:

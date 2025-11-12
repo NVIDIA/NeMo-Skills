@@ -120,8 +120,7 @@ class NemoRLTask:
             "export UV_PROJECT=/opt/NeMo-RL && "
             f"{nsight_cmd}"
             "echo 'Starting training' && "
-            "NRL_FORCE_REBUILD_VENVS=true uv run --active "
-            "python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
+            "VLLM_COMMIT=7fff9a83945e9f184d5f1ce085d3101620381af2 VLLM_PRECOMPILED_WHEEL_LOCATION=https://github.com/vllm-project/vllm/releases/download/v0.11.0/vllm-0.11.0-cp38-abi3-manylinux1_x86_64.whl RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 NRL_FORCE_REBUILD_VENVS=false uv run python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
             f"{self.format_train_args()} {self.format_data_args()} "
             f"{self.logging_params} {self.extra_arguments}"
         )
