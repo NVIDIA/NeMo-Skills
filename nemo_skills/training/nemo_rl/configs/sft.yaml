@@ -104,7 +104,7 @@ policy:
       use_distributed_optimizer: true
       use_precision_aware_optimizer: true
 
-      # clip_grad: ${policy.max_grad_norm}
+      clip_grad: ${policy.max_grad_norm}
 
       # optimizer cpu offload
       optimizer_cpu_offload: false
