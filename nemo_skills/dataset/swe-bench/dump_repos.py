@@ -15,6 +15,7 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -32,14 +33,18 @@ def read_repos(jsonl_file):
     return sorted(repos)
 
 
-def clone_repo(repo, output_dir):
+def clone_repo(repo, output_dir, force):
     """Clone a GitHub repo."""
     repo_dir = os.path.join(output_dir, repo)
 
     # Check if cloned repo already exists
     if os.path.exists(repo_dir):
-        print(f"✓ {repo} -> {repo_dir} (already exists)")
-        return True
+        if not force:  # skip by default unless --force was set
+            print(f"✓ {repo} -> {repo_dir} (already exists)")
+            return True
+        else:
+            print(f"{repo_dir} already exists, removing because --force was set...")
+            shutil.rmtree(repo_dir)
 
     try:
         # Clone repo
@@ -68,12 +73,14 @@ def main():
     parser.add_argument("input_file", help="JSONL file to read repos from (must have 'repo' field)")
     parser.add_argument("output_directory", help="Directory to save repos")
     parser.add_argument("--max_workers", "-j", type=int, default=20, help="Number of parallel downloads (default: 20)")
+    parser.add_argument("--force", action="store_true", help="Overwrite existing repos")
 
     args = parser.parse_args()
 
     jsonl_path = args.input_file
     output_dir = args.output_directory
     max_workers = args.max_workers
+    force = args.force
 
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -96,7 +103,7 @@ def main():
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all download tasks
-        futures = [executor.submit(clone_repo, repo, output_dir) for repo in repos]
+        futures = [executor.submit(clone_repo, repo, output_dir, force) for repo in repos]
 
         # Process completed tasks
         for future in as_completed(futures):
