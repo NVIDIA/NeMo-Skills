@@ -10,6 +10,7 @@ We support many popular benchmarks and it's easy to add new in the future. The f
 - [**Long-context**](./long-context.md): e.g. [ruler](./long-context.md#ruler), [mrcr](./long-context.md#mrcr)
 - [**Tool-calling**](./tool-calling.md): e.g. [bfcl_v3](./tool-calling.md#bfcl_v3)
 - [**Multilingual**](./multilingual.md): e.g. [mmlu-prox](./multilingual.md#mmlu-prox), [flores-200](./multilingual.md#FLORES-200), [wmt24pp](./multilingual.md#wmt24pp)
+- [**Speech & Audio**](./speech-audio.md): e.g. [mmau-pro](./speech-audio.md#mmau-pro)
 
 See [nemo_skills/dataset](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/dataset) where each folder is a benchmark we support.
 
@@ -49,6 +50,10 @@ ns prepare_data ruler --setup=llama_128k --tokenizer_path=meta-llama/Llama-3.1-8
 ```
 
 ## Running evaluation
+
+!!! warning
+    For correct evaluation of reasoning models, either provide reasoning parser in server args (e.g. `--server_args="--reasoning-parser ..."` for vllm)
+    or set `++parse_reasoning=True` as well as an appropriate `++end_reasoning_string` string (which defaults to `</think>`).
 
 ```bash
 ns eval \
@@ -166,8 +171,14 @@ Different benchmarks have different evaluation options that you can customize. H
 code execution timeout for scicode benchmark
 
 ```bash
-    --extra_eval_args="++eval_config.timeout=60"
+    ++eval_config.timeout=60
 ```
+
+!!! tip "Passing Main Arguments with Config Files"
+
+    For parameters that are difficult to escape on the command line (like `end_reasoning_string='</think>'`),
+    you can use YAML config files instead. See [Passing Main Arguments with Config Files](../pipelines/index.md###passing-main-arguments-with-config-files) for details.
+
 
 ## Using data on cluster
 
@@ -223,14 +234,11 @@ Inside [`nemo_skills/dataset/gsm8k/__init__.py`](https://github.com/NVIDIA-NeMo/
 # settings that define how evaluation should be done by default (all can be changed from cmdline)
 DATASET_GROUP = 'math'
 METRICS_TYPE = "math"
-EVAL_ARGS = "++eval_type=math"
-GENERATION_ARGS = "++prompt_config=generic/math"
+GENERATION_ARGS = "++eval_type=math ++prompt_config=generic/math"
 ```
 
 The prompt config and default generation arguments are passed to the
-[nemo_skills/inference/generate.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/inference/generate.py) and
-the default eval args are passed to the
-[nemo_skills/evaluation/evaluate_results.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/evaluation/evaluate_results.py).
+[nemo_skills/inference/generate.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/inference/generate.py).
 The dataset group is used by [nemo_skills/dataset/prepare.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/dataset/prepare.py)
 to help download only benchmarks from a particular group if `--dataset_groups` parameter is used.
 Finally, the metrics type is used to pick a metrics class from [nemo_skills/evaluation/metrics/map_metrics.py](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/evaluation/metrics/map_metrics.py)

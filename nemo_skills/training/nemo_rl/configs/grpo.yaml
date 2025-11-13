@@ -5,16 +5,31 @@ grpo:
   num_prompts_per_step: 32
   num_generations_per_prompt: 16
   max_rollout_turns: 1 # for multi-turn rollouts. Math Environments just have 1 turn (answering the question)
-  max_num_steps: 1000000
   max_num_epochs: 1
+  max_num_steps: 1000000
   normalize_rewards: true
   use_leave_one_out_baseline: true
   val_period: 0
   val_at_start: false
+  overlong_filtering: false
   max_val_samples: 256
   val_batch_size: 256
-  overlong_filtering: false
   seed: 42
+  use_dynamic_sampling: false
+  dynamic_sampling_max_gen_batches: 10
+  batch_multiplier: 1
+  reward_shaping:
+    enabled: false
+    overlong_buffer_length: 128
+    overlong_buffer_penalty: 1
+    max_response_length: ${policy.max_total_sequence_length}
+  reward_scaling:
+    enabled: false
+    source_min: 0.0
+    source_max: 1.0
+    target_min: 0.0
+    target_max: 1.0
+
   async_grpo:
     enabled: false # Set to true to enable async training mode
     # Max age (in training steps) for trajectories used in training
@@ -27,7 +42,11 @@ loss_fn:
   ratio_clip_c: null
   # (default off) loss formulation improvements (docs/guides/grpo.md#loss)
   use_on_policy_kl_approximation: false
+  # Async GRPO requires importance sampling correction enabled
+  # Set to true when async_grpo.enabled is true
   use_importance_sampling_correction: false
+  truncated_importance_sampling_ratio: null
+  sequence_level_importance_ratios: false
   token_level_loss: true
 
 checkpointing:
@@ -43,6 +62,7 @@ policy:
   model_name: ???
   tokenizer:
     name: ${policy.model_name} ## specify if you'd like to use a tokenizer different from the model's default
+    chat_template_kwargs: null # can be used to pass kwargs to the chat template, e.g., enable_thinking=true
   train_global_batch_size: 512
   train_micro_batch_size: 4
   generation_batch_size: 32 # Only used when generating using HF backend
@@ -87,10 +107,8 @@ policy:
     logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.logprob_batch_size}}
     algorithm: "modified_first_fit_decreasing"
     sequence_length_round: 64
-
-  # makes the training sequence length divisible by the tensor parallel size
-  # this is useful for sequence parallel training
-  make_sequence_length_divisible_by: ${policy.dtensor_cfg.tensor_parallel_size}
+  #If this value is set to null, it will be automatically assigned in the code.
+  make_sequence_length_divisible_by: null
   max_grad_norm: 1.0
 
   optimizer:
@@ -228,6 +246,7 @@ data:
     template_dir: null
   train_data_path: null
   val_data_path: null
+  num_workers: 10
 
 env:
   math:

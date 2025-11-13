@@ -22,9 +22,14 @@ import typer
 
 import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils import parse_kwargs
 from nemo_skills.pipeline.utils.server import get_free_port
 from nemo_skills.pipeline.verl import verl_app
-from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
+from nemo_skills.utils import (
+    get_logger_name,
+    setup_logging,
+    validate_wandb_project_name,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -220,7 +225,6 @@ def get_training_cmd(
 class SupportedServers(str, Enum):
     trtllm = "trtllm"
     vllm = "vllm"
-    nemo = "nemo"
     openai = "openai"
     sglang = "sglang"
 
@@ -240,8 +244,8 @@ def ppo_verl(
     prompt_data: str = typer.Option(None, help="Path to the prompt data"),
     eval_data: str = typer.Option(None, help="Path to the eval data"),
     num_nodes: int = typer.Option(1, help="Number of nodes"),
-    num_gpus: int = typer.Option(..., help="Number of GPUs"),
-    num_training_jobs: int = typer.Option(1, help="Number of training jobs"),
+    num_gpus: int = typer.Option(..., help="Number of GPUs per node"),
+    dependent_jobs: int = typer.Option(0, help="Number of dependent jobs"),
     server_model: str = typer.Option(None, help="Path to the model or model name in API"),
     server_address: str = typer.Option(
         None, help="Use ip:port for self-hosted models or the API url if using model providers"
@@ -306,6 +310,10 @@ def ppo_verl(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -329,9 +337,9 @@ def ppo_verl(
         final_ckpt_path = f"{output_dir}/final_hf_checkpoint"
     pipeline_utils.check_if_mounted(cluster_config, final_ckpt_path)
 
-    if num_training_jobs > 0:
+    if dependent_jobs >= 0:
         if prompt_data is None:
-            raise ValueError("prompt_data is required when num_training_jobs > 0")
+            raise ValueError("prompt_data is required when ndependent_jobs > 0")
         if prompt_data.startswith("/"):  # could ask to download from HF
             pipeline_utils.check_if_mounted(cluster_config, prompt_data)
 
@@ -394,8 +402,8 @@ def ppo_verl(
 
     with pipeline_utils.get_exp(expname, cluster_config, _reuse_exp) as exp:
         prev_task = _task_dependencies
-        for job_id in range(num_training_jobs):
-            if job_id == num_training_jobs - 1 and convert_last_ckpt_to_hf:
+        for job_id in range(dependent_jobs + 1):
+            if job_id == dependent_jobs and convert_last_ckpt_to_hf:
                 ckpt_dir = f"{output_dir}/checkpoints"
                 actor_dir = f"{ckpt_dir}/global_step_$(<{ckpt_dir}/latest_checkpointed_iteration.txt)/actor"
                 convert_cmd = f"python3 -m verl.utils.checkpoint.convert_checkpoint --ckpt_path {actor_dir}"
@@ -415,13 +423,11 @@ def ppo_verl(
                 cluster_config=cluster_config,
                 server_config=server_config,
                 partition=partition,
-                qos=qos,
-                time_min=time_min,
                 run_after=run_after,
                 reuse_code=reuse_code,
                 reuse_code_exp=reuse_code_exp,
                 task_dependencies=[prev_task] if prev_task is not None else None,
-                slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                sbatch_kwargs=parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min),
                 heterogeneous=True if server_config is not None else False,
                 with_sandbox=with_sandbox,
                 installation_command=installation_command,

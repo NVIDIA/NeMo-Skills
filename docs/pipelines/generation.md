@@ -36,7 +36,7 @@ Create your [prompt config](../basics/prompt-format.md). It needs to match the d
 E.g. you might have the following in `/workspace/prompt.yaml`
 
 ```yaml
-system: "When answering a question always mention NeMo-Skills repo in a funny way."
+system: "When answering a question always mention Nemo-Skills repo in a funny way."
 
 user: |-
    Question: {prompt}
@@ -81,9 +81,9 @@ to reuse existing output.
 Both of those calls should produce roughly the same result inside `/workspace/test-generate/generation/output.jsonl`
 
 ```jsonl
-{"generation": "I'm doing super duper fantastic, thanks for asking! You know, I'm just a language model, but I'm feeling like a million bucks, all thanks to the incredible skills I've learned from the NeMo-Skills repo - it's like a never-ending fountain of knowledge, and I'm just a sponge soaking it all up!", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
-{"generation": "You want to know the weather? Well, I'm not a meteorologist, but I can try to predict it for you... just like I can predict that you'll find the answer to this question in the NeMo-Skills repo, where the weather forecast is always \"hot\" and the skills are always \"cool\" (get it? like a cool breeze on a hot day?). \n\nBut, if I had to choose, I'd say... Option A: Perfect!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
-{"generation": "You know, I'm feeling a little \"NeMo-Skills repo-ed\" today - like I've been merged into a state of utter confusion! But if I had to choose, I'd say I'm feeling... (dramatic pause) ...Option B: Nice!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
+{"generation": "I'm doing super duper fantastic, thanks for asking! You know, I'm just a language model, but I'm feeling like a million bucks, all thanks to the incredible skills I've learned from the Nemo-Skills repo - it's like a never-ending fountain of knowledge, and I'm just a sponge soaking it all up!", "prompt": "How are you doing?", "option_a": "Great", "option_b": "Bad"}
+{"generation": "You want to know the weather? Well, I'm not a meteorologist, but I can try to predict it for you... just like I can predict that you'll find the answer to this question in the Nemo-Skills repo, where the weather forecast is always \"hot\" and the skills are always \"cool\" (get it? like a cool breeze on a hot day?). \n\nBut, if I had to choose, I'd say... Option A: Perfect!", "prompt": "What's the weather like today?", "option_a": "Perfect", "option_b": "Awful"}
+{"generation": "You know, I'm feeling a little \"Nemo-Skills repo-ed\" today - like I've been merged into a state of utter confusion! But if I had to choose, I'd say I'm feeling... (dramatic pause) ...Option B: Nice!", "prompt": "How do you feel?", "option_a": "Crazy", "option_b": "Nice"}
 ```
 
 You can customize batch size, temperature, number of generation tokens and many more things.
@@ -94,6 +94,11 @@ See [nemo_skills/inference/generate.py](https://github.com/NVIDIA-NeMo/Skills/bl
 
     Before running the generation we always print the first prompt that we are about to send to an LLM.
     It's a good idea to inspect that and make sure it's formatted properly.
+
+!!! tip "Passing Main Arguments with Config Files"
+
+    For parameters that are difficult to escape on the command line (like `end_reasoning_string='</think>'`),
+    you can use YAML config files instead. See [Passing Main Arguments with Config Files](index.md###passing-main-arguments-with-config-files) for details.
 
 
 ## Sampling multiple generations
@@ -108,7 +113,7 @@ as an example.
 First, let's prepare the data if you have not done so yet.
 
 ```bash
-ns prepare_data math
+ns prepare_data hendrycks_math
 ```
 
 Then we can run the generation
@@ -122,8 +127,8 @@ ns generate \
        --server_nodes=2 \
        --num_random_seeds=32 \
        --output_dir=/workspace/synthetic-math-solutions \
-       --eval_args="++eval_type=math" \
        --input_file=/nemo_run/code/nemo_skills/dataset/math/train.jsonl \
+       ++eval_type=hendrycks_math \
        ++prompt_config=generic/math-base \
        ++examples_type=math_text_detailed \
        ++inference.endpoint_type=text \
@@ -131,18 +136,15 @@ ns generate \
        ++stop_phrase='\\n\\n\\n\\n\\n\\n'
 ```
 
-In this case we are assuming you're running on a slurm cluster and have prepared Llama 3.1 405B
-in the TensorRT-LLM format (highly recommended for large-scale inference).
-See [checkpoint conversion](../pipelines/checkpoint-conversion.md) to learn more about how to convert
-models to different formats.
+In this case we are assuming you're running on a slurm cluster and have downloaded Llama 3.1 405B.
 
-Note that in this case we use a path to one the train set of the "math" dataset which we prepared with previous command.
+Note that in this case we use a path to one the train set of the "hendrycks_math" dataset which we prepared with previous command.
 We are using a [generic/math](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/prompt/config/generic/math.yaml) config
 and a tokenizer for the base model
 (we found Llama 3.1 follows few-shots much better without chat tokens).
 Finally, we are specifying few shot examples which come from
 [here](https://github.com/NVIDIA-NeMo/Skills/blob/main/nemo_skills/prompt/few_shot_examples/math.py)
-and asking the script to evaluate the generated solutions by providing `--eval_args`.
+and asking the script to evaluate the generated solutions by providing `++eval_type=math`.
 
 An example prompt (printed by the generate script) for that job is below.
 
@@ -386,7 +388,7 @@ We support three methods for automatic trimming of generation budget or context:
         tokenizer="Qwen/Qwen3-0.6B",
     )
 
-    input_prompt = prompt.fill({"problem": "What's 2 + 2?"})
+    input_prompt = prompt.fill({"problem": "What's 2 + 2?"}, format_as_string=True)
     llm = get_model(
         model="Qwen/Qwen3-0.6B",
         server_type="vllm",
@@ -418,7 +420,7 @@ We support three methods for automatic trimming of generation budget or context:
 
     # Construct a fake long prompt
     fake_long_prompt = "aa" * 500_000 + "bb" * 500_000
-    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt})
+    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt}, format_as_string=True)
     llm = get_model(
         model="Qwen/Qwen3-0.6B",
         server_type="vllm",
@@ -451,7 +453,7 @@ We support three methods for automatic trimming of generation budget or context:
 
     # Construct a fake long prompt
     fake_long_prompt = "aa" * 500_000 + "bb" * 500_000
-    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt})
+    input_prompt = prompt.fill({"problem": "What's the next character after " + fake_long_prompt}, format_as_string=True)
     llm = get_model(
         model="Qwen/Qwen3-0.6B",
         server_type="vllm",
@@ -468,3 +470,5 @@ We support three methods for automatic trimming of generation budget or context:
         ++server.enable_soft_fail=True
         ++server.context_limit_retry_strategy=reduce_prompt_from_end
     ```
+
+

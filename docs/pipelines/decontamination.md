@@ -19,7 +19,7 @@ Let's say you want to check for contamination of [MATH](https://github.com/hendr
 training set with MATH, AMC-23 and AIME-24 test sets. First, get the data
 
 ```bash
-ns prepare_data math amc23 aime24
+ns prepare_data hendrycks_math amc23 aime24
 ```
 
 Then we need to retrieve top-k similar questions from the training set. Assuming
@@ -30,12 +30,12 @@ you can do it in the following way
 from nemo_skills.pipeline.cli import wrap_arguments, run_cmd, generate
 
 
-test_sets = ['math', 'amc23', 'aime24']
+test_sets = ['hendrycks_math', 'amc23', 'aime24']
 compare_to = ",".join(f"/nemo_run/code/nemo_skills/dataset/{test_set}/test.jsonl" for test_set in test_sets)
 
 cmd = (
     f"python -m nemo_skills.inference.retrieve_similar "
-    f"    ++retrieve_from='/nemo_run/code/nemo_skills/dataset/math/train.jsonl' "
+    f"    ++retrieve_from='/nemo_run/code/nemo_skills/dataset/hendrycks_math/train.jsonl' "
     f"    ++compare_to=\\\'{compare_to}\\\'"
     f"    ++output_file='/workspace/math-contamination-retrieved.jsonl' "
     f"    ++top_k=1 "
@@ -43,7 +43,7 @@ cmd = (
 
 run_cmd(
     cluster="local",
-    container="nemo",
+    container="nemo-rl",
     num_gpus=1,  # can increase this if you have more gpus
     ctx=wrap_arguments(cmd),
 )
@@ -78,6 +78,6 @@ since we now want to make a check for each training set example and find closest
 
 After you get `/workspace/math-contamination-results/output.jsonl`,
 you can pass it into [prepare_data command](training.md#preparing-the-data)
-with `++contamination_file=...` option.
+with `++filters.remove_contaminated=true ++contamination_file=...` option.
 
 See a more detailed example in [OpenMathInstruct-2 dataset construction pipeline](../releases/openmathinstruct2/dataset.md#decontamination).

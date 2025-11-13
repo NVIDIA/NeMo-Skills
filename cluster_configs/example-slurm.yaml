@@ -15,19 +15,10 @@
 executor: slurm
 
 containers:
-  trtllm: nvcr.io/nvidia/tensorrt-llm/release:1.0.0
-  vllm: vllm/vllm-openai:v0.10.1.1
-  sglang: lmsysorg/sglang:v0.5.3rc1-cu126
-  nemo: igitman/nemo-skills-nemo:0.7.0
-  megatron: igitman/nemo-skills-megatron:0.7.0
-  sandbox: igitman/nemo-skills-sandbox:0.7.1
-  nemo-skills: igitman/nemo-skills:0.7.1
-  verl: igitman/nemo-skills-verl:0.7.0
-  nemo-rl: igitman/nemo-skills-nemo-rl:0.7.1
+  # follow steps in https://nvidia-nemo.github.io/Skills/basics/#slurm-inference
+  # to complete this section
 
 job_name_prefix: "nemo_skills:"
-
-
 # define this for ssh access
 # ssh_tunnel:
 #   host: <slurm host>
@@ -35,16 +26,13 @@ job_name_prefix: "nemo_skills:"
 #   job_dir: <some location on slurm cluster to keep job metadata, uploaded code and generated sbatch files>
 #   identity: <can specify ssh key to avoid entering password>
 
-
 # if you're running directly from cluster, you only need to define job_dir and shouldn't use ssh_tunnel
 # job_dir: <some location on slurm cluster to keep job metadata, uploaded code and generated sbatch files>
-
 
 # define your account/partition here
 # account: <slurm account>
 # partition: <slurm partition>
 # cpu_partition: <if cluster has a dedicated cpu partition, you can define it here>
-
 
 # add required mounts for models/data here
 # the code is mounted automatically inside /nemo_run/code
@@ -57,7 +45,6 @@ job_name_prefix: "nemo_skills:"
 #   - <path on slurm>/data:/data
 #   you can also override container libraries by directly mounting over them. E.g. to override NeMo-Aligner do
 #   - <path on slurm>/NeMo-Aligner:/opt/NeMo-Aligner
-
 
 # can use this section to set timeouts for different partitions
 # this will be used as a slurm parameter + to signal SFT job to finish

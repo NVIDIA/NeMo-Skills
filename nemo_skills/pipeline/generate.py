@@ -22,8 +22,15 @@ import nemo_skills.pipeline.utils as pipeline_utils
 from nemo_skills.dataset.utils import import_from_path
 from nemo_skills.inference import GENERATION_MODULE_MAP, GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
+from nemo_skills.pipeline.utils.cluster import parse_kwargs
 from nemo_skills.pipeline.utils.commands import sandbox_command
-from nemo_skills.pipeline.utils.declarative import Command, CommandGroup, HardwareConfig, Pipeline
+from nemo_skills.pipeline.utils.declarative import (
+    Command,
+    CommandGroup,
+    HardwareConfig,
+    Pipeline,
+)
+from nemo_skills.pipeline.utils.server import get_free_port
 from nemo_skills.utils import (
     compute_chunk_ids,
     get_logger_name,
@@ -46,12 +53,10 @@ def _create_commandgroup_from_config(
     installation_command: Optional[str],
     get_server_command_fn: Callable,
     partition: Optional[str],
-    qos: Optional[str],
-    time_min: Optional[str],
-    exclusive: bool,
     keep_mounts_for_sandbox: bool,
     task_name: str,
     log_dir: str,
+    sbatch_kwargs: Optional[Dict] = None,
 ) -> CommandGroup:
     """Create a CommandGroup from server_config.
 
@@ -66,7 +71,11 @@ def _create_commandgroup_from_config(
     # 1. Add server if server_config is provided
     if server_config is not None and int(server_config["num_gpus"]) > 0:
         server_type = server_config["server_type"]
-        server_container = server_config.pop("container", cluster_config["containers"][server_type])
+        # Get container from server_config if provided, otherwise fall back to cluster config
+        if "container" in server_config:
+            server_container = server_config.pop("container")
+        else:
+            server_container = cluster_config["containers"][server_type]
 
         # Call server command builder directly with cluster_config
         cmd, num_tasks = get_server_command_fn(**server_config, cluster_config=cluster_config)
@@ -90,12 +99,20 @@ def _create_commandgroup_from_config(
         components.append(server_cmd)
 
     # 2. Add main generation command
+    # Note: General cluster config env vars are automatically added by get_env_variables() in get_executor()
+    client_env = {}
+    if with_sandbox and sandbox_port is not None:
+        client_env["NEMO_SKILLS_SANDBOX_PORT"] = str(sandbox_port)
+
     client_cmd = Command(
         command=generation_cmd,
         container=cluster_config["containers"]["nemo-skills"],
         name=task_name,
         installation_command=installation_command,
-        metadata={"log_prefix": "main"},
+        metadata={
+            "log_prefix": "main",
+            "environment": client_env,
+        },
     )
     components.append(client_cmd)
 
@@ -123,11 +140,9 @@ def _create_commandgroup_from_config(
         commands=components,
         hardware=HardwareConfig(
             partition=partition,
-            qos=qos,
-            time_min=time_min,
-            exclusive=exclusive,
             num_gpus=max_gpus,
             num_nodes=max_nodes,
+            sbatch_kwargs=sbatch_kwargs,
         ),
         name=task_name,
         log_dir=log_dir,
@@ -205,9 +220,6 @@ def generate(
     ),
     qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
-    eval_args: str = typer.Option(
-        None, help="Specify if need to run nemo_skills/evaluation/evaluate_results.py on the generation outputs"
-    ),
     run_after: List[str] = typer.Option(
         None, help="Can specify a list of expnames that need to be completed before this one starts"
     ),
@@ -225,7 +237,7 @@ def generate(
     ),
     config_dir: str = typer.Option(None, help="Can customize where we search for cluster configs"),
     log_dir: str = typer.Option(None, help="Can specify a custom location for slurm logs."),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
@@ -261,6 +273,10 @@ def generate(
         help="If True, skip checking that HF_HOME env var is defined in the cluster config.",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -332,8 +348,9 @@ def generate(
     if generation_module is None:
         generation_module = GENERATION_MODULE_MAP[generation_type or GenerationType.generate]
 
-    if os.sep in generation_module:
-        generation_task = import_from_path(generation_module)
+    if generation_module.endswith(".py") or os.sep in generation_module:
+        path_suffix = ".py" if not generation_module.endswith(".py") else ""
+        generation_task = import_from_path(generation_module + path_suffix)
     else:
         generation_task = importlib.import_module(generation_module)
     if not hasattr(generation_task, "GENERATION_TASK_CLASS"):
@@ -359,6 +376,9 @@ def generate(
 
     if _task_dependencies is None:
         _task_dependencies = []
+
+    # Parse sbatch kwargs
+    sbatch_kwargs = parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
 
     # Build jobs list using declarative interface
     jobs = []
@@ -394,13 +414,13 @@ def generate(
                 random_seed=seed,
                 output_dir=output_dir,
                 extra_arguments=extra_arguments,
-                eval_args=eval_args,
                 chunk_id=chunk_id,
                 num_chunks=num_chunks,
                 preprocess_cmd=preprocess_cmd,
                 postprocess_cmd=postprocess_cmd,
                 wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                 script=generation_module,
+                with_sandbox=with_sandbox,
             )
             cmd = pipeline_utils.wrap_python_path(cmd=cmd)
 
@@ -414,22 +434,27 @@ def generate(
             prev_job = None
 
             for dep_idx in range(dependent_jobs + 1):
+                # Allocate sandbox port if needed
+                # This must be done BEFORE creating CommandGroup so client knows the port
+                if with_sandbox:
+                    current_sandbox_port = get_free_port(strategy="random") if get_random_port else 6000
+                else:
+                    current_sandbox_port = None
+
                 # Create CommandGroup for this task
                 cmd_group = _create_commandgroup_from_config(
                     generation_cmd=cmd,
                     server_config=server_config.copy() if server_config else None,
                     with_sandbox=with_sandbox,
-                    sandbox_port=None if get_random_port else 6000,
+                    sandbox_port=current_sandbox_port,
                     cluster_config=cluster_config,
                     installation_command=installation_command,
                     get_server_command_fn=generation_task.get_server_command_fn(),
                     partition=partition,
-                    qos=qos,
-                    time_min=time_min,
-                    exclusive=exclusive,
                     keep_mounts_for_sandbox=keep_mounts_for_sandbox,
                     task_name=task_name,
                     log_dir=log_dir,
+                    sbatch_kwargs=sbatch_kwargs,
                 )
 
                 # Use unique internal job name for dependency tracking, but same task_name
@@ -471,8 +496,11 @@ def generate(
         skip_hf_home_check=skip_hf_home_check,
     )
 
+    # TODO: remove after https://github.com/NVIDIA-NeMo/Skills/issues/578 is resolved as default will be single job
+    sequential = True if cluster_config["executor"] in ["local", "none"] else False
+
     # Pass _reuse_exp to pipeline.run() to add jobs to existing experiment
-    result = pipeline.run(dry_run=dry_run, _reuse_exp=_reuse_exp)
+    result = pipeline.run(dry_run=dry_run, _reuse_exp=_reuse_exp, sequential=sequential)
     return result
 
 

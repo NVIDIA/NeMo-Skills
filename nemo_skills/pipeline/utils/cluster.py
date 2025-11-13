@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 import os
 import sys
@@ -105,6 +106,60 @@ def get_timeout_str(cluster_config, partition, with_save_delay: bool = True) -> 
     return timeout_str
 
 
+def kwargs_to_string(kwargs: str | dict) -> dict:
+    """
+    Convert kwargs to a string.
+    """
+    if isinstance(kwargs, dict):
+        return json.dumps(kwargs)
+    elif isinstance(kwargs, str):
+        return kwargs
+    else:
+        raise ValueError(f"kwargs must be a dict or a string, got {type(kwargs).__name__}")
+
+
+def parse_kwargs(kwargs: str | dict | None, **extra_kwargs) -> dict | None:
+    """
+    Parse  kwargs from either a JSON string or a dictionary.
+
+    This utility function handles  kwargs that can be provided in two ways:
+    1. As a JSON string (typically from CLI)
+    2. As a dictionary (when invoked from Python code)
+
+    Args:
+        kwargs: Either a JSON string or a dictionary containing  kwargs.
+                         Can also be None or empty string.
+        **kwargs: any additional keyword arguments to include in the resulting dictionary.
+            Any values of None will be ignored.
+
+    Returns:
+        A dictionary containing kwargs, or None if no arguments are provided.
+
+    Raises:
+        ValueError: If kwargs is a string but cannot be parsed as JSON.
+    """
+    full_kwargs = {key: value for key, value in extra_kwargs.items() if value is not None}
+
+    if kwargs:
+        if isinstance(kwargs, dict):
+            # Already a dictionary, just update
+            full_kwargs.update(kwargs)
+        elif isinstance(kwargs, str):
+            # Parse JSON string
+            try:
+                kwargs = json.loads(kwargs)
+                full_kwargs.update(kwargs)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Failed to parse kwargs with JSON: {e}")
+        else:
+            raise ValueError(f"kwargs must be a string or dict, got {type(kwargs).__name__}")
+
+    if not len(full_kwargs):
+        return None
+
+    return full_kwargs
+
+
 def get_env_variables(cluster_config):
     """
     Will get the environment variables from the cluster config and the user environment.
@@ -157,6 +212,7 @@ def get_env_variables(cluster_config):
         "AZURE_OPENAI_API_KEY",
         "OPENAI_API_KEY",
         "HF_TOKEN",
+        "NGC_API_KEY",
     }
     default_factories = {
         "HF_TOKEN": lambda: str(token) if (token := get_token()) else "",
@@ -210,6 +266,13 @@ def get_env_variables(cluster_config):
             else:
                 raise ValueError(f"Cannot resolve environment variable {key} inside the placeholder value: {value}")
 
+    # Unless NGC_API_KEY is explicitly set we will populate it to be equal to NVIDIA_API_KEY
+    if "NGC_API_KEY" not in env_vars:
+        if "NVIDIA_API_KEY" in env_vars:
+            env_vars["NGC_API_KEY"] = env_vars["NVIDIA_API_KEY"]
+            if "NGC_API_KEY" not in _logged_optional_env_vars:
+                LOG.info("Populating NGC_API_KEY to be equal to NVIDIA_API_KEY")
+                _logged_optional_env_vars.add("NGC_API_KEY")
     return env_vars
 
 
@@ -353,11 +416,12 @@ def _get_tunnel_cached(
     job_dir: str,
     host: str,
     user: str,
+    port: int | None = None,
     identity: str | None = None,
     shell: str | None = None,
     pre_command: str | None = None,
 ):
-    return run.SSHTunnel(
+    kwargs = dict(
         host=host,
         user=user,
         identity=identity,
@@ -365,6 +429,17 @@ def _get_tunnel_cached(
         pre_command=pre_command,
         job_dir=job_dir,
     )
+    if port is not None:
+        kwargs["port"] = port
+    try:
+        return run.SSHTunnel(**kwargs)
+    except TypeError as exc:
+        if port is not None and "port" in str(exc):
+            raise RuntimeError(
+                "The configured SSH tunnel requires the `port` parameter, but your nemo_run version "
+                "does not support it. Please upgrade nemo_run."
+            ) from exc
+        raise
 
 
 def tunnel_hash(tunnel):

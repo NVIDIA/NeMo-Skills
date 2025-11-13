@@ -50,7 +50,7 @@ def eval_reasoning_on(workspace, cluster, expname_prefix, wandb_project):
     base_model = f"{workspace}/Llama-3_3-Nemotron-Super-49B-v1_5"
 
     # Common settings for reasoning ON
-    common_params = "++inference.temperature=0.6 ++inference.top_p=0.95 "
+    common_params = "++inference.temperature=0.6 ++inference.top_p=0.95  ++parse_reasoning=True"
     tokens_to_generate = "++inference.tokens_to_generate=65536 "
     # Math / Code / Science (Reasoning ON)
     eval(
@@ -319,7 +319,9 @@ def main():
 
     args = parser.parse_args()
 
-    prepare_data(ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"))
+    prepare_data(
+        ctx=wrap_arguments("gpqa mmlu-pro hle livecodebench scicode bfcl_v3 math-500 aime24 aime25"),
+    )
 
     setup(workspace=args.workspace, cluster=args.cluster, expname_prefix=args.expname_prefix)
 

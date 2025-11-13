@@ -26,8 +26,13 @@ from nemo_skills.dataset.utils import ExtraDatasetType
 from nemo_skills.inference import GenerationType
 from nemo_skills.pipeline.app import app, typer_unpacker
 from nemo_skills.pipeline.generate import generate as _generate
+from nemo_skills.pipeline.utils import kwargs_to_string, parse_kwargs
 from nemo_skills.pipeline.utils.eval import combine_cmds, prepare_eval_commands
-from nemo_skills.utils import get_logger_name, setup_logging, validate_wandb_project_name
+from nemo_skills.utils import (
+    get_logger_name,
+    setup_logging,
+    validate_wandb_project_name,
+)
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
@@ -35,6 +40,164 @@ LOG = logging.getLogger(get_logger_name(__file__))
 class SingleNodeMode(str, enum.Enum):
     sequential = "sequential"
     parallel = "parallel"
+
+
+def _create_nvembed_judge_tasks(
+    exp,
+    expname,
+    benchmark,
+    judge_pipeline_args,
+    rerun_done,
+    log_dir,
+    server_parameters,
+    cluster_config,
+    judge_server_gpus,
+    judge_server_nodes,
+    partition,
+    run_after,
+    reuse_code_exp,
+    reuse_code,
+    dependent_tasks,
+    all_tasks,
+    _task_dependencies,
+    installation_command,
+    skip_hf_home_check,
+    sbatch_kwargs,
+):
+    """Create tasks for NVEmbed judge evaluation."""
+    from nemo_skills.pipeline.utils.generation import get_remaining_jobs
+
+    output_dir_path = judge_pipeline_args.get("output_dir")
+    input_file = judge_pipeline_args.get("input_file")
+
+    # Determine seeds to check
+    if input_file is None:
+        num_seeds = judge_pipeline_args.get("num_random_seeds", 1)
+        random_seeds = list(range(num_seeds))
+    else:
+        random_seeds = [None]
+
+    remaining_jobs = get_remaining_jobs(
+        cluster_config=cluster_config,
+        output_dir=output_dir_path,
+        random_seeds=random_seeds,
+        chunk_ids=[None],  # No chunking for judge task
+        rerun_done=rerun_done,
+    )
+
+    if not remaining_jobs or all(not chunks for chunks in remaining_jobs.values()):
+        LOG.info(f"Skipping NVEmbed judge for {benchmark} - all output files and .done markers exist")
+        return []
+
+    # Build command to run NVEmbed judge script
+    script_args = [f"--output-dir {output_dir_path}"]
+
+    if input_file is None:
+        input_dir = judge_pipeline_args.get("input_dir")
+        script_args.append(f"--input-dir {input_dir}")
+        script_args.append(f"--num-seeds {num_seeds}")
+    else:
+        script_args.append(f"--input-file {input_file}")
+
+    # Add skip-existing flag unless rerun_done is set
+    if not rerun_done:
+        script_args.append("--skip-existing")
+
+    run_cmd = f"python3 -I /nemo_run/code/nemo_skills/evaluation/evaluator/nvembed_judge.py {' '.join(script_args)}"
+
+    # Create task with GPU support for NVEmbed
+    judge_task = pipeline_utils.add_task(
+        exp,
+        cmd=run_cmd,
+        task_name=f"{expname}-{benchmark}-nvembed-judge",
+        log_dir=log_dir + "/judge",
+        container=cluster_config["containers"]["vllm"],
+        cluster_config=cluster_config,
+        num_gpus=judge_server_gpus or 1,
+        num_nodes=judge_server_nodes or 1,
+        partition=partition,
+        run_after=run_after,
+        reuse_code_exp=reuse_code_exp,
+        reuse_code=reuse_code,
+        task_dependencies=(
+            dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
+        ),
+        installation_command=installation_command,
+        skip_hf_home_check=skip_hf_home_check,
+        sbatch_kwargs=sbatch_kwargs,
+    )
+    return [judge_task]
+
+
+def _create_llm_judge_tasks(
+    ctx,
+    expname,
+    benchmark,
+    judge_wrap_args,
+    judge_pipeline_args,
+    extra_judge_args,
+    judge_server_gpus,
+    cli_judge_pipeline_args,
+    judge_pipeline_kwargs,
+    log_dir,
+    cluster,
+    config_dir,
+    partition,
+    with_sandbox,
+    keep_mounts_for_sandbox,
+    run_after,
+    reuse_code_exp,
+    reuse_code,
+    exclusive,
+    installation_command,
+    sbatch_kwargs,
+    exp,
+    cluster_config,
+    dependent_tasks,
+    all_tasks,
+    _task_dependencies,
+):
+    """Create tasks for LLM-based judge evaluation."""
+    judge_ctx = deepcopy(ctx)
+    # removing any extra arguments here as they are assumed to be for the main job
+    judge_ctx.args = []
+    if judge_wrap_args:
+        judge_ctx.args.extend(judge_wrap_args.split(" "))
+    if extra_judge_args:
+        judge_ctx.args.extend(extra_judge_args.split(" "))
+
+    # the default parameters always have server_address, but it needs to be removed if model is self-hosted
+    if judge_server_gpus is not None:
+        judge_pipeline_args["server_address"] = None
+
+    for judge_server_param, judge_server_value in cli_judge_pipeline_args.items():
+        if judge_server_value is not None:
+            judge_pipeline_args[judge_server_param] = judge_server_value
+    if judge_pipeline_kwargs:
+        judge_pipeline_args.update(parse_kwargs(judge_pipeline_kwargs))
+
+    judge_tasks = _generate(
+        ctx=judge_ctx,
+        expname=f"{expname}-{benchmark}-judge",
+        log_dir=log_dir + "/judge",
+        cluster=cluster,
+        config_dir=config_dir,
+        partition=partition,
+        with_sandbox=with_sandbox,
+        keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+        run_after=run_after,
+        reuse_code_exp=reuse_code_exp,
+        reuse_code=reuse_code,
+        exclusive=exclusive,
+        installation_command=installation_command,
+        sbatch_kwargs=sbatch_kwargs,
+        _reuse_exp=exp,
+        _task_dependencies=(
+            dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
+        ),
+        **judge_pipeline_args,
+    )
+    return judge_tasks
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -79,6 +242,7 @@ def eval(
         help="Path to the entrypoint of the server. "
         "If not specified, will use the default entrypoint for the server type.",
     ),
+    judge_type: str = typer.Option("llm", help="Type of judge to use: 'llm' (default) or 'nvembed'"),
     judge_model: str = typer.Option(None, help="Path to the model to be used as a judge (if applicable)"),
     judge_server_address: str = typer.Option(None, help="Address of the server hosting the judge model"),
     judge_server_type: pipeline_utils.SupportedServers = typer.Option(
@@ -107,8 +271,9 @@ def eval(
     extra_judge_args: str = typer.Option(
         "", help="Additional arguments for judge (passed to generate script, so should start with ++)"
     ),
-    extra_judge_pipeline_args: str = typer.Option(
-        None, help="Additional arguments for judge that configure the job. Should be a dictionary (used from Python)"
+    judge_pipeline_kwargs: str = typer.Option(
+        None,
+        help="Additional kwargs for judge that configure the job. Values should be provided as a JSON string or as a `dict` if invoking from code.",
     ),
     dependent_jobs: int = typer.Option(0, help="Specify this to launch that number of dependent jobs"),
     starting_seed: int = typer.Option(0, help="Starting seed for random sampling"),
@@ -132,7 +297,6 @@ def eval(
     qos: str = typer.Option(None, help="Specify Slurm QoS, e.g. to request interactive nodes"),
     time_min: str = typer.Option(None, help="If specified, will use as a time-min slurm parameter"),
     mount_paths: str = typer.Option(None, help="Comma separated list of paths to mount on the remote machine"),
-    extra_eval_args: str = typer.Option("", help="Additional arguments for evaluation"),
     auto_summarize_results: bool = typer.Option(
         True, help="If True, will automatically launch summarize results tasks"
     ),
@@ -170,7 +334,7 @@ def eval(
         help="If you have extra datasets locally, set to 'local', if on cluster, set to 'cluster'."
         "Can also specify through NEMO_SKILLS_EXTRA_DATASETS_TYPE environment variable.",
     ),
-    exclusive: bool = typer.Option(False, help="If set will add exclusive flag to the slurm job."),
+    exclusive: bool | None = typer.Option(None, help="If set will add exclusive flag to the slurm job."),
     rerun_done: bool = typer.Option(
         False, help="If True, will re-run jobs even if a corresponding '.done' file already exists"
     ),
@@ -206,6 +370,14 @@ def eval(
         "E.g. 'pip install my_package'",
     ),
     dry_run: bool = typer.Option(False, help="If True, will not run the job, but will validate all arguments."),
+    sbatch_kwargs: str = typer.Option(
+        "",
+        help="Additional sbatch kwargs to pass to the job scheduler. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
+    metrics_kwargs: str = typer.Option(
+        "",
+        help="Additional kwargs to pass to the metrics calculator. Values should be provided as a JSON string or as a `dict` if invoking from code.",
+    ),
     _reuse_exp: str = typer.Option(None, help="Internal option to reuse an experiment object.", hidden=True),
     _task_dependencies: List[str] = typer.Option(
         None, help="Internal option to specify task dependencies.", hidden=True
@@ -269,7 +441,7 @@ def eval(
         "generation_type": judge_generation_type,
         "generation_module": judge_generation_module,
     }
-    eval_requires_judge = any(param_value for param_value in cli_judge_pipeline_args.values())
+    eval_requires_judge = any(param_value for param_value in cli_judge_pipeline_args.values()) or judge_type != "llm"
 
     # Prepare cluster config and mount paths
     cluster_config = pipeline_utils.get_cluster_config(cluster, config_dir)
@@ -318,11 +490,13 @@ def eval(
         with_sandbox,
         keep_mounts_for_sandbox,
         wandb_parameters,
-        extra_eval_args,
         eval_requires_judge=eval_requires_judge,
         generation_type=generation_type,
         generation_module=generation_module,
     )
+
+    sbatch_kwargs = parse_kwargs(sbatch_kwargs, exclusive=exclusive, qos=qos, time_min=time_min)
+
     get_random_port = pipeline_utils.should_get_random_port(server_gpus, exclusive)
     should_package_extra_datasets = extra_datasets and extra_datasets_type == ExtraDatasetType.local
     has_tasks = False
@@ -356,8 +530,6 @@ def eval(
                     container=cluster_config["containers"]["nemo-skills"],
                     cluster_config=cluster_config,
                     partition=partition,
-                    qos=qos,
-                    time_min=time_min,
                     server_config=job_server_config,
                     with_sandbox=job_needs_sandbox or with_sandbox,
                     keep_mounts_for_sandbox=job_needs_sandbox_to_keep_mounts or keep_mounts_for_sandbox,
@@ -371,7 +543,7 @@ def eval(
                     ),
                     get_server_command=job_server_command,
                     extra_package_dirs=[extra_datasets] if should_package_extra_datasets else None,
-                    slurm_kwargs={"exclusive": exclusive} if exclusive else None,
+                    sbatch_kwargs=sbatch_kwargs,
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
                 )
@@ -401,46 +573,65 @@ def eval(
             assert benchmark_args.eval_subfolder.startswith("tmp-")
             benchmark_args.eval_subfolder = benchmark_args.eval_subfolder[4:]
             judge_pipeline_args["output_dir"] = str(Path(output_dir) / benchmark_args.eval_subfolder)
-            judge_ctx = deepcopy(ctx)
-            # removing any extra arguments here as they are assumed to be for the main job
-            judge_ctx.args = []
-            if judge_wrap_args:
-                judge_ctx.args.extend(judge_wrap_args.split(" "))
-            if extra_judge_args:
-                judge_ctx.args.extend(extra_judge_args.split(" "))
 
-            # the default parameters always have server_address, but it needs to be removed if model is self-hosted
-            if judge_server_gpus is not None:
-                judge_pipeline_args["server_address"] = None
+            # Check for per-benchmark judge_type, fall back to global judge_type
+            benchmark_judge_type = judge_pipeline_args.pop("judge_type", judge_type)
 
-            for judge_server_param, judge_server_value in cli_judge_pipeline_args.items():
-                if judge_server_value is not None:
-                    judge_pipeline_args[judge_server_param] = judge_server_value
-            # TODO: should we support parsing a string?
-            if extra_judge_pipeline_args is not None:
-                judge_pipeline_args.update(extra_judge_pipeline_args)
-            has_tasks = True
-            judge_tasks = _generate(
-                ctx=judge_ctx,
-                expname=f"{expname}-{benchmark}-judge",
-                log_dir=log_dir + "/judge",
-                cluster=cluster,
-                partition=partition,
-                qos=qos,
-                time_min=time_min,
-                with_sandbox=with_sandbox,
-                keep_mounts_for_sandbox=keep_mounts_for_sandbox,
-                run_after=run_after,
-                reuse_code_exp=reuse_code_exp,
-                reuse_code=reuse_code,
-                exclusive=exclusive,
-                installation_command=installation_command,
-                _reuse_exp=exp,
-                _task_dependencies=(
-                    dependent_tasks if cluster_config["executor"] == "slurm" else all_tasks + _task_dependencies
-                ),
-                **judge_pipeline_args,
-            )
+            # Create judge tasks based on judge type
+            if benchmark_judge_type == "nvembed":
+                judge_tasks = _create_nvembed_judge_tasks(
+                    exp=exp,
+                    expname=expname,
+                    benchmark=benchmark,
+                    judge_pipeline_args=judge_pipeline_args,
+                    rerun_done=rerun_done,
+                    log_dir=log_dir,
+                    server_parameters=server_parameters,
+                    cluster_config=cluster_config,
+                    judge_server_gpus=judge_server_gpus,
+                    judge_server_nodes=judge_server_nodes,
+                    partition=partition,
+                    run_after=run_after,
+                    reuse_code_exp=reuse_code_exp,
+                    reuse_code=reuse_code,
+                    dependent_tasks=dependent_tasks,
+                    all_tasks=all_tasks,
+                    _task_dependencies=_task_dependencies,
+                    installation_command=installation_command,
+                    skip_hf_home_check=skip_hf_home_check,
+                    sbatch_kwargs=sbatch_kwargs,
+                )
+            else:
+                # Use default LLM judge pipeline
+                has_tasks = True
+                judge_tasks = _create_llm_judge_tasks(
+                    ctx=ctx,
+                    expname=expname,
+                    benchmark=benchmark,
+                    judge_wrap_args=judge_wrap_args,
+                    judge_pipeline_args=judge_pipeline_args,
+                    extra_judge_args=extra_judge_args,
+                    judge_server_gpus=judge_server_gpus,
+                    cli_judge_pipeline_args=cli_judge_pipeline_args,
+                    judge_pipeline_kwargs=judge_pipeline_kwargs,
+                    log_dir=log_dir,
+                    cluster=cluster,
+                    config_dir=config_dir,
+                    partition=partition,
+                    with_sandbox=with_sandbox,
+                    keep_mounts_for_sandbox=keep_mounts_for_sandbox,
+                    run_after=run_after,
+                    reuse_code_exp=reuse_code_exp,
+                    reuse_code=reuse_code,
+                    exclusive=exclusive,
+                    installation_command=installation_command,
+                    sbatch_kwargs=sbatch_kwargs,
+                    exp=exp,
+                    cluster_config=cluster_config,
+                    dependent_tasks=dependent_tasks,
+                    all_tasks=all_tasks,
+                    _task_dependencies=_task_dependencies,
+                )
             # _generate can return None when there are no jobs to run (e.g., outputs already exist)
             # Only record and extend when tasks are present to avoid NoneType errors
             if judge_tasks:
@@ -474,6 +665,8 @@ def eval(
                     command += f" --wandb_project={wandb_project} "
                 if data_dir:
                     command += f" --data_dir={data_dir} "
+                if metrics_kwargs:
+                    command += f" --metrics_kwargs='{kwargs_to_string(metrics_kwargs)}' "
 
                 if benchmark in benchmark_to_judge_tasks:
                     dependent_tasks = benchmark_to_judge_tasks[benchmark]
@@ -498,6 +691,7 @@ def eval(
                     ),
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
+                    sbatch_kwargs=sbatch_kwargs,
                 )
                 all_tasks.append(summarize_task)
                 if benchmark_args.benchmark_group:
@@ -531,6 +725,7 @@ def eval(
                     ),
                     installation_command=installation_command,
                     skip_hf_home_check=skip_hf_home_check,
+                    sbatch_kwargs=sbatch_kwargs,
                 )
                 all_tasks.append(score_task)
 

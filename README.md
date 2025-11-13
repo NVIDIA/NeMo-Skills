@@ -1,6 +1,6 @@
-# NeMo Skills
+# Nemo Skills
 
-NeMo-Skills is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
+Nemo-Skills is a collection of pipelines to improve "skills" of large language models (LLMs). We support everything needed for LLM development, from synthetic data generation, to model training, to evaluation on a wide range of benchmarks. Start developing on a local workstation and move to a large-scale Slurm cluster with just a one-line change.
 
 Here are some of the features we support:
 
@@ -18,6 +18,7 @@ Here are some of the features we support:
     - [**Long-context**](https://nvidia-nemo.github.io/Skills/evaluation/long-context): e.g. [ruler](https://nvidia-nemo.github.io/Skills/evaluation/long-context/#ruler), [mrcr](https://nvidia-nemo.github.io/Skills/evaluation/long-context/#mrcr), [aalcr](https://nvidia-nemo.github.io/Skills/evaluation/long-context/#aalcr)
     - [**Tool-calling**](https://nvidia-nemo.github.io/Skills/evaluation/tool-calling): e.g. [bfcl_v3](https://nvidia-nemo.github.io/Skills/evaluation/tool-calling/#bfcl_v3)
     - [**Multilingual**](https://nvidia-nemo.github.io/Skills/evaluation/multilingual): e.g. [mmlu-prox](https://nvidia-nemo.github.io/Skills/evaluation/multilingual/#mmlu-prox), [FLORES-200](https://nvidia-nemo.github.io/Skills/evaluation/multilingual/#FLORES-200), [wmt24pp](https://nvidia-nemo.github.io/Skills/evaluation/multilingual/#wmt24pp)
+    - [**Speech & Audio**](https://nvidia-nemo.github.io/Skills/evaluation/speech-audio): e.g. [mmau-pro](https://nvidia-nemo.github.io/Skills/evaluation/speech-audio/#mmau-pro)
   - Easily parallelize each evaluation across many slurm jobs, self-host LLM judges, bring your own prompts or change benchmark configuration in any other way.
 - [Model training](https://nvidia-nemo.github.io/Skills/pipelines/training): Train models using [NeMo-RL](https://github.com/NVIDIA-NeMo/RL/) or [verl](https://github.com/volcengine/verl).
 
@@ -54,16 +55,16 @@ To get started, follow these [steps](https://nvidia-nemo.github.io/Skills/basics
 browse available [pipelines](https://nvidia-nemo.github.io/Skills/pipelines) or run `ns --help` to see all available
 commands and their options.
 
-You can find more examples of how to use NeMo-Skills in the [tutorials](https://nvidia-nemo.github.io/Skills/tutorials) page.
+You can find more examples of how to use Nemo-Skills in the [tutorials](https://nvidia-nemo.github.io/Skills/tutorials) page.
 
-We've built and released many popular models and datasets using NeMo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
+We've built and released many popular models and datasets using Nemo-Skills. See all of them in the [Papers & Releases](./releases/index.md) documentation.
 
 You can find the full documentation [here](https://nvidia-nemo.github.io/Skills/).
 
 
 ## Contributing
 
-We welcome contributions to NeMo-Skills! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for more information on how to get involved.
+We welcome contributions to Nemo-Skills! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for more information on how to get involved.
 
 
 Disclaimer: This project is strictly for research purposes, and not an official product from NVIDIA.
