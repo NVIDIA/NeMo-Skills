@@ -150,7 +150,6 @@ class VLLMModel(BaseModel):
         extra_body: dict = None,
     ) -> dict:
         messages = [content_text_to_list(message) for message in messages]
-        print("messages", messages)
         request = {
             "messages": messages,
             "max_tokens": tokens_to_generate,
