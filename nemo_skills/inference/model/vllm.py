@@ -117,6 +117,7 @@ class VLLMModel(BaseModel):
         tools: list[dict] | None = None,
         extra_body: dict = None,
     ) -> dict:
+        print("messages", messages)
         request = {
             "messages": messages,
             "max_tokens": tokens_to_generate,
