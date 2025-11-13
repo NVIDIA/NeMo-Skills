@@ -25,9 +25,9 @@ from pathlib import Path
 DEFAULT_SETTINGS = """
 DATASET_GROUP = "long-context"
 METRICS_TYPE = "ruler"
-EVAL_ARGS = "++eval_type=ruler ++eval_config.match_type={match_type}"
 GENERATION_ARGS = (
     "++prompt_config=generic/default "
+    "++eval_type=ruler ++eval_config.match_type={match_type} "
 )
 """
 MATCH_TYPE = {"niah": "all", "vt": "all", "cwe": "all", "fwe": "all", "qa": "part"}
