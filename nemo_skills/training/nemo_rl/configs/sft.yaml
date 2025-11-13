@@ -138,7 +138,7 @@ policy:
     logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
   #If this value is set to null, it will be automatically assigned in the code.
   make_sequence_length_divisible_by: null
-  max_grad_norm: null
+  max_grad_norm: 1.0
 
   optimizer:
     name: "torch.optim.AdamW"
