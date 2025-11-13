@@ -523,6 +523,7 @@ class GenerationTask:
 
     def discard_binary_types(self, output):
         binary_types = {"audio_url"}
+        print("output", output)
         if isinstance(output["content"], list):
             for message in output["content"]:
                 if "type" in message and message["type"] in binary_types:
