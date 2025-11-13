@@ -107,7 +107,7 @@ def get_ruler_data(tasks, setup, template_tokens, max_seq_length, ruler_prepare_
         def prepare_task(task):
             subprocess.run(
                 f"python prepare.py --save_dir {tmpdirname}/ruler_data --benchmark synthetic "
-                f"    --subset test --task {task} --tokenizer_type hf --model_template_type base --prepare_for_ns "
+                f"    --subset test --task {task} --model_template_type base --prepare_for_ns "
                 f"    --num_samples 100 --max_seq_length {max_seq_length} {ruler_prepare_args}",
                 shell=True,
                 check=True,
@@ -174,6 +174,12 @@ if __name__ == "__main__":
         type=int,
         default=50,
         help="Number of tokens in chat template (will be subtracted from max_seq_length to not exceed max context)",
+    )
+    parser.add_argument(
+        "--tokenizer_type",
+        type=str,
+        default="hf",
+        help="Type of the tokenizer to use for RULER dataset. Options: hf, openai, gemini.",
     )
     parser.add_argument(
         "--tmp_data_dir",
