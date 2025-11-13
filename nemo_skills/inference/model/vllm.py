@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-
+import base64
 import requests
 
 from nemo_skills.utils import get_logger_name
@@ -23,6 +23,38 @@ from .utils import ServerTokenizer
 
 LOG = logging.getLogger(get_logger_name(__file__))
 
+def audio_file_to_base64(audio_file_path: str):
+    """Encodes an audio file into a base64 string."""
+    with open(audio_file_path, "rb") as audio_file:
+        audio_content = audio_file.read()
+        return base64.b64encode(audio_content).decode("utf-8")
+
+def content_text_to_list(message):
+    content = message["content"]
+    if isinstance(content, str):
+        message["content"] = [{"type": "text", "text": content}]
+    elif isinstance(content, list):
+        message["content"] = content
+    else:
+        raise TypeError(str(content))
+
+    if "audios" in message:
+        for audio in message["audios"]:
+            base64_audio = audio_file_to_base64(audio["path"])
+            audio_message = {
+                "type": "audio_url",
+                "audio_url": {"url": f"data:audio/wav;base64,{base64_audio}"}
+            }
+            message["content"].append(audio_message)
+    if "audio" in message:
+        audio = message["audio"]
+        base64_audio = audio_file_to_base64(audio["path"])
+        audio_message = {
+            "type": "audio_url",
+            "audio_url": {"url": f"data:audio/wav;base64,{base64_audio}"}
+        }
+        message["content"].append(audio_message)
+    return message
 
 class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
@@ -117,6 +149,7 @@ class VLLMModel(BaseModel):
         tools: list[dict] | None = None,
         extra_body: dict = None,
     ) -> dict:
+        messages = [content_text_to_list(message) for message in messages]
         print("messages", messages)
         request = {
             "messages": messages,
