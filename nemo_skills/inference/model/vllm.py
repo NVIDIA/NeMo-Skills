@@ -30,23 +30,15 @@ def audio_file_to_base64(audio_file_path: str):
         return base64.b64encode(audio_content).decode("utf-8")
 
 def content_text_to_list(message):
-    content = message["content"]
-    if isinstance(content, str):
-        message["content"] = [{"type": "text", "text": content}]
-    elif isinstance(content, list):
-        message["content"] = content
-    else:
-        raise TypeError(str(content))
-
-    if "audios" in message:
-        for audio in message["audios"]:
-            base64_audio = audio_file_to_base64(audio["path"])
-            audio_message = {
-                "type": "audio_url",
-                "audio_url": {"url": f"data:audio/wav;base64,{base64_audio}"}
-            }
-            message["content"].append(audio_message)
     if "audio" in message:
+        content = message["content"]
+        if isinstance(content, str):
+            message["content"] = [{"type": "text", "text": content}]
+        elif isinstance(content, list):
+            message["content"] = content
+        else:
+            raise TypeError(str(content))
+
         audio = message["audio"]
         base64_audio = audio_file_to_base64(audio["path"])
         audio_message = {
@@ -54,6 +46,23 @@ def content_text_to_list(message):
             "audio_url": {"url": f"data:audio/wav;base64,{base64_audio}"}
         }
         message["content"].append(audio_message)
+
+    if "audios" in message:
+        content = message["content"]
+        if isinstance(content, str):
+            message["content"] = [{"type": "text", "text": content}]
+        elif isinstance(content, list):
+            message["content"] = content
+        else:
+            raise TypeError(str(content))
+        
+        for audio in message["audios"]:
+            base64_audio = audio_file_to_base64(audio["path"])
+            audio_message = {
+                "type": "audio_url",
+                "audio_url": {"url": f"data:audio/wav;base64,{base64_audio}"}
+            }
+            message["content"].append(audio_message)
     return message
 
 class VLLMModel(BaseModel):
