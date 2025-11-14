@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import os
 import json
 import logging
 import random
@@ -387,9 +388,7 @@ class GenerationTask:
                 additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
-            print("self.cfgself.cfg", str(self.cfg))
-            print("self.cfg.eval_config[]", self.cfg.eval_config["data_dir"])
-            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer, data_dir=self.cfg.eval_config["data_dir"])
+            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer, data_dir=os.path.join(self.cfg.eval_config["data_dir"], self.cfg.eval_type))
 
         if self.cfg.parallel_thinking.mode is not None:
             # We don't want to override these key variables which overlap with self.cfg
