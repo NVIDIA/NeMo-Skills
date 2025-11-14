@@ -593,6 +593,7 @@ class GenerationTask:
         as long as those requests also use this function.
         """
         async with self.semaphore:
+            print("generation_paramsgeneration_params", str(generation_params))
             return await self.llm.generate_async(**generation_params)
 
     async def evaluate_single_datapoint(self, data_point):

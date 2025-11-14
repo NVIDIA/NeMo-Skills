@@ -50,7 +50,6 @@ def content_text_to_list(message):
 
 class VLLMModel(BaseModel):
     def __init__(self, **kwargs):
-        print("kwargskwargs", str(kwargs))
         super().__init__(**kwargs)
 
     def _get_tokenizer_endpoint(self):
