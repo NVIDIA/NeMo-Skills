@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import os
 import base64
 import requests
 
@@ -29,27 +30,10 @@ def audio_file_to_base64(audio_file_path: str):
         audio_content = audio_file.read()
         return base64.b64encode(audio_content).decode("utf-8")
 
-def content_text_to_list(message):
-    if "audios" in message:
-        content = message["content"]
-        if isinstance(content, str):
-            message["content"] = [{"type": "text", "text": content}]
-        elif isinstance(content, list):
-            message["content"] = content
-        else:
-            raise TypeError(str(content))
-        
-        for audio in message["audios"]:
-            base64_audio = audio_file_to_base64(audio["path"])
-            audio_message = {
-                "type": "audio_url",
-                "audio_url": {"url": f"data:audio/wav;base64,{base64_audio}"}
-            }
-            message["content"].append(audio_message)
-    return message
 
 class VLLMModel(BaseModel):
-    def __init__(self, **kwargs):
+    def __init__(self, data_dir, **kwargs):
+        self.data_dir = data_dir
         super().__init__(**kwargs)
 
     def _get_tokenizer_endpoint(self):
@@ -123,6 +107,25 @@ class VLLMModel(BaseModel):
             "extra_body": self._build_request_body(top_k, min_p, repetition_penalty, extra_body=extra_body),
         }
 
+    def content_text_to_list(self, message):
+        if "audios" in message:
+            content = message["content"]
+            if isinstance(content, str):
+                message["content"] = [{"type": "text", "text": content}]
+            elif isinstance(content, list):
+                message["content"] = content
+            else:
+                raise TypeError(str(content))
+            
+            for audio in message["audios"]:
+                base64_audio = audio_file_to_base64(os.path.join(self.data_dir, audio["path"]))
+                audio_message = {
+                    "type": "audio_url",
+                    "audio_url": {"url": f"data:audio/wav;base64,{base64_audio}"}
+                }
+                message["content"].append(audio_message)
+        return message
+
     def _build_chat_request_params(
         self,
         messages: list[dict],
@@ -141,7 +144,7 @@ class VLLMModel(BaseModel):
         tools: list[dict] | None = None,
         extra_body: dict = None,
     ) -> dict:
-        messages = [content_text_to_list(message) for message in messages]
+        messages = [self.content_text_to_list(message) for message in messages]
         request = {
             "messages": messages,
             "max_tokens": tokens_to_generate,
