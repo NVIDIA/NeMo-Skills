@@ -521,14 +521,12 @@ class GenerationTask:
         for output in outputs:
             fout.write(json.dumps(output) + "\n")
 
-    def discard_binary_types(self, output):
+    def drop_binary_data(self, output):
         binary_types = {"audio_url"}
-        print("output", output)
-        if isinstance(output["content"], list):
-            for message in output["content"]:
-                if "type" in message and message["type"] in binary_types:
-                    message[message["type"]]["url"] = ""
-        return output
+        if isinstance(output["messages"][0]["content"], list):
+            for content in output["messages"][0]["content"]:
+                if "type" in content and content["type"] in binary_types:
+                    content[content["type"]]["url"] = ""
         
     async def postprocess_single_output(self, output, original_data_point):
         # to make it easier to follow up with other generations and limit accidental errors, we are adding
@@ -546,7 +544,7 @@ class GenerationTask:
             original_data_point.pop(key, None)
         output.update(original_data_point)
         
-        output = self.discard_binary_types(output)
+        self.drop_binary_data(output)
 
         if self.cfg.parse_reasoning:
             parse_reasoning(
