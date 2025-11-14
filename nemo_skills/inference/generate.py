@@ -522,10 +522,10 @@ class GenerationTask:
             fout.write(json.dumps(output) + "\n")
 
     def drop_binary_data(self, output):
-        binary_types = {"audio_url"}
+        binary_data_to_drop_from_output = {"audio_url"}
         if isinstance(output["messages"][0]["content"], list):
             for content in output["messages"][0]["content"]:
-                if "type" in content and content["type"] in binary_types:
+                if "type" in content and content["type"] in binary_data_to_drop_from_output:
                     content[content["type"]]["url"] = ""
         
     async def postprocess_single_output(self, output, original_data_point):
