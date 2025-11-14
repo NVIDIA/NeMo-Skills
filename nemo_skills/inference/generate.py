@@ -387,7 +387,8 @@ class GenerationTask:
                 additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
-            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
+            print("self.cfgself.cfg", str(self.cfg))
+            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer, data_dir=data_dir)
 
         if self.cfg.parallel_thinking.mode is not None:
             # We don't want to override these key variables which overlap with self.cfg

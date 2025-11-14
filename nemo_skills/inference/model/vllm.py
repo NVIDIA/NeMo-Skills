@@ -32,7 +32,7 @@ def audio_file_to_base64(audio_file_path: str):
 
 
 class VLLMModel(BaseModel):
-    def __init__(self, data_dir, **kwargs):
+    def __init__(self, data_dir: str = "", **kwargs):
         self.data_dir = data_dir
         super().__init__(**kwargs)
 
