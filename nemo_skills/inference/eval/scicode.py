@@ -55,6 +55,8 @@ class SciCodeGenerationConfig(GenerateSolutionsConfig):
     prompt_config: str = "eval/scicode/background"
     with_background: bool = True
 
+    parse_reasoning: bool = True  # override default to True for SciCode
+
 
 cs = hydra.core.config_store.ConfigStore.instance()
 cs.store(name="base_scicode_generation_config", node=SciCodeGenerationConfig)
