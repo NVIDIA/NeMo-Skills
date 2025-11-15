@@ -441,6 +441,7 @@ def prepare_eval_commands(
                     # only logging for the first seed
                     wandb_parameters=wandb_parameters if seed_idx == 0 else None,
                     with_sandbox=benchmark_args.requires_sandbox,
+                    skip_default_inference_params=True,  # Let eval scripts fully control inference params
                 )
                 job_cmds.append(cmd)
 

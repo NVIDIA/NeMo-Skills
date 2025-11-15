@@ -419,6 +419,7 @@ def generate(
                 preprocess_cmd=preprocess_cmd,
                 postprocess_cmd=postprocess_cmd,
                 wandb_parameters=wandb_parameters if seed_idx == 0 else None,
+                skip_default_inference_params=True,  # Let user-provided extra_arguments fully control inference params
                 script=generation_module,
                 with_sandbox=with_sandbox,
             )

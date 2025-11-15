@@ -294,6 +294,7 @@ def get_generation_cmd(
     wandb_parameters=None,
     with_sandbox: bool = False,
     script: str = "nemo_skills.inference.generate",
+    skip_default_inference_params=False,
 ):
     """Construct the generation command for language model inference."""
     if input_file is None and input_dir is None:
@@ -329,7 +330,7 @@ def get_generation_cmd(
         cmd += f"python -m {script} {hydra_config_args} {common_args} "
     job_end_cmd = ""
 
-    if random_seed is not None and input_dir is None:  # if input_dir is not None, we default to greedy generations
+    if random_seed is not None and input_dir is None and not skip_default_inference_params:  # if input_dir is not None, we default to greedy generations
         cmd += (
             f"    ++inference.random_seed={random_seed} "
             f"    ++inference.temperature=0.7 "
