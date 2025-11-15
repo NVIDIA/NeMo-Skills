@@ -111,6 +111,19 @@ class NemoRLTask:
             )
         return cmd
 
+    # def get_cmd(self):
+    #     self.logging_params = self.format_wandb_args()
+
+    #     nsight_cmd = get_nsight_cmd(self.profile_step_range)
+    #     cmd = (
+    #         "export PYTHONPATH=$PYTHONPATH:/nemo_run/code:/opt/NeMo-RL && "
+    #         "export UV_PROJECT=/opt/NeMo-RL && "
+    #         f"{nsight_cmd}"
+    #         "echo 'Starting training' && "
+    #         "VLLM_COMMIT=7fff9a83945e9f184d5f1ce085d3101620381af2 VLLM_PRECOMPILED_WHEEL_LOCATION=https://github.com/vllm-project/vllm/releases/download/v0.11.0/vllm-0.11.0-cp38-abi3-manylinux1_x86_64.whl RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 NRL_FORCE_REBUILD_VENVS=false uv run python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
+    #         f"{self.format_train_args()} {self.format_data_args()} "
+    #         f"{self.logging_params} {self.extra_arguments}"
+    #     )
     def get_cmd(self):
         self.logging_params = self.format_wandb_args()
 
@@ -120,7 +133,7 @@ class NemoRLTask:
             "export UV_PROJECT=/opt/NeMo-RL && "
             f"{nsight_cmd}"
             "echo 'Starting training' && "
-            "VLLM_COMMIT=7fff9a83945e9f184d5f1ce085d3101620381af2 VLLM_PRECOMPILED_WHEEL_LOCATION=https://github.com/vllm-project/vllm/releases/download/v0.11.0/vllm-0.11.0-cp38-abi3-manylinux1_x86_64.whl RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 NRL_FORCE_REBUILD_VENVS=false uv run python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
+            "NRL_VLLM_USE_V1=1 NRL_FORCE_REBUILD_VENVS=False RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 UV_HTTP_TIMEOUT=10 VLLM_USE_PRECOMPILED=1 VLLM_COMMIT=b8b302cde434df8c9289a2b465406b47ebab1c2d VLLM_PRECOMPILED_WHEEL_LOCATION=https://github.com/vllm-project/vllm/releases/download/v0.11.0/vllm-0.11.0-cp38-abi3-manylinux1_x86_64.whl uv run python /nemo_run/code/nemo_skills/training/nemo_rl/start_sft.py "
             f"{self.format_train_args()} {self.format_data_args()} "
             f"{self.logging_params} {self.extra_arguments}"
         )
