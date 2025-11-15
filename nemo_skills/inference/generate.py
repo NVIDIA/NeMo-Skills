@@ -389,7 +389,6 @@ class GenerationTask:
             )
         else:
             if isinstance(self.cfg.eval_config["data_dir"], type(None)) or isinstance(self.cfg.eval_type, type(None)):
-                print("self.cfg.eval_config", self.cfg)
                 data_dir = ""
             else:
                 data_dir =os.path.join(self.cfg.eval_config["data_dir"], self.cfg.eval_type)
