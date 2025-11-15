@@ -1,0 +1,10 @@
+# Overrides to enable python-tool-assisted generations across pipelines.
+
+stages:
+  filter_problems:
+    problem_field: null
+    problem_template: "{prompt}\n\n{problem}"
+    num_options_field: num_options
+  generate_solutions:
+    prompt_config: ++prompt_config=/nemo_run/code/recipes/opensciencereasoning/sdg_pipeline/prompts/default_problem.yaml
+    predicted_answer_regex_field: answer_regex
