@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import os
 import json
 import logging
 import random
@@ -387,7 +388,11 @@ class GenerationTask:
                 additional_config={"sandbox": self.cfg.sandbox},
             )
         else:
-            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer)
+            if isinstance(self.cfg.eval_config["data_dir"], type(None)) or isinstance(self.cfg.eval_type, type(None)):
+                data_dir = ""
+            else:
+                data_dir =os.path.join(self.cfg.eval_config["data_dir"], self.cfg.eval_type)
+            llm = get_model(**self.cfg.server, tokenizer=self.tokenizer, data_dir = data_dir)
 
         if self.cfg.parallel_thinking.mode is not None:
             # We don't want to override these key variables which overlap with self.cfg
@@ -521,6 +526,13 @@ class GenerationTask:
         for output in outputs:
             fout.write(json.dumps(output) + "\n")
 
+    def drop_binary_data(self, output):
+        binary_data_to_drop_from_output = {"audio_url"}
+        if isinstance(output["messages"][0]["content"], list):
+            for content in output["messages"][0]["content"]:
+                if "type" in content and content["type"] in binary_data_to_drop_from_output:
+                    content[content["type"]]["url"] = ""
+        
     async def postprocess_single_output(self, output, original_data_point):
         # to make it easier to follow up with other generations and limit accidental errors, we are adding
         # all of the original data to the output file alongside the new generations
@@ -536,6 +548,9 @@ class GenerationTask:
         for key in output:
             original_data_point.pop(key, None)
         output.update(original_data_point)
+        
+        self.drop_binary_data(output)
+
         if self.cfg.parse_reasoning:
             parse_reasoning(
                 output,

@@ -16,6 +16,7 @@
 METRICS_TYPE = "mmau_pro_open_ended"
 SCORE_MODULE = "nemo_skills.evaluation.metrics.mmau_pro_metrics"
 GENERATION_ARGS = "++prompt_format=openai"
+EVAL_ARGS = "++eval_type=mmau-pro"
 
 # Judge configuration for open-ended evaluation using NVIDIA API
 JUDGE_PIPELINE_ARGS = {
